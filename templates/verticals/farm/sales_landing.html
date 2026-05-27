@@ -1,0 +1,189 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Sales - {{ business.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+/* ===== Premium Farm Sales Landing ===== */
+.farm-sales-landing {
+    --farm-green: #16a34a;
+    --farm-green-light: #dcfce7;
+    --farm-green-rgb: 22, 163, 74;
+    --farm-blue: #2563eb;
+    --farm-blue-light: #dbeafe;
+    --farm-amber: #d97706;
+    --farm-amber-light: #fef3c7;
+}
+
+.sale-type-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    padding: 1.75rem 1.25rem;
+    background: var(--surface, #fff);
+    border: 2px solid var(--border, #e2e8f0);
+    border-radius: 16px;
+    text-decoration: none;
+    color: var(--ink, #0f172a);
+    font-weight: 600;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    cursor: pointer;
+    text-align: center;
+    height: 100%;
+    position: relative;
+    overflow: hidden;
+}
+
+.sale-type-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.sale-type-card.card-crops::before {
+    background: linear-gradient(135deg, var(--farm-green-light), #f0fdf4);
+}
+
+.sale-type-card.card-livestock::before {
+    background: linear-gradient(135deg, var(--farm-blue-light), #eff6ff);
+}
+
+.sale-type-card.card-quick::before {
+    background: linear-gradient(135deg, var(--farm-amber-light), #fffbeb);
+}
+
+.sale-type-card:hover::before { opacity: 1; }
+
+.sale-type-card:hover {
+    transform: translateY(-4px);
+    text-decoration: none;
+    color: var(--ink, #0f172a);
+}
+
+.sale-type-card.card-crops:hover {
+    border-color: var(--farm-green);
+    box-shadow: 0 12px 32px rgba(var(--farm-green-rgb), 0.2);
+}
+
+.sale-type-card.card-livestock:hover {
+    border-color: var(--farm-blue);
+    box-shadow: 0 12px 32px rgba(37, 99, 235, 0.2);
+}
+
+.sale-type-card.card-quick:hover {
+    border-color: var(--farm-amber);
+    box-shadow: 0 12px 32px rgba(217, 119, 6, 0.2);
+}
+
+.sale-type-card:focus {
+    outline: 2px solid var(--farm-green);
+    outline-offset: 2px;
+}
+
+.sale-type-card .card-emoji {
+    font-size: 2.75rem;
+    line-height: 1;
+    position: relative;
+    z-index: 1;
+}
+
+.sale-type-card .card-label {
+    font-size: 1rem;
+    font-weight: 800;
+    position: relative;
+    z-index: 1;
+}
+
+.sale-type-card .card-sublabel {
+    font-size: 0.78rem;
+    font-weight: 400;
+    color: var(--muted, #64748b);
+    line-height: 1.4;
+    position: relative;
+    z-index: 1;
+}
+
+.sale-type-card .card-badge {
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 0.2rem 0.6rem;
+    border-radius: 999px;
+    position: relative;
+    z-index: 1;
+}
+
+.card-crops .card-badge {
+    background: var(--farm-green-light);
+    color: var(--farm-green);
+    border: 1px solid rgba(22, 163, 74, 0.3);
+}
+
+.card-livestock .card-badge {
+    background: var(--farm-blue-light);
+    color: var(--farm-blue);
+    border: 1px solid rgba(37, 99, 235, 0.3);
+}
+
+.card-quick .card-badge {
+    background: var(--farm-amber-light);
+    color: var(--farm-amber);
+    border: 1px solid rgba(217, 119, 6, 0.3);
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="farm-sales-landing container-fluid py-3" data-testid="farm-sales-landing">
+    <div class="d-flex justify-content-between align-items-start mb-4">
+        <div>
+            <h1 class="h3 mb-1"><span class="me-2">💰</span>{{ hero_title }}</h1>
+            <p class="text-muted mb-0">{{ hero_blurb }}</p>
+        </div>
+        {% if filter_state %}
+        {% include "partials/farm_filter_panel.html" with filter_state=filter_state filter_options=filter_options %}
+        {% endif %}
+    </div>
+
+    <!-- Premium Sale Type Cards -->
+    <div class="row g-3">
+        <div class="col-6 col-md-4">
+            <a href="{% url 'verticals:farm_sales_crops' %}"
+               class="sale-type-card card-crops"
+               data-testid="sale-card-crops">
+                <span class="card-emoji">🌽</span>
+                <span class="card-label">Crop Sales</span>
+                <span class="card-sublabel">Maize, beans, vegetables &amp; more</span>
+                <span class="card-badge">Record Sale</span>
+            </a>
+        </div>
+        <div class="col-6 col-md-4">
+            <a href="{% url 'verticals:farm_sales_livestock' %}"
+               class="sale-type-card card-livestock"
+               data-testid="sale-card-livestock">
+                <span class="card-emoji">🐄</span>
+                <span class="card-label">Livestock Sales</span>
+                <span class="card-sublabel">Cattle, pigs, chickens &amp; more</span>
+                <span class="card-badge">Record Sale</span>
+            </a>
+        </div>
+        <div class="col-6 col-md-4">
+            <a href="{% url 'verticals:farm_sales_record' %}"
+               class="sale-type-card card-quick"
+               data-testid="sale-card-quick">
+                <span class="card-emoji">⚡</span>
+                <span class="card-label">Quick Sale</span>
+                <span class="card-sublabel">Record any farm sale directly</span>
+                <span class="card-badge">Fast Entry</span>
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

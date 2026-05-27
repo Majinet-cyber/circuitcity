@@ -1,0 +1,36 @@
+<!-- Spirits Step 1: Quantity (Shot-based) -->
+<div class="step-header">
+  <div class="step-icon">🥃</div>
+  <div class="step-title">
+    <h2>Step 1: Quantity</h2>
+    <div class="step-subtitle">Enter shots and reserved barman shots</div>
+  </div>
+</div>
+
+<div id="error-message" class="error-message"></div>
+
+<div class="form-group">
+  <label class="form-label">
+    Total Shots Added <span class="required">*</span>
+  </label>
+  <input type="number" class="form-control form-control-lg" id="shots_added" name="shots_added" min="1" required>
+  <div class="form-hint">1 bottle = 30 shots</div>
+</div>
+
+<div class="form-group">
+  <label class="form-label">
+    Reserved Barman Shots
+  </label>
+  <input type="number" class="form-control" id="reserved_barman_shots" name="reserved_barman_shots" min="0" value="0">
+  <div class="form-hint">Shots reserved for barman (not for sale). Must be less than total shots.</div>
+</div>
+
+<div style="background: #fef3c7; border-left: 4px solid #f59e0b; padding: 1rem; border-radius: 4px; margin-top: 1.5rem;">
+  <p style="margin: 0; font-size: 0.95rem; color: #78350f;">
+    <strong>ℹ️ Note:</strong> Only sellable shots (total - reserved) will be added to inventory. Reserved shots are tracked separately.
+  </p>
+</div>
+
+
+
+

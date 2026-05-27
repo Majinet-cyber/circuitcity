@@ -100,5 +100,3 @@ class ActiveContextMiddleware(MiddlewareMixin):
         except Exception:
             # Fail silently so it doesn't crash unrelated requests
             pass
-
-

@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Business Command Center · {{ business.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+.os-wrapper{max-width:1400px;margin:0 auto;padding:16px}
+.os-header{background:linear-gradient(135deg,#1e293b 0%,#334155 50%,#475569 100%);padding:32px;border-radius:20px;color:#fff;margin-bottom:28px;position:relative;overflow:hidden}
+.os-header::after{content:"";position:absolute;top:-50%;right:-10%;width:300px;height:300px;background:rgba(255,255,255,.03);border-radius:50%}
+.os-header h1{font-size:1.6rem;font-weight:800;margin:0 0 4px}
+.os-header p{opacity:.75;margin:0;font-size:.95rem}
+.os-header .verticals{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+.os-header .v-tag{background:rgba(255,255,255,.12);padding:4px 12px;border-radius:16px;font-size:.8rem;font-weight:600}
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:28px}
+.kpi-card{background:#fff;border-radius:14px;padding:20px;text-align:center;box-shadow:0 2px 10px rgba(0,0,0,.05)}
+.kpi-card .num{font-size:1.8rem;font-weight:800;color:#1e293b}
+.kpi-card .lbl{color:#64748b;font-size:.8rem;text-transform:uppercase;letter-spacing:.5px;margin-top:4px}
+.kpi-card.highlight{background:linear-gradient(135deg,#2563eb,#3b82f6);color:#fff}
+.kpi-card.highlight .num,.kpi-card.highlight .lbl{color:#fff}
+.section{margin-bottom:28px}
+.section-title{font-size:1.15rem;font-weight:700;color:#1e293b;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.insights-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px}
+.insight-pill{display:flex;align-items:center;gap:12px;background:#fff;border-radius:12px;padding:16px;box-shadow:0 1px 6px rgba(0,0,0,.04)}
+.insight-pill i{font-size:1.3rem;flex-shrink:0}
+.insight-pill.success i{color:#10b981}
+.insight-pill.warning i{color:#f59e0b}
+.insight-pill.danger i{color:#ef4444}
+.insight-pill.info i{color:#2563eb}
+.insight-pill .text{font-size:.9rem;color:#475569;line-height:1.4}
+.vertical-section{background:#fff;border-radius:14px;padding:24px;box-shadow:0 2px 10px rgba(0,0,0,.05);margin-bottom:18px}
+.vertical-section h3{font-size:1.05rem;font-weight:700;margin:0 0 16px;color:#1e293b;display:flex;align-items:center;gap:8px}
+.v-metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.v-metric{text-align:center;padding:12px;background:#f8fafc;border-radius:10px}
+.v-metric .val{font-size:1.2rem;font-weight:700;color:#1e293b}
+.v-metric .lbl{font-size:.75rem;color:#64748b;text-transform:uppercase;margin-top:2px}
+.empty-state{text-align:center;padding:60px 20px;color:#94a3b8}
+.empty-state i{font-size:3rem;margin-bottom:12px;display:block}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="os-wrapper">
+  <div class="os-header">
+    <h1><i class="bi bi-grid-3x3-gap"></i> Business Command Center</h1>
+    <p>Unified intelligence across all your business operations</p>
+    {% if verticals_active %}
+    <div class="verticals">
+      {% for v in verticals_active %}<span class="v-tag">{{ v|title }}</span>{% endfor %}
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="kpi-grid">
+    <div class="kpi-card highlight">
+      <div class="num">MWK {{ total_revenue_30d|floatformat:0|intcomma }}</div>
+      <div class="lbl">Revenue / Savings (30d)</div>
+    </div>
+    <div class="kpi-card">
+      <div class="num">{{ total_orders_30d|intcomma }}</div>
+      <div class="lbl">Orders / Jobs (30d)</div>
+    </div>
+    <div class="kpi-card">
+      <div class="num">MWK {{ inventory_value|floatformat:0|intcomma }}</div>
+      <div class="lbl">Inventory Value</div>
+    </div>
+    <div class="kpi-card">
+      <div class="num">{{ low_stock_alerts }}</div>
+      <div class="lbl">Low Stock Alerts</div>
+    </div>
+    <div class="kpi-card">
+      <div class="num">{{ alerts_active }}</div>
+      <div class="lbl">Active Alerts</div>
+    </div>
+  </div>
+
+  {% if insights %}
+  <div class="section">
+    <div class="section-title"><i class="bi bi-lightbulb"></i> Executive Insights</div>
+    <div class="insights-grid">
+      {% for i in insights %}
+      <div class="insight-pill {{ i.type }}">
+        <i class="{{ i.icon }}"></i>
+        <span class="text">{{ i.text }}</span>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  {% for vname, vdata in vertical_metrics.items %}
+  <div class="vertical-section">
+    <h3>
+      {% if vname == "energy" %}<i class="bi bi-lightning-charge" style="color:#f59e0b"></i> Energy
+      {% elif vname == "welding" %}<i class="bi bi-tools" style="color:#6366f1"></i> Welding Workshop
+      {% elif vname == "groceries" %}<i class="bi bi-cart4" style="color:#10b981"></i> Groceries
+      {% endif %}
+    </h3>
+    <div class="v-metrics">
+      {% if vname == "energy" %}
+      <div class="v-metric"><div class="val">{{ vdata.active_sites|default:0 }}</div><div class="lbl">Active Sites</div></div>
+      <div class="v-metric"><div class="val">{{ vdata.total_assets|default:0 }}</div><div class="lbl">Assets</div></div>
+      <div class="v-metric"><div class="val">{{ vdata.installed_capacity_kw|default:0|floatformat:0 }} kW</div><div class="lbl">Capacity</div></div>
+      <div class="v-metric"><div class="val">{{ vdata.generation_30d_kwh|default:0|floatformat:0|intcomma }}</div><div class="lbl">Generation kWh</div></div>
+      <div class="v-metric"><div class="val">MWK {{ vdata.savings_30d|default:0|floatformat:0|intcomma }}</div><div class="lbl">Savings</div></div>
+      <div class="v-metric"><div class="val">{{ vdata.avg_asset_health|default:0 }}%</div><div class="lbl">Avg Health</div></div>
+      {% elif vname == "welding" %}
+      <div class="v-metric"><div class="val">{{ vdata.active_jobs|default:0 }}</div><div class="lbl">Active Jobs</div></div>
+      <div class="v-metric"><div class="val">{{ vdata.completed_30d|default:0 }}</div><div class="lbl">Completed</div></div>
+      <div class="v-metric"><div class="val">MWK {{ vdata.revenue_30d|default:0|floatformat:0|intcomma }}</div><div class="lbl">Revenue</div></div>
+      <div class="v-metric"><div class="val">MWK {{ vdata.profit_30d|default:0|floatformat:0|intcomma }}</div><div class="lbl">Profit</div></div>
+      <div class="v-metric"><div class="val">{{ vdata.conversion_rate|default:0 }}%</div><div class="lbl">Quote Conversion</div></div>
+      <div class="v-metric"><div class="val">{{ vdata.low_stock_count|default:0 }}</div><div class="lbl">Low Stock</div></div>
+      {% elif vname == "groceries" %}
+      <div class="v-metric"><div class="val">{{ vdata.total_products|default:0 }}</div><div class="lbl">Products</div></div>
+      <div class="v-metric"><div class="val">{{ vdata.sales_30d|default:0|intcomma }}</div><div class="lbl">Sales</div></div>
+      <div class="v-metric"><div class="val">MWK {{ vdata.revenue_30d|default:0|floatformat:0|intcomma }}</div><div class="lbl">Revenue</div></div>
+      <div class="v-metric"><div class="val">MWK {{ vdata.profit_30d|default:0|floatformat:0|intcomma }}</div><div class="lbl">Profit</div></div>
+      <div class="v-metric"><div class="val">MWK {{ vdata.stock_value|default:0|floatformat:0|intcomma }}</div><div class="lbl">Stock Value</div></div>
+      <div class="v-metric"><div class="val">{{ vdata.out_of_stock|default:0 }}</div><div class="lbl">Out of Stock</div></div>
+      {% endif %}
+    </div>
+  </div>
+  {% empty %}
+  <div class="empty-state">
+    <i class="bi bi-grid-3x3-gap"></i>
+    <h3>No vertical data available</h3>
+    <p>Start adding products, sites, or jobs to see your unified business intelligence.</p>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

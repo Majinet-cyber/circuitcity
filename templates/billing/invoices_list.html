@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Invoices · {{ business.name }}{% endblock %}
+
+{% block content %}
+<div style="max-width:1200px;margin:0 auto;padding:20px">
+  <h1>Invoices</h1>
+  
+  {% if invoices %}
+    <p>You have {{ invoices|length }} invoice{{ invoices|length|pluralize }}.</p>
+    <!-- TODO: Add invoice list table here -->
+  {% else %}
+    <p>No invoices yet.</p>
+  {% endif %}
+</div>
+{% endblock %}
+

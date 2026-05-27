@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Add Phone Product · Wizard{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/wizard-system.css' %}">
+{% endblock %}
+
+{% block content %}
+<div id="wizard-container"></div>
+
+<script src="{% static 'js/wizard-engine.js' %}"></script>
+<script>
+(function() {
+  // Phone brands
+  const brands = [
+    { value: 'tecno', label: 'Tecno', icon: '📱', featured: true },
+    { value: 'itel', label: 'Itel', icon: '📱', featured: true },
+    { value: 'infinix', label: 'Infinix', icon: '📱' },
+    { value: 'samsung', label: 'Samsung', icon: '📱' },
+    { value: 'iphone', label: 'iPhone', icon: '🍎', badge: 'Premium' },
+    { value: 'redmi', label: 'Redmi', icon: '📱' },
+    { value: 'huawei', label: 'Huawei', icon: '📱' },
+    { value: 'other', label: 'Other', icon: '📦' }
+  ];
+
+  // Popular models by brand
+  const popularModels = {
+    tecno: ['Spark 40', 'Spark 30', 'Spark 20', 'Spark 10', 'Camon 30', 'Camon 20', 'Pova 6', 'Pop 8'],
+    itel: ['P55', 'P40', 'S23', 'A70', 'Vision 3'],
+    infinix: ['Hot 40', 'Hot 30', 'Note 30', 'Smart 8'],
+    samsung: ['A15', 'A25', 'A35', 'A55', 'S24', 'S23'],
+    redmi: ['Note 13', 'Note 12', '13C', 'A3'],
+    iphone: ['15', '14', '13', '12', 'SE'],
+    huawei: ['Y9', 'P40', 'Nova']
+  };
+
+  // RAM/Storage variants
+  const ramStorageOptions = [
+    { value: '2/32', label: '2GB/32GB', icon: '💾' },
+    { value: '3/64', label: '3GB/64GB', icon: '💾' },
+    { value: '4/64', label: '4GB/64GB', icon: '💾', featured: true },
+    { value: '4/128', label: '4GB/128GB', icon: '💾', featured: true },
+    { value: '6/128', label: '6GB/128GB', icon: '💾' },
+    { value: '8/128', label: '8GB/128GB', icon: '💾', badge: 'Popular' },
+    { value: '8/256', label: '8GB/256GB', icon: '💾', badge: 'High-End' }
+  ];
+
+  // Conditions
+  const conditions = [
+    { value: 'new', label: 'New', icon: '✨', featured: true },
+    { value: 'used', label: 'Used', icon: '♻️' },
+    { value: 'refurbished', label: 'Refurbished', icon: '🔧' }
+  ];
+
+  // Tracking types
+  const trackingTypes = [
+    { value: 'imei', label: 'IMEI Only', icon: '🔢', description: 'Track by 15-digit IMEI', featured: true },
+    { value: 'barcode', label: 'Barcode Only', icon: '📊', description: 'Track by barcode' },
+    { value: 'both', label: 'Both', icon: '🎯', description: 'IMEI + Barcode' }
+  ];
+
+  // Wizard configuration
+  wizard = new WizardEngine('wizard-container', {
+    steps: [
+      // Step 1: Brand
+      {
+        type: 'cards',
+        key: 'brand',
+        title: 'Choose Brand',
+        subtitle: 'Select the phone brand',
+        options: brands,
+        columns: 'auto'
+      },
+      
+      // Step 2: Model
+      {
+        type: 'cards',
+        key: 'model',
+        title: 'Select Model',
+        subtitle: 'Choose a popular model or enter custom',
+        options: (data) => {
+          const brand = data.brand;
+          const models = popularModels[brand] || [];
+          return models.map(model => ({ value: model, label: model, icon: '📱' }));
+        },
+        allowCustom: true,
+        customPlaceholder: 'Enter model name'
+      },
+      
+      // Step 3: RAM/Storage
+      {
+        type: 'cards',
+        key: 'ram_storage',
+        title: 'RAM & Storage',
+        subtitle: 'Select the variant',
+        options: ramStorageOptions,
+        columns: 'auto'
+      },
+      
+      // Step 4: Condition
+      {
+        type: 'cards',
+        key: 'condition',
+        title: 'Condition',
+        subtitle: 'What is the condition of the phone?',
+        options: conditions,
+        columns: 'three-col'
+      },
+      
+      // Step 5: Pricing
+      {
+        type: 'multi-input',
+        key: 'pricing',
+        title: 'Pricing',
+        subtitle: 'Set your prices',
+        fields: [
+          { key: 'selling_price', label: 'Selling Price (MWK)', type: 'number', min: 0, step: '0.01', required: true },
+          { key: 'cost_price', label: 'Cost Price (MWK)', type: 'number', min: 0, step: '0.01' }
+        ]
+      },
+      
+      // Step 6: Tracking Type
+      {
+        type: 'cards',
+        key: 'tracking_type',
+        title: 'Tracking Method',
+        subtitle: 'How will you track this phone in stock?',
+        options: trackingTypes,
+        columns: 'auto'
+      }
+    ],
+    
+    onComplete: async (data) => {
+      console.log('Phones wizard complete:', data);
+      
+      // Show loading
+      const loading = document.createElement('div');
+      loading.className = 'wizard-loading';
+      loading.innerHTML = '<div class="wizard-loading-spinner"></div>';
+      document.body.appendChild(loading);
+      
+      try {
+        // Submit to server
+        const csrfToken = document.querySelector('[name=csrf-token]')?.content || 
+                          document.querySelector('[name=csrfmiddlewaretoken]')?.value;
+        
+        const response = await fetch('{% url "inventory:phones_wizard_submit" %}', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': csrfToken
+          },
+          body: JSON.stringify(data)
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+          // Success! Redirect
+          window.location.href = result.redirect || '{% url "inventory:dashboard" %}';
+        } else {
+          loading.remove();
+          alert(result.error || 'Failed to create product');
+        }
+      } catch (error) {
+        loading.remove();
+        console.error('Submit error:', error);
+        alert('Failed to create product. Please try again.');
+      }
+    },
+    
+    onCancel: () => {
+      if (confirm('Cancel adding phone?')) {
+        window.location.href = '{% url "inventory:dashboard" %}';
+      }
+    }
+  });
+})();
+</script>
+{% endblock %}
+

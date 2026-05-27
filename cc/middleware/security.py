@@ -2,6 +2,7 @@
 from django.shortcuts import redirect
 from importlib import import_module
 
+
 def _get_is_hq_admin():
     """
     Try to import your canonical is_hq_admin(user) check from HQ.
@@ -19,12 +20,21 @@ def _get_is_hq_admin():
     # Conservative fallback: staff OR superuser is considered HQ
     return lambda u: bool(getattr(u, "is_staff", False) or getattr(u, "is_superuser", False))
 
+
 _is_hq_admin = _get_is_hq_admin()
 
 # Paths HQ admins are allowed to hit without being bounced
 _HQ_ALLOW_PREFIXES = (
-    "/hq", "/admin", "/accounts", "/static", "/media", "/favicon.ico", "/robots.txt",
-    "/healthz", "/healthz/", "/api/global-search/",
+    "/hq",
+    "/admin",
+    "/accounts",
+    "/static",
+    "/media",
+    "/favicon.ico",
+    "/robots.txt",
+    "/healthz",
+    "/healthz/",
+    "/api/global-search/",
 )
 
 # Store/tenant UI entry points we want to keep HQ admins out of
@@ -36,6 +46,7 @@ class PreventHQFromClientUI:
     HQ admins must NOT browse tenant/store UIs.
     If an HQ admin requests a blocked path, redirect to hq:home.
     """
+
     def __init__(self, get_response):
         self.get_response = get_response
 
@@ -62,5 +73,3 @@ class PreventHQFromClientUI:
                 return redirect("hq:home")
 
         return self.get_response(request)
-
-

@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Sales Trend Bar Chart Test{% endblock %}
+
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  .container{max-width:1200px;margin:0 auto;padding:24px}
+  .card{background:#fff;border-radius:16px;padding:24px;box-shadow:0 6px 18px rgba(0,0,0,.08);margin-bottom:24px}
+  .card h2{margin:0 0 16px;font-weight:800;color:#0f172a}
+  .filters{display:flex;gap:10px;margin-bottom:20px}
+  .btn{padding:10px 20px;border:1px solid #e2e8f0;border-radius:10px;background:#fff;cursor:pointer;font-weight:600;transition:all .2s}
+  .btn.active{background:#3b82f6;color:#fff;border-color:#3b82f6}
+  .btn:hover{background:#f1f5f9}
+  .btn.active:hover{background:#2563eb}
+  .chart-container{position:relative;height:400px}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+  <div class="card">
+    <h2>📊 Sales Trend: Products vs Quantity Sold</h2>
+    
+    <div class="filters">
+      <button class="btn active" data-range="7d">Last 7 Days</button>
+      <button class="btn" data-range="mtd">Month to Date</button>
+      <button class="btn" data-range="30d">Last 30 Days</button>
+      <button class="btn" data-range="today">Today</button>
+    </div>
+    
+    <div class="chart-container">
+      <canvas id="salesTrendChart"></canvas>
+    </div>
+    
+    <div id="stats" style="margin-top:20px;padding:16px;background:#f8fafc;border-radius:10px;font-size:.95rem">
+      <strong>Total Units:</strong> <span id="totalQty">-</span> · 
+      <strong>Total Revenue:</strong> <span id="totalRevenue">-</span>
+    </div>
+  </div>
+</div>
+
+<script>
+  const ctx = document.getElementById('salesTrendChart');
+  let chart = null;
+  let currentRange = '7d';
+  
+  // Initialize chart
+  function initChart(data) {
+    if (chart) chart.destroy();
+    
+    chart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: data.labels || [],
+        datasets: [{
+          label: 'Quantity Sold',
+          data: data.quantities || [],
+          backgroundColor: 'rgba(59, 130, 246, 0.7)',
+          borderColor: 'rgba(59, 130, 246, 1)',
+          borderWidth: 2,
+          borderRadius: 8,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            display: true,
+            position: 'top',
+          },
+          tooltip: {
+            callbacks: {
+              afterLabel: function(context) {
+                const idx = context.dataIndex;
+                const revenue = data.revenue ? data.revenue[idx] : 0;
+                return 'Revenue: MK ' + revenue.toLocaleString();
+              }
+            }
+          }
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            ticks: {
+              precision: 0
+            }
+          }
+        }
+      }
+    });
+    
+    // Update stats
+    document.getElementById('totalQty').textContent = (data.total_qty || 0).toLocaleString();
+    document.getElementById('totalRevenue').textContent = 'MK ' + (data.total_revenue || 0).toLocaleString();
+  }
+  
+  // Load data
+  async function loadData(range) {
+    try {
+      const resp = await fetch(`{% url 'inventory:sales_trend_json' %}?range=${range}`);
+      const data = await resp.json();
+      
+      if (data.error) {
+        console.error('API error:', data.error);
+        initChart({labels: [], quantities: [], revenue: [], total_qty: 0, total_revenue: 0});
+      } else {
+        initChart(data);
+      }
+    } catch (err) {
+      console.error('Failed to load sales trend:', err);
+      initChart({labels: [], quantities: [], revenue: [], total_qty: 0, total_revenue: 0});
+    }
+  }
+  
+  // Handle filter buttons
+  document.querySelectorAll('.filters .btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+      document.querySelectorAll('.filters .btn').forEach(b => b.classList.remove('active'));
+      this.classList.add('active');
+      currentRange = this.getAttribute('data-range');
+      loadData(currentRange);
+    });
+  });
+  
+  // Initial load
+  loadData(currentRange);
+</script>
+{% endblock %}
+

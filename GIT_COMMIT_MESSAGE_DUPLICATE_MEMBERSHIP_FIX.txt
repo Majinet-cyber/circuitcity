@@ -1,0 +1,41 @@
+Fix duplicate active membership crash and add deduplication
+
+Goal: Never 500 if duplicates exist, clean existing duplicates, and prevent future duplicates.
+
+Changes:
+
+1. Hotfix: Make get_membership() tolerant of duplicates
+   - Replace .get() with .filter().order_by().first()
+   - Add logging when duplicates are detected
+   - Prefer memberships with location set, then most recent
+   - Prevents 500 errors immediately, even if DB has duplicates
+   - File: tenants/scope.py
+
+2. Add management command to clean existing duplicates
+   - Command: python manage.py dedupe_memberships [--apply]
+   - Finds (user, business) pairs with multiple ACTIVE memberships
+   - Keeps the best one (with location, most recent, highest ID)
+   - Sets others to status="REJECTED"
+   - Shows detailed dry-run output before applying
+   - Files: tenants/management/commands/dedupe_memberships.py
+
+3. Add DB constraint to prevent future duplicates
+   - UniqueConstraint on (user, business) where status="ACTIVE"
+   - Constraint name: uniq_active_membership_user_business
+   - Must run dedupe command BEFORE applying this migration
+   - Files: tenants/models.py, tenants/migrations/0016_*.py
+
+4. Add comprehensive regression tests
+   - Tests for graceful duplicate handling
+   - Tests for DB constraint enforcement
+   - Tests for management command (dry-run and apply)
+   - Tests for edge cases (unauthenticated, no membership, etc.)
+   - File: tenants/tests/test_duplicate_memberships.py
+
+Deployment steps:
+1. Deploy code (hotfix prevents crashes immediately)
+2. Run: python manage.py dedupe_memberships --apply
+3. Run: python manage.py migrate tenants
+
+Testing: 6 tests pass, 2 skip (constraint already active), 0 failures
+

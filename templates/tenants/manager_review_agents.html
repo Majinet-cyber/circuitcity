@@ -2,8 +2,8 @@
 {% load static %}
 {% load humanize %}
 
-{% block title %}Agents · {{ tenant.name|default:"Business" }} · Emajinet{% endblock %}
-{% block header_title %}Agents{% endblock %}
+{% block title %}{% if BUSINESS_VERTICAL == "gym" %}Trainers{% else %}Agents{% endif %} · {{ tenant.name|default:"Business" }} · Emajinet{% endblock %}
+{% block header_title %}{% if BUSINESS_VERTICAL == "gym" %}Trainers{% else %}Agents{% endif %}{% endblock %}
 {% block notif_scope %}tenants{% endblock %}
 
 {% block content %}
@@ -33,7 +33,7 @@
 </style>
 
 <div class="container py-4" style="max-width:1100px;">
-  <h1 class="h5 fw-bold mb-3">Agents <span class="muted">· {{ tenant.name|default:"—" }}</span></h1>
+  <h1 class="h5 fw-bold mb-3">{% if BUSINESS_VERTICAL == "gym" %}Trainers{% else %}Agents{% endif %} <span class="muted">· {{ tenant.name|default:"—" }}</span></h1>
 
   <div class="row g-4">
     <!-- Create Invite -->
@@ -94,6 +94,33 @@
           {% endif %}
         </div>
 
+        <!-- LIQUOR ONLY: Invite Bar Manager (Supervisor/Team Lead) -->
+        {% if BUSINESS_VERTICAL == "liquor" %}
+        <div class="glass glass-info p-3 p-md-4 mt-3" style="border-left: 4px solid #3b82f6;">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <div class="section-title"><i class="bi bi-people-fill"></i> Invite Bar Manager</div>
+            <span class="small muted">Team Lead / Supervisor</span>
+          </div>
+          <p class="small text-muted mb-3">
+            Bar Managers can access liquor dashboards, manage agents, and oversee stock. They <strong>cannot</strong> access billing or HQ settings.
+          </p>
+          <form method="post" action="{% url 'tenants:create_agent_invite' %}" class="needs-validation-bar-mgr" novalidate>
+            {% csrf_token %}
+            <input type="hidden" name="role" value="BAR_MANAGER">
+            <div class="mb-3">
+              <label class="form-label fw-semibold" for="bar_mgr_invited_name">Manager name</label>
+              <input id="bar_mgr_invited_name" type="text" name="invited_name" class="form-control" placeholder="e.g. John (Bar Manager)" required>
+              <div class="invalid-feedback">Please enter a name.</div>
+            </div>
+            <input type="hidden" name="email" value="">
+            <input type="hidden" name="phone" value="">
+            <button class="btn btn-primary" type="submit"><i class="bi bi-shield-check"></i> Create Bar Manager Invite</button>
+            <div class="small muted mt-2">This person will have supervisor-level access to liquor operations.</div>
+          </form>
+        </div>
+        {% endif %}
+        <!-- END LIQUOR BAR MANAGER INVITE -->
+
         <script>
         (function(){
           // simple client-side validation feedback for the form
@@ -104,6 +131,17 @@
                 e.preventDefault(); e.stopPropagation();
               }
               form.classList.add('was-validated');
+            }, false);
+          }
+          
+          // Bar manager form validation
+          const barMgrForm = document.querySelector('form.needs-validation-bar-mgr');
+          if (barMgrForm){
+            barMgrForm.addEventListener('submit', function(e){
+              if (!barMgrForm.checkValidity()){
+                e.preventDefault(); e.stopPropagation();
+              }
+              barMgrForm.classList.add('was-validated');
             }, false);
           }
 
@@ -147,76 +185,220 @@
       </div>
     </div>
 
-    <!-- Active agents -->
+    <!-- Commission Settings (Managers Only) -->
     <div class="col-12">
       <div class="glass p-3 p-md-4">
-        <div class="section-title mb-2">Active agents</div>
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <div class="section-title">Commission Settings</div>
+          <button class="btn btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#commissionSettings" aria-expanded="false">
+            <i class="bi bi-gear"></i> Configure
+          </button>
+        </div>
+        
+        <!-- Current Settings Display -->
+        {% if config %}
+        <div class="mb-2">
+          <div class="d-flex gap-3 flex-wrap">
+            <div>
+              <span class="small muted">Status:</span>
+              {% if config.commissions_enabled %}
+                <span class="chip status--accepted">Enabled</span>
+              {% else %}
+                <span class="chip status--revoked">Disabled</span>
+              {% endif %}
+            </div>
+            <div>
+              <span class="small muted">Mode:</span>
+              <strong>{{ config.get_commission_mode_display }}</strong>
+            </div>
+            {% if config.commission_mode == 'PERCENT' %}
+              <div>
+                <span class="small muted">Rate:</span>
+                <strong>{{ config.base_commission_pct }}%</strong>
+              </div>
+            {% else %}
+              <div>
+                <span class="small muted">Amount:</span>
+                <strong>MWK {{ config.fixed_commission_amount|floatformat:0 }}</strong>
+              </div>
+            {% endif %}
+          </div>
+        </div>
+        {% endif %}
+        
+        <!-- Collapsible Settings Form -->
+        <div class="collapse mt-3" id="commissionSettings">
+          <div class="glass-ghost p-3">
+            <form method="post" action="{% url 'tenants:manager_review_agents' %}" id="commissionForm">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="update_commission_settings">
+              
+              <!-- Master Toggle -->
+              <div class="mb-3">
+                <div class="form-check form-switch">
+                  <input class="form-check-input" type="checkbox" role="switch" id="commissionsEnabled" name="commissions_enabled" {% if config.commissions_enabled %}checked{% endif %}>
+                  <label class="form-check-label fw-semibold" for="commissionsEnabled">
+                    Enable Commissions
+                  </label>
+                </div>
+                <small class="text-muted">When disabled, agents stop earning commissions on new sales.</small>
+              </div>
+              
+              <!-- Mode Selector -->
+              <div class="mb-3">
+                <label class="form-label fw-semibold">Commission Mode</label>
+                <div class="btn-group w-100" role="group">
+                  <input type="radio" class="btn-check" name="commission_mode" id="modePercent" value="PERCENT" {% if config.commission_mode == 'PERCENT' %}checked{% endif %} autocomplete="off">
+                  <label class="btn btn-outline-primary" for="modePercent">
+                    <i class="bi bi-percent"></i> Percentage
+                  </label>
+                  
+                  <input type="radio" class="btn-check" name="commission_mode" id="modeFixed" value="FIXED" {% if config.commission_mode == 'FIXED' %}checked{% endif %} autocomplete="off">
+                  <label class="btn btn-outline-primary" for="modeFixed">
+                    <i class="bi bi-cash-coin"></i> Fixed Amount
+                  </label>
+                </div>
+              </div>
+              
+              <!-- Percentage Input -->
+              <div class="mb-3" id="percentField" style="display:{% if config.commission_mode == 'PERCENT' %}block{% else %}none{% endif %};">
+                <label class="form-label fw-semibold" for="baseCommissionPct">Commission Percentage (%)</label>
+                <input type="number" class="form-control" id="baseCommissionPct" name="base_commission_pct" value="{{ config.base_commission_pct|default:'12.00' }}" min="0" max="100" step="0.01">
+                <small class="text-muted">Percentage of sale price (0-100)</small>
+              </div>
+              
+              <!-- Fixed Amount Input -->
+              <div class="mb-3" id="fixedField" style="display:{% if config.commission_mode == 'FIXED' %}block{% else %}none{% endif %};">
+                <label class="form-label fw-semibold" for="fixedCommissionAmount">Fixed Commission Amount (MWK)</label>
+                <input type="number" class="form-control" id="fixedCommissionAmount" name="fixed_commission_amount" value="{{ config.fixed_commission_amount|default:'2000.00' }}" min="0" step="0.01">
+                <small class="text-muted">Fixed amount per sale</small>
+              </div>
+              
+              <button type="submit" class="btn btn-primary">
+                <i class="bi bi-check-lg"></i> Save Settings
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Active agents (Card View - NEW) -->
+    <div class="col-12">
+      <div class="glass p-3 p-md-4">
+        <div class="section-title mb-3">Joined Agents</div>
         {% if active_members %}
-          <div class="table-responsive">
-            <table class="table">
-              <thead>
-                <tr>
-                  <th>Agent</th>
-                  <th>Location</th>
-                  <th>Status</th>
-                  <th>Joined</th>
-                  <th style="width:200px">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for m in active_members %}
-                <tr>
-                  <td class="ellipsis">
-                    <strong>{{ m.user.get_full_name|default:m.user.username }}</strong>
-                    <br><small class="text-muted">{{ m.user.email }}</small>
-                  </td>
-                  <td>
-                    {% if m.location %}
-                      <span class="badge bg-info">{{ m.location.name }}</span>
-                    {% else %}
-                      <span class="text-muted">—</span>
-                    {% endif %}
-                  </td>
-                  <td>
-                    {% if m.status == "ACTIVE" and m.user.is_active %}
-                      <span class="chip status--accepted">Active</span>
-                    {% elif m.status == "SUSPENDED" or not m.user.is_active %}
-                      <span class="chip status--revoked">Suspended</span>
-                    {% else %}
-                      <span class="chip">{{ m.status|title }}</span>
-                    {% endif %}
-                  </td>
-                  <td class="small muted">{{ m.created_at|date:"M j, Y" }}</td>
-                  <td>
-                    <div class="d-flex flex-wrap gap-1">
-                      <!-- Location assignment -->
-                      <div class="dropdown">
-                        <button class="btn btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                          <i class="bi bi-geo-alt"></i>
-                        </button>
-                        <ul class="dropdown-menu">
-                          {% if locations %}
-                            {% for loc in locations %}
-                            <li>
-                              <form method="post" action="{% url 'tenants:edit_agent_location' m.id %}" class="d-inline">
-                                {% csrf_token %}
-                                <input type="hidden" name="location_id" value="{{ loc.id }}">
-                                <button type="submit" class="dropdown-item">{{ loc.name }}</button>
-                              </form>
-                            </li>
-                            {% endfor %}
-                            <li><hr class="dropdown-divider"></li>
-                            <li>
-                              <form method="post" action="{% url 'tenants:edit_agent_location' m.id %}" class="d-inline">
-                                {% csrf_token %}
-                                <button type="submit" class="dropdown-item text-muted">Clear location</button>
-                              </form>
-                            </li>
-                          {% else %}
-                            <li><span class="dropdown-item text-muted">No locations</span></li>
-                          {% endif %}
-                        </ul>
-                      </div>
+          <!-- Card Grid -->
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;margin-bottom:24px;">
+            {% for m in active_members %}
+            <div class="glass-ghost p-3" style="cursor:pointer;transition:all 0.2s;border:2px solid transparent;" 
+                 onclick="window.location.href='{% url 'tenants:agent_detail' m.user.id %}';"
+                 onmouseover="this.style.borderColor='#1f6feb';this.style.transform='translateY(-3px)';"
+                 onmouseout="this.style.borderColor='transparent';this.style.transform='translateY(0)';">
+              <div class="d-flex align-items-center gap-3 mb-2">
+                <div style="width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,#1f6feb,#0969da);display:grid;place-items:center;font-weight:900;color:#fff;font-size:1.2rem;">
+                  {{ m.user.get_full_name|default:m.user.username|first|upper }}
+                </div>
+                <div class="flex-grow-1 min-w-0">
+                  <div class="fw-bold ellipsis">{{ m.user.get_full_name|default:m.user.username }}</div>
+                  <div class="small text-muted ellipsis">{{ m.user.email|default:"No email" }}</div>
+                </div>
+              </div>
+              <div class="d-flex justify-content-between align-items-center">
+                <div>
+                  {% if m.status == "ACTIVE" and m.user.is_active %}
+                    <span class="chip status--accepted">Active</span>
+                  {% elif m.status == "SUSPENDED" or not m.user.is_active %}
+                    <span class="chip status--revoked">Suspended</span>
+                  {% else %}
+                    <span class="chip">{{ m.status|title }}</span>
+                  {% endif %}
+                </div>
+                <div class="small muted">
+                  {% if m.location %}
+                    <i class="bi bi-geo-alt"></i> {{ m.location.name }}
+                  {% else %}
+                    <i class="bi bi-building"></i> All
+                  {% endif %}
+                </div>
+              </div>
+              <div class="small muted mt-2">
+                <i class="bi bi-calendar"></i> Joined {{ m.created_at|date:"M j, Y" }}
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+          
+          <!-- Table View (Collapsed by default - for advanced management) -->
+          <details>
+            <summary class="btn btn-sm mb-3" style="cursor:pointer;">
+              <i class="bi bi-table"></i> Show detailed table
+            </summary>
+            <div class="table-responsive">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th>Agent</th>
+                    <th>Location</th>
+                    <th>Status</th>
+                    <th>Joined</th>
+                    <th style="width:200px">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for m in active_members %}
+                  <tr>
+                    <td class="ellipsis">
+                      <strong>{{ m.user.get_full_name|default:m.user.username }}</strong>
+                      <br><small class="text-muted">{{ m.user.email }}</small>
+                    </td>
+                    <td>
+                      {% if m.location %}
+                        <span class="badge bg-info">{{ m.location.name }}</span>
+                      {% else %}
+                        <span class="text-muted">—</span>
+                      {% endif %}
+                    </td>
+                    <td>
+                      {% if m.status == "ACTIVE" and m.user.is_active %}
+                        <span class="chip status--accepted">Active</span>
+                      {% elif m.status == "SUSPENDED" or not m.user.is_active %}
+                        <span class="chip status--revoked">Suspended</span>
+                      {% else %}
+                        <span class="chip">{{ m.status|title }}</span>
+                      {% endif %}
+                    </td>
+                    <td class="small muted">{{ m.created_at|date:"M j, Y" }}</td>
+                    <td>
+                      <div class="d-flex flex-wrap gap-1">
+                        <!-- Location assignment -->
+                        <div class="dropdown">
+                          <button class="btn btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="bi bi-geo-alt"></i>
+                          </button>
+                          <ul class="dropdown-menu">
+                            {% if locations %}
+                              {% for loc in locations %}
+                              <li>
+                                <form method="post" action="{% url 'tenants:edit_agent_location' m.id %}" class="d-inline">
+                                  {% csrf_token %}
+                                  <input type="hidden" name="location_id" value="{{ loc.id }}">
+                                  <button type="submit" class="dropdown-item">{{ loc.name }}</button>
+                                </form>
+                              </li>
+                              {% endfor %}
+                              <li><hr class="dropdown-divider"></li>
+                              <li>
+                                <form method="post" action="{% url 'tenants:edit_agent_location' m.id %}" class="d-inline">
+                                  {% csrf_token %}
+                                  <button type="submit" class="dropdown-item text-muted">Clear location</button>
+                                </form>
+                              </li>
+                            {% else %}
+                              <li><span class="dropdown-item text-muted">No locations</span></li>
+                            {% endif %}
+                          </ul>
+                        </div>
                       
                       <!-- Suspend/Restore -->
                       {% if m.status == "ACTIVE" and m.user.is_active %}
@@ -237,10 +419,11 @@
                     </div>
                   </td>
                 </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-          </div>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </details>
         {% else %}
           <div class="glass-ghost p-3 text-center muted">No active agents yet.</div>
         {% endif %}
@@ -429,6 +612,32 @@
 
   show(0);
   start();
+})();
+
+// Commission settings form toggle
+(function(){
+  const form = document.getElementById('commissionForm');
+  if (!form) return;
+  
+  const modePercent = document.getElementById('modePercent');
+  const modeFixed = document.getElementById('modeFixed');
+  const percentField = document.getElementById('percentField');
+  const fixedField = document.getElementById('fixedField');
+  
+  function updateFieldVisibility() {
+    if (modePercent && modePercent.checked) {
+      percentField.style.display = 'block';
+      fixedField.style.display = 'none';
+    } else if (modeFixed && modeFixed.checked) {
+      percentField.style.display = 'none';
+      fixedField.style.display = 'block';
+    }
+  }
+  
+  if (modePercent) modePercent.addEventListener('change', updateFieldVisibility);
+  if (modeFixed) modeFixed.addEventListener('change', updateFieldVisibility);
+  
+  updateFieldVisibility();
 })();
 </script>
 

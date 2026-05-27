@@ -74,13 +74,29 @@
 
   /* =========================
      SIDEBAR TOGGLE (mobile)
-     - Supports new (#ccBurger/#ccSidebar/#ccOverlay)
-       and legacy (#sidebarToggle/#sidebar)
+     - Now handled by base.html CC Drawer Hotfix v4
+     - This section only sets up legacy IDs if they exist
   ========================== */
   (function sidebarInit() {
+    // Skip if already handled by CC Drawer system
+    const sidebarOpen = d.getElementById('sidebarOpen');
+    if (sidebarOpen && sidebarOpen.getAttribute('data-bound') === '1') {
+      // Already bound by CC Drawer Hotfix — just expose compatibility functions
+      window.ccOpenSidebar = () => { if (window.ccDrawer) window.ccDrawer.open(); };
+      window.ccCloseSidebar = () => { if (window.ccDrawer) window.ccDrawer.close(); };
+      return;
+    }
+
+    // Legacy sidebar support for pages using #ccBurger/#ccSidebar/#ccOverlay
     const burger = d.getElementById('ccBurger') || d.getElementById('sidebarToggle');
     const sidebar = d.getElementById('ccSidebar') || d.getElementById('sidebar');
     const overlay = d.getElementById('ccOverlay'); // may be null
+
+    if (!burger || !sidebar) return;
+
+    // Check if already bound
+    if (burger.getAttribute('data-bound') === '1') return;
+    burger.setAttribute('data-bound', '1');
 
     function openSidebar() {
       if (!sidebar) return;
@@ -100,34 +116,33 @@
       sidebar.classList.contains('open') ? closeSidebar() : openSidebar();
     }
 
-    if (burger && sidebar) {
-      burger.addEventListener('click', toggleSidebar);
-      if (overlay) overlay.addEventListener('click', closeSidebar);
-      // Close on Escape
-      d.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeSidebar(); });
-      // Close if layout switches to desktop
-      const mq = window.matchMedia('(min-width: 1025px)');
-      mq.addEventListener('change', closeSidebar);
-    }
+    burger.addEventListener('click', toggleSidebar);
+    if (overlay) overlay.addEventListener('click', closeSidebar);
+    // Close on Escape
+    d.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeSidebar(); });
+    // Close if layout switches to desktop
+    const mq = window.matchMedia('(min-width: 1025px)');
+    mq.addEventListener('change', closeSidebar);
 
-    // Edge-swipe to open (mobile)
-    (function swipeToOpen() {
-      if (!sidebar) return;
-      let startX = null, startY = null, t0 = 0;
-      const EDGE = 24, MIN = 60, MAX_ANGLE = 25; // px, px, degrees
-      window.addEventListener('touchstart', (e) => {
-        const t = e.touches[0]; if (!t) return;
-        if (t.clientX <= EDGE) { startX = t.clientX; startY = t.clientY; t0 = Date.now(); }
-      }, { passive: true });
-      window.addEventListener('touchend', (e) => {
-        if (startX == null) return;
-        const t = e.changedTouches[0]; if (!t) return;
-        const dx = t.clientX - startX, dy = Math.abs(t.clientY - startY);
-        const angle = Math.atan2(dy, Math.abs(dx)) * 180 / Math.PI;
-        if (dx > MIN && angle < MAX_ANGLE && (Date.now() - t0) < 600) openSidebar();
-        startX = startY = null;
-      }, { passive: true });
-    })();
+    // Edge-swipe to open (mobile) — skip if CC Drawer handles it
+    if (!window.__CC_DRAWER_V4__) {
+      (function swipeToOpen() {
+        let startX = null, startY = null, t0 = 0;
+        const EDGE = 24, MIN = 60, MAX_ANGLE = 25; // px, px, degrees
+        window.addEventListener('touchstart', (e) => {
+          const t = e.touches[0]; if (!t) return;
+          if (t.clientX <= EDGE) { startX = t.clientX; startY = t.clientY; t0 = Date.now(); }
+        }, { passive: true });
+        window.addEventListener('touchend', (e) => {
+          if (startX == null) return;
+          const t = e.changedTouches[0]; if (!t) return;
+          const dx = t.clientX - startX, dy = Math.abs(t.clientY - startY);
+          const angle = Math.atan2(dy, Math.abs(dx)) * 180 / Math.PI;
+          if (dx > MIN && angle < MAX_ANGLE && (Date.now() - t0) < 600) openSidebar();
+          startX = startY = null;
+        }, { passive: true });
+      })();
+    }
 
     // Expose to other scripts if needed
     window.ccOpenSidebar = openSidebar;
@@ -357,14 +372,14 @@
   (function rotatingInsights() {
     const canvas = d.getElementById('rotating-insights-chart');
     if (!canvas || typeof Chart === 'undefined') return;
-    
+
     const data = window.EmajinetDashboardData;
     if (!data) return;
-    
+
     const titleEl = d.getElementById('rotating-insights-title');
     const subtitleEl = d.getElementById('rotating-insights-subtitle');
     const indicatorEl = d.getElementById('rotating-insights-indicator');
-    
+
     // Define states for rotation
     const states = [
       {
@@ -396,7 +411,7 @@
         colors: ['#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6']
       }
     ];
-    
+
     // Filter out states with no data
     const activeStates = states.filter(s => s.data.length > 0);
     if (activeStates.length === 0) {
@@ -404,10 +419,10 @@
       if (subtitleEl) subtitleEl.textContent = 'Start making sales to see insights';
       return;
     }
-    
+
     let currentIndex = 0;
-    
-    // Initialize chart
+
+    // Initialize chart with premium AI-generated styling
     const ctx = canvas.getContext('2d');
     const chart = new Chart(ctx, {
       type: 'bar',
@@ -417,28 +432,55 @@
           label: 'Value',
           data: [],
           backgroundColor: [],
-          borderRadius: 8,
-          borderSkipped: false
+          borderRadius: 12,
+          borderSkipped: false,
+          barPercentage: 0.7,
+          categoryPercentage: 0.8
         }]
       },
       options: {
         responsive: true,
         maintainAspectRatio: false,
+        layout: {
+          padding: {
+            top: 10,
+            right: 10,
+            bottom: 0,
+            left: 10
+          }
+        },
         plugins: {
           legend: {
             display: false
           },
           tooltip: {
-            backgroundColor: 'rgba(15, 23, 42, 0.9)',
-            padding: 12,
-            borderRadius: 8,
-            titleFont: { size: 14, weight: 'bold' },
-            bodyFont: { size: 13 },
+            enabled: true,
+            backgroundColor: 'rgba(15, 23, 42, 0.95)',
+            padding: 16,
+            borderRadius: 12,
+            titleFont: {
+              size: 15,
+              weight: '700',
+              family: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+            },
+            bodyFont: {
+              size: 14,
+              family: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+            },
+            titleColor: '#ffffff',
+            bodyColor: '#e2e8f0',
+            borderColor: 'rgba(99, 102, 241, 0.3)',
+            borderWidth: 1,
+            displayColors: true,
+            boxWidth: 12,
+            boxHeight: 12,
+            boxPadding: 6,
+            usePointStyle: true,
             callbacks: {
               label: function(context) {
                 const value = context.parsed.y;
-                // Format numbers with commas
-                return ' ' + value.toLocaleString();
+                // Format numbers with commas and add currency/unit
+                return ' ' + value.toLocaleString('en-US');
               }
             }
           }
@@ -446,39 +488,76 @@
         scales: {
           y: {
             beginAtZero: true,
+            border: {
+              display: false
+            },
+            grid: {
+              color: 'rgba(148, 163, 184, 0.08)',
+              lineWidth: 1,
+              drawTicks: false
+            },
             ticks: {
+              padding: 8,
+              font: {
+                size: 11,
+                weight: '600',
+                family: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+              },
+              color: '#64748b',
               callback: function(value) {
                 // Format large numbers (e.g., 1000 -> 1K)
                 if (value >= 1000000) return (value / 1000000).toFixed(1) + 'M';
-                if (value >= 1000) return (value / 1000).toFixed(1) + 'K';
+                if (value >= 1000) return (value / 1000).toFixed(0) + 'K';
                 return value;
               }
-            },
-            grid: {
-              color: 'rgba(0, 0, 0, 0.05)'
             }
           },
           x: {
+            border: {
+              display: false
+            },
             grid: {
               display: false
+            },
+            ticks: {
+              padding: 8,
+              font: {
+                size: 11,
+                weight: '600',
+                family: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+              },
+              color: '#64748b',
+              maxRotation: 0,
+              minRotation: 0,
+              autoSkip: true,
+              autoSkipPadding: 20
             }
           }
         },
         animation: {
-          duration: 750,
-          easing: 'easeInOutQuart'
+          duration: 800,
+          easing: 'easeInOutCubic',
+          onComplete: function() {
+            // Add subtle pulse effect on bars
+            const meta = chart.getDatasetMeta(0);
+            meta.data.forEach((bar, index) => {
+              if (bar) {
+                bar.$animations = {};
+              }
+            });
+          }
         }
       }
     });
-    
+
     // Update chart with current state
     function updateChart() {
       const state = activeStates[currentIndex];
-      
+
       // Update title and subtitle
       if (titleEl) titleEl.textContent = state.title;
       if (subtitleEl) subtitleEl.textContent = state.subtitle;
-      
+
       // Update indicator dots
       if (indicatorEl) {
         const dots = indicatorEl.querySelectorAll('.rotating-insights-dot');
@@ -486,17 +565,17 @@
           dot.classList.toggle('active', i === currentIndex);
         });
       }
-      
+
       // Update chart data
       chart.data.labels = state.data.map(item => item.label);
       chart.data.datasets[0].data = state.data.map(item => item.value);
       chart.data.datasets[0].backgroundColor = state.colors.slice(0, state.data.length);
       chart.update();
     }
-    
+
     // Initial render
     updateChart();
-    
+
     // Rotate every 5 seconds
     setInterval(() => {
       currentIndex = (currentIndex + 1) % activeStates.length;
@@ -505,13 +584,11 @@
   })();
 
   /* =========================
-     SERVICE WORKER (optional)
+     SERVICE WORKER — DISABLED
+     SW registration removed to eliminate hard-refresh rendering bugs.
+     The /sw.js endpoint now serves a cleanup-only no-op worker.
+     See templates/base.html for full explanation.
   ========================== */
-  (function sw() {
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/static/sw.js').catch(() => { /* no-op */ });
-    }
-  })();
 
   /* =========================
      LEGACY BLOCKS (kept from your original file)
@@ -519,11 +596,12 @@
      - Auto-hide simple .toast blocks (already enhanced above)
   ========================== */
 
-  // Legacy Sidebar toggle for #sidebarToggle/#sidebar (kept; safe no-op if handled above)
+  // Legacy Sidebar toggle for #sidebarToggle/#sidebar (skip if already bound)
   (function () {
     const toggle = d.getElementById('sidebarToggle');
     const sidebar = d.getElementById('sidebar');
-    if (toggle && sidebar) {
+    if (toggle && sidebar && toggle.getAttribute('data-bound') !== '1') {
+      toggle.setAttribute('data-bound', '1');
       const setState = (open) => { sidebar.classList.toggle('open', open); toggle.setAttribute('aria-expanded', String(open)); };
       toggle.addEventListener('click', () => setState(!sidebar.classList.contains('open')));
       d.addEventListener('keydown', (e) => { if (e.key === 'Escape') setState(false); });

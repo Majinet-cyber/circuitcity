@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+
+{% block title %}Barman Reconciliation{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <h1 class="text-3xl font-bold mb-6">📊 Barman Reconciliation</h1>
+    
+    <!-- Filters -->
+    <div class="bg-white rounded-lg shadow-md p-4 mb-6">
+        <form method="get" class="flex gap-4 flex-wrap">
+            <div>
+                <label class="block text-sm font-semibold mb-1">Date Range</label>
+                <select name="date" class="px-4 py-2 border rounded-lg">
+                    <option value="today" {% if date_filter == 'today' %}selected{% endif %}>Today</option>
+                    <option value="week" {% if date_filter == 'week' %}selected{% endif %}>Last 7 Days</option>
+                    <option value="month" {% if date_filter == 'month' %}selected{% endif %}>This Month</option>
+                    <option value="all" {% if date_filter == 'all' %}selected{% endif %}>All Time</option>
+                </select>
+            </div>
+            
+            <div>
+                <label class="block text-sm font-semibold mb-1">Status</label>
+                <select name="status" class="px-4 py-2 border rounded-lg">
+                    <option value="all" {% if status_filter == 'all' %}selected{% endif %}>All</option>
+                    <option value="pending" {% if status_filter == 'pending' %}selected{% endif %}>Pending</option>
+                    <option value="reconciled" {% if status_filter == 'reconciled' %}selected{% endif %}>Reconciled</option>
+                </select>
+            </div>
+            
+            <div class="flex items-end">
+                <button type="submit" class="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-lg">
+                    Apply
+                </button>
+            </div>
+        </form>
+    </div>
+    
+    <!-- Agent Summaries -->
+    <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+        {% for agent in agent_summaries %}
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <h3 class="font-bold text-lg mb-2">
+                {{ agent.attributed_to__first_name }} {{ agent.attributed_to__last_name }}
+            </h3>
+            <p class="text-sm text-gray-600 mb-4">@{{ agent.attributed_to__username }}</p>
+            
+            <div class="space-y-2">
+                <div class="flex justify-between">
+                    <span class="text-gray-600">Total Sales:</span>
+                    <span class="font-semibold">{{ agent.total_sales }}</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-gray-600">Total Amount:</span>
+                    <span class="font-semibold">K {{ agent.total_amount|floatformat:2 }}</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-orange-600">Pending:</span>
+                    <span class="font-semibold text-orange-600">{{ agent.pending_count }}</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-green-600">Reconciled:</span>
+                    <span class="font-semibold text-green-600">{{ agent.reconciled_count }}</span>
+                </div>
+            </div>
+            
+            {% if agent.pending_count == 0 %}
+            <div class="mt-4 bg-green-100 text-green-700 px-3 py-2 rounded-lg text-center font-semibold">
+                ✅ Records Balanced
+            </div>
+            {% endif %}
+        </div>
+        {% empty %}
+        <div class="col-span-full text-center text-gray-500 py-8">
+            No attributions found for selected filters
+        </div>
+        {% endfor %}
+    </div>
+    
+    <!-- Detailed Attributions -->
+    <div class="bg-white rounded-lg shadow-md overflow-hidden">
+        <table class="w-full">
+            <thead class="bg-gray-100">
+                <tr>
+                    <th class="px-4 py-3 text-left">Date</th>
+                    <th class="px-4 py-3 text-left">Sale ID</th>
+                    <th class="px-4 py-3 text-left">Agent</th>
+                    <th class="px-4 py-3 text-left">Barman</th>
+                    <th class="px-4 py-3 text-right">Amount</th>
+                    <th class="px-4 py-3 text-center">Status</th>
+                    <th class="px-4 py-3 text-center">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for attr in attributions %}
+                <tr class="border-b hover:bg-gray-50">
+                    <td class="px-4 py-3">{{ attr.created_at|date:"Y-m-d H:i" }}</td>
+                    <td class="px-4 py-3">#{{ attr.liquor_sale_id }}</td>
+                    <td class="px-4 py-3">{{ attr.attributed_to.username }}</td>
+                    <td class="px-4 py-3">{{ attr.attributed_by.username }}</td>
+                    <td class="px-4 py-3 text-right font-semibold">K {{ attr.sale_amount|floatformat:2 }}</td>
+                    <td class="px-4 py-3 text-center">
+                        {% if attr.status == 'pending' %}
+                        <span class="bg-orange-100 text-orange-700 px-3 py-1 rounded-full text-sm">Pending</span>
+                        {% else %}
+                        <span class="bg-green-100 text-green-700 px-3 py-1 rounded-full text-sm">Reconciled</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-4 py-3 text-center">
+                        <button onclick="toggleStatus({{ attr.id }}, '{% if attr.status == 'pending' %}reconciled{% else %}pending{% endif %}')"
+                                class="text-sm bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded">
+                            {% if attr.status == 'pending' %}Mark Reconciled{% else %}Mark Pending{% endif %}
+                        </button>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="7" class="px-4 py-8 text-center text-gray-500">
+                        No attributions found
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+async function toggleStatus(attrId, newStatus) {
+    try {
+        const resp = await fetch('/verticals/liquor/api/barman/reconciliation/toggle/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: JSON.stringify({
+                attribution_id: attrId,
+                status: newStatus
+            })
+        });
+        
+        const data = await resp.json();
+        
+        if (data.ok) {
+            location.reload();
+        } else {
+            alert('Failed: ' + data.error);
+        }
+    } catch (err) {
+        alert('Failed to update status');
+    }
+}
+</script>
+{% endblock %}
+

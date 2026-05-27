@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Log Maintenance – {{ business.name }}{% endblock %}
+{% block content %}
+<div class="container py-4" style="max-width:640px;">
+  <div class="d-flex align-items-center gap-2 mb-4">
+    <a href="{% url 'verticals:energy_maintenance' %}" class="btn btn-outline-secondary btn-sm rounded-pill">← Back</a>
+    <h4 class="fw-bold mb-0">{{ action }} Maintenance Record</h4>
+  </div>
+  {% if messages %}{% for m in messages %}<div class="alert alert-{{ m.tags|default:'info' }} rounded-3 mb-3">{{ m }}</div>{% endfor %}{% endif %}
+  <div class="card border-0 shadow-sm rounded-4">
+    <div class="card-body p-4">
+      <form method="post">
+        {% csrf_token %}
+        <div class="row g-3">
+          <div class="col-12">
+            <label class="form-label fw-semibold">Asset *</label>
+            <select name="asset" class="form-select rounded-3" required>
+              <option value="">Select asset…</option>
+              {% for asset in assets %}
+                <option value="{{ asset.id }}">{{ asset }} ({{ asset.site.name }})</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">Maintenance Type</label>
+            <select name="maintenance_type" class="form-select rounded-3">
+              {% for val, label in maintenance_types %}
+                <option value="{{ val }}">{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">Date Performed</label>
+            <input type="date" name="performed_at" class="form-control rounded-3" value="{{ today|date:'Y-m-d' }}">
+          </div>
+          <div class="col-12">
+            <label class="form-label fw-semibold">Description / What Was Done</label>
+            <textarea name="description" class="form-control rounded-3" rows="3" placeholder="Describe what was inspected, repaired, or replaced…"></textarea>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">Parts Used</label>
+            <input type="text" name="parts_used" class="form-control rounded-3" placeholder="e.g. Fuse 32A, Connector">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">Cost ({{ business.currency }})</label>
+            <input type="number" name="cost" class="form-control rounded-3" step="0.01" min="0">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">Health Score After (%)</label>
+            <input type="number" name="health_score_after" class="form-control rounded-3" min="0" max="100" placeholder="0–100">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">Follow-up Date</label>
+            <input type="date" name="follow_up_date" class="form-control rounded-3">
+          </div>
+          <div class="col-12">
+            <label class="form-label fw-semibold">Root Cause Notes</label>
+            <textarea name="root_cause_notes" class="form-control rounded-3" rows="2" placeholder="What caused the issue?"></textarea>
+          </div>
+          <div class="col-12">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" name="resolved" id="resolved" checked>
+              <label class="form-check-label" for="resolved">Issue resolved</label>
+            </div>
+          </div>
+        </div>
+        <div class="d-flex gap-2 mt-4">
+          <button type="submit" class="btn btn-warning rounded-pill px-4">Save Record</button>
+          <a href="{% url 'verticals:energy_maintenance' %}" class="btn btn-outline-secondary rounded-pill">Cancel</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

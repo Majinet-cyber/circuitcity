@@ -1,0 +1,253 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{{ cat_label }} Stock · {{ business.name }}{% endblock %}
+{% block header_title %}{{ cat_icon }} {{ cat_label }} Stock{% endblock %}
+
+{% block extra_css %}
+<style>
+:root {
+  --el-blue:#3b82f6; --el-blue-rgb:59,130,246;
+  --el-green:#10b981; --el-red:#ef4444;
+  --el-border:#e2e8f0; --el-bg:#f8fafc;
+  --el-text:#0f172a; --el-muted:#64748b;
+  --el-card:#ffffff; --el-shadow:0 4px 16px rgba(15,23,42,.07);
+}
+.el-page { max-width:1100px; margin:0 auto; padding:clamp(12px,3vw,24px); padding-bottom:80px; }
+
+/* category switcher */
+.cat-switcher { display:flex; gap:8px; margin-bottom:20px; flex-wrap:wrap; }
+.cat-btn {
+  padding:8px 18px; border-radius:10px; font-size:.88rem; font-weight:700;
+  border:2px solid var(--el-border); background:var(--el-card); color:var(--el-muted);
+  text-decoration:none; transition:all .18s;
+}
+.cat-btn:hover { border-color:var(--el-blue); color:var(--el-blue); }
+.cat-btn.active { border-color:var(--el-blue); background:rgba(var(--el-blue-rgb),.08); color:var(--el-blue); }
+
+/* KPI row */
+.kpi-row { display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:14px; margin-bottom:20px; }
+.kpi-card {
+  background:var(--el-card); border:1px solid var(--el-border); border-radius:14px;
+  padding:16px 18px; box-shadow:var(--el-shadow);
+}
+.kpi-label { font-size:.75rem; font-weight:700; color:var(--el-muted); text-transform:uppercase; letter-spacing:.04em; }
+.kpi-value { font-size:1.5rem; font-weight:800; color:var(--el-text); margin-top:4px; }
+.kpi-value.green { color:var(--el-green); }
+
+/* filters bar */
+.filters-bar { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:18px; align-items:center; }
+.filter-input {
+  flex:1; min-width:180px; padding:9px 14px; border:1.5px solid var(--el-border);
+  border-radius:10px; font-size:.9rem;
+}
+.filter-input:focus { outline:none; border-color:var(--el-blue); }
+.filter-select {
+  padding:9px 14px; border:1.5px solid var(--el-border); border-radius:10px;
+  font-size:.9rem; cursor:pointer; background:var(--el-card); color:var(--el-text);
+}
+.filter-select:focus { outline:none; border-color:var(--el-blue); }
+.btn-filter {
+  padding:9px 18px; background:var(--el-blue); color:#fff; border:none;
+  border-radius:10px; font-weight:700; cursor:pointer; font-size:.9rem;
+}
+.btn-csv {
+  padding:9px 16px; background:var(--el-card); border:1.5px solid var(--el-border);
+  border-radius:10px; font-size:.88rem; font-weight:700; color:var(--el-muted);
+  text-decoration:none; display:flex; align-items:center; gap:6px;
+}
+.btn-csv:hover { border-color:var(--el-green); color:var(--el-green); }
+
+/* table */
+.stock-table-wrap { overflow-x:auto; border-radius:14px; border:1px solid var(--el-border); background:var(--el-card); }
+.stock-table { width:100%; border-collapse:collapse; font-size:.88rem; }
+.stock-table th {
+  padding:10px 14px; background:var(--el-bg); font-weight:700; font-size:.78rem;
+  text-transform:uppercase; letter-spacing:.04em; color:var(--el-muted);
+  border-bottom:1px solid var(--el-border); text-align:left; white-space:nowrap;
+}
+.stock-table td { padding:12px 14px; border-bottom:1px solid var(--el-border); vertical-align:middle; }
+.stock-table tr:last-child td { border-bottom:none; }
+.stock-table tr:hover td { background:rgba(var(--el-blue-rgb),.03); }
+
+.badge-in-stock { background:rgba(16,185,129,.12); color:#059669; padding:3px 10px; border-radius:6px; font-size:.75rem; font-weight:700; }
+.badge-sold     { background:rgba(239,68,68,.12); color:#dc2626; padding:3px 10px; border-radius:6px; font-size:.75rem; font-weight:700; }
+
+/* serial number */
+.serial-cell { font-family:monospace; font-size:.82rem; color:var(--el-text); }
+
+/* battery */
+.battery-good { color:#059669; font-size:.8rem; }
+.battery-low  { color:#dc2626; font-size:.8rem; }
+.battery-na   { color:var(--el-muted); font-size:.8rem; }
+
+/* pager */
+.pager { display:flex; align-items:center; gap:8px; margin-top:16px; flex-wrap:wrap; }
+.pager a { padding:6px 12px; border:1.5px solid var(--el-border); border-radius:8px; font-size:.85rem; text-decoration:none; color:var(--el-text); }
+.pager a:hover { border-color:var(--el-blue); color:var(--el-blue); }
+.pager-info { color:var(--el-muted); font-size:.85rem; }
+
+/* empty */
+.empty-state { text-align:center; padding:48px 20px; color:var(--el-muted); }
+.empty-state .es-icon { font-size:3rem; margin-bottom:12px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="el-page">
+
+  <!-- Category Switcher -->
+  <div class="cat-switcher">
+    <a href="{{ phones_stock_url }}" class="cat-btn">📱 Phones</a>
+    <a href="{{ laptops_url }}" class="cat-btn {% if category == 'laptops' %}active{% endif %}">💻 Laptops</a>
+    <a href="{{ desktops_url }}" class="cat-btn {% if category == 'desktops' %}active{% endif %}">🖥️ Desktops</a>
+  </div>
+
+  <!-- KPI Row -->
+  <div class="kpi-row">
+    <div class="kpi-card">
+      <div class="kpi-label">In Stock</div>
+      <div class="kpi-value green">{{ total_in_stock }}</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Sold</div>
+      <div class="kpi-value">{{ total_sold }}</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Stock Value (Cost)</div>
+      <div class="kpi-value" style="font-size:1.1rem">MWK {{ stock_value|floatformat:0 }}</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Sales Revenue</div>
+      <div class="kpi-value green" style="font-size:1.1rem">MWK {{ sold_revenue|floatformat:0 }}</div>
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <form method="get" class="filters-bar">
+    <input type="hidden" name="category" value="{{ category }}">
+    <input type="text" name="q" value="{{ q }}" class="filter-input"
+           placeholder="Search serial, brand, model…">
+    <select name="status" class="filter-select">
+      <option value="in_stock" {% if status == 'in_stock' %}selected{% endif %}>In Stock</option>
+      <option value="sold"     {% if status == 'sold' %}selected{% endif %}>Sold</option>
+      <option value="all"      {% if status == 'all' %}selected{% endif %}>All</option>
+    </select>
+    <button type="submit" class="btn-filter">Filter</button>
+    <a href="{{ csv_url }}" class="btn-csv">⬇ CSV</a>
+    {% if status == 'in_stock' %}
+    <a href="{% url 'inventory:scan_in' %}?category={{ category }}"
+       style="padding:9px 16px;background:var(--el-green);color:#fff;border-radius:10px;font-size:.88rem;font-weight:700;text-decoration:none;">
+      + Stock In
+    </a>
+    {% endif %}
+  </form>
+
+  <!-- Table -->
+  {% if page_obj.object_list %}
+  <div class="stock-table-wrap">
+    <table class="stock-table">
+      <thead>
+        <tr>
+          <th>Brand</th>
+          <th>Model</th>
+          <th>Specs</th>
+          <th>Serial Number</th>
+          <th>Battery</th>
+          <th>Status</th>
+          <th class="right">Cost</th>
+          <th class="right">Selling Price</th>
+          <th>Payment</th>
+          <th>Location</th>
+          <th>Received</th>
+          {% if status == 'sold' or status == 'all' %}<th>Sold At</th>{% endif %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in page_obj.object_list %}
+        <tr>
+          <td style="font-weight:700;font-size:.8rem;letter-spacing:.04em;color:var(--el-blue)">
+            {{ item.catalog_product.brand }}
+          </td>
+          <td style="font-weight:700">{{ item.catalog_product.model_name }}</td>
+          <td style="color:var(--el-muted);font-size:.8rem">
+            {{ item.catalog_product.ram_str }}
+            {% if item.catalog_product.ram_str and item.catalog_product.storage_str %}/{% endif %}
+            {{ item.catalog_product.storage_str }}
+            {% if item.catalog_product.screen_size %} · {{ item.catalog_product.screen_size }}{% endif %}
+          </td>
+          <td class="serial-cell">{{ item.serial_number }}</td>
+          <td>
+            {% if item.battery_health %}
+              {% if 'good' in item.battery_health|lower %}
+                <span class="battery-good">🔋 {{ item.battery_health }}</span>
+              {% else %}
+                <span class="battery-low">🔋 {{ item.battery_health }}</span>
+              {% endif %}
+            {% else %}
+              <span class="battery-na">—</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if item.status == 'IN_STOCK' %}
+              <span class="badge-in-stock">In Stock</span>
+            {% else %}
+              <span class="badge-sold">Sold</span>
+            {% endif %}
+          </td>
+          <td class="right">MWK {{ item.order_price|floatformat:0 }}</td>
+          <td class="right">
+            {% if item.selling_price %}MWK {{ item.selling_price|floatformat:0 }}{% else %}—{% endif %}
+          </td>
+          <td style="font-size:.8rem;color:var(--el-muted)">
+            {{ item.payment_method|default:"—" }}
+          </td>
+          <td style="font-size:.8rem;color:var(--el-muted)">
+            {{ item.current_location.name|default:"—" }}
+          </td>
+          <td style="font-size:.78rem;color:var(--el-muted)">{{ item.received_at }}</td>
+          {% if status == 'sold' or status == 'all' %}
+          <td style="font-size:.78rem;color:var(--el-muted)">
+            {% if item.sold_at %}{{ item.sold_at|date:"d M Y" }}{% else %}—{% endif %}
+          </td>
+          {% endif %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Pagination -->
+  <div class="pager">
+    {% if page_obj.has_previous %}
+    <a href="?category={{ category }}&status={{ status }}&q={{ q }}&page={{ page_obj.previous_page_number }}">← Prev</a>
+    {% endif %}
+    <span class="pager-info">
+      Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+      ({{ page_obj.paginator.count }} item{{ page_obj.paginator.count|pluralize }})
+    </span>
+    {% if page_obj.has_next %}
+    <a href="?category={{ category }}&status={{ status }}&q={{ q }}&page={{ page_obj.next_page_number }}">Next →</a>
+    {% endif %}
+  </div>
+
+  {% else %}
+  <div class="empty-state">
+    <div class="es-icon">📭</div>
+    <p style="font-weight:700;color:var(--el-text);margin-bottom:6px">No {{ cat_label|lower }} found</p>
+    {% if q %}
+    <p>No results for "{{ q }}". Try a different search.</p>
+    {% elif status == 'in_stock' %}
+    <p>No {{ cat_label|lower }} in stock. Stock some units via Scan In.</p>
+    <a href="{% url 'inventory:scan_in' %}?category={{ category }}"
+       style="display:inline-block;margin-top:12px;padding:10px 22px;background:var(--el-blue);color:#fff;border-radius:10px;text-decoration:none;font-weight:700;">
+      Go to Scan In →
+    </a>
+    {% else %}
+    <p>No records found.</p>
+    {% endif %}
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}

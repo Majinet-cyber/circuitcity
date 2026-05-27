@@ -38,9 +38,10 @@ User = get_user_model()
 @pytest.fixture
 def business():
     """Create a test phones business"""
+    from conftest import unique_slug
     return Business.objects.create(
         name="Test Phone Store",
-        slug="test-phones",
+        slug=unique_slug("Test Phone Store"),
         status="ACTIVE",
         business_kind=BusinessKind.PHONES
     )
@@ -63,10 +64,13 @@ def agent(business, location):
     user.is_staff = False
     user.save()
     
-    # Create agent profile with location
+    # Create/update agent profile with location (idempotent)
     try:
-        from tenants.models import AgentProfile
-        AgentProfile.objects.create(user=user, location=location, business=business)
+        from inventory.models import AgentProfile
+        agent_profile, _ = AgentProfile.objects.get_or_create(user=user)
+        if agent_profile.location != location:
+            agent_profile.location = location
+            agent_profile.save(update_fields=["location"])
     except Exception:
         pass  # AgentProfile may not exist in all setups
     

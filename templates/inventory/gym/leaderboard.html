@@ -1,0 +1,420 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Leaderboard · Gym · {{ business.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+  /* Gym Leaderboard - Mobile-First Premium Design */
+  .gym-lb-page {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  @media (min-width: 768px) {
+    .gym-lb-page {
+      padding: 1.5rem;
+      gap: 2rem;
+    }
+  }
+
+  /* Header */
+  .gym-lb-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    padding: 2rem 1.5rem;
+    border-radius: 20px;
+    color: white;
+    box-shadow: 0 8px 24px rgba(102, 126, 234, 0.25);
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .gym-lb-header::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    right: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+    animation: pulse 3s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { transform: scale(1); opacity: 0.3; }
+    50% { transform: scale(1.1); opacity: 0.5; }
+  }
+
+  .gym-lb-header h1 {
+    margin: 0 0 0.5rem;
+    font-size: clamp(1.75rem, 5vw, 2.5rem);
+    font-weight: 800;
+    position: relative;
+    z-index: 1;
+  }
+
+  .gym-lb-header p {
+    margin: 0;
+    opacity: 0.95;
+    font-size: 0.95rem;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* Podium (Top 3) */
+  .gym-lb-podium {
+    display: flex;
+    justify-content: center;
+    align-items: flex-end;
+    gap: 0.75rem;
+    padding: 0 1rem;
+  }
+
+  @media (min-width: 768px) {
+    .gym-lb-podium {
+      gap: 1rem;
+    }
+  }
+
+  .gym-lb-podium-place {
+    flex: 1;
+    max-width: 160px;
+    text-align: center;
+  }
+
+  .gym-lb-podium-place.first { order: 2; }
+  .gym-lb-podium-place.second { order: 1; }
+  .gym-lb-podium-place.third { order: 3; }
+
+  .gym-lb-podium-medal {
+    font-size: 2rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .gym-lb-podium-place.first .gym-lb-podium-medal {
+    font-size: 3rem;
+  }
+
+  .gym-lb-podium-avatar {
+    width: 60px;
+    height: 60px;
+    background: linear-gradient(135deg, #e2e8f0, #cbd5e1);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    margin: 0 auto 0.75rem;
+    border: 3px solid white;
+    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.1);
+    font-weight: 700;
+    color: white;
+  }
+
+  .gym-lb-podium-place.first .gym-lb-podium-avatar {
+    width: 80px;
+    height: 80px;
+    font-size: 2rem;
+    background: linear-gradient(135deg, #fbbf24, #f59e0b);
+    box-shadow: 0 8px 24px rgba(245, 158, 11, 0.4);
+  }
+
+  .gym-lb-podium-place.second .gym-lb-podium-avatar {
+    background: linear-gradient(135deg, #94a3b8, #64748b);
+  }
+
+  .gym-lb-podium-place.third .gym-lb-podium-avatar {
+    background: linear-gradient(135deg, #d97706, #b45309);
+  }
+
+  .gym-lb-podium-name {
+    font-weight: 700;
+    color: #0f172a;
+    font-size: 0.95rem;
+    margin-bottom: 0.25rem;
+  }
+
+  .gym-lb-podium-stat {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .gym-lb-podium-checkins {
+    color: #10b981;
+    font-weight: 800;
+    font-size: 1.25rem;
+  }
+
+  .gym-lb-podium-place.first .gym-lb-podium-checkins {
+    font-size: 1.5rem;
+  }
+
+  .gym-lb-podium-streak {
+    font-size: 0.875rem;
+    color: #64748b;
+  }
+
+  /* Leaderboard List */
+  .gym-lb-list {
+    background: white;
+    border-radius: 16px;
+    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
+    border: 1px solid #e2e8f0;
+    overflow: hidden;
+  }
+
+  .gym-lb-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1rem;
+    border-bottom: 1px solid #f1f5f9;
+    transition: background 0.2s;
+  }
+
+  @media (min-width: 768px) {
+    .gym-lb-item {
+      gap: 1rem;
+      padding: 1.25rem;
+    }
+  }
+
+  .gym-lb-item:last-child {
+    border-bottom: 0;
+  }
+
+  .gym-lb-item:hover {
+    background: #f8fafc;
+  }
+
+  .gym-lb-rank {
+    font-size: 1.5rem;
+    font-weight: 900;
+    color: #cbd5e1;
+    min-width: 40px;
+    text-align: center;
+  }
+
+  .gym-lb-avatar {
+    width: 48px;
+    height: 48px;
+    background: linear-gradient(135deg, #e2e8f0, #cbd5e1);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+    flex-shrink: 0;
+    font-weight: 700;
+    color: white;
+  }
+
+  .gym-lb-info {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .gym-lb-name {
+    font-weight: 700;
+    color: #0f172a;
+    font-size: 1rem;
+    margin-bottom: 0.25rem;
+  }
+
+  .gym-lb-meta {
+    font-size: 0.8rem;
+    color: #64748b;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .gym-lb-stats {
+    text-align: right;
+  }
+
+  .gym-lb-checkins {
+    font-size: 1.25rem;
+    font-weight: 800;
+    color: #10b981;
+    margin-bottom: 0.25rem;
+  }
+
+  .gym-lb-badge {
+    font-size: 0.75rem;
+  }
+
+  /* Empty state */
+  .gym-lb-empty {
+    text-align: center;
+    padding: 3rem 1.5rem;
+    color: #94a3b8;
+  }
+
+  .gym-lb-empty .icon {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+    opacity: 0.5;
+  }
+
+  .gym-lb-empty p {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 600;
+  }
+
+  /* Period selector */
+  .gym-lb-period {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .gym-lb-period-btn {
+    padding: 0.5rem 1rem;
+    border: 2px solid #e2e8f0;
+    background: white;
+    border-radius: 50px;
+    font-weight: 600;
+    font-size: 0.875rem;
+    color: #64748b;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .gym-lb-period-btn.active {
+    background: #667eea;
+    color: white;
+    border-color: #667eea;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="gym-lb-page">
+  <!-- Header -->
+  <header class="gym-lb-header">
+    <h1>🏆 Gym Leaderboard</h1>
+    <p>Top Attendees · {{ period_label }}</p>
+  </header>
+
+  <!-- Period Selector -->
+  <div class="gym-lb-period">
+    <a href="?period=week" class="gym-lb-period-btn {% if period == 'week' %}active{% endif %}">
+      This Week
+    </a>
+    <a href="?period=month" class="gym-lb-period-btn {% if period == 'month' %}active{% endif %}">
+      This Month
+    </a>
+    <a href="?period=all" class="gym-lb-period-btn {% if period == 'all' %}active{% endif %}">
+      All Time
+    </a>
+  </div>
+
+  <!-- Podium (Top 3) -->
+  {% if leaderboard|length >= 3 %}
+  <section class="gym-lb-podium">
+    <!-- 1st Place -->
+    <div class="gym-lb-podium-place first">
+      <div class="gym-lb-podium-medal">🥇</div>
+      <div class="gym-lb-podium-avatar">{{ leaderboard.0.member.name.0|upper }}</div>
+      <div class="gym-lb-podium-name"><a href="{% url 'gym:member_detail' leaderboard.0.member.id %}" class="text-decoration-none text-white">{{ leaderboard.0.member.name }}</a></div>
+      <div class="gym-lb-podium-stat">
+        <div class="gym-lb-podium-checkins">{{ leaderboard.0.checkins }} days</div>
+        {% if leaderboard.0.member.streak_days > 0 %}
+          <div class="gym-lb-podium-streak">🔥 {{ leaderboard.0.member.streak_days }}-day streak</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- 2nd Place -->
+    {% if leaderboard|length >= 2 %}
+    <div class="gym-lb-podium-place second">
+      <div class="gym-lb-podium-medal">🥈</div>
+      <div class="gym-lb-podium-avatar">{{ leaderboard.1.member.name.0|upper }}</div>
+      <div class="gym-lb-podium-name"><a href="{% url 'gym:member_detail' leaderboard.1.member.id %}" class="text-decoration-none text-white">{{ leaderboard.1.member.name }}</a></div>
+      <div class="gym-lb-podium-stat">
+        <div class="gym-lb-podium-checkins">{{ leaderboard.1.checkins }} days</div>
+        {% if leaderboard.1.member.streak_days > 0 %}
+          <div class="gym-lb-podium-streak">🔥 {{ leaderboard.1.member.streak_days }}-day</div>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- 3rd Place -->
+    {% if leaderboard|length >= 3 %}
+    <div class="gym-lb-podium-place third">
+      <div class="gym-lb-podium-medal">🥉</div>
+      <div class="gym-lb-podium-avatar">{{ leaderboard.2.member.name.0|upper }}</div>
+      <div class="gym-lb-podium-name"><a href="{% url 'gym:member_detail' leaderboard.2.member.id %}" class="text-decoration-none text-white">{{ leaderboard.2.member.name }}</a></div>
+      <div class="gym-lb-podium-stat">
+        <div class="gym-lb-podium-checkins">{{ leaderboard.2.checkins }} days</div>
+        {% if leaderboard.2.member.streak_days > 0 %}
+          <div class="gym-lb-podium-streak">🔥 {{ leaderboard.2.member.streak_days }}-day</div>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+  </section>
+  {% endif %}
+
+  <!-- Full Leaderboard -->
+  {% if leaderboard %}
+  <section class="gym-lb-list">
+    {% for entry in leaderboard %}
+    <div class="gym-lb-item">
+      <div class="gym-lb-rank">
+        {% if entry.rank == 1 %}🥇
+        {% elif entry.rank == 2 %}🥈
+        {% elif entry.rank == 3 %}🥉
+        {% else %}{{ entry.rank }}{% endif %}
+      </div>
+      <div class="gym-lb-avatar">{{ entry.member.name.0|upper }}</div>
+      <div class="gym-lb-info">
+        <div class="gym-lb-name"><a href="{% url 'gym:member_detail' entry.member.id %}" class="text-decoration-none text-dark">{{ entry.member.name }}</a></div>
+        <div class="gym-lb-meta">
+          <span>{{ entry.checkins }} check-in{{ entry.checkins|pluralize }}</span>
+          {% if entry.member.streak_days > 0 %}
+            <span>🔥 {{ entry.member.streak_days }}-day streak</span>
+          {% endif %}
+          {% if entry.member.get_badge_display.icon %}
+            <span>{{ entry.member.get_badge_display.icon }}</span>
+          {% endif %}
+        </div>
+      </div>
+      <div class="gym-lb-stats">
+        <div class="gym-lb-checkins">{{ entry.checkins }}</div>
+        {% if entry.member.get_badge_display.icon %}
+          <div class="gym-lb-badge">
+            {{ entry.member.get_badge_display.icon }}
+          </div>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </section>
+  {% else %}
+  <div class="gym-lb-empty">
+    <div class="icon">🏆</div>
+    <p>No check-ins recorded yet. Be the first!</p>
+  </div>
+  {% endif %}
+
+  <!-- Back Link -->
+  <div style="text-align: center; padding: 1rem 0;">
+    <a href="{% url 'gym:checkin_page' %}"
+       class="btn btn-outline-primary"
+       style="border-radius: 12px; padding: 0.75rem 1.5rem;">
+      ← Back to Check-In
+    </a>
+  </div>
+</div>
+{% endblock %}

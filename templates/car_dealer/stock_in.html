@@ -1,0 +1,848 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Add Vehicle – {{ business.name }}{% endblock %}
+
+{% block content %}
+<style>
+  /* ── WIZARD PROGRESS ── */
+  .wiz-steps {
+    display: flex; align-items: center; gap: 0; margin-bottom: 2rem;
+    background: #fff; border: 1.5px solid #e2e8f0; border-radius: 16px;
+    padding: .85rem 1.25rem; box-shadow: 0 2px 12px rgba(0,0,0,.04);
+  }
+  .wiz-step {
+    flex: 1; display: flex; align-items: center; gap: .5rem;
+    font-size: .78rem; font-weight: 600; color: #94a3b8;
+    position: relative; cursor: pointer;
+  }
+  .wiz-step.active   { color: #1d4ed8; }
+  .wiz-step.done     { color: #16a34a; }
+  .wiz-step-num {
+    width: 26px; height: 26px; border-radius: 50%;
+    background: #f1f5f9; border: 2px solid #cbd5e1;
+    display: flex; align-items: center; justify-content: center;
+    font-size: .75rem; font-weight: 800; flex-shrink: 0;
+    transition: all .2s;
+  }
+  .wiz-step.active .wiz-step-num {
+    background: #1d4ed8; border-color: #1d4ed8; color: #fff;
+    box-shadow: 0 2px 8px rgba(29,78,216,.35);
+  }
+  .wiz-step.done .wiz-step-num {
+    background: #16a34a; border-color: #16a34a; color: #fff;
+  }
+  .wiz-connector {
+    flex-shrink: 0; width: 24px; height: 2px;
+    background: #e2e8f0; margin: 0 .25rem; border-radius: 999px;
+  }
+  .wiz-step.done ~ .wiz-connector,
+  .wiz-connector.done { background: #16a34a; }
+  @media (max-width: 576px) {
+    .wiz-step-label { display: none; }
+    .wiz-steps { padding: .7rem .85rem; }
+  }
+
+  /* ── WIZARD PANELS ── */
+  .wiz-panel { display: none; }
+  .wiz-panel.active { display: block; }
+
+  /* ── MAKE GRID ── */
+  .make-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: .65rem; margin-bottom: 1rem;
+  }
+  .make-tile {
+    padding: .85rem .5rem; border-radius: 14px;
+    border: 2px solid #e2e8f0; background: #f8fafc;
+    display: flex; flex-direction: column; align-items: center;
+    gap: .35rem; cursor: pointer; transition: all .14s;
+    font-size: .8rem; font-weight: 700; color: #374151;
+    text-align: center; user-select: none;
+  }
+  .make-tile:hover { border-color: #3b82f6; background: #eff6ff; color: #1d4ed8; }
+  .make-tile.active {
+    border-color: #1d4ed8; background: #1d4ed8; color: #fff;
+    box-shadow: 0 4px 16px rgba(29,78,216,.28);
+  }
+  .make-tile-icon { font-size: 1.4rem; line-height: 1; }
+
+  /* ── MODEL GRID ── */
+  .model-grid {
+    display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: 1rem;
+  }
+  .model-btn {
+    padding: .42rem 1rem; border-radius: 999px; font-size: .82rem; font-weight: 600;
+    border: 1.5px solid #e2e8f0; background: #f8fafc; color: #475569;
+    cursor: pointer; transition: all .12s; user-select: none;
+  }
+  .model-btn:hover  { border-color: #93c5fd; color: #1d4ed8; background: #eff6ff; }
+  .model-btn.active { background: #1d4ed8; border-color: #1d4ed8; color: #fff; box-shadow: 0 2px 8px rgba(29,78,216,.3); }
+
+  /* ── PILL SELECTORS ── */
+  .pill-group { display: flex; flex-wrap: wrap; gap: .45rem; }
+  .pill-btn {
+    padding: .38rem .9rem; border-radius: 999px; font-size: .8rem; font-weight: 600;
+    border: 1.5px solid #e2e8f0; background: #f8fafc; color: #475569;
+    cursor: pointer; transition: all .12s; user-select: none;
+  }
+  .pill-btn:hover  { border-color: #93c5fd; color: #1d4ed8; background: #eff6ff; }
+  .pill-btn.active { background: #1d4ed8; border-color: #1d4ed8; color: #fff; box-shadow: 0 2px 8px rgba(29,78,216,.3); }
+
+  /* ── BODY TYPE CARDS ── */
+  .body-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+    gap: .55rem;
+  }
+  .body-tile {
+    padding: .7rem .4rem; border-radius: 12px;
+    border: 2px solid #e2e8f0; background: #f8fafc;
+    display: flex; flex-direction: column; align-items: center;
+    gap: .25rem; cursor: pointer; transition: all .14s;
+    font-size: .74rem; font-weight: 700; color: #374151;
+    text-align: center; user-select: none;
+  }
+  .body-tile:hover  { border-color: #93c5fd; background: #eff6ff; color: #1d4ed8; }
+  .body-tile.active { border-color: #1d4ed8; background: #1d4ed8; color: #fff; box-shadow: 0 2px 8px rgba(29,78,216,.25); }
+  .body-tile-icon { font-size: 1.5rem; }
+
+  /* ── DEAL HEALTH CARD ── */
+  .deal-health {
+    border-radius: 14px; padding: 1.1rem 1.25rem;
+    border: 1.5px solid #e2e8f0; background: #f8fafc; transition: all .25s;
+  }
+  .deal-health.healthy { border-color: #86efac; background: linear-gradient(135deg,#f0fdf4,#dcfce7); }
+  .deal-health.thin    { border-color: #fde68a; background: linear-gradient(135deg,#fffbeb,#fef3c7); }
+  .deal-health.risky   { border-color: #fca5a5; background: linear-gradient(135deg,#fff1f2,#fee2e2); }
+  .dh-title { font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: #64748b; margin-bottom: .6rem; }
+  .dh-row { display: flex; justify-content: space-between; align-items: center; font-size: .82rem; margin-bottom: .3rem; }
+  .dh-label { color: #64748b; }
+  .dh-val { font-weight: 700; color: #0f172a; }
+  .dh-status { display: inline-flex; align-items: center; gap: .3rem; font-size: .75rem; font-weight: 700; padding: .25rem .7rem; border-radius: 999px; margin-top: .5rem; }
+  .dh-status.healthy { background: #dcfce7; color: #16a34a; }
+  .dh-status.thin    { background: #fef3c7; color: #b45309; }
+  .dh-status.risky   { background: #fee2e2; color: #dc2626; }
+
+  /* ── FORM SECTION CARD ── */
+  .form-section {
+    background: #fff; border: 1.5px solid #e2e8f0;
+    border-radius: 16px; padding: 1.4rem 1.5rem; margin-bottom: 1.25rem;
+  }
+  .form-section-title {
+    font-size: .7rem; font-weight: 700; letter-spacing: .08em;
+    text-transform: uppercase; color: #64748b; margin-bottom: 1rem;
+    display: flex; align-items: center; gap: .4rem;
+  }
+  .form-label { font-size: .8rem; font-weight: 600; margin-bottom: .35rem; }
+  .form-control, .form-select { font-size: .85rem; border-radius: 10px; }
+
+  /* ── NAV BUTTONS ── */
+  .wiz-nav { display: flex; justify-content: space-between; align-items: center; margin-top: 1.5rem; gap: .75rem; }
+  .btn-wiz-next {
+    background: #1d4ed8; color: #fff; border: none;
+    border-radius: 999px; padding: .55rem 1.75rem;
+    font-size: .88rem; font-weight: 700;
+    display: inline-flex; align-items: center; gap: .4rem;
+    cursor: pointer; transition: all .14s;
+  }
+  .btn-wiz-next:hover { background: #1e40af; transform: translateY(-1px); }
+  .btn-wiz-back {
+    background: #f1f5f9; color: #475569; border: 1.5px solid #e2e8f0;
+    border-radius: 999px; padding: .5rem 1.25rem;
+    font-size: .85rem; font-weight: 600;
+    display: inline-flex; align-items: center; gap: .4rem;
+    cursor: pointer; transition: all .14s; text-decoration: none;
+  }
+  .btn-wiz-back:hover { background: #e2e8f0; color: #334155; }
+
+  /* ── MANUAL SECTION ── */
+  .manual-row {
+    border-top: 1.5px dashed #e2e8f0; padding-top: 1rem; margin-top: 1rem;
+  }
+  .manual-toggle {
+    font-size: .78rem; color: #64748b; cursor: pointer; user-select: none;
+    display: inline-flex; align-items: center; gap: .3rem;
+    background: none; border: none; padding: 0; margin-bottom: .75rem;
+  }
+  .manual-toggle:hover { color: #1d4ed8; }
+</style>
+
+<div class="container py-4" style="max-width: 780px;">
+
+  {# ── PAGE HEADER ── #}
+  <div class="d-flex align-items-center gap-3 mb-4">
+    <a href="{% url 'car_dealer:dashboard' %}" class="btn btn-outline-secondary btn-sm rounded-pill">
+      <i class="bi bi-arrow-left me-1"></i>Back
+    </a>
+    <div>
+      <h4 class="fw-bold mb-0" style="color:#0f172a;">
+        <img src="{% static 'img/car-dealer/car-green.svg' %}" alt="" style="height:1.4em;vertical-align:middle;margin-right:.4rem;">
+        Add Vehicle to Inventory
+      </h4>
+      <div class="text-muted small">{{ business.name }}</div>
+    </div>
+  </div>
+
+  {% if messages %}
+    {% for m in messages %}
+      <div class="alert alert-{{ m.tags|default:'info' }} rounded-3 mb-3 py-2">{{ m }}</div>
+    {% endfor %}
+  {% endif %}
+
+  {# ── STEP INDICATOR ── #}
+  <div class="wiz-steps" id="wizSteps">
+    <div class="wiz-step active" id="step-dot-1" onclick="goToStep(1)">
+      <div class="wiz-step-num">1</div>
+      <span class="wiz-step-label">Make</span>
+    </div>
+    <div class="wiz-connector" id="conn-1"></div>
+    <div class="wiz-step" id="step-dot-2" onclick="goToStep(2)">
+      <div class="wiz-step-num">2</div>
+      <span class="wiz-step-label">Model &amp; Body</span>
+    </div>
+    <div class="wiz-connector" id="conn-2"></div>
+    <div class="wiz-step" id="step-dot-3" onclick="goToStep(3)">
+      <div class="wiz-step-num">3</div>
+      <span class="wiz-step-label">Specs</span>
+    </div>
+    <div class="wiz-connector" id="conn-3"></div>
+    <div class="wiz-step" id="step-dot-4" onclick="goToStep(4)">
+      <div class="wiz-step-num">4</div>
+      <span class="wiz-step-label">Pricing &amp; Details</span>
+    </div>
+    <div class="wiz-connector" id="conn-4"></div>
+    <div class="wiz-step" id="step-dot-5" onclick="goToStep(5)">
+      <div class="wiz-step-num">5</div>
+      <span class="wiz-step-label">Photos</span>
+    </div>
+  </div>
+
+  <form method="post" enctype="multipart/form-data" id="vehicleForm">
+    {% csrf_token %}
+
+    {# ════════════════════════════════ STEP 1 — MAKE ════════════════════════════════ #}
+    <div class="wiz-panel active" id="wiz-panel-1">
+      <div class="form-section">
+        <div class="form-section-title"><i class="bi bi-car-front"></i> Step 1 — Select Make</div>
+
+        {% if not makes %}
+        <div class="alert alert-info rounded-3 mb-3 py-2" style="font-size:.85rem;">
+          <i class="bi bi-info-circle me-1"></i>
+          No makes loaded yet.
+          <a href="{% url 'car_dealer:seed_data' %}" class="fw-bold ms-1">Seed reference catalog →</a>
+        </div>
+        {% endif %}
+        <div class="make-grid" id="makeGrid">
+          {% for make in makes %}
+          <div class="make-tile" data-make-id="{{ make.pk }}" data-make-name="{{ make.name }}"
+               data-popular="{{ make.is_popular|yesno:'true,false' }}">
+            <div class="make-tile-icon">🚗</div>
+            {{ make.name }}
+          </div>
+          {% endfor %}
+          <div class="make-tile" data-make-id="" data-make-name="">
+            <div class="make-tile-icon">✏️</div>
+            Other
+          </div>
+        </div>
+
+        <input type="hidden" name="make_id" id="makeId">
+
+        <div id="makeManualRow" class="manual-row" style="display:none;">
+          <button type="button" class="manual-toggle" id="makeManualToggle">
+            <i class="bi bi-chevron-down" id="makeManualChevron"></i>
+            Enter make manually
+          </button>
+          <div id="makeManualFields">
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label class="form-label">Make Name</label>
+                <input type="text" name="make_text" id="makeTextInput" class="form-control" placeholder="e.g. BYD, MG, Chery">
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="wiz-nav">
+        <a href="{% url 'car_dealer:dashboard' %}" class="btn-wiz-back">
+          <i class="bi bi-x"></i> Cancel
+        </a>
+        <button type="button" class="btn-wiz-next" onclick="nextStep(1)">
+          Next: Model &amp; Body <i class="bi bi-chevron-right"></i>
+        </button>
+      </div>
+    </div>
+
+    {# ════════════════════════════════ STEP 2 — MODEL & BODY TYPE ════════════════════════════════ #}
+    <div class="wiz-panel" id="wiz-panel-2">
+      <div class="form-section">
+        <div class="form-section-title"><i class="bi bi-list-ul"></i> Step 2 — Model &amp; Body Type</div>
+
+        {# Selected make indicator #}
+        <div class="d-flex align-items-center gap-2 mb-3 p-2 rounded-3" style="background:#eff6ff;border:1.5px solid #bfdbfe;">
+          <span class="fw-bold" style="color:#1d4ed8;" id="selectedMakeLabel">—</span>
+          <button type="button" onclick="goToStep(1)" class="btn btn-link btn-sm p-0 ms-auto" style="font-size:.75rem;color:#64748b;">Change make</button>
+        </div>
+
+        <div id="modelGridWrap">
+          <div class="form-section-title mb-2" style="margin-top:0;">
+            <i class="bi bi-grid-3x3-gap"></i> Common Models — tap to select
+          </div>
+          <div class="model-grid" id="modelGrid"></div>
+        </div>
+
+        <input type="hidden" name="model_id" id="modelId">
+
+        <div class="manual-row">
+          <button type="button" class="manual-toggle" id="modelManualToggle">
+            <i class="bi bi-chevron-down" id="modelManualChevron"></i>
+            Model not listed? Enter manually
+          </button>
+          <div id="modelManualFields" style="display:none;">
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label class="form-label">Model Name</label>
+                <input type="text" name="model_text" id="modelTextInput" class="form-control" placeholder="e.g. Atto 3, EQB">
+              </div>
+              <div class="col-md-3">
+                <label class="form-label">Year</label>
+                <input type="number" name="year" id="yearInput" class="form-control" min="1990" max="{{ current_year }}" placeholder="{{ current_year }}">
+              </div>
+              <div class="col-md-3">
+                <label class="form-label">Trim / Grade</label>
+                <input type="text" name="trim" class="form-control" placeholder="e.g. GL, SE">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {# Year (always visible shortcut) #}
+        <div class="row g-3 mt-2">
+          <div class="col-md-3">
+            <label class="form-label">Year <span style="color:#94a3b8;font-weight:400;">(required)</span></label>
+            <input type="number" name="year" id="yearInputMain" class="form-control" min="1990" max="{{ current_year }}" placeholder="{{ current_year }}">
+          </div>
+        </div>
+
+        {# BODY TYPE #}
+        <div class="mt-4">
+          <div class="form-section-title mb-2" style="margin-top:0;"><i class="bi bi-grid-1x2"></i> Body Type</div>
+          <input type="hidden" name="body_type" id="bodyTypeVal">
+          <div class="body-grid">
+            <div class="body-tile" data-value="sedan">
+              <div class="body-tile-icon">🚗</div>Sedan
+            </div>
+            <div class="body-tile" data-value="hatchback">
+              <div class="body-tile-icon">🚘</div>Hatchback
+            </div>
+            <div class="body-tile" data-value="suv">
+              <div class="body-tile-icon">🚙</div>SUV
+            </div>
+            <div class="body-tile" data-value="pickup">
+              <div class="body-tile-icon">🛻</div>Pickup
+            </div>
+            <div class="body-tile" data-value="minivan">
+              <div class="body-tile-icon">🚐</div>Minivan
+            </div>
+            <div class="body-tile" data-value="van">
+              <div class="body-tile-icon">🚌</div>Van
+            </div>
+            <div class="body-tile" data-value="wagon">
+              <div class="body-tile-icon">🚗</div>Wagon
+            </div>
+            <div class="body-tile" data-value="other">
+              <div class="body-tile-icon">🔘</div>Other
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="wiz-nav">
+        <button type="button" class="btn-wiz-back" onclick="goToStep(1)">
+          <i class="bi bi-chevron-left"></i> Back
+        </button>
+        <button type="button" class="btn-wiz-next" onclick="nextStep(2)">
+          Next: Specifications <i class="bi bi-chevron-right"></i>
+        </button>
+      </div>
+    </div>
+
+    {# ════════════════════════════════ STEP 3 — SPECS ════════════════════════════════ #}
+    <div class="wiz-panel" id="wiz-panel-3">
+      <div class="form-section">
+        <div class="form-section-title"><i class="bi bi-sliders"></i> Step 3 — Specifications</div>
+
+        {# Fuel Type #}
+        <div class="mb-4">
+          <label class="form-label">Fuel Type</label>
+          <input type="hidden" name="fuel_type" id="fuelTypeVal">
+          <div class="pill-group" id="fuelGroup">
+            <button type="button" class="pill-btn" data-value="petrol">⛽ Petrol</button>
+            <button type="button" class="pill-btn" data-value="diesel">🛢 Diesel</button>
+            <button type="button" class="pill-btn" data-value="hybrid">🔋 Hybrid</button>
+            <button type="button" class="pill-btn" data-value="electric">⚡ Electric</button>
+          </div>
+        </div>
+
+        {# Transmission #}
+        <div class="mb-4">
+          <label class="form-label">Transmission</label>
+          <input type="hidden" name="transmission" id="transmissionVal">
+          <div class="pill-group" id="transmissionGroup">
+            <button type="button" class="pill-btn" data-value="auto">Automatic</button>
+            <button type="button" class="pill-btn" data-value="manual">Manual</button>
+            <button type="button" class="pill-btn" data-value="cvt">CVT</button>
+          </div>
+        </div>
+
+        {# Drivetrain #}
+        <div class="mb-4">
+          <label class="form-label">Drivetrain</label>
+          <input type="hidden" name="drivetrain" id="drivetrainVal">
+          <div class="pill-group" id="drivetrainGroup">
+            <button type="button" class="pill-btn" data-value="fwd">FWD</button>
+            <button type="button" class="pill-btn" data-value="rwd">RWD</button>
+            <button type="button" class="pill-btn" data-value="awd">AWD</button>
+            <button type="button" class="pill-btn" data-value="4wd">4WD</button>
+          </div>
+        </div>
+
+        {# Condition #}
+        <div class="mb-4">
+          <label class="form-label">Condition</label>
+          <input type="hidden" name="condition" id="conditionVal" value="used">
+          <div class="pill-group" id="conditionGroup">
+            <button type="button" class="pill-btn active" data-value="used">Used</button>
+            <button type="button" class="pill-btn" data-value="new">Brand New</button>
+            <button type="button" class="pill-btn" data-value="certified">Certified Pre-Owned</button>
+          </div>
+        </div>
+
+        <div class="row g-3">
+          <div class="col-md-4">
+            <label class="form-label">Mileage (km)</label>
+            <input type="number" name="mileage" class="form-control" min="0" placeholder="e.g. 45000">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Engine Size</label>
+            <input type="text" name="engine_size" class="form-control" placeholder="e.g. 1500cc">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Colour</label>
+            <input type="text" name="color" class="form-control" placeholder="e.g. White Pearl">
+          </div>
+        </div>
+      </div>
+
+      <div class="wiz-nav">
+        <button type="button" class="btn-wiz-back" onclick="goToStep(2)">
+          <i class="bi bi-chevron-left"></i> Back
+        </button>
+        <button type="button" class="btn-wiz-next" onclick="nextStep(3)">
+          Next: Pricing &amp; Details <i class="bi bi-chevron-right"></i>
+        </button>
+      </div>
+    </div>
+
+    {# ════════════════════════════════ STEP 4 — PRICING & DETAILS ════════════════════════════════ #}
+    <div class="wiz-panel" id="wiz-panel-4">
+
+      {# Summary banner #}
+      <div class="d-flex align-items-center gap-2 mb-3 p-3 rounded-3" style="background:#f0fdf4;border:1.5px solid #bbf7d0;">
+        <i class="bi bi-check-circle-fill text-success"></i>
+        <span style="font-size:.85rem;font-weight:600;color:#166534;" id="vehicleSummaryLabel">
+          Vehicle details captured — just add pricing to complete.
+        </span>
+      </div>
+
+      {# PRICING #}
+      <div class="form-section">
+        <div class="form-section-title"><i class="bi bi-cash-coin"></i>Pricing</div>
+        <div class="row g-3 align-items-start">
+          <div class="col-md-4">
+            <label class="form-label">Buying Price <span class="text-muted fw-normal">(cost)</span></label>
+            <div class="input-group">
+              <span class="input-group-text">{{ business.currency }}</span>
+              <input type="number" name="buying_price" id="buying_price_input"
+                     class="form-control" step="0.01" min="0" placeholder="0.00"
+                     autocomplete="off">
+            </div>
+            <div class="form-text">Internal only</div>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Asking Price <span class="text-muted fw-normal">(selling)</span></label>
+            <div class="input-group">
+              <span class="input-group-text">{{ business.currency }}</span>
+              <input type="number" name="selling_price" id="selling_price_input"
+                     class="form-control" step="0.01" min="0" placeholder="0.00"
+                     autocomplete="off">
+            </div>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Stock Reference</label>
+            <input type="text" name="stock_ref" class="form-control" placeholder="e.g. CD-001">
+          </div>
+
+          {# DEAL HEALTH CARD #}
+          <div class="col-12">
+            <div class="deal-health" id="dealHealthCard">
+              <div class="dh-title"><i class="bi bi-graph-up-arrow me-1"></i>Deal Health — Live Preview</div>
+              <div class="row g-3">
+                <div class="col-6 col-md-3">
+                  <div class="dh-label" style="font-size:.72rem;">Cost</div>
+                  <div class="dh-val" id="dh_cost" style="font-size:1rem;">—</div>
+                </div>
+                <div class="col-6 col-md-3">
+                  <div class="dh-label" style="font-size:.72rem;">Asking Price</div>
+                  <div class="dh-val" id="dh_sell" style="font-size:1rem;">—</div>
+                </div>
+                <div class="col-6 col-md-3">
+                  <div class="dh-label" style="font-size:.72rem;">Gross Profit</div>
+                  <div class="dh-val" id="dh_profit" style="font-size:1.15rem;">—</div>
+                </div>
+                <div class="col-6 col-md-3">
+                  <div class="dh-label" style="font-size:.72rem;">Margin</div>
+                  <div class="dh-val" id="dh_margin" style="font-size:1.15rem;">—</div>
+                </div>
+              </div>
+              <div id="dh_badge"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {# IDENTITY & LOCATION #}
+      <div class="form-section">
+        <div class="form-section-title"><i class="bi bi-geo-alt"></i>Identity &amp; Location</div>
+        <div class="row g-3">
+          <div class="col-md-5">
+            <label class="form-label">Chassis / VIN Number</label>
+            <input type="text" name="chassis_no" class="form-control" placeholder="e.g. JTNB11HK0J3…">
+          </div>
+          <div class="col-md-7">
+            <label class="form-label">Location</label>
+            <input type="text" name="location_text" class="form-control" placeholder="e.g. Showroom – Area 25">
+          </div>
+          <div class="col-12">
+            <label class="form-label">Import Source Notes</label>
+            <input type="text" name="import_source_notes" class="form-control" placeholder="e.g. Japan direct, Be Forward, 2023">
+          </div>
+        </div>
+      </div>
+
+      {# DESCRIPTION #}
+      <div class="form-section">
+        <div class="form-section-title"><i class="bi bi-card-text"></i>Description &amp; Features</div>
+        <div class="row g-3">
+          <div class="col-12">
+            <label class="form-label">Description</label>
+            <textarea name="description" class="form-control" rows="2" placeholder="Brief overview…"></textarea>
+          </div>
+          <div class="col-12">
+            <label class="form-label">Key Features / Notes</label>
+            <textarea name="features_notes" class="form-control" rows="2" placeholder="e.g. Push-start, reverse camera, alloy wheels, sunroof…"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="wiz-nav">
+        <button type="button" class="btn-wiz-back" onclick="goToStep(3)">
+          <i class="bi bi-chevron-left"></i> Back
+        </button>
+        <button type="submit" class="btn-wiz-next" style="background:#16a34a;box-shadow:0 4px 16px rgba(22,163,74,.3);">
+          <i class="bi bi-plus-circle-fill"></i> Add to Inventory
+        </button>
+      </div>
+    </div>
+
+  </form>
+</div>
+
+<script>
+(function () {
+  /* ─── WIZARD STATE ─── */
+  var currentStep = 1;
+  var totalSteps  = 4;
+  var selectedMakeId   = '';
+  var selectedMakeName = '';
+  var selectedModelId  = '';
+  var carModelsData    = {{ car_models_json|safe }};
+
+  /* ─── STEP NAVIGATION ─── */
+  window.goToStep = function(step) {
+    if (step < 1 || step > totalSteps) return;
+    document.querySelectorAll('.wiz-panel').forEach(function(p) { p.classList.remove('active'); });
+    document.getElementById('wiz-panel-' + step).classList.add('active');
+
+    for (var i = 1; i <= totalSteps; i++) {
+      var dot = document.getElementById('step-dot-' + i);
+      var conn = document.getElementById('conn-' + i);
+      if (!dot) continue;
+      dot.classList.remove('active', 'done');
+      if (i < step)       dot.classList.add('done');
+      else if (i === step) dot.classList.add('active');
+      if (conn) {
+        conn.classList.toggle('done', i < step);
+      }
+    }
+    currentStep = step;
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  window.nextStep = function(from) {
+    goToStep(from + 1);
+    if (from + 1 === 4) updateVehicleSummary();
+  };
+
+  /* ─── DROP ZONE DRAG EVENTS ─── */
+  var dropZone = document.getElementById('photoDropZone');
+  if (dropZone) {
+    dropZone.addEventListener('dragover', function(e) {
+      e.preventDefault();
+      dropZone.style.borderColor = '#1d4ed8';
+      dropZone.style.background = '#eff6ff';
+    });
+    dropZone.addEventListener('dragleave', function() {
+      dropZone.style.borderColor = '#cbd5e1';
+      dropZone.style.background = '#f8fafc';
+    });
+    dropZone.addEventListener('drop', function(e) {
+      e.preventDefault();
+      dropZone.style.borderColor = '#cbd5e1';
+      dropZone.style.background = '#f8fafc';
+      if (e.dataTransfer.files.length) {
+        handlePhotoSelect(e.dataTransfer.files);
+      }
+    });
+  }
+
+  /* ─── MAKE GRID ─── */
+  var makeGrid = document.getElementById('makeGrid');
+  if (makeGrid) {
+    makeGrid.querySelectorAll('.make-tile').forEach(function(tile) {
+      tile.addEventListener('click', function() {
+        makeGrid.querySelectorAll('.make-tile').forEach(function(t) { t.classList.remove('active'); });
+        tile.classList.add('active');
+        selectedMakeId   = tile.dataset.makeId   || '';
+        selectedMakeName = tile.dataset.makeName || 'Other';
+        document.getElementById('makeId').value = selectedMakeId;
+        if (!selectedMakeId) {
+          document.getElementById('makeManualRow').style.display = 'block';
+          document.getElementById('makeManualFields').style.display = 'block';
+          document.getElementById('makeManualToggle').style.display = 'none';
+        } else {
+          document.getElementById('makeManualRow').style.display = 'none';
+        }
+        // Build model grid for step 2
+        buildModelGrid(selectedMakeId);
+        var lbl = document.getElementById('selectedMakeLabel');
+        if (lbl) lbl.textContent = selectedMakeName || '—';
+        nextStep(1);
+      });
+    });
+  }
+
+  /* ─── MODEL GRID ─── */
+  function buildModelGrid(makeId) {
+    var grid = document.getElementById('modelGrid');
+    if (!grid) return;
+    var models = carModelsData[makeId] || [];
+    grid.innerHTML = '';
+    var wrap = document.getElementById('modelGridWrap');
+    if (models.length === 0) {
+      if (wrap) wrap.style.display = 'none';
+      return;
+    }
+    if (wrap) wrap.style.display = '';
+    models.forEach(function(m) {
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'model-btn';
+      btn.dataset.modelId   = m.id;
+      btn.dataset.modelName = m.name;
+      btn.textContent = m.name;
+      btn.addEventListener('click', function() {
+        grid.querySelectorAll('.model-btn').forEach(function(b) { b.classList.remove('active'); });
+        btn.classList.add('active');
+        selectedModelId = m.id;
+        document.getElementById('modelId').value = m.id;
+        // Pre-fill body type from model metadata if available
+        if (m.body_type) {
+          setBodyType(m.body_type);
+        }
+      });
+      grid.appendChild(btn);
+    });
+  }
+
+  /* ─── BODY TYPE TILES ─── */
+  function setBodyType(val) {
+    document.querySelectorAll('.body-tile').forEach(function(t) {
+      var active = t.dataset.value === val;
+      t.classList.toggle('active', active);
+    });
+    document.getElementById('bodyTypeVal').value = val;
+  }
+  document.querySelectorAll('.body-tile').forEach(function(tile) {
+    tile.addEventListener('click', function() {
+      setBodyType(tile.dataset.value);
+    });
+  });
+
+  /* ─── PILL GROUPS (Fuel, Transmission, Drivetrain, Condition) ─── */
+  [
+    { groupId: 'fuelGroup',        hiddenId: 'fuelTypeVal' },
+    { groupId: 'transmissionGroup', hiddenId: 'transmissionVal' },
+    { groupId: 'drivetrainGroup',   hiddenId: 'drivetrainVal' },
+    { groupId: 'conditionGroup',    hiddenId: 'conditionVal' },
+  ].forEach(function(cfg) {
+    var group  = document.getElementById(cfg.groupId);
+    var hidden = document.getElementById(cfg.hiddenId);
+    if (!group || !hidden) return;
+    group.querySelectorAll('.pill-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        group.querySelectorAll('.pill-btn').forEach(function(b) { b.classList.remove('active'); });
+        btn.classList.add('active');
+        hidden.value = btn.dataset.value;
+      });
+    });
+  });
+
+  /* ─── MANUAL MAKE TOGGLE ─── */
+  var makeManualToggle = document.getElementById('makeManualToggle');
+  var makeManualFields = document.getElementById('makeManualFields');
+  if (makeManualToggle && makeManualFields) {
+    makeManualToggle.addEventListener('click', function() {
+      var open = makeManualFields.style.display !== 'none';
+      makeManualFields.style.display = open ? 'none' : 'block';
+      document.getElementById('makeManualChevron').className = open ? 'bi bi-chevron-down' : 'bi bi-chevron-up';
+    });
+  }
+
+  /* ─── MANUAL MODEL TOGGLE ─── */
+  var modelManualToggle = document.getElementById('modelManualToggle');
+  var modelManualFields = document.getElementById('modelManualFields');
+  if (modelManualToggle && modelManualFields) {
+    modelManualToggle.addEventListener('click', function() {
+      var open = modelManualFields.style.display !== 'none';
+      modelManualFields.style.display = open ? 'none' : 'block';
+      document.getElementById('modelManualChevron').className = open ? 'bi bi-chevron-down' : 'bi bi-chevron-up';
+    });
+  }
+
+  /* ─── VEHICLE SUMMARY LABEL ─── */
+  function updateVehicleSummary() {
+    var makeTile = document.querySelector('.make-tile.active');
+    var modelBtn = document.querySelector('.model-btn.active');
+    var bodyTile = document.querySelector('.body-tile.active');
+    var yearVal  = document.getElementById('yearInputMain') ? document.getElementById('yearInputMain').value : '';
+
+    var parts = [];
+    if (makeTile && makeTile.dataset.makeName) parts.push(makeTile.dataset.makeName);
+    if (modelBtn)  parts.push(modelBtn.dataset.modelName || modelBtn.textContent);
+    if (yearVal)   parts.push(yearVal);
+    if (bodyTile)  parts.push(bodyTile.dataset.value ? bodyTile.dataset.value.charAt(0).toUpperCase() + bodyTile.dataset.value.slice(1) : '');
+
+    var lbl = document.getElementById('vehicleSummaryLabel');
+    if (lbl && parts.length > 0) {
+      lbl.textContent = parts.join(' ') + ' — add pricing below to finish.';
+    }
+  }
+
+  /* ─── LIVE DEAL HEALTH ─── */
+  var buyingInput  = document.getElementById('buying_price_input');
+  var sellingInput = document.getElementById('selling_price_input');
+  var card         = document.getElementById('dealHealthCard');
+  var dhCost   = document.getElementById('dh_cost');
+  var dhSell   = document.getElementById('dh_sell');
+  var dhProfit = document.getElementById('dh_profit');
+  var dhMargin = document.getElementById('dh_margin');
+  var dhBadge  = document.getElementById('dh_badge');
+  var currency = '{{ business.currency }}';
+
+  function fmt(n) { return currency + ' ' + Math.round(n).toLocaleString(); }
+
+  function updateMargin() {
+    var cost = parseFloat(buyingInput ? buyingInput.value : '') || 0;
+    var sell = parseFloat(sellingInput ? sellingInput.value : '') || 0;
+    if (!cost && !sell) {
+      card.className = 'deal-health';
+      dhCost.textContent = dhSell.textContent = dhProfit.textContent = dhMargin.textContent = '—';
+      dhBadge.innerHTML = '';
+      return;
+    }
+    var profit = sell - cost;
+    var margin = sell > 0 ? (profit / sell * 100) : 0;
+    dhCost.textContent   = fmt(cost);
+    dhSell.textContent   = fmt(sell);
+    dhProfit.textContent = fmt(profit);
+    dhMargin.textContent = margin.toFixed(1) + '%';
+    var status, label, icon;
+    if (profit <= 0)    { status='risky';   label='Loss — price below cost';  icon='⚠️'; }
+    else if (margin<8)  { status='risky';   label='Risky — very thin margin'; icon='⚠️'; }
+    else if (margin<15) { status='thin';    label='Thin — acceptable margin'; icon='⚡'; }
+    else                { status='healthy'; label='Healthy margin';           icon='✓'; }
+    card.className = 'deal-health ' + status;
+    dhProfit.style.color = profit > 0 ? '#16a34a' : '#dc2626';
+    dhBadge.innerHTML = '<span class="dh-status ' + status + '">' + icon + ' ' + label + '</span>';
+  }
+
+  if (buyingInput)  buyingInput.addEventListener('input',  updateMargin);
+  if (sellingInput) sellingInput.addEventListener('input', updateMargin);
+})();
+
+/* ─── PHOTO PREVIEW LOGIC ─── */
+var allSelectedFiles = [];
+
+window.handlePhotoSelect = function(files) {
+  var input = document.getElementById('photoFileInput');
+  var newFiles = Array.from(files).filter(function(f) { return f.type.startsWith('image/'); });
+  allSelectedFiles = allSelectedFiles.concat(newFiles).slice(0, 20);
+
+  if (window.DataTransfer) {
+    var dt = new DataTransfer();
+    allSelectedFiles.forEach(function(f) { dt.items.add(f); });
+    input.files = dt.files;
+  }
+
+  _renderPhotoPreviews();
+};
+
+window.removePhoto = function(idx) {
+  allSelectedFiles.splice(idx, 1);
+  var input = document.getElementById('photoFileInput');
+  if (window.DataTransfer) {
+    var dt = new DataTransfer();
+    allSelectedFiles.forEach(function(f) { dt.items.add(f); });
+    input.files = dt.files;
+  }
+  // Re-render preview with the updated allSelectedFiles list
+  _renderPhotoPreviews();
+};
+
+function _renderPhotoPreviews() {
+  var grid    = document.getElementById('photoPreviewGrid');
+  var counter = document.getElementById('photoCount');
+  if (!grid) return;
+  grid.innerHTML = '';
+  grid.style.display = allSelectedFiles.length ? 'grid' : 'none';
+  allSelectedFiles.forEach(function(file, idx) {
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      var item = document.createElement('div');
+      item.style.cssText = 'position:relative;border-radius:10px;overflow:hidden;border:2px solid ' + (idx===0 ? '#1d4ed8' : '#e2e8f0') + ';aspect-ratio:4/3;';
+      item.innerHTML =
+        '<img src="' + e.target.result + '" style="width:100%;height:100%;object-fit:cover;">' +
+        (idx === 0 ? '<div style="position:absolute;top:4px;left:4px;background:#1d4ed8;color:#fff;font-size:.6rem;font-weight:800;padding:2px 7px;border-radius:999px;">COVER</div>' : '') +
+        '<button type="button" onclick="removePhoto(' + idx + ')" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,.5);color:#fff;border:none;border-radius:50%;width:20px;height:20px;font-size:.7rem;cursor:pointer;display:flex;align-items:center;justify-content:center;">×</button>';
+      grid.appendChild(item);
+    };
+    reader.readAsDataURL(file);
+  });
+  if (counter) counter.textContent = allSelectedFiles.length + ' photo(s) selected' + (allSelectedFiles.length === 20 ? ' (max reached)' : '');
+}
+</script>
+{% endblock %}

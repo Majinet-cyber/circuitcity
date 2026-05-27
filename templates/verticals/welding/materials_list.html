@@ -1,0 +1,605 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Materials Catalog - Welding Workshop{% endblock %}
+
+{% block extra_css %}
+<style>
+:root {
+  --weld-primary: #2563eb;
+  --weld-accent: #0ea5e9;
+  --weld-dark: #ffffff;
+  --weld-surface: #f8fafc;
+  --weld-card: #ffffff;
+  --weld-border: #e2e8f0;
+  --weld-text: #111827;
+  --weld-muted: #64748b;
+  --weld-success: #22c55e;
+  --weld-warning: #eab308;
+  --weld-danger: #ef4444;
+}
+
+.welding-page {
+  background: linear-gradient(135deg, #eff6ff 0%, #f8fafc 38%, #ffffff 100%);
+  min-height: 100vh;
+  color: var(--weld-text);
+  overflow-x: hidden;
+}
+
+.welding-container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 1.5rem;
+  padding-bottom: calc(5.5rem + env(safe-area-inset-bottom));
+  box-sizing: border-box;
+}
+
+/* Search Header */
+.search-header {
+  background: #ffffff;
+  border: 1px solid var(--weld-border);
+  border-radius: 20px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 14px 36px rgba(15, 23, 42, 0.08);
+}
+
+.search-title {
+  font-size: 1.75rem;
+  font-weight: 800;
+  margin-bottom: 1rem;
+  color: #111827;
+}
+
+.search-box {
+  position: relative;
+}
+
+.search-input {
+  width: 100%;
+  padding: 1rem 1.25rem 1rem 3.5rem;
+  font-size: 1.1rem;
+  background: #ffffff;
+  border: 2px solid var(--weld-border);
+  border-radius: 16px;
+  color: var(--weld-text);
+  transition: all 0.3s;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: var(--weld-primary);
+  box-shadow: 0 0 0 4px rgba(249, 115, 22, 0.2);
+}
+
+.search-input::placeholder {
+  color: var(--weld-muted);
+}
+
+.search-icon {
+  position: absolute;
+  left: 1.25rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--weld-muted);
+  font-size: 1.25rem;
+}
+
+/* Category Filter - Compact chips */
+.category-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.category-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.5rem 1rem;
+  border-radius: 100px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  background: #ffffff;
+  border: 1px solid var(--weld-border);
+  color: var(--weld-muted);
+  text-decoration: none;
+  transition: all 0.2s;
+  cursor: pointer;
+}
+
+.category-chip:hover {
+  border-color: var(--weld-primary);
+  color: var(--weld-primary);
+}
+
+.category-chip.active {
+  background: var(--weld-primary);
+  border-color: var(--weld-primary);
+  color: #ffffff;
+}
+
+/* Stats bar */
+.stats-bar {
+  display: flex;
+  gap: 1.5rem;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--weld-border);
+}
+
+.stat-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  color: var(--weld-muted);
+}
+
+.stat-value {
+  font-weight: 700;
+  color: var(--weld-text);
+}
+
+/* Materials Grid */
+.materials-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 1rem;
+  min-width: 0;
+}
+
+/* Material Card - Premium Design */
+.material-card {
+  background: var(--weld-card);
+  border: 1px solid var(--weld-border);
+  border-radius: 16px;
+  padding: 1.25rem;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+  min-width: 0;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.06);
+}
+
+.material-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--weld-primary), var(--weld-accent));
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.material-card:hover {
+  transform: translateY(-4px);
+  border-color: var(--weld-primary);
+  box-shadow: 0 16px 36px rgba(249, 115, 22, 0.14);
+}
+
+.material-card:hover::before {
+  opacity: 1;
+}
+
+.material-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 0.75rem;
+}
+
+.material-name {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--weld-text);
+  line-height: 1.3;
+  flex: 1;
+  margin-right: 0.5rem;
+}
+
+.material-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: #f1f5f9;
+  color: var(--weld-muted);
+  border-radius: 4px;
+}
+
+.material-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.meta-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  background: #f8fafc;
+  color: var(--weld-muted);
+  border-radius: 6px;
+}
+
+.meta-tag i {
+  margin-right: 0.25rem;
+}
+
+.material-pricing {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--weld-border);
+}
+
+.price-main {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--weld-primary);
+  overflow-wrap: anywhere;
+}
+
+.price-unit {
+  font-size: 0.85rem;
+  color: var(--weld-muted);
+  margin-top: 0.25rem;
+}
+
+.stock-display {
+  text-align: right;
+}
+
+.stock-value {
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.stock-value.low {
+  color: var(--weld-danger);
+}
+
+.stock-value.ok {
+  color: var(--weld-success);
+}
+
+.stock-label {
+  font-size: 0.75rem;
+  color: var(--weld-muted);
+}
+
+.material-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.btn-edit {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  background: #ffffff;
+  border: 1px solid var(--weld-border);
+  border-radius: 10px;
+  color: var(--weld-text);
+  text-decoration: none;
+  transition: all 0.2s;
+}
+
+.btn-edit:hover {
+  background: var(--weld-primary);
+  border-color: var(--weld-primary);
+  color: #ffffff;
+}
+
+.btn-edit i {
+  margin-right: 0.5rem;
+}
+
+/* Quick Actions */
+.quick-actions {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.action-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.875rem 1.5rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+  background: linear-gradient(135deg, var(--weld-primary), var(--weld-accent));
+  border: none;
+  border-radius: 12px;
+  color: white;
+  text-decoration: none;
+  transition: all 0.2s;
+  box-shadow: 0 4px 12px rgba(249, 115, 22, 0.3);
+}
+
+.action-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(249, 115, 22, 0.4);
+  color: white;
+}
+
+.action-btn i {
+  margin-right: 0.5rem;
+}
+
+.action-btn.secondary {
+  background: #ffffff;
+  border: 1px solid var(--weld-border);
+  box-shadow: none;
+  color: var(--weld-text);
+}
+
+.action-btn.secondary:hover {
+  border-color: var(--weld-primary);
+  color: var(--weld-primary);
+  box-shadow: none;
+}
+
+/* Empty State */
+.empty-state {
+  text-align: center;
+  padding: 4rem 2rem;
+  background: var(--weld-card);
+  border: 1px solid var(--weld-border);
+  border-radius: 20px;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.06);
+}
+
+.empty-icon {
+  font-size: 4rem;
+  margin-bottom: 1rem;
+}
+
+.empty-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+}
+
+.empty-text {
+  color: var(--weld-muted);
+  margin-bottom: 1.5rem;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .welding-container {
+    padding: 1rem;
+    padding-bottom: calc(5.5rem + env(safe-area-inset-bottom));
+  }
+  
+  .materials-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .quick-actions {
+    flex-direction: column;
+  }
+  
+  .stats-bar {
+    flex-wrap: wrap;
+    gap: 1rem;
+  }
+  
+  .category-chips {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    padding-bottom: 0.5rem;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  .category-chip {
+    flex-shrink: 0;
+  }
+}
+
+@media (max-width: 430px) {
+  .search-header,
+  .material-card,
+  .empty-state {
+    border-radius: 14px;
+  }
+
+  .search-title {
+    font-size: 1.45rem;
+  }
+
+  .search-input {
+    font-size: 1rem;
+  }
+
+  .materials-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .material-pricing,
+  .material-header {
+    gap: 0.75rem;
+  }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="welding-page">
+  <div class="welding-container">
+    <!-- Search Header -->
+    <div class="search-header">
+      <h1 class="search-title">🔩 Materials Catalog</h1>
+      
+      <div class="search-box">
+        <i class="bi bi-search search-icon"></i>
+        <input 
+          type="search" 
+          class="search-input" 
+          id="materialSearch"
+          placeholder="Search materials (e.g., 20x20, MDF white, sanding disc...)"
+          value="{{ search_query|default:'' }}"
+          data-testid="welding-materials-search"
+        >
+      </div>
+      
+      <!-- Category Chips -->
+      <div class="category-chips" data-testid="welding-category-chips">
+        <a href="{% url 'verticals:welding_materials_list' %}" 
+           class="category-chip {% if not filter_category %}active{% endif %}">
+          All
+        </a>
+        {% for value, label in categories %}
+        <a href="{% url 'verticals:welding_materials_list' %}?category={{ value }}" 
+           class="category-chip {% if filter_category == value %}active{% endif %}">
+          {{ label }}
+        </a>
+        {% endfor %}
+      </div>
+      
+      <!-- Stats Bar -->
+      <div class="stats-bar">
+        <div class="stat-item">
+          <i class="bi bi-box-seam"></i>
+          <span class="stat-value">{{ materials|length }}</span>
+          <span>materials</span>
+        </div>
+        <div class="stat-item">
+          <i class="bi bi-tags"></i>
+          <span class="stat-value">{{ categories|length }}</span>
+          <span>categories</span>
+        </div>
+        {% if low_stock_count %}
+        <div class="stat-item" style="color: var(--weld-warning);">
+          <i class="bi bi-exclamation-triangle"></i>
+          <span class="stat-value">{{ low_stock_count }}</span>
+          <span>low stock</span>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+    
+    <!-- Quick Actions -->
+    <div class="quick-actions">
+      <a href="{% url 'verticals:welding_stock_in' %}" class="action-btn" data-testid="welding-stock-in">
+        <i class="bi bi-box-arrow-in-down"></i> Stock In
+      </a>
+      <a href="{% url 'verticals:welding_dashboard' %}" class="action-btn secondary">
+        <i class="bi bi-arrow-left"></i> Dashboard
+      </a>
+    </div>
+    
+    <!-- Materials Grid -->
+    <div class="materials-grid" id="materialsGrid">
+      {% for material in materials %}
+      <div class="material-card" data-name="{{ material.name|lower }}" data-category="{{ material.category }}">
+        <div class="material-header">
+          <div class="material-name">{{ material.name }}</div>
+          {% if material.is_seeded %}
+          <span class="material-badge">Default</span>
+          {% endif %}
+        </div>
+        
+        <div class="material-meta">
+          <span class="meta-tag">
+            <i class="bi bi-tag"></i> {{ material.get_category_display }}
+          </span>
+          <span class="meta-tag">
+            <i class="bi bi-rulers"></i> {{ material.get_unit_display }}
+          </span>
+          {% if material.code %}
+          <span class="meta-tag">
+            <i class="bi bi-upc"></i> {{ material.code }}
+          </span>
+          {% endif %}
+        </div>
+        
+        <div class="material-pricing">
+          <div>
+            <div class="price-main">MWK {{ material.price_mwk|floatformat:0|intcomma }}</div>
+            <div class="price-unit">per {{ material.get_unit_display }}</div>
+          </div>
+          <div class="stock-display">
+            <div class="stock-value {% if material.is_low_stock %}low{% else %}ok{% endif %}">
+              {{ material.quantity_in_stock|floatformat:1 }}
+            </div>
+            <div class="stock-label">in stock</div>
+          </div>
+        </div>
+        
+        <div class="material-actions">
+          <a href="{% url 'verticals:welding_material_edit' material.id %}" class="btn-edit">
+            <i class="bi bi-pencil"></i> Edit Price
+          </a>
+        </div>
+      </div>
+      {% empty %}
+      <div class="empty-state" style="grid-column: 1 / -1;">
+        <div class="empty-icon">📦</div>
+        <div class="empty-title">No materials found</div>
+        <div class="empty-text">
+          {% if search_query %}
+          Try searching for "20x20", "MDF", "paint", or "electrode"
+          {% else %}
+          Materials will appear here after seeding.
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<script>
+// Client-side search filtering
+document.addEventListener('DOMContentLoaded', function() {
+  const searchInput = document.getElementById('materialSearch');
+  const materialsGrid = document.getElementById('materialsGrid');
+  const cards = materialsGrid.querySelectorAll('.material-card');
+  
+  searchInput.addEventListener('input', function() {
+    const query = this.value.toLowerCase().trim();
+    let visibleCount = 0;
+    
+    cards.forEach(card => {
+      const name = card.dataset.name || '';
+      const match = name.includes(query);
+      card.style.display = match ? '' : 'none';
+      if (match) visibleCount++;
+    });
+    
+    // Show empty state if no matches
+    const emptyState = materialsGrid.querySelector('.empty-state');
+    if (emptyState) {
+      emptyState.style.display = visibleCount === 0 ? '' : 'none';
+    }
+  });
+  
+  // Submit search on Enter (server-side)
+  searchInput.addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') {
+      const query = this.value.trim();
+      if (query) {
+        window.location.href = '{% url "verticals:welding_materials_list" %}?q=' + encodeURIComponent(query);
+      }
+    }
+  });
+});
+</script>
+{% endblock %}

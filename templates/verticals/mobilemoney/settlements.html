@@ -1,0 +1,234 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Agent Settlements · Mobile Money · {{ business.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+.mm-wrap { max-width: 1100px; margin: 0 auto; padding: 20px 14px; }
+.mm-nav { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 22px; }
+.mm-nav-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 9px 16px; border-radius: 10px; font-weight: 700; font-size: 0.82rem;
+  text-decoration: none; border: 1px solid; transition: all 0.15s;
+  background: #fff; border-color: #e2e8f0; color: #0f172a;
+}
+.mm-nav-btn:hover { background: #f8fafc; }
+.mm-nav-btn.active { background: #0f172a; color: #fff; border-color: #0f172a; }
+
+/* Balance summary */
+.settle-summary { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 22px; }
+.ss-card { border-radius: 14px; padding: 18px 20px; }
+.ss-label { font-size: 0.72rem; text-transform: uppercase; font-weight: 800; letter-spacing: 0.07em; margin-bottom: 6px; }
+.ss-value { font-size: 1.8rem; font-weight: 900; line-height: 1; }
+.ss-sub { font-size: 0.78rem; margin-top: 5px; }
+
+/* Grid */
+.settle-grid { display: grid; grid-template-columns: 380px 1fr; gap: 20px; }
+.mm-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 20px; }
+
+/* Settlement item */
+.settle-item {
+  border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px 16px; margin-bottom: 10px;
+}
+.settle-item.we-owe { border-left: 4px solid #ef4444; }
+.settle-item.owed-us { border-left: 4px solid #22c55e; }
+.settle-item.settled { border-left: 4px solid #94a3b8; opacity: 0.7; }
+
+.stype-badge {
+  display: inline-block; padding: 3px 9px; border-radius: 99px;
+  font-size: 0.7rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em;
+}
+.st-borrowed_float  { background: #fee2e2; color: #991b1b; }
+.st-returned_float  { background: #dcfce7; color: #15803d; }
+.st-borrowed_cash   { background: #fef9c3; color: #854d0e; }
+.st-returned_cash   { background: #dbeafe; color: #1d4ed8; }
+.st-settlement      { background: #f3e8ff; color: #7c3aed; }
+
+@media (max-width: 800px) { .settle-grid { grid-template-columns: 1fr; } .settle-summary { grid-template-columns: 1fr; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="mm-wrap" data-testid="mm-settlements">
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+    <a href="{% url 'mobilemoney:dashboard' %}" style="color:#64748b;font-size:0.875rem;">&larr; Dashboard</a>
+    <h1 style="margin:0;font-size:1.4rem;font-weight:900;color:#0f172a;">Agent Settlements</h1>
+  </div>
+
+  <div class="mm-nav">
+    <a href="{% url 'mobilemoney:transactions' %}" class="mm-nav-btn">Transactions</a>
+    <a href="{% url 'mobilemoney:credits' %}" class="mm-nav-btn">Credits & Debts</a>
+    <a href="{% url 'mobilemoney:commissions' %}" class="mm-nav-btn">Commissions</a>
+    <a href="{% url 'mobilemoney:reconciliation' %}" class="mm-nav-btn">End of Day</a>
+    <a href="{% url 'mobilemoney:settlements' %}" class="mm-nav-btn active">Settlements</a>
+  </div>
+
+  {% if messages %}
+  {% for msg in messages %}
+  <div style="padding:12px 16px;border-radius:10px;margin-bottom:12px;font-weight:600;{% if 'error' in msg.tags %}background:#fee2e2;color:#991b1b;{% else %}background:#dcfce7;color:#15803d;{% endif %}">{{ msg }}</div>
+  {% endfor %}
+  {% endif %}
+
+  <!-- Summary -->
+  <div class="settle-summary">
+    <div class="ss-card" style="background:#fef2f2;border:1px solid #fecaca;">
+      <div class="ss-label" style="color:#991b1b;">We Owe</div>
+      <div class="ss-value" style="color:#dc2626;">MK {{ pending_we_owe|floatformat:0|intcomma }}</div>
+      <div class="ss-sub" style="color:#dc2626;">Outstanding obligations to other agents</div>
+    </div>
+    <div class="ss-card" style="background:#f0fdf4;border:1px solid #bbf7d0;">
+      <div class="ss-label" style="color:#15803d;">Others Owe Us</div>
+      <div class="ss-value" style="color:#16a34a;">MK {{ pending_owed_us|floatformat:0|intcomma }}</div>
+      <div class="ss-sub" style="color:#16a34a;">Float/cash owed to this agent</div>
+    </div>
+  </div>
+
+  <div class="settle-grid">
+    <!-- Form -->
+    <div class="mm-card">
+      <h3 style="margin:0 0 16px;font-size:0.95rem;font-weight:800;color:#0f172a;">Record Settlement</h3>
+      <form method="post" data-testid="settlement-form">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="create">
+        <div class="mb-3">
+          <label class="form-label fw-semibold" style="font-size:0.85rem;">Settlement Type *</label>
+          <select name="settlement_type" class="form-select form-select-sm">
+            {% for val, lbl in settlement_types %}
+            <option value="{{ val }}">{{ lbl }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold" style="font-size:0.85rem;">Direction *</label>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+            {% for val, lbl in direction_choices %}
+            <label style="cursor:pointer;">
+              <input type="radio" name="direction" value="{{ val }}" {% if val == 'received' %}checked{% endif %} style="display:none;" id="dir_{{ val }}">
+              <div onclick="selectDirection('{{ val }}')" id="dir_{{ val }}_btn"
+                style="border:2px solid {% if val == 'received' %}#3b82f6{% else %}#e2e8f0{% endif %};border-radius:10px;padding:9px;text-align:center;background:{% if val == 'received' %}#eff6ff{% else %}#fff{% endif %};color:{% if val == 'received' %}#1d4ed8{% else %}#64748b{% endif %};font-weight:700;font-size:0.82rem;cursor:pointer;">
+                {{ lbl }}
+              </div>
+            </label>
+            {% endfor %}
+          </div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold" style="font-size:0.85rem;">Other Agent Name *</label>
+          <input type="text" name="agent_name" class="form-control form-control-sm" required placeholder="Agent's name">
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold" style="font-size:0.85rem;">Agent Phone</label>
+          <input type="text" name="agent_phone" class="form-control form-control-sm" placeholder="0999 xxx xxx">
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold" style="font-size:0.85rem;">Amount (MWK) *</label>
+          <input type="number" name="amount" class="form-control form-control-sm" required min="1" step="0.01" placeholder="0.00">
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold" style="font-size:0.85rem;">Notes</label>
+          <textarea name="notes" class="form-control form-control-sm" rows="2" placeholder="Details about this settlement..."></textarea>
+        </div>
+        <button type="submit" class="btn btn-primary w-100 fw-bold">Record Settlement</button>
+      </form>
+    </div>
+
+    <!-- Settlements list -->
+    <div>
+      {% if pending_settlements %}
+      <div class="mm-card" style="margin-bottom:16px;">
+        <h3 style="margin:0 0 14px;font-size:0.9rem;font-weight:800;color:#0f172a;text-transform:uppercase;letter-spacing:0.04em;">
+          Pending ({{ pending_settlements|length }})
+        </h3>
+        {% for s in pending_settlements %}
+        <div class="settle-item {% if s.balance_impact < 0 %}we-owe{% else %}owed-us{% endif %}">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
+            <div style="flex:1;min-width:0;">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+                <span class="stype-badge st-{{ s.settlement_type }}">{{ s.get_settlement_type_display }}</span>
+                <span style="font-size:0.72rem;color:#64748b;font-weight:600;">
+                  {% if s.direction == 'given' %}We gave{% else %}We received{% endif %}
+                </span>
+              </div>
+              <strong style="color:#0f172a;font-size:0.9rem;">{{ s.agent_name }}</strong>
+              {% if s.agent_phone %}<div style="font-size:0.75rem;color:#64748b;">{{ s.agent_phone }}</div>{% endif %}
+              {% if s.notes %}<div style="font-size:0.75rem;color:#94a3b8;margin-top:3px;">{{ s.notes }}</div>{% endif %}
+              <div style="font-size:0.72rem;color:#94a3b8;margin-top:3px;">{{ s.created_at|date:"d M Y, g:i A" }}</div>
+            </div>
+            <div style="text-align:right;flex-shrink:0;">
+              <div style="font-size:1.1rem;font-weight:900;color:{% if s.balance_impact < 0 %}#dc2626{% else %}#16a34a{% endif %};">
+                MK {{ s.amount|floatformat:0|intcomma }}
+              </div>
+              <div style="font-size:0.7rem;color:{% if s.balance_impact < 0 %}#dc2626{% else %}#16a34a{% endif %};font-weight:600;">
+                {% if s.balance_impact < 0 %}We owe{% else %}Owed us{% endif %}
+              </div>
+              <form method="post" style="margin-top:6px;">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="mark_settled">
+                <input type="hidden" name="settlement_id" value="{{ s.id }}">
+                <button type="submit" class="btn btn-sm" style="font-size:0.72rem;padding:4px 10px;border:1px solid #22c55e;color:#15803d;background:#f0fdf4;">
+                  Mark Settled
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      {% if settled_settlements %}
+      <div class="mm-card">
+        <h3 style="margin:0 0 14px;font-size:0.9rem;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:0.04em;">
+          Recently Settled
+        </h3>
+        {% for s in settled_settlements %}
+        <div class="settle-item settled">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div>
+              <span class="stype-badge st-{{ s.settlement_type }}">{{ s.get_settlement_type_display }}</span>
+              <strong style="color:#64748b;margin-left:8px;font-size:0.88rem;">{{ s.agent_name }}</strong>
+              <div style="font-size:0.72rem;color:#94a3b8;margin-top:3px;">Settled {{ s.settled_at|date:"d M Y" }}</div>
+            </div>
+            <div style="text-align:right;">
+              <div style="font-size:0.95rem;font-weight:700;color:#64748b;">MK {{ s.amount|floatformat:0|intcomma }}</div>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      {% if not pending_settlements and not settled_settlements %}
+      <div class="mm-card">
+        <div style="text-align:center;padding:40px 0;color:#94a3b8;">
+          <div style="font-size:2.5rem;margin-bottom:8px;">🤝</div>
+          <p style="margin:0;font-size:0.875rem;">No agent settlements recorded yet.</p>
+          <p style="margin:6px 0 0;font-size:0.78rem;">Use this module to track float/cash borrowed from or lent to other agents.</p>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<script>
+function selectDirection(val) {
+  ['given', 'received'].forEach(function(v) {
+    const btn = document.getElementById('dir_' + v + '_btn');
+    const radio = document.getElementById('dir_' + v);
+    if (v === val) {
+      radio.checked = true;
+      btn.style.borderColor = '#3b82f6';
+      btn.style.background = '#eff6ff';
+      btn.style.color = '#1d4ed8';
+    } else {
+      radio.checked = false;
+      btn.style.borderColor = '#e2e8f0';
+      btn.style.background = '#fff';
+      btn.style.color = '#64748b';
+    }
+  });
+}
+</script>
+{% endblock %}

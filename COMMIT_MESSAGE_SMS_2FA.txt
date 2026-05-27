@@ -1,0 +1,60 @@
+feat: implement optional SMS OTP two-factor authentication
+
+Add comprehensive SMS-based 2FA system using Twilio Verify API.
+
+FEATURES:
+- Users can enable/disable SMS 2FA in account settings
+- Post-login OTP challenge for users with 2FA enabled
+- Phone number verification (E.164 format)
+- Rate limiting: 60s cooldown + 3 sends/10min + 8 verifies/10min
+- Step-up authentication decorator for sensitive actions
+- Admin rescue path to disable 2FA
+
+IMPLEMENTATION:
+- Model: UserTwoFactor (user, sms_enabled, phone_e164, phone_verified_at)
+- Service: Twilio Verify API integration (send_otp, check_otp)
+- Views: Enable/disable/challenge flows with rate limiting
+- Middleware: TwoFactorAuthMiddleware enforces challenge before app access
+- Decorator: @require_recent_2fa for sensitive actions (password change, etc.)
+- Templates: Modern challenge page + functional settings UI
+
+SECURITY:
+- No OTP codes logged anywhere
+- Phone numbers masked in UI (+265******456)
+- All credentials from environment variables
+- CSRF protection on all forms
+- Session security with twofa_passed flag
+- Graceful Twilio outage handling
+
+TESTING:
+- Comprehensive test suite with mocked Twilio API
+- Tests for enable/disable flows, rate limits, middleware, decorator
+
+FILES CREATED:
+- circuitcity/accounts/services/twilio_verify.py
+- circuitcity/accounts/decorators.py
+- cc/middleware_twofa.py
+- templates/accounts/2fa_challenge.html
+- circuitcity/accounts/tests/test_twofa_sms.py
+- circuitcity/accounts/migrations/0015_add_usertwofa.py
+
+FILES MODIFIED:
+- circuitcity/accounts/models.py (UserTwoFactor model + helpers)
+- circuitcity/accounts/views.py (5 new views + updated login)
+- circuitcity/accounts/urls.py (5 new URL patterns)
+- circuitcity/accounts/admin.py (UserTwoFactor admin)
+- templates/accounts/settings_security.html (functional 2FA UI)
+- cc/settings.py (Twilio config + middleware)
+
+DEPLOYMENT:
+1. Set environment variables: TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_VERIFY_SERVICE_SID
+2. Run migration: python manage.py migrate accounts
+3. Verify cache backend is production-ready (Redis/Memcached)
+
+DOCUMENTATION:
+- SMS_OTP_2FA_IMPLEMENTATION.md (complete documentation)
+- SMS_2FA_QUICK_REFERENCE.md (developer quick reference)
+- SMS_2FA_IMPLEMENTATION_SUMMARY.txt (implementation summary)
+
+Closes #[TICKET_NUMBER]
+

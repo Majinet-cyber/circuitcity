@@ -1,0 +1,559 @@
+{% load static %}
+{% comment %}
+==============================================================================
+UNIFIED IMEI SCANNER - Shared Component for Phones Scan-In and Sell
+==============================================================================
+
+This shared scanner provides:
+1. Scan-In UI layout (no overflowing controls, responsive)
+2. Sell scan logic (robust, powerful, multi-IMEI capture)
+3. Scanning line animation (top→bottom)
+4. Luhn validation
+5. Multiple IMEI capture in Set
+6. User picks one from list
+7. Manual fallback always available
+8. Never fails
+
+Usage:
+  {% include "shared/partials/imei_scanner.html" with mode="scan_in" target_input_id="imei_input" %}
+  
+  or
+  
+  {% include "shared/partials/imei_scanner.html" with mode="sell" target_input_id="imei_field" %}
+
+Required context:
+  - mode: str ("scan_in" or "sell") - determines button text and behavior
+  - target_input_id: str - ID of input field to fill with selected IMEI
+
+Optional context:
+  - button_text: str - Custom button text (default: "Scan IMEI")
+  - button_class: str - Additional CSS classes for button
+{% endcomment %}
+
+<style>
+/* Scanner Modal */
+.imei-scanner-modal {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.95);
+  z-index: 9999;
+  animation: fadeIn 0.3s ease-out;
+}
+
+.imei-scanner-modal.active {
+  display: flex;
+  flex-direction: column;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Scanner Header (Scan-In style - no overflow) */
+.scanner-header {
+  background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%);
+  padding: 16px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.scanner-title {
+  color: white;
+  font-size: 1.2rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.scanner-close-btn {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: white;
+  font-size: 1.5rem;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.scanner-close-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: scale(1.1);
+}
+
+/* Camera View Container */
+.scanner-camera-container {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  background: #000;
+}
+
+#scannerVideo {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Scanning Line Animation (top→bottom) */
+.scanner-line {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, #10b981, transparent);
+  box-shadow: 0 0 10px #10b981, 0 0 20px #10b981;
+  animation: scanLine 2s linear infinite;
+  z-index: 10;
+}
+
+@keyframes scanLine {
+  0% { top: 0%; }
+  100% { top: 100%; }
+}
+
+/* Scanner Overlay Guide */
+.scanner-guide {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 280px;
+  height: 100px;
+  border: 3px solid rgba(16, 185, 129, 0.8);
+  border-radius: 12px;
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+}
+
+.scanner-guide::before {
+  content: 'Position IMEI barcode here';
+  position: absolute;
+  bottom: -40px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: white;
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+  white-space: nowrap;
+}
+
+/* Scanner Footer (Scan-In style - no overflow) */
+.scanner-footer {
+  background: #1e293b;
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.scanner-status {
+  color: #10b981;
+  font-size: 0.95rem;
+  font-weight: 600;
+  text-align: center;
+  min-height: 24px;
+}
+
+.scanner-status.scanning {
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* IMEI Candidates List */
+.imei-candidates {
+  display: none;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 12px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.imei-candidates.has-items {
+  display: block;
+}
+
+.imei-candidates-title {
+  color: #10b981;
+  font-size: 0.9rem;
+  font-weight: 700;
+  margin: 0 0 8px 0;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.imei-candidate-item {
+  background: rgba(255, 255, 255, 0.15);
+  border: 2px solid rgba(16, 185, 129, 0.5);
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.imei-candidate-item:hover {
+  background: rgba(255, 255, 255, 0.25);
+  border-color: #10b981;
+  transform: translateX(4px);
+}
+
+.imei-candidate-value {
+  color: white;
+  font-family: monospace;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.imei-candidate-check {
+  color: #10b981;
+  font-size: 1.2rem;
+}
+
+/* Scanner Actions (Scan-In layout - horizontal, no overflow) */
+.scanner-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.scanner-btn {
+  flex: 1;
+  padding: 12px 20px;
+  border: none;
+  border-radius: 10px;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.scanner-btn-manual {
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  color: white;
+}
+
+.scanner-btn-manual:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4);
+}
+
+.scanner-btn-cancel {
+  background: linear-gradient(135deg, #64748b 0%, #475569 100%);
+  color: white;
+}
+
+.scanner-btn-cancel:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(100, 116, 139, 0.4);
+}
+
+/* Mobile Optimizations */
+@media (max-width: 640px) {
+  .scanner-header {
+    padding: 12px 16px;
+  }
+  
+  .scanner-title {
+    font-size: 1.1rem;
+  }
+  
+  .scanner-footer {
+    padding: 12px 16px;
+  }
+  
+  .scanner-guide {
+    width: 240px;
+    height: 80px;
+  }
+  
+  .scanner-actions {
+    flex-direction: column;
+  }
+  
+  .scanner-btn {
+    width: 100%;
+  }
+}
+</style>
+
+<!-- Scanner Modal -->
+<div class="imei-scanner-modal" id="imeiScannerModal" data-target-input="{{ target_input_id }}" data-mode="{{ mode|default:'scan_in' }}">
+  <!-- Header -->
+  <div class="scanner-header">
+    <h3 class="scanner-title">
+      <i class="bi bi-upc-scan"></i>
+      Scan IMEI
+    </h3>
+    <button class="scanner-close-btn" id="scannerCloseBtn" type="button">
+      <i class="bi bi-x"></i>
+    </button>
+  </div>
+  
+  <!-- Camera View -->
+  <div class="scanner-camera-container">
+    <video id="scannerVideo" playsinline autoplay></video>
+    <div class="scanner-line"></div>
+    <div class="scanner-guide"></div>
+  </div>
+  
+  <!-- Footer -->
+  <div class="scanner-footer">
+    <div class="scanner-status" id="scannerStatus">Initializing camera...</div>
+    
+    <!-- IMEI Candidates List -->
+    <div class="imei-candidates" id="imeiCandidates">
+      <p class="imei-candidates-title">Select IMEI:</p>
+      <div id="imeiCandidatesList"></div>
+    </div>
+    
+    <!-- Actions -->
+    <div class="scanner-actions">
+      <button class="scanner-btn scanner-btn-manual" id="scannerManualBtn" type="button">
+        <i class="bi bi-keyboard"></i>
+        <span>Enter Manually</span>
+      </button>
+      <button class="scanner-btn scanner-btn-cancel" id="scannerCancelBtn" type="button">
+        <i class="bi bi-x-circle"></i>
+        <span>Cancel</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  // Unified IMEI Scanner Logic
+  // Combines Sell's powerful logic with Scan-In's UI layout
+  
+  const modal = document.getElementById('imeiScannerModal');
+  const video = document.getElementById('scannerVideo');
+  const statusEl = document.getElementById('scannerStatus');
+  const candidatesEl = document.getElementById('imeiCandidates');
+  const candidatesListEl = document.getElementById('imeiCandidatesList');
+  const closeBtn = document.getElementById('scannerCloseBtn');
+  const manualBtn = document.getElementById('scannerManualBtn');
+  const cancelBtn = document.getElementById('scannerCancelBtn');
+  
+  let stream = null;
+  let barcodeDetector = null;
+  let scanning = false;
+  let imeiSet = new Set(); // Collect multiple IMEIs
+  
+  // Luhn algorithm for IMEI validation
+  function isValidLuhn(imei) {
+    if (!imei || !/^\d{15}$/.test(imei)) return false;
+    
+    let sum = 0;
+    let alternate = false;
+    
+    for (let i = imei.length - 1; i >= 0; i--) {
+      let digit = parseInt(imei[i], 10);
+      
+      if (alternate) {
+        digit *= 2;
+        if (digit > 9) digit -= 9;
+      }
+      
+      sum += digit;
+      alternate = !alternate;
+    }
+    
+    return sum % 10 === 0;
+  }
+  
+  // Open scanner
+  async function openScanner() {
+    try {
+      modal.classList.add('active');
+      imeiSet.clear();
+      renderCandidates();
+      
+      statusEl.textContent = 'Starting camera...';
+      statusEl.className = 'scanner-status';
+      
+      // Request camera access (rear camera preferred)
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: 'environment',
+          width: { ideal: 1920 },
+          height: { ideal: 1080 }
+        }
+      });
+      
+      video.srcObject = stream;
+      await video.play();
+      
+      statusEl.textContent = 'Ready to scan';
+      statusEl.classList.add('scanning');
+      
+      // Start barcode detection
+      startBarcodeDetection();
+      
+    } catch (error) {
+      console.error('Camera error:', error);
+      statusEl.textContent = 'Camera error. Use manual entry.';
+      statusEl.className = 'scanner-status';
+    }
+  }
+  
+  // Start barcode detection (BarcodeDetector API or fallback)
+  async function startBarcodeDetection() {
+    scanning = true;
+    
+    // Try native BarcodeDetector API
+    if ('BarcodeDetector' in window) {
+      try {
+        barcodeDetector = new BarcodeDetector({ formats: ['code_128', 'ean_13', 'ean_8'] });
+        detectBarcodesNative();
+        return;
+      } catch (e) {
+        console.warn('BarcodeDetector failed, using fallback:', e);
+      }
+    }
+    
+    // Fallback: manual detection (user must enter manually)
+    statusEl.textContent = 'Scan barcode or tap "Enter Manually"';
+  }
+  
+  // Native barcode detection loop
+  async function detectBarcodesNative() {
+    if (!scanning || !video.readyState === video.HAVE_ENOUGH_DATA) {
+      if (scanning) setTimeout(detectBarcodesNative, 100);
+      return;
+    }
+    
+    try {
+      const barcodes = await barcodeDetector.detect(video);
+      
+      for (const barcode of barcodes) {
+        const rawValue = barcode.rawValue;
+        
+        // Check if it looks like an IMEI (15 digits)
+        if (/^\d{15}$/.test(rawValue) && isValidLuhn(rawValue)) {
+          // Valid IMEI found
+          addIMEICandidate(rawValue);
+        }
+      }
+    } catch (error) {
+      console.error('Detection error:', error);
+    }
+    
+    // Continue scanning
+    if (scanning) {
+      setTimeout(detectBarcodesNative, 300); // Scan every 300ms
+    }
+  }
+  
+  // Add IMEI to candidates
+  function addIMEICandidate(imei) {
+    if (!imeiSet.has(imei)) {
+      imeiSet.add(imei);
+      renderCandidates();
+      
+      statusEl.textContent = `${imeiSet.size} IMEI(s) found. Select one.`;
+      statusEl.className = 'scanner-status';
+    }
+  }
+  
+  // Render candidates list
+  function renderCandidates() {
+    if (imeiSet.size === 0) {
+      candidatesEl.classList.remove('has-items');
+      return;
+    }
+    
+    candidatesEl.classList.add('has-items');
+    
+    const html = Array.from(imeiSet).map(imei => `
+      <div class="imei-candidate-item" data-imei="${imei}">
+        <span class="imei-candidate-value">${imei}</span>
+        <i class="bi bi-check-circle imei-candidate-check"></i>
+      </div>
+    `).join('');
+    
+    candidatesListEl.innerHTML = html;
+    
+    // Add click handlers
+    document.querySelectorAll('.imei-candidate-item').forEach(item => {
+      item.addEventListener('click', () => {
+        selectIMEI(item.dataset.imei);
+      });
+    });
+  }
+  
+  // Select IMEI and fill target input
+  function selectIMEI(imei) {
+    const targetId = modal.dataset.targetInput;
+    const targetInput = document.getElementById(targetId);
+    
+    if (targetInput) {
+      targetInput.value = imei;
+      
+      // Trigger change event
+      targetInput.dispatchEvent(new Event('change', { bubbles: true }));
+      targetInput.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+    
+    closeScanner();
+  }
+  
+  // Close scanner
+  function closeScanner() {
+    scanning = false;
+    modal.classList.remove('active');
+    
+    if (stream) {
+      stream.getTracks().forEach(track => track.stop());
+      stream = null;
+    }
+    
+    video.srcObject = null;
+    imeiSet.clear();
+    renderCandidates();
+  }
+  
+  // Manual entry
+  function manualEntry() {
+    const targetId = modal.dataset.targetInput;
+    const targetInput = document.getElementById(targetId);
+    
+    if (targetInput) {
+      closeScanner();
+      targetInput.focus();
+    }
+  }
+  
+  // Event listeners
+  closeBtn.addEventListener('click', closeScanner);
+  cancelBtn.addEventListener('click', closeScanner);
+  manualBtn.addEventListener('click', manualEntry);
+  
+  // Export to global scope for trigger buttons
+  window.openIMEIScanner = openScanner;
+})();
+</script>
+

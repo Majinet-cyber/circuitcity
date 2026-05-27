@@ -2,11 +2,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional, Any
+from typing import Any, Optional
 
 from django.conf import settings
 from django.core.mail import send_mail
 from django.template.loader import render_to_string
+
 
 # ---- Best-effort in-app notifications adapter --------------------------
 def _notify_in_app(*, title: str, body: str, ntype: str = "billing", business=None, user=None, url: str = "") -> None:
@@ -17,6 +18,7 @@ def _notify_in_app(*, title: str, body: str, ntype: str = "billing", business=No
     try:
         # Preferred: a utils.notify(title, body, type, business=user/url)
         from notifications.utils import notify  # type: ignore
+
         notify(title=title, body=body, type=ntype, business=business, user=user, url=url)
         return
     except Exception:
@@ -25,9 +27,8 @@ def _notify_in_app(*, title: str, body: str, ntype: str = "billing", business=No
     try:
         # Fallback: create a Notification model directly if it exists
         from notifications.models import Notification  # type: ignore
-        Notification.objects.create(
-            type=ntype, title=title, body=body, business=business, user=user, url=url
-        )
+
+        Notification.objects.create(type=ntype, title=title, body=body, business=business, user=user, url=url)
     except Exception:
         # Silently ignore if notifications app is not wired yet
         pass
@@ -36,8 +37,14 @@ def _notify_in_app(*, title: str, body: str, ntype: str = "billing", business=No
 # ---- WhatsApp dispatchers (console / Twilio / Meta) --------------------
 def _send_whatsapp_console(to: str, body: str) -> None:
     try:
-        from django.utils import timezone
-        print(f"[WA/console {timezone.now()}] -> {to}: {body}")
+        # Console logging removed - use Django logging if needed
+        import logging
+
+        logger = logging.getLogger(__name__)
+        from django.conf import settings
+
+        if settings.DEBUG:
+            logger.debug("[WA/console] -> %s", to[:4] + "***")
     except Exception:
         pass
 
@@ -45,6 +52,7 @@ def _send_whatsapp_console(to: str, body: str) -> None:
 def _send_whatsapp_twilio(to: str, body: str) -> None:
     # Requires TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_WHATSAPP_FROM in settings
     from twilio.rest import Client  # type: ignore
+
     client = Client(settings.TWILIO_ACCOUNT_SID, settings.TWILIO_AUTH_TOKEN)
     from_num = settings.TWILIO_WHATSAPP_FROM  # e.g., 'whatsapp:+14155238886'
     if not str(to).startswith("whatsapp:"):
@@ -57,7 +65,9 @@ def _send_whatsapp_meta(to: str, body: str) -> None:
     Meta (WhatsApp Cloud API) simple text message.
     Expects WHATSAPP_TOKEN, WHATSAPP_PHONE_NUMBER_ID; `to` must be MSISDN (e.g., +265...).
     """
-    import json, urllib.request
+    import json
+    import urllib.request
+
     token = settings.WHATSAPP_TOKEN
     phone_id = settings.WHATSAPP_PHONE_NUMBER_ID
     url = f"https://graph.facebook.com/v18.0/{phone_id}/messages"
@@ -74,7 +84,10 @@ def _send_whatsapp_meta(to: str, body: str) -> None:
         urllib.request.urlopen(req, data=json.dumps(payload).encode("utf-8"), timeout=10)
     except Exception as e:
         # Don't crash app flow due to WA fanout
-        print(f"[WA/meta] send error: {e}")
+        import logging
+
+        logger = logging.getLogger(__name__)
+        logger.warning("[WA/meta] send error: %s", str(e))
 
 
 def send_whatsapp(to: Optional[str], body: str) -> None:
@@ -89,11 +102,16 @@ def send_whatsapp(to: Optional[str], body: str) -> None:
         else:
             _send_whatsapp_console(to, body)
     except Exception as e:
-        print(f"[WA] error: {e}")
+        import logging
+
+        logger = logging.getLogger(__name__)
+        logger.warning("[WA] error: %s", str(e))
 
 
 # ---- Email helpers ------------------------------------------------------
-def send_email(subject: str, body: str, to_email: Optional[str], html_template: Optional[str] = None, ctx: Optional[dict] = None):
+def send_email(
+    subject: str, body: str, to_email: Optional[str], html_template: Optional[str] = None, ctx: Optional[dict] = None
+):
     if not to_email:
         return
     from_email = getattr(settings, "DEFAULT_FROM_EMAIL", "noreply@example.com")
@@ -133,7 +151,16 @@ def business_contact(business) -> Contact:
 
 
 # ---- Unified fanout -----------------------------------------------------
-def fanout(*, business, title: str, body: str, ntype: str = "billing", url: str = "", to_email: Optional[str] = None, to_whatsapp: Optional[str] = None) -> None:
+def fanout(
+    *,
+    business,
+    title: str,
+    body: str,
+    ntype: str = "billing",
+    url: str = "",
+    to_email: Optional[str] = None,
+    to_whatsapp: Optional[str] = None,
+) -> None:
     """
     Send email + WhatsApp + in-app bell (best-effort).
     """
@@ -145,18 +172,25 @@ def fanout(*, business, title: str, body: str, ntype: str = "billing", url: str 
     try:
         send_email(subject=title, body=body, to_email=email)
     except Exception as e:
-        print(f"[billing.email] error: {e}")
+        import logging
+
+        logger = logging.getLogger(__name__)
+        logger.warning("[billing.email] error: %s", str(e))
 
     # WhatsApp
     try:
         send_whatsapp(wa, body)
     except Exception as e:
-        print(f"[billing.wa] error: {e}")
+        import logging
+
+        logger = logging.getLogger(__name__)
+        logger.warning("[billing.wa] error: %s", str(e))
 
     # In-app bell
     try:
         _notify_in_app(title=title, body=body, ntype=ntype, business=business, url=url)
     except Exception as e:
-        print(f"[billing.inapp] error: {e}")
+        import logging
 
-
+        logger = logging.getLogger(__name__)
+        logger.warning("[billing.inapp] error: %s", str(e))

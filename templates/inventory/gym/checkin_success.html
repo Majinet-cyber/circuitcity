@@ -1,0 +1,527 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Check-in Recorded - {{ business.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+/* ========== GYM CHECK-IN SUCCESS: PREMIUM, MOTIVATING DESIGN ========== */
+
+/* Full-height centered layout */
+.gym-success-wrapper {
+    min-height: calc(100vh - 200px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem 1rem;
+}
+
+/* Success card - centered, premium shadow */
+.gym-success-card {
+    background: white;
+    border-radius: 24px;
+    padding: 2.5rem 2rem;
+    max-width: 560px;
+    width: 100%;
+    box-shadow: 0 20px 60px rgba(102, 126, 234, 0.15);
+    text-align: center;
+    animation: scaleIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes scaleIn {
+    from {
+        opacity: 0;
+        transform: scale(0.9) translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+/* Success icon with bounce animation */
+.gym-success-icon {
+    width: 80px;
+    height: 80px;
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 1.5rem;
+    animation: bounceIn 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+    box-shadow: 0 8px 24px rgba(16, 185, 129, 0.3);
+}
+
+@keyframes bounceIn {
+    0% {
+        opacity: 0;
+        transform: scale(0);
+    }
+    50% {
+        transform: scale(1.1);
+    }
+    100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+.gym-success-icon i {
+    font-size: 3rem;
+    color: white;
+}
+
+/* Header text */
+.gym-success-title {
+    font-size: 1.75rem;
+    font-weight: 800;
+    color: #0f172a;
+    margin: 0 0 0.5rem 0;
+}
+
+.gym-success-subtitle {
+    font-size: 1rem;
+    color: #64748b;
+    margin: 0 0 1.5rem 0;
+    font-weight: 500;
+}
+
+/* Member name highlight */
+.gym-success-member {
+    background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+    padding: 1rem 1.5rem;
+    border-radius: 16px;
+    margin-bottom: 1.5rem;
+    border: 2px solid #e2e8f0;
+}
+
+.gym-success-member-label {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #64748b;
+    font-weight: 700;
+    margin-bottom: 0.25rem;
+}
+
+.gym-success-member-name {
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: #667eea;
+    margin: 0;
+}
+
+/* Stats chips (streak, monthly, time) */
+.gym-success-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.gym-stat-chip {
+    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+    padding: 1rem;
+    border-radius: 16px;
+    border: 2px solid #e2e8f0;
+    transition: all 0.3s;
+}
+
+.gym-stat-chip:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(102, 126, 234, 0.1);
+}
+
+.gym-stat-chip-icon {
+    font-size: 1.5rem;
+    margin-bottom: 0.5rem;
+    display: block;
+}
+
+.gym-stat-chip-label {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #64748b;
+    font-weight: 700;
+    margin-bottom: 0.25rem;
+}
+
+.gym-stat-chip-value {
+    font-size: 1.25rem;
+    font-weight: 800;
+    color: #0f172a;
+    margin: 0;
+}
+
+.gym-stat-chip.highlight .gym-stat-chip-value {
+    color: #667eea;
+}
+
+.gym-stat-chip.streak .gym-stat-chip-value {
+    color: #f59e0b;
+}
+
+/* Badge display */
+.gym-success-badge {
+    background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+    padding: 0.75rem 1.5rem;
+    border-radius: 12px;
+    display: inline-block;
+    margin-bottom: 1.5rem;
+    border: 2px solid #fbbf24;
+}
+
+.gym-success-badge span {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #92400e;
+}
+
+/* Action buttons row */
+.gym-success-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin-top: 2rem;
+}
+
+@media (min-width: 768px) {
+    .gym-success-actions {
+        flex-direction: row;
+    }
+}
+
+.gym-success-btn {
+    flex: 1;
+    padding: 1rem 1.5rem;
+    border-radius: 12px;
+    font-weight: 700;
+    font-size: 1rem;
+    border: none;
+    cursor: pointer;
+    transition: all 0.3s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    text-decoration: none;
+}
+
+.gym-success-btn:hover {
+    transform: translateY(-2px);
+    text-decoration: none;
+}
+
+.gym-success-btn-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    box-shadow: 0 8px 24px rgba(102, 126, 234, 0.3);
+}
+
+.gym-success-btn-primary:hover {
+    box-shadow: 0 12px 32px rgba(102, 126, 234, 0.4);
+    color: white;
+}
+
+.gym-success-btn-secondary {
+    background: white;
+    color: #667eea;
+    border: 2px solid #e2e8f0;
+}
+
+.gym-success-btn-secondary:hover {
+    border-color: #667eea;
+    background: #f8fafc;
+    color: #667eea;
+}
+
+/* Secondary links */
+.gym-success-links {
+    margin-top: 1.5rem;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 1rem;
+}
+
+.gym-success-links a {
+    font-size: 0.875rem;
+    color: #64748b;
+    text-decoration: none;
+    font-weight: 600;
+    transition: color 0.2s;
+}
+
+.gym-success-links a:hover {
+    color: #667eea;
+}
+
+/* Celebration badges (new achievements) */
+.gym-celebration-badges {
+    background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+    padding: 1.5rem;
+    border-radius: 16px;
+    margin-bottom: 1.5rem;
+    border: 2px solid #86efac;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        transform: scale(1);
+        box-shadow: 0 0 0 0 rgba(134, 239, 172, 0.4);
+    }
+    50% {
+        transform: scale(1.02);
+        box-shadow: 0 0 0 10px rgba(134, 239, 172, 0);
+    }
+}
+
+.gym-celebration-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #166534;
+    margin: 0 0 1rem 0;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.gym-celebration-badge-item {
+    background: white;
+    padding: 1rem;
+    border-radius: 12px;
+    margin-bottom: 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.gym-celebration-badge-item:last-child {
+    margin-bottom: 0;
+}
+
+.gym-celebration-badge-icon {
+    font-size: 2.5rem;
+}
+
+.gym-celebration-badge-info h4 {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #0f172a;
+    margin: 0 0 0.25rem 0;
+}
+
+.gym-celebration-badge-info p {
+    font-size: 0.875rem;
+    color: #64748b;
+    margin: 0;
+}
+
+/* Mobile responsive */
+@media (max-width: 576px) {
+    .gym-success-card {
+        padding: 2rem 1.5rem;
+    }
+
+    .gym-success-title {
+        font-size: 1.5rem;
+    }
+
+    .gym-success-member-name {
+        font-size: 1.25rem;
+    }
+
+    .gym-success-stats {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Already checked in variant */
+.gym-success-card.already-checked {
+    border: 3px solid #10b981;
+    background: linear-gradient(135deg, #f0fdf4 0%, white 100%);
+}
+
+.gym-success-icon.already-checked {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="gym-success-wrapper">
+    <div class="gym-success-card {% if already_checked_in %}already-checked{% endif %}">
+        <!-- Success Icon -->
+        <div class="gym-success-icon {% if already_checked_in %}already-checked{% endif %}">
+            <i class="bi bi-check-circle-fill"></i>
+        </div>
+
+        <!-- Header -->
+        <h1 class="gym-success-title">
+            {% if already_checked_in %}
+                Already Checked In!
+            {% else %}
+                Check-in Recorded
+            {% endif %}
+        </h1>
+        <p class="gym-success-subtitle">
+            {% if already_checked_in %}
+                This member was already checked in today
+            {% else %}
+                Great work — consistency wins 💪
+            {% endif %}
+        </p>
+
+        <!-- Member Name -->
+        <div class="gym-success-member">
+            <div class="gym-success-member-label">Member</div>
+            <h2 class="gym-success-member-name">{{ member_name }}</h2>
+        </div>
+
+        <!-- New Badges (Celebration) -->
+        {% if show_celebration and badges_earned %}
+        <div class="gym-celebration-badges">
+            <div class="gym-celebration-title">🏆 New Achievement Unlocked!</div>
+            {% for badge in badges_earned %}
+            <div class="gym-celebration-badge-item">
+                <div class="gym-celebration-badge-icon">{{ badge.icon }}</div>
+                <div class="gym-celebration-badge-info">
+                    <h4>{{ badge.name }}</h4>
+                    <p>{{ badge.description }}</p>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- Stats Chips -->
+        <div class="gym-success-stats">
+            <!-- Streak -->
+            <div class="gym-stat-chip {% if streak_days > 0 %}streak{% endif %}">
+                <span class="gym-stat-chip-icon">🔥</span>
+                <div class="gym-stat-chip-label">Streak</div>
+                <p class="gym-stat-chip-value">
+                    {% if streak_days > 0 %}
+                        {{ streak_days }} day{{ streak_days|pluralize }}
+                    {% else %}
+                        Start today!
+                    {% endif %}
+                </p>
+            </div>
+
+            <!-- Monthly Check-ins -->
+            <div class="gym-stat-chip highlight">
+                <span class="gym-stat-chip-icon">📅</span>
+                <div class="gym-stat-chip-label">This Month</div>
+                <p class="gym-stat-chip-value">{{ monthly_checkins }} check-in{{ monthly_checkins|pluralize }}</p>
+            </div>
+
+            <!-- Time -->
+            <div class="gym-stat-chip">
+                <span class="gym-stat-chip-icon">⏰</span>
+                <div class="gym-stat-chip-label">Time</div>
+                <p class="gym-stat-chip-value">{{ checked_in_at|date:"H:i" }}</p>
+            </div>
+        </div>
+
+        <!-- Badge Display (if member has badge) -->
+        {% if badge_display.icon %}
+        <div class="gym-success-badge">
+            <span>{{ badge_display.icon }} {{ badge_display.label }}</span>
+        </div>
+        {% endif %}
+
+        <!-- Membership Status -->
+        <div style="margin-bottom: 1rem;">
+            <span class="badge {% if membership_status == 'Active' %}bg-success{% else %}bg-warning{% endif %}">
+                {{ membership_status }}
+            </span>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="gym-success-actions">
+            <a href="{% url 'gym:checkin_page' %}" class="gym-success-btn gym-success-btn-primary">
+                <i class="bi bi-arrow-repeat"></i>
+                Check in another
+            </a>
+            <a href="{% url 'gym:scan_member' %}" class="gym-success-btn gym-success-btn-secondary">
+                <i class="bi bi-qr-code-scan"></i>
+                Scan QR
+            </a>
+        </div>
+
+        <!-- Secondary Links -->
+        <div class="gym-success-links">
+            <a href="{% url 'gym:members_list' %}">
+                <i class="bi bi-people"></i> View Members
+            </a>
+            <a href="{% url 'gym:dashboard' %}">
+                <i class="bi bi-speedometer2"></i> Dashboard
+            </a>
+            <a href="{% url 'gym:member_detail' member.id %}">
+                <i class="bi bi-eye"></i> View {{ member_name }}'s Profile
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Optional: Confetti effect for celebration milestones -->
+{% if show_celebration %}
+<script>
+// Minimal confetti animation (CSS-based, no libraries)
+function createConfetti() {
+    const colors = ['#10b981', '#667eea', '#f59e0b', '#ec4899', '#8b5cf6'];
+    const confettiCount = 40;
+    
+    for (let i = 0; i < confettiCount; i++) {
+        const confetti = document.createElement('div');
+        confetti.style.position = 'fixed';
+        confetti.style.width = '10px';
+        confetti.style.height = '10px';
+        confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+        confetti.style.left = Math.random() * 100 + '%';
+        confetti.style.top = '-10px';
+        confetti.style.opacity = '1';
+        confetti.style.borderRadius = '50%';
+        confetti.style.pointerEvents = 'none';
+        confetti.style.zIndex = '10000';
+        
+        document.body.appendChild(confetti);
+        
+        const duration = Math.random() * 3 + 2;
+        const xMovement = (Math.random() - 0.5) * 200;
+        
+        confetti.animate([
+            { 
+                transform: `translate(0, 0) rotate(0deg)`, 
+                opacity: 1 
+            },
+            { 
+                transform: `translate(${xMovement}px, ${window.innerHeight + 10}px) rotate(${Math.random() * 720}deg)`, 
+                opacity: 0 
+            }
+        ], {
+            duration: duration * 1000,
+            easing: 'cubic-bezier(0.25, 0.46, 0.45, 0.94)'
+        });
+        
+        setTimeout(() => confetti.remove(), duration * 1000);
+    }
+}
+
+// Trigger confetti on load
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', createConfetti);
+} else {
+    createConfetti();
+}
+</script>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<!-- No additional JS needed - all animations are CSS-based -->
+{% endblock %}
+

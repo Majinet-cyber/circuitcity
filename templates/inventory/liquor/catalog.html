@@ -1,0 +1,274 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{{ category_display }} Catalog{% endblock %}
+
+{% block extra_css %}
+<style>
+.catalog-container {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 1rem;
+}
+
+.catalog-header {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.catalog-header h1 {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #1f2937;
+  margin-bottom: 0.5rem;
+}
+
+.catalog-header p {
+  color: #6b7280;
+  font-size: 1.1rem;
+}
+
+.search-box {
+  margin-bottom: 2rem;
+}
+
+.search-box input {
+  width: 100%;
+  padding: 1rem;
+  border: 2px solid #e5e7eb;
+  border-radius: 12px;
+  font-size: 1.1rem;
+  transition: border-color 0.2s;
+}
+
+.search-box input:focus {
+  outline: none;
+  border-color: #10b981;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+}
+
+.product-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.product-card {
+  background: white;
+  border: 2px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 1.5rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.product-card:hover {
+  border-color: #10b981;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.15);
+}
+
+.product-card.selected {
+  border-color: #10b981;
+  background: #f0fdf4;
+}
+
+.product-name {
+  font-weight: 600;
+  color: #1f2937;
+  font-size: 1.1rem;
+  margin-bottom: 0.5rem;
+}
+
+.product-price {
+  color: #10b981;
+  font-weight: 600;
+  font-size: 1rem;
+}
+
+.product-stock {
+  color: #6b7280;
+  font-size: 0.875rem;
+  margin-top: 0.5rem;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: #6b7280;
+}
+
+.empty-state-icon {
+  font-size: 4rem;
+  margin-bottom: 1rem;
+}
+
+.catalog-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 2rem;
+  flex-wrap: wrap;
+}
+
+.btn-catalog {
+  padding: 0.75rem 2rem;
+  font-size: 1.1rem;
+  font-weight: 600;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: white;
+}
+
+.btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.btn-secondary {
+  background: white;
+  color: #6b7280;
+  border: 2px solid #e5e7eb;
+}
+
+.btn-secondary:hover {
+  border-color: #10b981;
+  color: #10b981;
+}
+
+@media (max-width: 768px) {
+  .product-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .catalog-actions {
+    flex-direction: column;
+  }
+  
+  .btn-catalog {
+    width: 100%;
+  }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- LIQUOR_WIZARD_V2 - Catalog page proof marker -->
+<div class="d-none" data-proof="LIQUOR_WIZARD_V2"></div>
+
+<div class="catalog-container">
+  <!-- Header -->
+  <div class="catalog-header">
+    <h1>{{ category_display }} Catalog</h1>
+    <p>Select a product to add stock</p>
+  </div>
+
+  <!-- Messages -->
+  {% if messages %}
+    {% for message in messages %}
+    <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+      {{ message }}
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    {% endfor %}
+  {% endif %}
+
+  <!-- Search Box -->
+  <div class="search-box">
+    <form method="get" id="search-form">
+      <input 
+        type="text" 
+        name="q" 
+        placeholder="🔍 Search products..." 
+        value="{{ search_query }}"
+        autocomplete="off"
+      >
+    </form>
+  </div>
+
+  <!-- Product Grid -->
+  {% if has_products %}
+  <div class="product-grid" id="product-grid">
+    {% for product in products %}
+    <div class="product-card" data-product-id="{{ product.id }}" onclick="selectProduct({{ product.id }})">
+      <div class="product-name">{{ product.name }}</div>
+      <div class="product-price">
+        {% if product.price_per_bottle %}
+          MWK {{ product.price_per_bottle|floatformat:0 }}
+        {% else %}
+          Price not set
+        {% endif %}
+      </div>
+      <div class="product-stock">
+        {% if product.quantity_in_stock %}
+          {% if product.has_shots %}
+            In stock: {{ product.quantity_in_stock }} shots available
+            {% if product.shots_per_bottle %}<br><small style="color:#94a3b8;">({{ product.shots_per_bottle }} shots/bottle)</small>{% endif %}
+          {% elif product.has_glasses %}
+            In stock: {{ product.quantity_in_stock }} glasses available
+            {% if product.glasses_per_bottle %}<br><small style="color:#94a3b8;">({{ product.glasses_per_bottle }} glasses/bottle)</small>{% endif %}
+          {% else %}
+            In stock: {{ product.quantity_in_stock }} bottle{{ product.quantity_in_stock|pluralize }}
+          {% endif %}
+        {% else %}
+          Out of stock
+        {% endif %}
+      </div>
+      <a href="{% url 'inventory:liquor_stock_in' product_id=product.id %}" class="btn btn-success btn-sm mt-2" style="display: block; text-decoration: none;">
+        Select & Stock In
+      </a>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <div class="empty-state-icon">📦</div>
+    <h3>No products found</h3>
+    <p>Try a different search or add a custom product</p>
+  </div>
+  {% endif %}
+
+  <!-- Actions -->
+  <div class="catalog-actions">
+    <a href="{% url 'inventory:liquor_wizard' %}" class="btn-catalog btn-secondary">
+      ← Back to Categories
+    </a>
+  </div>
+
+  <!-- Secondary Action: Add Custom Product -->
+  <div style="text-align: center; margin-top: 1.5rem;">
+    <a href="{% url 'inventory:liquor_wizard_step2' %}" class="btn-catalog btn-secondary" style="display: inline-block;">
+      + Add New Product (Custom)
+    </a>
+  </div>
+</div>
+
+<script>
+// Auto-submit search after typing stops
+let searchTimeout;
+const searchInput = document.querySelector('input[name="q"]');
+if (searchInput) {
+  searchInput.addEventListener('input', function() {
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(() => {
+      document.getElementById('search-form').submit();
+    }, 500);
+  });
+}
+</script>
+{% endblock %}
+

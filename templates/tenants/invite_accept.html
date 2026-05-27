@@ -1,179 +1,255 @@
+{# templates/tenants/invite_accept.html — Clean mobile-first agent signup (like login page) #}
 {% extends "base.html" %}
 {% load static %}
-{% block title %}Join as Agent · {{ invite.business.name }}{% endblock %}
+{% block title %}Join as {% if invite.business.business_kind == "gym" %}Trainer{% else %}Agent{% endif %} · {{ invite.business.name }}{% endblock %}
 
-{# Hide app chrome for this page #}
-{% block sidebar %}{% endblock %}
-{% block header %}{% endblock %}
-{% block nav %}{% endblock %}
-{% block topbar %}{% endblock %}
-{% block header_title %}{% endblock %}
-
-{% block extra_head %}
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-{% endblock %}
-
-{% block extra_css %}
+{% block body %}
 <style>
-  html, body { height:100%; margin:0 !important; background:#eef2f7; }
-  body { overflow:hidden !important; }
+  /* ============== Scoped styles (matching login.html pattern) ============== */
+  .cc-signup{
+    --bg1:#eef5ff; --bg2:#f9fbff; --card:#ffffff; --text:#0f172a; --muted:#475569;
+    --border:#e2e8f0; --ring:#93c5fd; --brand:#2563eb; --brand-2:#1d4ed8;
+    --success:#16a34a; --success-hover:#15803d;
+    --danger:#b91c1c; --danger-bg:#fee2e2; --danger-bd:#fecaca;
+    --glass-bg: rgba(37,99,235,0.12);
+    --glass-brd: rgba(96,165,250,.55);
+    --glass-shadow: 0 10px 30px rgba(37,99,235,.22);
+  }
+  .cc-signup *{ box-sizing:border-box }
 
-  /* In case your base injects fixed navs/headers */
-  .app-header, .appheader, header.navbar, .navbar, .topbar, .layout-topbar,
-  .app-sidebar, .sidebar, #sidebar, .cc-sidebar, .layout-sidebar,
-  .app-bottom-nav { display:none !important; }
-
-  /* Full-screen stage */
-  .invite-screen{
-    position:fixed; inset:0; display:flex; align-items:center; justify-content:center; 
-    padding:1rem;
+  /* ---------- Layout ---------- */
+  .cc-signup .wrap{
+    min-height:100dvh; display:grid; place-items:center;
+    padding:max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right))
+            max(24px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
     background:
-      radial-gradient(1200px 600px at 30% -10%, #ffffff 0%, rgba(255,255,255,0) 60%),
-      radial-gradient(1200px 600px at 90% 120%, #ffffff 0%, rgba(255,255,255,0) 60%),
-      #eef2f7;
+      radial-gradient(1200px 600px at 20% -10%, #e0edff 0%, transparent 60%),
+      radial-gradient(1000px 500px at 110% 10%, #dbeafe 0%, transparent 60%),
+      linear-gradient(180deg,var(--bg1),var(--bg2));
+    color:var(--text);
+  }
+  .cc-signup .card{
+    width:min(560px,92vw); background:var(--card); border:1px solid var(--border);
+    border-radius:16px; padding:24px 22px 22px;
+    box-shadow:0 18px 60px rgba(2,8,23,.08), 0 2px 8px rgba(2,8,23,.04);
+    position:relative; max-height:95vh; overflow-y:auto;
   }
 
-  /* Card = header (auto) • body (scrolls) • footer (auto) - fits nicely on 768px height */
-  .invite-card{
-    width:100%; max-width:520px; max-height:min(95vh, 720px);
-    background:#fff; border-radius:20px; box-shadow:0 18px 45px rgba(15,23,42,.15);
-    display:grid; grid-template-rows:auto 1fr auto;
-    overflow:hidden;
+  /* Subtle animated border glow */
+  .cc-signup .card::before{
+    content:""; position:absolute; inset:-1px; border-radius:inherit;
+    background:conic-gradient(from 180deg,#93c5fd,transparent 30%,#a7f3d0 55%,transparent 80%);
+    filter:blur(10px) opacity(.2); z-index:-1; animation: spin2 8s linear infinite;
   }
-  .invite-head{ padding:16px 20px 8px; }
-  .invite-body{ padding:4px 20px 8px; overflow:auto; -webkit-overflow-scrolling:touch; }
-  .invite-foot{ padding:12px 20px 16px; border-top:1px solid #eef2f7; background:#fafbfc; }
+  @keyframes spin2{ to{ transform:rotate(1turn); } }
+  @media (prefers-reduced-motion:reduce){ .cc-signup .card::before{ animation:none; } }
 
-  .invite-title{ font-weight:800; margin:0 0 4px 0; letter-spacing:.2px; font-size:1.5rem; }
-  .badge-soft{ background:#eef2ff; color:#273a8a; border:1px solid #e5e7eb; border-radius:999px; padding:2px 10px; font-size:11px; }
-  .hello{ background:#f8fafc; border-radius:10px; padding:8px 10px; margin-bottom:0.75rem !important; }
-  
-  /* Compact form styling */
-  .form-label{ font-weight:600; margin-bottom:0.35rem; font-size:0.9rem; }
-  .form-control{ height:42px; border-radius:10px; font-size:0.95rem; }
-  .input-group .btn{ border-radius:10px; font-size:0.85rem; }
-  .form-text{ font-size:0.8rem; margin-top:0.25rem; }
-  
-  /* Reduce spacing between fields */
-  .mb-3{ margin-bottom:0.75rem !important; }
-  .mb-2{ margin-bottom:0.5rem !important; }
-
-  .btn-accept{
-    background:#16a34a; border-color:#16a34a; color:#fff;
-    height:46px; border-radius:10px; font-weight:700; width:100%;
-    font-size:1rem; border:none;
+  /* ---------- Typography & Brand ---------- */
+  .cc-signup .brand{display:flex;align-items:center;gap:.75rem;margin-bottom:.5rem}
+  .cc-signup .dot{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#60a5fa,#3b82f6)}
+  .cc-signup h1{margin:0 0 .25rem;font-size:clamp(18px,4vw,22px);font-weight:800}
+  .cc-signup .tagline{color:var(--muted);font-size:13px;margin:0 0 .5rem}
+  .cc-signup .hello{
+    background:#f8fafc;border-radius:10px;padding:8px 12px;margin:1rem 0 .75rem;
+    font-size:14px;font-weight:600;color:#334155;
   }
-  .btn-accept:hover{ background:#15803d; }
-  .btn-accept:disabled{ opacity:.7; }
 
-  /* Mobile compaction */
+  /* Expiry badge */
+  .badge-soft{
+    background:#eef2ff;color:#273a8a;border:1px solid #e5e7eb;
+    border-radius:999px;padding:2px 10px;font-size:11px;
+  }
+
+  /* ---------- Alerts ---------- */
+  .cc-signup .alert{
+    background:#e0f2fe;border:1px solid #bae6fd;color:#0c4a6e;
+    padding:10px 12px;border-radius:12px;font-size:14px;margin:10px 0 6px;
+  }
+  .cc-signup .alert.err{
+    background:var(--danger-bg);border-color:var(--danger-bd);color:var(--danger);
+  }
+
+  /* ---------- Form Fields ---------- */
+  .cc-signup form{display:grid;gap:12px;margin-top:12px}
+  .cc-signup .form-label{
+    display:block;margin:0 0 .4rem;color:#334155;font-weight:600;font-size:14px;
+  }
+  .cc-signup .form-control{
+    width:100%;background:#f8fafc;border:1px solid var(--border);
+    border-radius:12px;padding:12px 14px;font-size:16px;color:var(--text);
+    outline:0;transition:border .15s, box-shadow .15s;
+  }
+  .cc-signup .form-control:focus{
+    border-color:var(--ring);box-shadow:0 0 0 4px rgba(147,197,253,.25);
+  }
+  .cc-signup .form-control:disabled{
+    background:#e2e8f0;color:#64748b;cursor:not-allowed;
+  }
+
+  /* Input groups (password with Show button) */
+  .cc-signup .input-group{
+    display:flex;align-items:stretch;gap:0;
+  }
+  .cc-signup .input-group .form-control{
+    border-top-right-radius:0;border-bottom-right-radius:0;flex:1;
+  }
+  .cc-signup .input-group .btn{
+    border-top-left-radius:0;border-bottom-left-radius:0;
+    background:#f8fafc;border:1px solid var(--border);border-left:0;
+    padding:8px 14px;font-size:13px;font-weight:600;color:#475569;cursor:pointer;
+  }
+  .cc-signup .input-group .btn:hover{background:#e2e8f0}
+
+  .cc-signup .form-text{
+    font-size:12px;color:var(--muted);margin-top:4px;
+  }
+  .cc-signup .text-danger{color:var(--danger)}
+  .cc-signup .text-success{color:var(--success)}
+  .cc-signup .text-warning{color:#ca8a04}
+
+  /* ---------- Buttons ---------- */
+  .btn-signup{
+    display:inline-flex;align-items:center;justify-content:center;gap:.5rem;
+    width:100%;padding:14px 16px;margin-top:6px;
+    font-weight:800;letter-spacing:.02em;border-radius:14px;
+    border:1px solid transparent;color:#ffffff;
+    background:linear-gradient(135deg,var(--success),#15803d);
+    box-shadow:0 8px 18px rgba(22,163,74,.22);
+    transition:transform .15s ease, box-shadow .15s ease;cursor:pointer;
+  }
+  .btn-signup:hover{
+    transform:translateY(-1px);
+    box-shadow:0 12px 24px rgba(22,163,74,.32);
+  }
+  .btn-signup:active{transform:none}
+  .btn-signup:disabled{opacity:.65;cursor:not-allowed}
+
+  .cc-signup .footer{
+    display:flex;justify-content:center;margin-top:12px;font-size:13px;
+  }
+  .cc-signup a{color:var(--brand);text-decoration:none}
+  .cc-signup a:hover{text-decoration:underline}
+
+  /* ---------- Mobile compaction ---------- */
   @media (max-width:420px){
-    .invite-head{ padding:12px 16px 6px; }
-    .invite-body{ padding:4px 16px 8px; }
-    .invite-foot{ padding:10px 16px 12px; }
-    .invite-title{ font-size:1.3rem; }
+    .cc-signup .card{padding:20px 18px 18px;max-height:100vh}
+    .cc-signup h1{font-size:18px}
+    .cc-signup .hello{font-size:13px;padding:6px 10px}
   }
 </style>
-{% endblock %}
 
-{% block content %}
-<div class="invite-screen">
-  <div class="invite-card">
-
-    <!-- Header -->
-    <div class="invite-head">
-      <div class="d-flex align-items-center gap-2 mb-2">
-        <div class="fw-bold text-uppercase small text-secondary" style="font-size:0.7rem;">Agent Invite</div>
+<div class="cc-signup">
+  <div class="wrap">
+    <main class="card" role="dialog" aria-labelledby="signupTitle">
+      <!-- Brand header -->
+      <header class="brand">
+        <div class="dot"></div>
+        <div>
+          <div style="font-weight:800">{{ invite.business.name }}</div>
+          <div class="tagline">{% if invite.business.business_kind == "gym" %}Trainer{% else %}Agent{% endif %} Invite</div>
+        </div>
         {% if invite.expires_at %}
-          <div class="ms-auto">
-            <span class="badge-soft" id="expiryBadge" title="{{ invite.expires_at|date:'c' }}">checking expiry…</span>
+          <div style="margin-left:auto">
+            <span class="badge-soft" id="expiryBadge" title="{{ invite.expires_at|date:'c' }}">checking…</span>
           </div>
         {% endif %}
-      </div>
-      <h2 class="invite-title">Join {{ invite.business.name }}</h2>
-      <p class="text-muted mb-0" style="font-size:0.9rem;">Create your account to start working.</p>
-    </div>
+      </header>
 
-    <!-- Body (scrolls on small phones) -->
-    <div class="invite-body">
-      {% if error %}<div class="alert alert-danger" role="alert">{{ error }}</div>{% endif %}
-      {% if form.non_field_errors %}<div class="alert alert-danger" role="alert">{{ form.non_field_errors|join:", " }}</div>{% endif %}
+      <h1 id="signupTitle">Create your account</h1>
+      <p class="tagline">Join {{ invite.business.name }} to start working.</p>
 
-      <div class="hello">
-        <div id="greeting" style="font-weight:600; font-size:0.95rem;">
-          Hi {{ invite.invited_name|default:"there" }}, welcome to {{ invite.business.name }}.
-        </div>
+      <!-- Greeting -->
+      <div class="hello" id="greeting">
+        Hi {{ invite.invited_name|default:"there" }}, welcome to {{ invite.business.name }}.
       </div>
 
+      <!-- Errors -->
+      {% if error %}
+        <div class="alert err" role="alert">{{ error }}</div>
+      {% endif %}
+      {% if form.non_field_errors %}
+        <div class="alert err" role="alert">{{ form.non_field_errors|join:", " }}</div>
+      {% endif %}
+
+      <!-- Form -->
       <form method="post" novalidate id="inviteForm" autocomplete="on">
         {% csrf_token %}
 
-        <div class="mb-3">
+        <!-- Name -->
+        <div>
           <label for="name" class="form-label">Your name</label>
           <input type="text" class="form-control" id="name" name="name"
                  placeholder="e.g. Chris Mwale"
                  value="{{ invite.invited_name|default_if_none:'' }}"
-                 autocomplete="name">
+                 autocomplete="name" required>
         </div>
 
-        <div class="mb-3">
+        <!-- Email -->
+        <div>
           <label class="form-label">
-            Email {% if invite.email %}<span class="text-muted" style="font-weight:400; font-size:0.85rem;">(from invite)</span>{% endif %}
+            Email {% if invite.email %}<span style="font-weight:400;color:var(--muted);font-size:12px;">(from invite)</span>{% endif %}
           </label>
-
-          {# If invite has an email, lock it: show disabled field + hidden real field #}
           {% if invite.email %}
             <input type="email" class="form-control" value="{{ invite.email }}" disabled>
             <input type="hidden" name="email" value="{{ invite.email }}">
           {% else %}
-            {# Use the Django form widget if no fixed email came with the invite #}
             {% if form.email %}
-              {% if form.email.errors %}<div class="text-danger small mt-0 mb-1">{{ form.email.errors|join:", " }}</div>{% endif %}
-              {{ form.email }}
+              {% if form.email.errors %}
+                <div class="text-danger" style="font-size:12px;margin:0 0 4px">{{ form.email.errors|join:", " }}</div>
+              {% endif %}
+              <input type="email" class="form-control" name="email"
+                     value="{{ form.email.value|default:'' }}"
+                     required autocomplete="email">
             {% else %}
-              <input type="email" class="form-control" name="email" required autocomplete="email" value="">
+              <input type="email" class="form-control" name="email" required autocomplete="email">
             {% endif %}
           {% endif %}
         </div>
 
-        <div class="mb-2">
-          <label for="{{ form.password1.id_for_label|default:'id_password1' }}" class="form-label">Password</label>
+        <!-- Password -->
+        <div>
+          <label for="id_password1" class="form-label">Password</label>
           <div class="input-group">
-            {% if form.password1 %}
-              {{ form.password1 }}
-            {% else %}
-              <input type="password" name="password1" id="id_password1" class="form-control" minlength="8" required autocomplete="new-password" autofocus>
-            {% endif %}
-            <button class="btn btn-outline-secondary" type="button" data-toggle="reveal" data-target="[name='password1']">Show</button>
+            <input type="password" name="password1" id="id_password1" class="form-control"
+                   minlength="12" required autocomplete="new-password">
+            <button class="btn" type="button" data-toggle="reveal" data-target="#id_password1">Show</button>
           </div>
-          {% if form.password1 and form.password1.errors %}<div class="text-danger small mt-1">{{ form.password1.errors|join:", " }}</div>{% endif %}
-          <div id="strengthHint" class="small mt-1"></div>
+          {% if form.password1.errors %}
+            <div class="text-danger" style="font-size:12px;margin-top:4px">
+              {{ form.password1.errors|join:", " }}
+            </div>
+          {% endif %}
+          <div class="form-text">
+            Must be at least 12 characters with uppercase, lowercase, digit, and symbol (e.g. @, #, $, !)
+          </div>
+          <div id="strengthHint" style="font-size:12px;margin-top:4px"></div>
         </div>
 
-        <div class="mb-2">
-          <label for="{{ form.password2.id_for_label|default:'id_password2' }}" class="form-label">Confirm</label>
+        <!-- Confirm Password -->
+        <div>
+          <label for="id_password2" class="form-label">Confirm password</label>
           <div class="input-group">
-            {% if form.password2 %}
-              {{ form.password2 }}
-            {% else %}
-              <input type="password" name="password2" id="id_password2" class="form-control" minlength="8" required autocomplete="new-password">
-            {% endif %}
-            <button class="btn btn-outline-secondary" type="button" data-toggle="reveal" data-target="[name='password2']">Show</button>
+            <input type="password" name="password2" id="id_password2" class="form-control"
+                   minlength="12" required autocomplete="new-password">
+            <button class="btn" type="button" data-toggle="reveal" data-target="#id_password2">Show</button>
           </div>
-          {% if form.password2 and form.password2.errors %}<div class="text-danger small mt-1">{{ form.password2.errors|join:", " }}</div>{% endif %}
-          <div class="form-text" id="matchHint" style="display:none;">Passwords match ✔</div>
+          {% if form.password2.errors %}
+            <div class="text-danger" style="font-size:12px;margin-top:4px">
+              {{ form.password2.errors|join:", " }}
+            </div>
+          {% endif %}
+          <div id="matchHint" class="form-text" style="display:none">Passwords match ✔</div>
         </div>
 
-        <div class="text-center mt-2">
-          <a href="{% url 'login' %}" class="small" style="font-size:0.85rem;">Already have an account? Sign in</a>
+        <!-- Submit -->
+        <button class="btn-signup" type="submit" id="submitBtn">Create account</button>
+
+        <!-- Sign in link -->
+        <div class="footer">
+          <a href="{% url 'login' %}">Already have an account? Sign in</a>
         </div>
       </form>
-    </div>
-
-    <!-- Footer with CTA -->
-    <div class="invite-foot">
-      <button class="btn-accept" type="submit" form="inviteForm" id="submitBtn">Create account</button>
-    </div>
+    </main>
   </div>
 </div>
 
@@ -184,118 +260,126 @@
   const form=document.getElementById('inviteForm');
   const nameInput=document.getElementById('name');
   const greeting=document.getElementById('greeting');
-  const p1=form?form.querySelector("input[name='password1']"):null;
-  const p2=form?form.querySelector("input[name='password2']"):null;
-  const emailInput=form?form.querySelector("input[name='email']"):null;
+  const p1=document.getElementById('id_password1');
+  const p2=document.getElementById('id_password2');
   const matchHint=document.getElementById('matchHint');
   const strengthHint=document.getElementById('strengthHint');
   const expiryBadge=document.getElementById('expiryBadge');
   const submitBtn=document.getElementById('submitBtn');
 
-  /* Ensure Django form widgets look right even if not pre-styled */
-  [emailInput,p1,p2].forEach(el=>{ if(el && !el.classList.contains('form-control')) el.classList.add('form-control'); });
-
+  // Update greeting when name changes
   function updateGreeting(){
-    if(!greeting) return;
-    const name=(nameInput && nameInput.value || '').trim() || defaultInvitee || 'there';
+    if(!greeting||!nameInput) return;
+    const name=nameInput.value.trim()||defaultInvitee||'there';
     greeting.textContent=`Hi ${name}, welcome to ${shopName}.`;
   }
 
-  function strength(s){let n=0; if(s.length>=8)n++; if(/[a-z]/.test(s)&&/[A-Z]/.test(s))n++; if(/\d/.test(s))n++; if(/[^A-Za-z0-9]/.test(s))n++; return n;}
+  // Password strength
+  function strength(s){
+    let n=0;
+    if(s.length>=12)n++;
+    if(/[a-z]/.test(s)&&/[A-Z]/.test(s))n++;
+    if(/\d/.test(s))n++;
+    if(/[^A-Za-z0-9]/.test(s))n++;
+    return n;
+  }
   function updateStrength(){
     if(!p1||!strengthHint)return;
     const sc=strength(p1.value||"");
     let msg="";
     if(!p1.value) msg="";
-    else if(sc<=1) msg="Strength: weak";
-    else if(sc===2) msg="Strength: fair";
-    else if(sc===3) msg="Strength: good";
-    else msg="Strength: strong";
+    else if(sc<=1) msg="⚠️ Too weak - needs 12+ chars, upper, lower, digit, symbol";
+    else if(sc===2) msg="⚠️ Weak - missing some requirements";
+    else if(sc===3) msg="✓ Good password";
+    else msg="✓ Strong password";
     strengthHint.textContent=msg;
-    strengthHint.className="small mt-1 "+(sc<=1?"text-danger":sc===2?"text-warning":"text-success");
+    strengthHint.className=(sc<=2?"text-danger":sc===3?"text-warning":"text-success");
   }
 
+  // Password match
   function updateMatch(){
     if(!p1||!p2||!matchHint)return;
-    if(!p1.value||!p2.value){ matchHint.style.display='none'; return; }
-    const ok=p1.value===p2.value && p1.value.length>=8;
+    if(!p1.value||!p2.value){matchHint.style.display='none';return;}
+    const ok=p1.value===p2.value && p1.value.length>=12;
     matchHint.style.display='block';
     matchHint.className="form-text "+(ok?"text-success":"text-danger");
-    matchHint.textContent= ok ? "Passwords match ✔" : "Passwords don't match";
+    matchHint.textContent=ok?"✓ Passwords match":"⚠️ Passwords don't match";
   }
 
-  if(form){
-    form.addEventListener('submit', e=>{
-      const ok=p1&&p2&&p1.value===p2.value&&p1.value.length>=8;
-      if(!ok){
-        e.preventDefault(); updateMatch();
-        if(p1&&p1.value.length<8) p1.focus(); else if(p2) p2.focus();
-        return;
-      }
-      if(submitBtn){ submitBtn.disabled=true; submitBtn.innerText="Creating account…"; }
-    });
-  }
-
+  // Show/hide password toggles
   document.querySelectorAll('button[data-toggle="reveal"]').forEach(btn=>{
-    btn.addEventListener('click', ()=>{
+    btn.addEventListener('click',()=>{
       const sel=btn.getAttribute('data-target');
       const input=document.querySelector(sel);
-      if(!input) return;
+      if(!input)return;
       const isPwd=input.getAttribute('type')==='password';
-      input.setAttribute('type', isPwd?'text':'password');
+      input.setAttribute('type',isPwd?'text':'password');
       btn.textContent=isPwd?'Hide':'Show';
     });
   });
 
+  // Form submit validation
+  if(form){
+    form.addEventListener('submit',e=>{
+      const ok=p1&&p2&&p1.value===p2.value&&p1.value.length>=12;
+      if(!ok){
+        e.preventDefault();
+        updateMatch();
+        if(p1&&p1.value.length<12)p1.focus();
+        else if(p2)p2.focus();
+        return;
+      }
+      if(submitBtn){
+        submitBtn.disabled=true;
+        submitBtn.innerHTML='Creating account…';
+      }
+    });
+  }
+
+  // Expiry countdown
   function renderExpiryBadge(){
-    if(!expiryBadge) return;
-    const iso=expiryBadge.title; if(!iso) return;
-    const end=new Date(iso); if(isNaN(end.getTime())){ expiryBadge.textContent="expiry unknown"; return; }
+    if(!expiryBadge)return;
+    const iso=expiryBadge.title;
+    if(!iso)return;
+    const end=new Date(iso);
+    if(isNaN(end.getTime())){expiryBadge.textContent="expiry unknown";return;}
     function tick(){
-      const now=new Date(); let ms=end-now; const expired=ms<=0; if(expired) ms=Math.abs(ms);
+      const now=new Date();
+      let ms=end-now;
+      const expired=ms<=0;
+      if(expired)ms=Math.abs(ms);
       const sec=Math.floor(ms/1000), m=Math.floor(sec/60), h=Math.floor(m/60), d=Math.floor(h/24);
       let text;
       if(expired){
-        if(m<1) text="expired just now";
-        else if(h<1) text=`expired ${m} min ago`;
-        else if(d<1) text=`expired ${h} hr ago`;
+        if(m<1)text="expired just now";
+        else if(h<1)text=`expired ${m} min ago`;
+        else if(d<1)text=`expired ${h} hr ago`;
         else text=`expired ${d} d ago`;
-        expiryBadge.classList.add('text-danger');
+        expiryBadge.style.background='#fee2e2';
+        expiryBadge.style.color='#b91c1c';
       }else{
-        if(h<1) text=`expires in ${m} min`;
-        else if(d<1) text=`expires in ${h} hr`;
+        if(h<1)text=`expires in ${m} min`;
+        else if(d<1)text=`expires in ${h} hr`;
         else text=`expires in ${d} d`;
-        expiryBadge.classList.remove('text-danger');
       }
       expiryBadge.textContent=text;
     }
-    tick(); setInterval(tick, 30000);
+    tick();
+    setInterval(tick,30000);
   }
 
-  if(nameInput) nameInput.addEventListener('input', updateGreeting);
-  if(p1){ p1.addEventListener('input', updateStrength); p1.addEventListener('input', updateMatch); }
-  if(p2) p2.addEventListener('input', updateMatch);
-  updateGreeting(); updateStrength(); renderExpiryBadge();
-})();
-</script>
-
-<!-- Location tracking script -->
-<script src="{% static 'js/location-tracking.js' %}"></script>
-<script>
-// Request location permission after successful signup
-document.getElementById('inviteForm').addEventListener('submit', function(e) {
-  // Let form submit, then on success page request permission
-  const form = this;
+  // Event listeners
+  if(nameInput)nameInput.addEventListener('input',updateGreeting);
+  if(p1){
+    p1.addEventListener('input',updateStrength);
+    p1.addEventListener('input',updateMatch);
+  }
+  if(p2)p2.addEventListener('input',updateMatch);
   
-  // If this is being submitted and we haven't requested location yet
-  setTimeout(function() {
-    // This will run after the page loads following successful submission
-    // In a real scenario, you'd call this on the success/redirect page
-    // For now, we'll add it to the next page load
-  }, 100);
-});
-
-// Alternative: Add location request to the success/completion page
-// You would add this to the agent dashboard or success page after signup
+  // Initial updates
+  updateGreeting();
+  updateStrength();
+  renderExpiryBadge();
+})();
 </script>
 {% endblock %}

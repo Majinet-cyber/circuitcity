@@ -1,0 +1,422 @@
+{% extends "base.html" %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}Confirm Rollback · Sale #{{ sale.pk }}{% endblock %}
+{% block header_title %}⚠️ Confirm Rollback{% endblock %}
+
+{% block extra_css %}
+<style>
+  .page{max-width:800px;margin:0 auto;padding:clamp(12px,4vw,24px)}
+  
+  .card{
+    background:#fff;
+    border:1px solid #e2e8f0;
+    border-radius:16px;
+    padding:24px;
+    box-shadow:0 4px 12px rgba(0,0,0,.05);
+    margin-bottom:24px;
+  }
+  
+  .alert{
+    padding:16px 20px;
+    border-radius:12px;
+    margin-bottom:24px;
+    display:flex;
+    align-items:center;
+    gap:12px;
+  }
+  .alert-warning{background:#fef3c7;border:1px solid #fbbf24;color:#92400e}
+  .alert-danger{background:#fee2e2;border:1px solid #f87171;color:#991b1b}
+  .alert-info{background:#dbeafe;border:1px solid #60a5fa;color:#1e40af}
+  .alert i{font-size:24px}
+  
+  .detail-row{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:12px 0;
+    border-bottom:1px solid #f1f5f9;
+  }
+  .detail-row:last-child{border-bottom:none}
+  .detail-label{color:#64748b;font-size:14px}
+  .detail-value{font-weight:600;font-size:15px}
+  
+  .form-group{margin-bottom:20px}
+  .form-label{
+    display:block;
+    font-weight:600;
+    font-size:14px;
+    color:#0f172a;
+    margin-bottom:8px;
+  }
+  .form-label .required{color:#ef4444}
+  .form-input,.form-select,.form-textarea{
+    width:100%;
+    padding:12px 16px;
+    border:2px solid #e2e8f0;
+    border-radius:10px;
+    font-size:15px;
+    transition:all .2s;
+    min-height:44px;
+  }
+  .form-input:focus,.form-select:focus,.form-textarea:focus{
+    outline:none;
+    border-color:#3b82f6;
+    box-shadow:0 0 0 3px rgba(59,130,246,.1);
+  }
+  .form-textarea{
+    min-height:100px;
+    resize:vertical;
+    font-family:inherit;
+  }
+  
+  .radio-group{
+    display:flex;
+    gap:16px;
+    margin-top:8px;
+  }
+  .radio-option{
+    flex:1;
+    position:relative;
+  }
+  .radio-option input{
+    position:absolute;
+    opacity:0;
+  }
+  .radio-option label{
+    display:block;
+    padding:12px 16px;
+    border:2px solid #e2e8f0;
+    border-radius:10px;
+    cursor:pointer;
+    transition:all .2s;
+    text-align:center;
+    font-weight:600;
+    min-height:44px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+  .radio-option input:checked + label{
+    border-color:#3b82f6;
+    background:#eff6ff;
+    color:#1e40af;
+  }
+  
+  .conditional-field{
+    display:none;
+    margin-top:12px;
+    padding-left:16px;
+    border-left:3px solid #dbeafe;
+  }
+  .conditional-field.show{display:block}
+  
+  .btn{
+    appearance:none;
+    border:none;
+    padding:14px 28px;
+    border-radius:12px;
+    font-weight:700;
+    font-size:15px;
+    cursor:pointer;
+    transition:all .2s;
+    display:inline-flex;
+    align-items:center;
+    gap:10px;
+    min-height:52px;
+    justify-content:center;
+  }
+  .btn-danger{background:#ef4444;color:#fff;width:100%}
+  .btn-danger:hover{background:#dc2626;transform:translateY(-2px);box-shadow:0 4px 12px rgba(239,68,68,.3)}
+  .btn-secondary{background:#f1f5f9;color:#475569}
+  .btn-secondary:hover{background:#e2e8f0}
+  
+  .actions{
+    display:flex;
+    gap:12px;
+    margin-top:24px;
+  }
+  
+  @media (max-width:640px){
+    .card{padding:16px}
+    .radio-group{flex-direction:column;gap:12px}
+    .actions{flex-direction:column-reverse}
+    .btn{width:100%}
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page">
+  <!-- Permission Check -->
+  {% if not can_rollback %}
+  <div class="alert alert-danger">
+    <i class="bi bi-x-circle-fill"></i>
+    <div>
+      <strong>Cannot Rollback This Sale</strong>
+      <p style="margin:4px 0 0">{{ error_msg }}</p>
+    </div>
+  </div>
+  {% else %}
+  <div class="alert alert-warning">
+    <i class="bi bi-exclamation-triangle-fill"></i>
+    <div>
+      <strong>Caution: This action is permanent</strong>
+      <p style="margin:4px 0 0">This sale will be marked as rolled back and cannot be un-rolled back.</p>
+    </div>
+  </div>
+  {% endif %}
+  
+  <!-- Sale Details -->
+  <div class="card">
+    <h2 style="margin:0 0 20px;font-size:20px;">📋 Sale Details</h2>
+    
+    <div class="detail-row">
+      <span class="detail-label">Sale ID</span>
+      <span class="detail-value">#{{ sale.pk }}</span>
+    </div>
+    
+    <div class="detail-row">
+      <span class="detail-label">Item</span>
+      <span class="detail-value">
+        {{ sale.item.product.name|default:"Unknown" }}
+        {% if sale.item.product.variant_label %}
+        <br><small style="color:#64748b;font-weight:normal">{{ sale.item.product.variant_label }}</small>
+        {% endif %}
+      </span>
+    </div>
+    
+    {% if sale.item.imei %}
+    <div class="detail-row">
+      <span class="detail-label">IMEI</span>
+      <span class="detail-value"><code>{{ sale.item.imei }}</code></span>
+    </div>
+    {% elif sale.item.barcode %}
+    <div class="detail-row">
+      <span class="detail-label">Barcode</span>
+      <span class="detail-value"><code>{{ sale.item.barcode }}</code></span>
+    </div>
+    {% endif %}
+    
+    <div class="detail-row">
+      <span class="detail-label">Price</span>
+      <span class="detail-value" style="color:#10b981">K{{ sale.price|floatformat:0|intcomma }}</span>
+    </div>
+    
+    <div class="detail-row">
+      <span class="detail-label">Agent</span>
+      <span class="detail-value">{{ sale.agent.get_full_name|default:sale.agent.username }}</span>
+    </div>
+    
+    <div class="detail-row">
+      <span class="detail-label">Location</span>
+      <span class="detail-value">{{ sale.location.name }}</span>
+    </div>
+    
+    <div class="detail-row">
+      <span class="detail-label">Date</span>
+      <span class="detail-value">
+        {{ sale.sold_at|date:"F d, Y" }}
+        <br><small style="color:#64748b;font-weight:normal">{{ sale.created_at|timesince }} ago</small>
+      </span>
+    </div>
+    
+    <div class="detail-row">
+      <span class="detail-label">Payment Method</span>
+      <span class="detail-value">{{ sale.get_payment_method_display }}</span>
+    </div>
+  </div>
+  
+  <!-- Action Choice (for phone sales) -->
+  {% if can_rollback and is_phone_sale and not action %}
+  <div class="card">
+    <h2 style="margin:0 0 20px;font-size:20px;">What do you want to do?</h2>
+    
+    <div style="display:flex;gap:16px;flex-direction:column">
+      <a href="{% url 'sales:rollback_confirm' sale.id %}?action=rollback" 
+         class="action-card" 
+         style="text-decoration:none;display:block;padding:20px;border:2px solid #ef4444;border-radius:12px;background:#fef2f2;transition:all .2s">
+        <div style="display:flex;align-items:center;gap:12px">
+          <div style="font-size:32px">✅</div>
+          <div style="flex:1">
+            <h3 style="margin:0 0 4px;font-size:18px;color:#991b1b">Rollback Sale</h3>
+            <p style="margin:0;color:#64748b;font-size:14px">Undo the sale and restore stock</p>
+          </div>
+          <div style="font-size:24px;color:#ef4444">→</div>
+        </div>
+      </a>
+      
+      {% if can_edit %}
+      <a href="{% url 'sales:rollback_confirm' sale.id %}?action=edit" 
+         class="action-card" 
+         style="text-decoration:none;display:block;padding:20px;border:2px solid #3b82f6;border-radius:12px;background:#eff6ff;transition:all .2s">
+        <div style="display:flex;align-items:center;gap:12px">
+          <div style="font-size:32px">✏️</div>
+          <div style="flex:1">
+            <h3 style="margin:0 0 4px;font-size:18px;color:#1e40af">Correct Sale Details</h3>
+            <p style="margin:0;color:#64748b;font-size:14px">Update price and IMEI without undoing the sale</p>
+          </div>
+          <div style="font-size:24px;color:#3b82f6">→</div>
+        </div>
+      </a>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+  
+  <!-- Rollback Form -->
+  {% if can_rollback and action == "rollback" %}
+  <form method="post" class="card">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="rollback">
+    
+    <div style="margin-bottom:16px">
+      <a href="{% url 'sales:rollback_confirm' sale.id %}" style="color:#3b82f6;text-decoration:none;font-size:14px">
+        ← Back to action choice
+      </a>
+    </div>
+    
+    <h2 style="margin:0 0 20px;font-size:20px;">🔄 Rollback Details</h2>
+    
+    <!-- Reason -->
+    <div class="form-group">
+      <label class="form-label">Reason <span class="required">*</span></label>
+      <select name="reason" id="reason-select" class="form-select" required>
+        <option value="">-- Select a reason --</option>
+        {% for value, label in rollback_reasons %}
+        <option value="{{ value }}">{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    
+    <!-- Refund -->
+    <div class="form-group">
+      <label class="form-label">Was a refund issued?</label>
+      <div class="radio-group">
+        <div class="radio-option">
+          <input type="radio" name="refunded" value="no" id="refund-no" checked>
+          <label for="refund-no">No Refund</label>
+        </div>
+        <div class="radio-option">
+          <input type="radio" name="refunded" value="yes" id="refund-yes">
+          <label for="refund-yes">Yes, Refunded</label>
+        </div>
+      </div>
+      
+      <div id="refund-amount-field" class="conditional-field">
+        <label class="form-label" style="margin-bottom:8px">Refund Amount (MWK) <span class="required">*</span></label>
+        <input 
+          type="number" 
+          name="refunded_amount" 
+          id="refund-amount" 
+          class="form-input"
+          placeholder="0.00"
+          step="0.01"
+          min="0"
+          max="{{ sale.price }}"
+        >
+        <small style="color:#64748b;font-size:13px;display:block;margin-top:6px">
+          Maximum: K{{ sale.price|floatformat:0|intcomma }}
+        </small>
+      </div>
+    </div>
+    
+    <!-- Return to Stock -->
+    <div class="form-group">
+      <label class="form-label">Return item to stock?</label>
+      <div class="radio-group">
+        <div class="radio-option">
+          <input type="radio" name="return_to_stock" value="no" id="stock-no" checked>
+          <label for="stock-no">No</label>
+        </div>
+        <div class="radio-option">
+          <input type="radio" name="return_to_stock" value="yes" id="stock-yes">
+          <label for="stock-yes">Yes, Return</label>
+        </div>
+      </div>
+      <small style="color:#64748b;font-size:13px;display:block;margin-top:8px">
+        If yes, the item will be marked as available again in your inventory.
+      </small>
+    </div>
+    
+    <!-- Notes -->
+    <div class="form-group">
+      <label class="form-label">Additional Notes (Optional)</label>
+      <textarea 
+        name="notes" 
+        class="form-textarea" 
+        placeholder="Add any additional context about this rollback..."
+      ></textarea>
+    </div>
+    
+    <!-- Actions -->
+    <div class="actions">
+      <a href="{% url 'sales:rollback_home' %}" class="btn btn-secondary" style="flex:1">
+        <i class="bi bi-x-circle"></i> Cancel
+      </a>
+      <button type="submit" class="btn btn-danger" style="flex:2">
+        <i class="bi bi-arrow-counterclockwise"></i> Confirm Rollback
+      </button>
+    </div>
+  </form>
+  {% elif can_edit and action == "edit" %}
+  <!-- Redirect to edit page -->
+  <script>
+    window.location.href = "{% url 'sales:edit_phone_sale' sale.id %}";
+  </script>
+  {% else %}
+  <div class="actions">
+    <a href="{% url 'sales:rollback_home' %}" class="btn btn-secondary" style="width:100%">
+      <i class="bi bi-arrow-left"></i> Back to Rollback Home
+    </a>
+  </div>
+  {% endif %}
+</div>
+
+<script>
+// Show/hide refund amount field
+const refundYes = document.getElementById('refund-yes');
+const refundNo = document.getElementById('refund-no');
+const refundAmountField = document.getElementById('refund-amount-field');
+const refundAmountInput = document.getElementById('refund-amount');
+
+function toggleRefundAmount() {
+  if (refundYes.checked) {
+    refundAmountField.classList.add('show');
+    refundAmountInput.required = true;
+  } else {
+    refundAmountField.classList.remove('show');
+    refundAmountInput.required = false;
+    refundAmountInput.value = '';
+  }
+}
+
+refundYes.addEventListener('change', toggleRefundAmount);
+refundNo.addEventListener('change', toggleRefundAmount);
+
+// Form validation
+const form = document.querySelector('form');
+if (form) {
+  form.addEventListener('submit', function(e) {
+    if (refundYes.checked) {
+      const amount = parseFloat(refundAmountInput.value);
+      const maxAmount = parseFloat('{{ sale.price }}');
+      
+      if (amount <= 0) {
+        e.preventDefault();
+        alert('Refund amount must be greater than 0');
+        return;
+      }
+      
+      if (amount > maxAmount) {
+        e.preventDefault();
+        alert('Refund amount cannot exceed the sale price');
+        return;
+      }
+    }
+  });
+}
+</script>
+{% endblock %}
+

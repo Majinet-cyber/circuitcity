@@ -1,0 +1,198 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Add Pharmacy Product · Wizard{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/wizard-system.css' %}">
+{% endblock %}
+
+{% block content %}
+<div id="wizard-container"></div>
+
+<script src="{% static 'js/wizard-engine.js' %}"></script>
+<script>
+(function() {
+  // Pharmacy categories
+  const categories = [
+    { value: 'painkillers', label: 'Painkillers', icon: '💊' },
+    { value: 'antibiotics', label: 'Antibiotics', icon: '💉' },
+    { value: 'vitamins', label: 'Vitamins', icon: '🌟' },
+    { value: 'supplements', label: 'Supplements', icon: '🥤' },
+    { value: 'skincare', label: 'Skin Care', icon: '🧴' },
+    { value: 'haircare', label: 'Hair Products', icon: '💇' },
+    { value: 'babycare', label: 'Baby Care', icon: '👶' },
+    { value: 'feminine', label: 'Feminine Care', icon: '💝' },
+    { value: 'cold_flu', label: 'Cold & Flu', icon: '🤧' },
+    { value: 'first_aid', label: 'First Aid', icon: '🩹' },
+    { value: 'eye_ear', label: 'Eye/Ear Care', icon: '👁️' },
+    { value: 'other', label: 'Other', icon: '📦' }
+  ];
+
+  // Common brands (stored for reuse)
+  let existingBrands = {{ brands_json|default:"[]"|safe }};
+  
+  const popularBrands = [
+    { value: 'Panadol', label: 'Panadol', icon: '🏷️' },
+    { value: 'Brufen', label: 'Brufen', icon: '🏷️' },
+    { value: 'Amoxil', label: 'Amoxil', icon: '🏷️' },
+    { value: 'Septrin', label: 'Septrin', icon: '🏷️' },
+    { value: 'Vaseline', label: 'Vaseline', icon: '🏷️' }
+  ];
+
+  // Unit types
+  const unitTypes = [
+    { value: 'tablet', label: 'Tablet', icon: '💊' },
+    { value: 'syrup', label: 'Syrup', icon: '🧪' },
+    { value: 'cream', label: 'Cream', icon: '🧴' },
+    { value: 'drops', label: 'Drops', icon: '💧' },
+    { value: 'bottle', label: 'Bottle', icon: '🍾' },
+    { value: 'tube', label: 'Tube', icon: '🧴' },
+    { value: 'pack', label: 'Pack', icon: '📦' },
+    { value: 'box', label: 'Box', icon: '📦' }
+  ];
+
+  // Barcode options
+  const barcodeOptions = [
+    { value: 'yes', label: 'Yes, has barcode', icon: '📱' },
+    { value: 'no', label: 'No barcode', icon: '✋' }
+  ];
+
+  // Wizard configuration
+  wizard = new WizardEngine('wizard-container', {
+    steps: [
+      // Step 1: Category
+      {
+        type: 'cards',
+        key: 'category',
+        title: 'Choose Category',
+        subtitle: 'What type of product are you adding?',
+        options: categories,
+        columns: 'auto'
+      },
+      
+      // Step 2: Brand
+      {
+        type: 'cards',
+        key: 'brand',
+        title: 'Select Brand',
+        subtitle: 'Choose an existing brand or add new',
+        options: (data) => {
+          // Merge existing brands with popular ones
+          const merged = [...new Set([...existingBrands, ...popularBrands.map(b => b.value)])];
+          return merged.map(brand => ({ 
+            value: brand, 
+            label: brand, 
+            icon: '🏷️'
+          }));
+        },
+        allowCustom: true,
+        customPlaceholder: 'Enter brand name'
+      },
+      
+      // Step 3: Product Name
+      {
+        type: 'input',
+        key: 'product_name',
+        title: 'Product Name',
+        subtitle: 'Enter the product name',
+        inputType: 'text',
+        placeholder: 'e.g., Panadol Extra 500mg',
+        required: true
+      },
+      
+      // Step 4: Unit Type
+      {
+        type: 'cards',
+        key: 'unit_type',
+        title: 'Unit Type',
+        subtitle: 'How is this product packaged?',
+        options: unitTypes,
+        columns: 'auto'
+      },
+      
+      // Step 5: Pricing
+      {
+        type: 'multi-input',
+        key: 'pricing',
+        title: 'Pricing & Stock',
+        subtitle: 'Set prices and initial stock',
+        fields: [
+          { key: 'selling_price', label: 'Selling Price (MWK)', type: 'number', min: 0, step: '0.01', required: true },
+          { key: 'cost_price', label: 'Cost Price (MWK) - Optional', type: 'number', min: 0, step: '0.01' },
+          { key: 'initial_stock', label: 'Initial Stock Quantity', type: 'number', min: 0, value: 0 }
+        ]
+      },
+      
+      // Step 6: Barcode
+      {
+        type: 'cards',
+        key: 'has_barcode',
+        title: 'Barcode',
+        subtitle: 'Does this product have a barcode?',
+        options: barcodeOptions,
+        columns: 'two-col'
+      },
+      
+      // Step 7: Barcode Entry (conditional)
+      {
+        type: 'input',
+        key: 'barcode',
+        title: 'Scan or Enter Barcode',
+        subtitle: 'Use camera to scan or type manually',
+        inputType: 'text',
+        placeholder: 'Barcode number',
+        required: false,
+        skip: (data) => data.has_barcode !== 'yes'
+      }
+    ],
+    
+    onComplete: async (data) => {
+      console.log('Pharmacy wizard complete:', data);
+      
+      // Show loading
+      const loading = document.createElement('div');
+      loading.className = 'wizard-loading';
+      loading.innerHTML = '<div class="wizard-loading-spinner"></div>';
+      document.body.appendChild(loading);
+      
+      try {
+        // Submit to server
+        const csrfToken = document.querySelector('[name=csrf-token]')?.content || 
+                          document.querySelector('[name=csrfmiddlewaretoken]')?.value;
+        
+        const response = await fetch('{% url "inventory:pharmacy_wizard_submit" %}', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': csrfToken
+          },
+          body: JSON.stringify(data)
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+          // Success! Redirect
+          window.location.href = result.redirect || '{% url "inventory:dashboard" %}';
+        } else {
+          loading.remove();
+          alert(result.error || 'Failed to create product');
+        }
+      } catch (error) {
+        loading.remove();
+        console.error('Submit error:', error);
+        alert('Failed to create product. Please try again.');
+      }
+    },
+    
+    onCancel: () => {
+      if (confirm('Cancel adding product?')) {
+        window.location.href = '{% url "inventory:dashboard" %}';
+      }
+    }
+  });
+})();
+</script>
+{% endblock %}
+

@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Housing Planner — {{ batch.name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-3" style="max-width:640px;">
+
+  <div style="margin-bottom:1.25rem;">
+    <a href="{% url 'verticals:farm_livestock_list' %}" style="color:#64748b;font-size:.85rem;text-decoration:none;">
+      ← Back to Livestock
+    </a>
+    <h1 style="font-size:1.5rem;font-weight:800;margin:.5rem 0 0;">Housing Planner</h1>
+    <p style="color:#64748b;font-size:.875rem;margin:0;">{{ batch.name }} · {{ batch.count_current }} {{ batch.get_animal_type_display }}</p>
+  </div>
+
+  <!-- Space Estimate -->
+  <div style="background:linear-gradient(135deg,#f0fdf4,#dcfce7);border:1px solid #bbf7d0;border-radius:20px;padding:1.5rem;margin-bottom:1.25rem;">
+    <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#16a34a;margin-bottom:.5rem;">Space Estimate</div>
+    <div style="display:flex;align-items:baseline;gap:.5rem;margin-bottom:.25rem;">
+      <span style="font-size:2rem;font-weight:900;color:#14532d;">{{ estimated_sqm|floatformat:1 }} m²</span>
+      <span style="font-size:.875rem;color:#166534;">recommended</span>
+    </div>
+    <div style="font-size:.78rem;color:#166534;">{{ space_per_animal }} m² × {{ batch.count_current }} animals = {{ estimated_sqm|floatformat:1 }} m² floor area</div>
+  </div>
+
+  <!-- Checklist -->
+  <div style="background:#fff;border:1px solid #e2e8f0;border-radius:20px;padding:1.5rem;box-shadow:0 2px 8px rgba(0,0,0,0.05);">
+    <div style="font-size:.8rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:1rem;">Housing Checklist</div>
+    <div style="display:flex;flex-direction:column;gap:.75rem;">
+      {% for item_label, item_detail in checklist %}
+      <div style="display:flex;align-items:flex-start;gap:.75rem;padding:.875rem;background:#f8fafc;border-radius:12px;">
+        <div style="width:24px;height:24px;background:#dcfce7;border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+          <i class="bi bi-check-lg" style="color:#16a34a;font-size:.875rem;"></i>
+        </div>
+        <div>
+          <div style="font-size:.82rem;font-weight:700;color:#0f172a;">{{ item_label }}</div>
+          <div style="font-size:.75rem;color:#64748b;margin-top:2px;">{{ item_detail }}</div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div style="margin-top:1.25rem;text-align:center;">
+    <a href="{% url 'verticals:farm_livestock_detail' batch_id=batch.pk %}" style="display:inline-block;background:#2563eb;color:#fff;border-radius:12px;padding:10px 24px;font-weight:700;font-size:.875rem;text-decoration:none;">
+      Back to Batch Detail
+    </a>
+  </div>
+
+</div>
+{% endblock %}

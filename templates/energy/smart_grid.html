@@ -1,0 +1,737 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Smart Grid & Mini-Grid Planner – {{ business.name }}{% endblock %}
+
+{% block content %}
+<style>
+:root {
+  --sg-blue:   #1d4ed8;
+  --sg-green:  #059669;
+  --sg-purple: #7c3aed;
+  --sg-amber:  #d97706;
+  --sg-red:    #dc2626;
+  --sg-teal:   #0891b2;
+  --sg-slate:  #0f172a;
+  --sg-muted:  #64748b;
+  --sg-border: #e2e8f0;
+  --sg-radius: 16px;
+  --sg-shadow: 0 2px 12px rgba(15,23,42,.07);
+}
+.sg-hero {
+  background:linear-gradient(135deg,#0f172a 0%,#1a1040 40%,#7c3aed 100%);
+  border-radius:var(--sg-radius); padding:2rem 2.25rem 1.75rem;
+  position:relative; overflow:hidden; margin-bottom:1.75rem; color:#fff;
+}
+.sg-hero::before {
+  content:''; position:absolute; top:-80px; right:-60px;
+  width:300px; height:300px;
+  background:radial-gradient(circle,rgba(124,58,237,.25) 0%,transparent 70%);
+}
+.sg-hero::after {
+  content:''; position:absolute; bottom:-50px; left:15%;
+  width:250px; height:250px;
+  background:radial-gradient(circle,rgba(5,150,105,.12) 0%,transparent 70%);
+}
+.sg-hero-inner { position:relative; z-index:1; }
+.sg-eyebrow {
+  font-size:.68rem; font-weight:700; letter-spacing:.12em; text-transform:uppercase;
+  color:rgba(255,255,255,.5); margin-bottom:.35rem;
+}
+.sg-hero h1 { font-size:1.65rem; font-weight:800; margin-bottom:.2rem; }
+.sg-hero-sub { font-size:.87rem; color:rgba(255,255,255,.65); max-width:580px; }
+.sg-hero-stats {
+  display:flex; gap:1.5rem; flex-wrap:wrap; margin-top:1rem;
+  padding-top:.75rem; border-top:1px solid rgba(255,255,255,.1);
+}
+.sg-stat-val { font-size:1.4rem; font-weight:800; color:#fff; }
+.sg-stat-lbl { font-size:.65rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:rgba(255,255,255,.5); }
+
+.sg-card {
+  background:#fff; border-radius:var(--sg-radius); border:1.5px solid var(--sg-border);
+  box-shadow:var(--sg-shadow); padding:1.5rem; margin-bottom:1.25rem;
+}
+.sg-card-header {
+  display:flex; align-items:center; gap:.6rem; margin-bottom:1rem;
+  padding-bottom:.7rem; border-bottom:1px solid #f1f5f9;
+}
+.sg-card-icon { width:36px; height:36px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:1rem; flex-shrink:0; }
+.sg-card-title { font-size:.95rem; font-weight:700; color:var(--sg-slate); }
+.sg-card-sub { font-size:.75rem; color:var(--sg-muted); }
+
+.sg-label { font-size:.78rem; font-weight:700; color:#475569; text-transform:uppercase; letter-spacing:.05em; margin-bottom:.35rem; display:block; }
+.sg-input {
+  width:100%; padding:.55rem .85rem; border-radius:10px; border:1.5px solid var(--sg-border);
+  font-size:.88rem; color:var(--sg-slate); background:#fff; transition:border-color .15s; outline:none;
+}
+.sg-input:focus { border-color:#7c3aed; box-shadow:0 0 0 3px rgba(124,58,237,.12); }
+.sg-select {
+  width:100%; padding:.55rem .85rem; border-radius:10px; border:1.5px solid var(--sg-border);
+  font-size:.88rem; color:var(--sg-slate); background:#fff; cursor:pointer;
+}
+.sg-form-grid { display:grid; grid-template-columns:1fr 1fr; gap:1rem; }
+@media(max-width:576px) { .sg-form-grid { grid-template-columns:1fr; } }
+
+/* KPI strip */
+.sg-kpi-strip { display:grid; grid-template-columns:repeat(auto-fill,minmax(130px,1fr)); gap:.75rem; margin-bottom:1rem; }
+.sg-kpi {
+  background:#f8fafc; border-radius:12px; border:1.5px solid #e2e8f0;
+  padding:.85rem .9rem; text-align:center;
+}
+.sg-kpi.purple { background:#faf5ff; border-color:#ddd6fe; }
+.sg-kpi.green  { background:#f0fdf4; border-color:#bbf7d0; }
+.sg-kpi.amber  { background:#fefce8; border-color:#fde047; }
+.sg-kpi.red    { background:#fff1f2; border-color:#fecaca; }
+.sg-kpi.blue   { background:#eff6ff; border-color:#bfdbfe; }
+.sg-kpi-val { font-size:1.4rem; font-weight:800; color:var(--sg-slate); line-height:1.1; }
+.sg-kpi-lbl { font-size:.67rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--sg-muted); margin-top:.2rem; }
+.sg-kpi-sub { font-size:.7rem; color:#94a3b8; margin-top:.1rem; }
+
+/* Feeder table */
+.sg-table { width:100%; border-collapse:collapse; font-size:.82rem; }
+.sg-table th { background:#f8fafc; color:#475569; font-weight:700; font-size:.72rem; text-transform:uppercase; letter-spacing:.05em; padding:.5rem .75rem; border-bottom:2px solid #e2e8f0; text-align:left; }
+.sg-table td { padding:.5rem .75rem; border-bottom:1px solid #f1f5f9; color:#374151; vertical-align:middle; }
+.sg-table tr:hover td { background:#f8fafc; }
+
+/* Load node */
+.load-node {
+  background:#fff; border-radius:12px; border:1.5px solid #e2e8f0;
+  padding:.75rem; margin-bottom:.5rem; display:flex; align-items:center; gap:.75rem;
+}
+.load-node-icon { width:32px; height:32px; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:.95rem; flex-shrink:0; }
+.load-node-name { font-size:.85rem; font-weight:700; color:#374151; }
+.load-node-detail { font-size:.75rem; color:#94a3b8; }
+.load-node-badge { margin-left:auto; }
+
+/* Reliability meter */
+.rel-meter { display:flex; align-items:center; gap:.5rem; margin:.5rem 0; }
+.rel-bar { flex:1; height:8px; background:#f1f5f9; border-radius:999px; overflow:hidden; }
+.rel-fill { height:100%; border-radius:999px; transition:width .4s; }
+
+/* Alert box */
+.sg-alert { border-radius:12px; padding:.85rem 1rem; margin-bottom:.6rem; font-size:.82rem; display:flex; align-items:flex-start; gap:.6rem; }
+.sg-alert.critical { background:#fff1f2; border:1.5px solid #fca5a5; color:#991b1b; }
+.sg-alert.high     { background:#fff7ed; border:1.5px solid #fed7aa; color:#9a3412; }
+.sg-alert.medium   { background:#fefce8; border:1.5px solid #fde047; color:#713f12; }
+.sg-alert.info     { background:#eff6ff; border:1.5px solid #bfdbfe; color:#1e40af; }
+.sg-alert-icon { font-size:1rem; flex-shrink:0; margin-top:.05rem; }
+.sg-alert-content { flex:1; }
+.sg-alert-title { font-weight:700; margin-bottom:.15rem; }
+
+/* Grid topology SVG */
+.grid-svg-wrap { background:#0f172a; border-radius:14px; padding:1.25rem; overflow-x:auto; }
+
+/* Tab system */
+.sg-tabs { display:flex; gap:.3rem; flex-wrap:wrap; border-bottom:2px solid #e2e8f0; margin-bottom:1.1rem; }
+.sg-tab { padding:.45rem .9rem; border-radius:8px 8px 0 0; font-size:.8rem; font-weight:600; color:var(--sg-muted); cursor:pointer; border:none; background:none; transition:all .15s; position:relative; bottom:-2px; border-bottom:2px solid transparent; }
+.sg-tab.active { color:#7c3aed; border-bottom-color:#7c3aed; background:#faf5ff; }
+.sg-tab-content { display:none; }
+.sg-tab-content.active { display:block; }
+
+/* Pulse */
+@keyframes sg-pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+.sg-pulse { animation:sg-pulse 2s infinite; }
+</style>
+
+<div class="container-fluid py-4">
+
+  <!-- HERO -->
+  <div class="sg-hero mb-4">
+    <div class="sg-hero-inner">
+      <div class="sg-eyebrow"><i class="bi bi-grid-3x3-gap-fill me-1"></i>Emajinet Smart Grid Intelligence</div>
+      <h1>Smart Grid &amp; Mini-Grid Planner</h1>
+      <div class="sg-hero-sub">
+        Plan, size, and analyse community grids, mini-grids, and productive-use systems.
+        Transformer loading, feeder analysis, outage prediction, and reliability scoring — utility-grade intelligence.
+      </div>
+      <div class="sg-hero-stats">
+        <div>
+          <div class="sg-stat-val" id="heroTotalLoad">—</div>
+          <div class="sg-stat-lbl">Total Load (kW)</div>
+        </div>
+        <div>
+          <div class="sg-stat-val" id="heroReliability">—</div>
+          <div class="sg-stat-lbl">System Reliability</div>
+        </div>
+        <div>
+          <div class="sg-stat-val" id="heroHouseholds">—</div>
+          <div class="sg-stat-lbl">Households Served</div>
+        </div>
+        <div>
+          <div class="sg-stat-val" id="heroCapacity">—</div>
+          <div class="sg-stat-lbl">Available Capacity</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-3">
+
+    <!-- LEFT: CONFIG -->
+    <div class="col-lg-5">
+
+      <!-- Generation Source -->
+      <div class="sg-card">
+        <div class="sg-card-header">
+          <div class="sg-card-icon" style="background:#fefce8;"><i class="bi bi-sun" style="color:#d97706;"></i></div>
+          <div><div class="sg-card-title">Generation Source</div><div class="sg-card-sub">Define your mini-grid power source</div></div>
+        </div>
+        <div class="sg-form-grid mb-3">
+          <div>
+            <label class="sg-label">Generation Type</label>
+            <select class="sg-select" id="genType" onchange="recalcMiniGrid()">
+              <option value="solar_battery">Solar + Battery</option>
+              <option value="solar_gen">Solar + Generator</option>
+              <option value="solar_batt_gen" selected>Solar + Battery + Generator</option>
+              <option value="hydro">Micro-Hydro</option>
+              <option value="wind_solar">Wind + Solar</option>
+              <option value="grid_extension">Grid Extension</option>
+            </select>
+          </div>
+          <div>
+            <label class="sg-label">Solar Capacity (kWp)</label>
+            <input type="number" class="sg-input" id="genSolar" value="30" min="0" oninput="recalcMiniGrid()">
+          </div>
+          <div>
+            <label class="sg-label">Battery Storage (kWh)</label>
+            <input type="number" class="sg-input" id="genBattery" value="60" min="0" oninput="recalcMiniGrid()">
+          </div>
+          <div>
+            <label class="sg-label">Generator Backup (kVA)</label>
+            <input type="number" class="sg-input" id="genBackup" value="20" min="0" oninput="recalcMiniGrid()">
+          </div>
+          <div>
+            <label class="sg-label">Distribution Voltage</label>
+            <select class="sg-select" id="distVolt" onchange="recalcMiniGrid()">
+              <option value="230">230V AC Single Phase</option>
+              <option value="400" selected>400V AC Three Phase</option>
+              <option value="11000">11kV MV Distribution</option>
+              <option value="33000">33kV HV Distribution</option>
+            </select>
+          </div>
+          <div>
+            <label class="sg-label">Distribution Radius (km)</label>
+            <input type="number" class="sg-input" id="distRadius" value="2.5" min="0.1" step="0.1" oninput="recalcMiniGrid()">
+          </div>
+        </div>
+      </div>
+
+      <!-- Load Nodes -->
+      <div class="sg-card">
+        <div class="sg-card-header">
+          <div class="sg-card-icon" style="background:#eff6ff;"><i class="bi bi-buildings" style="color:#1d4ed8;"></i></div>
+          <div><div class="sg-card-title">Load Nodes</div><div class="sg-card-sub">Add consumers to the mini-grid</div></div>
+        </div>
+        <div id="loadNodesList"><!-- filled dynamically --></div>
+        <div class="sg-form-grid mt-2" id="addNodeForm">
+          <div>
+            <label class="sg-label">Node Name</label>
+            <input type="text" class="sg-input" id="newNodeName" placeholder="e.g. School Block A">
+          </div>
+          <div>
+            <label class="sg-label">Node Type</label>
+            <select class="sg-select" id="newNodeType">
+              <option value="household">Household (avg)</option>
+              <option value="school">School</option>
+              <option value="clinic">Health Clinic</option>
+              <option value="shop">Shop</option>
+              <option value="mill">Grain Mill</option>
+              <option value="pump">Water Pump</option>
+              <option value="telecom">Telecom Tower</option>
+              <option value="cold_room">Cold Room</option>
+              <option value="industry">Small Industry</option>
+            </select>
+          </div>
+          <div>
+            <label class="sg-label">Peak Load (kW)</label>
+            <input type="number" class="sg-input" id="newNodeKW" value="2" min="0.1" step="0.1">
+          </div>
+          <div>
+            <label class="sg-label">Daily Usage (h/day)</label>
+            <input type="number" class="sg-input" id="newNodeHrs" value="8" min="0.5" max="24">
+          </div>
+        </div>
+        <button class="btn btn-sm rounded-pill px-3 mt-2" style="background:#7c3aed;color:#fff;border:none;font-weight:600;" onclick="addLoadNode()">
+          <i class="bi bi-plus-circle me-1"></i>Add Node
+        </button>
+      </div>
+
+      <!-- Reliability Settings -->
+      <div class="sg-card">
+        <div class="sg-card-header">
+          <div class="sg-card-icon" style="background:#f0fdf4;"><i class="bi bi-shield-check" style="color:#059669;"></i></div>
+          <div><div class="sg-card-title">Reliability &amp; Spinning Reserve</div><div class="sg-card-sub">Define reliability standards</div></div>
+        </div>
+        <div class="sg-form-grid">
+          <div>
+            <label class="sg-label">Target Reliability (%)</label>
+            <select class="sg-select" id="targetRel" onchange="recalcMiniGrid()">
+              <option value="95">95% — Basic</option>
+              <option value="97">97% — Good</option>
+              <option value="99" selected>99% — High</option>
+              <option value="99.5">99.5% — Premium</option>
+              <option value="99.9">99.9% — Hospital-grade</option>
+            </select>
+          </div>
+          <div>
+            <label class="sg-label">Spinning Reserve (%)</label>
+            <select class="sg-select" id="spinReserve" onchange="recalcMiniGrid()">
+              <option value="10">10% — Minimum</option>
+              <option value="15" selected>15% — Standard</option>
+              <option value="20">20% — High</option>
+              <option value="25">25% — Mission-critical</option>
+            </select>
+          </div>
+          <div>
+            <label class="sg-label">Peak Sun Hours</label>
+            <input type="number" class="sg-input" id="psh" value="5.2" step="0.1" min="1" max="8" oninput="recalcMiniGrid()">
+          </div>
+          <div>
+            <label class="sg-label">Grid Availability (%)</label>
+            <input type="number" class="sg-input" id="gridAvail" value="60" min="0" max="100" oninput="recalcMiniGrid()">
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /col-lg-5 -->
+
+    <!-- RIGHT: RESULTS -->
+    <div class="col-lg-7">
+
+      <!-- System KPIs -->
+      <div class="sg-card">
+        <div class="sg-card-header">
+          <div class="sg-card-icon" style="background:#faf5ff;"><i class="bi bi-speedometer2" style="color:#7c3aed;"></i></div>
+          <div><div class="sg-card-title">System Intelligence</div><div class="sg-card-sub">Live mini-grid analysis</div></div>
+        </div>
+        <div class="sg-kpi-strip" id="systemKPIs"><!-- filled by JS --></div>
+        <div id="systemAlerts"><!-- filled by JS --></div>
+      </div>
+
+      <!-- Analysis Tabs -->
+      <div class="sg-card">
+        <div class="sg-tabs">
+          <button class="sg-tab active" onclick="openSgTab('feeder_tab')" id="sg-tab-feeder_tab">Feeder Analysis</button>
+          <button class="sg-tab" onclick="openSgTab('reliability_tab')" id="sg-tab-reliability_tab">Reliability</button>
+          <button class="sg-tab" onclick="openSgTab('transformer_tab')" id="sg-tab-transformer_tab">Transformer</button>
+          <button class="sg-tab" onclick="openSgTab('demand_tab')" id="sg-tab-demand_tab">Demand Profile</button>
+          <button class="sg-tab" onclick="openSgTab('productive_tab')" id="sg-tab-productive_tab">Productive Use</button>
+        </div>
+
+        <div id="feeder_tab" class="sg-tab-content active">
+          <div id="feederAnalysis"></div>
+        </div>
+        <div id="reliability_tab" class="sg-tab-content">
+          <div id="reliabilityAnalysis"></div>
+        </div>
+        <div id="transformer_tab" class="sg-tab-content">
+          <div id="transformerAnalysis"></div>
+        </div>
+        <div id="demand_tab" class="sg-tab-content">
+          <canvas id="demandChart" height="200"></canvas>
+          <div id="demandInsights" class="mt-2"></div>
+        </div>
+        <div id="productive_tab" class="sg-tab-content">
+          <div id="productiveUse"></div>
+        </div>
+      </div>
+
+      <!-- Grid Topology Map -->
+      <div class="sg-card">
+        <div class="sg-card-header">
+          <div class="sg-card-icon" style="background:#faf5ff;"><i class="bi bi-diagram-3" style="color:#7c3aed;"></i></div>
+          <div><div class="sg-card-title">Distribution Topology</div><div class="sg-card-sub">Schematic layout of mini-grid</div></div>
+        </div>
+        <div class="grid-svg-wrap">
+          <div id="gridTopologySVG"></div>
+        </div>
+      </div>
+
+    </div><!-- /col-lg-7 -->
+  </div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<script>
+/* ============================================================
+   SMART GRID & MINI-GRID PLANNER — Emajinet Engineering
+   ============================================================ */
+
+let loadNodes = [
+  { name: "Residential Block A", type: "household", kw: 8.0, hrs: 6, count: 20 },
+  { name: "Primary School",       type: "school",    kw: 3.5, hrs: 8, count: 1 },
+  { name: "Health Clinic",        type: "clinic",    kw: 5.0, hrs: 12, count: 1 },
+  { name: "Market Stalls",        type: "shop",      kw: 6.0, hrs: 10, count: 15 },
+  { name: "Water Pump Station",   type: "pump",      kw: 4.5, hrs: 6,  count: 1 },
+];
+
+const NODE_ICONS = {
+  household:'🏠', school:'🏫', clinic:'🏥', shop:'🏪',
+  mill:'⚙️', pump:'💧', telecom:'📡', cold_room:'❄️', industry:'🏭'
+};
+
+let demandChartInstance = null;
+
+function addLoadNode() {
+  const name = document.getElementById('newNodeName').value.trim();
+  const type = document.getElementById('newNodeType').value;
+  const kw   = parseFloat(document.getElementById('newNodeKW').value) || 1;
+  const hrs  = parseFloat(document.getElementById('newNodeHrs').value) || 6;
+  if (!name) { alert('Please enter a node name.'); return; }
+  loadNodes.push({ name, type, kw, hrs, count: 1 });
+  document.getElementById('newNodeName').value = '';
+  renderLoadNodes();
+  recalcMiniGrid();
+}
+
+function removeNode(i) {
+  loadNodes.splice(i, 1);
+  renderLoadNodes();
+  recalcMiniGrid();
+}
+
+function renderLoadNodes() {
+  document.getElementById('loadNodesList').innerHTML = loadNodes.map((n, i) => `
+    <div class="load-node">
+      <div class="load-node-icon" style="background:#f1f5f9;">${NODE_ICONS[n.type] || '🔌'}</div>
+      <div>
+        <div class="load-node-name">${n.name}</div>
+        <div class="load-node-detail">${n.kw} kW · ${n.hrs} h/day · ${(n.kw * n.hrs).toFixed(1)} kWh/day</div>
+      </div>
+      <div class="load-node-badge">
+        <button onclick="removeNode(${i})" style="background:none;border:none;color:#94a3b8;cursor:pointer;font-size:.9rem;" title="Remove">✕</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function num(id) { return parseFloat(document.getElementById(id).value) || 0; }
+function sel(id) { return document.getElementById(id).value; }
+
+function recalcMiniGrid() {
+  const genSolar   = num('genSolar');
+  const genBattery = num('genBattery');
+  const genBackup  = num('genBackup');
+  const distVolt   = num('distVolt');
+  const distRadius = num('distRadius');
+  const psh        = num('psh');
+  const gridAvail  = num('gridAvail') / 100;
+  const targetRel  = parseFloat(sel('targetRel'));
+  const spinRes    = num('spinReserve') / 100;
+
+  // Total load
+  const totalPeakKW = loadNodes.reduce((s, n) => s + n.kw, 0);
+  const totalDailyKWh = loadNodes.reduce((s, n) => s + n.kw * n.hrs, 0);
+  const households = loadNodes.filter(n => n.type === 'household').reduce((s, n) => s + (n.count || 1) * (n.name.includes('Block') ? 20 : 1), 0);
+
+  // Generation capacity
+  const solarGenDaily  = genSolar * psh * 0.85; // 85% efficiency
+  const backupAvailKW  = genBackup * 0.8; // 80% KW rating of KVA
+  const totalGenCapKW  = genSolar + backupAvailKW;
+  const reserveKW      = totalPeakKW * spinRes;
+  const requiredCapKW  = totalPeakKW * (1 + spinRes);
+
+  // Capacity adequacy
+  const capacityOk = totalGenCapKW >= requiredCapKW;
+  const capacityMargin = ((totalGenCapKW - totalPeakKW) / totalPeakKW) * 100;
+
+  // Reliability score (simplified)
+  const batteryHrs = totalPeakKW > 0 ? (genBattery * 0.8 / totalPeakKW) : 0;
+  let reliabilityScore = 90;
+  if (batteryHrs >= 4) reliabilityScore += 4;
+  if (batteryHrs >= 6) reliabilityScore += 2;
+  if (genBackup >= totalPeakKW * 0.5) reliabilityScore += 3;
+  if (genSolar >= totalPeakKW * 0.8) reliabilityScore += 2;
+  reliabilityScore = Math.min(99.9, reliabilityScore);
+
+  // Feeder: voltage drop at end of feeder
+  const rho_cu = 0.0175;
+  const feederCurrentA = (totalPeakKW * 1000) / (Math.sqrt(3) * Math.max(distVolt, 1));
+  const feederMM2 = distVolt >= 11000 ? 95 : distVolt >= 400 ? 35 : 16;
+  const feederR = rho_cu / feederMM2;
+  const feederVD = (feederR * distRadius * 1000 * Math.sqrt(3) * feederCurrentA / distVolt) * 100;
+
+  // Transformer recommendation
+  const transKVA = Math.ceil(requiredCapKW / 0.9 / 50) * 50; // round up to nearest 50 kVA
+
+  // Update hero stats
+  document.getElementById('heroTotalLoad').textContent = totalPeakKW.toFixed(1) + ' kW';
+  document.getElementById('heroReliability').textContent = reliabilityScore.toFixed(1) + '%';
+  document.getElementById('heroHouseholds').textContent = loadNodes.length + ' nodes';
+  document.getElementById('heroCapacity').textContent = (totalGenCapKW - totalPeakKW).toFixed(1) + ' kW';
+
+  // System KPIs
+  document.getElementById('systemKPIs').innerHTML = `
+    <div class="sg-kpi ${capacityOk ? 'green' : 'red'}">
+      <div class="sg-kpi-val" style="color:${capacityOk ? '#059669' : '#dc2626'};">${totalPeakKW.toFixed(1)} kW</div>
+      <div class="sg-kpi-lbl">Total Peak Load</div>
+      <div class="sg-kpi-sub">${loadNodes.length} nodes</div>
+    </div>
+    <div class="sg-kpi blue">
+      <div class="sg-kpi-val" style="color:#1d4ed8;">${totalDailyKWh.toFixed(0)} kWh</div>
+      <div class="sg-kpi-lbl">Daily Demand</div>
+      <div class="sg-kpi-sub">Avg load profile</div>
+    </div>
+    <div class="sg-kpi purple">
+      <div class="sg-kpi-val" style="color:#7c3aed;">${reliabilityScore.toFixed(1)}%</div>
+      <div class="sg-kpi-lbl">Reliability Score</div>
+      <div class="sg-kpi-sub">Target: ${targetRel}%</div>
+    </div>
+    <div class="sg-kpi ${capacityMargin >= 15 ? 'green' : 'amber'}">
+      <div class="sg-kpi-val" style="color:${capacityMargin>=15?'#059669':'#d97706'};">${capacityMargin.toFixed(0)}%</div>
+      <div class="sg-kpi-lbl">Reserve Margin</div>
+      <div class="sg-kpi-sub">Need: ${(spinRes*100).toFixed(0)}%</div>
+    </div>
+    <div class="sg-kpi amber">
+      <div class="sg-kpi-val" style="color:#d97706;">${batteryHrs.toFixed(1)} h</div>
+      <div class="sg-kpi-lbl">Battery Autonomy</div>
+      <div class="sg-kpi-sub">Full load</div>
+    </div>
+    <div class="sg-kpi ${feederVD <= 3 ? 'green' : 'red'}">
+      <div class="sg-kpi-val" style="color:${feederVD<=3?'#059669':'#dc2626'};">${feederVD.toFixed(1)}%</div>
+      <div class="sg-kpi-lbl">Feeder VDrop</div>
+      <div class="sg-kpi-sub">at ${distRadius} km</div>
+    </div>
+  `;
+
+  // Alerts
+  const alerts = [];
+  if (!capacityOk) alerts.push({ level:'critical', title:'Generation Deficit', text:`Total generation (${totalGenCapKW.toFixed(1)} kW) is less than required ${requiredCapKW.toFixed(1)} kW including spinning reserve. Add ${(requiredCapKW - totalGenCapKW).toFixed(1)} kW more generation.` });
+  if (reliabilityScore < targetRel) alerts.push({ level:'high', title:'Below Target Reliability', text:`System reliability (${reliabilityScore.toFixed(1)}%) is below target (${targetRel}%). Increase battery storage or add backup generation.` });
+  if (feederVD > 5) alerts.push({ level:'critical', title:'Excessive Feeder Voltage Drop', text:`${feederVD.toFixed(1)}% feeder voltage drop at ${distRadius} km. Upgrade to ${feederMM2 * 2}mm² cable or add voltage regulation.` });
+  else if (feederVD > 3) alerts.push({ level:'high', title:'High Feeder Voltage Drop', text:`${feederVD.toFixed(1)}% feeder voltage drop. Consider upgrading cable to reduce losses.` });
+  if (batteryHrs < 2) alerts.push({ level:'medium', title:'Insufficient Battery Backup', text:`Only ${batteryHrs.toFixed(1)} hours of backup at full load. Add ${(totalPeakKW * 4 * 1.25 - genBattery).toFixed(0)} kWh more storage for 4-hour autonomy.` });
+  if (solarGenDaily < totalDailyKWh) alerts.push({ level:'medium', title:'Solar May Not Cover Daily Demand', text:`Solar generation (${solarGenDaily.toFixed(0)} kWh/day) may not cover daily demand (${totalDailyKWh.toFixed(0)} kWh). Generator backup is needed on low-irradiance days.` });
+  if (alerts.length === 0) alerts.push({ level:'info', title:'✅ System Within Specification', text:`Mini-grid configuration meets ${targetRel}% reliability target with ${capacityMargin.toFixed(0)}% reserve margin.` });
+
+  document.getElementById('systemAlerts').innerHTML = alerts.map(a => `
+    <div class="sg-alert ${a.level}">
+      <div class="sg-alert-icon">${a.level==='critical'?'🔴':a.level==='high'?'🟠':a.level==='medium'?'🟡':'💡'}</div>
+      <div class="sg-alert-content">
+        <div class="sg-alert-title">${a.title}</div>
+        ${a.text}
+      </div>
+    </div>
+  `).join('');
+
+  // Feeder analysis tab
+  const feeLines = loadNodes.map(n => {
+    const nodeI = (n.kw * 1000) / (Math.sqrt(3) * Math.max(distVolt, 1));
+    const nodeVD = (rho_cu / feederMM2 * distRadius * 1000 * Math.sqrt(3) * nodeI / distVolt) * 100;
+    return { ...n, nodeI, nodeVD };
+  });
+  document.getElementById('feederAnalysis').innerHTML = `
+    <div style="overflow-x:auto;">
+    <table class="sg-table">
+      <thead><tr><th>Node</th><th>Type</th><th>Load (kW)</th><th>Feeder Current (A)</th><th>VD (%)</th><th>Priority</th></tr></thead>
+      <tbody>
+        ${feeLines.map(n => `
+          <tr>
+            <td>${NODE_ICONS[n.type]||'🔌'} ${n.name}</td>
+            <td>${n.type}</td>
+            <td>${n.kw.toFixed(1)}</td>
+            <td>${n.nodeI.toFixed(1)}</td>
+            <td style="color:${n.nodeVD>5?'#dc2626':n.nodeVD>3?'#d97706':'#059669'};">${n.nodeVD.toFixed(2)}%</td>
+            <td><span style="font-size:.72rem;font-weight:700;padding:.2rem .5rem;border-radius:6px;${n.type==='clinic'?'background:#fff1f2;color:#991b1b;':n.type==='school'?'background:#eff6ff;color:#1e40af;':'background:#f1f5f9;color:#475569;'}">${n.type==='clinic'?'Critical':n.type==='school'?'High':'Standard'}</span></td>
+          </tr>
+        `).join('')}
+        <tr style="background:#f8fafc;font-weight:700;">
+          <td colspan="2">TOTAL</td>
+          <td>${totalPeakKW.toFixed(1)}</td>
+          <td>${feederCurrentA.toFixed(1)}</td>
+          <td style="color:${feederVD>5?'#dc2626':feederVD>3?'#d97706':'#059669'};">${feederVD.toFixed(2)}%</td>
+          <td></td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+    <div class="mt-2 sg-alert info">
+      <div class="sg-alert-icon">💡</div>
+      <div class="sg-alert-content">
+        <div class="sg-alert-title">Feeder Configuration</div>
+        ${feederMM2} mm² copper conductor, ${distRadius} km radius, ${distVolt}V distribution.
+        ${feederVD > 3 ? `Upgrade to ${Math.min(feederMM2*2, 185)} mm² to reduce voltage drop to ${(feederVD * feederMM2 / (feederMM2*2)).toFixed(1)}%.` : 'Cable size is adequate for this distribution radius.'}
+      </div>
+    </div>
+  `;
+
+  // Reliability tab
+  const outageHrsPerYear = (1 - reliabilityScore/100) * 8760;
+  document.getElementById('reliabilityAnalysis').innerHTML = `
+    <div class="row g-2 mb-3">
+      <div class="col-md-4 text-center">
+        <div style="font-size:2.5rem;font-weight:900;color:${reliabilityScore>=targetRel?'#059669':'#dc2626'};">${reliabilityScore.toFixed(1)}%</div>
+        <div style="font-size:.75rem;font-weight:700;color:#64748b;text-transform:uppercase;">Reliability Score</div>
+      </div>
+      <div class="col-md-4 text-center">
+        <div style="font-size:2.5rem;font-weight:900;color:#d97706;">${outageHrsPerYear.toFixed(0)} h</div>
+        <div style="font-size:.75rem;font-weight:700;color:#64748b;text-transform:uppercase;">Est. Outage/Year</div>
+      </div>
+      <div class="col-md-4 text-center">
+        <div style="font-size:2.5rem;font-weight:900;color:#7c3aed;">${batteryHrs.toFixed(1)} h</div>
+        <div style="font-size:.75rem;font-weight:700;color:#64748b;text-transform:uppercase;">Battery Autonomy</div>
+      </div>
+    </div>
+    <div class="rel-meter"><span style="font-size:.78rem;color:#64748b;min-width:120px;">Reliability</span><div class="rel-bar"><div class="rel-fill" style="width:${reliabilityScore}%;background:${reliabilityScore>=99?'#059669':reliabilityScore>=95?'#d97706':'#dc2626'};"></div></div><span style="font-size:.78rem;font-weight:700;min-width:50px;text-align:right;">${reliabilityScore.toFixed(1)}%</span></div>
+    <div class="rel-meter"><span style="font-size:.78rem;color:#64748b;min-width:120px;">Capacity Margin</span><div class="rel-bar"><div class="rel-fill" style="width:${Math.min(100,capacityMargin)}%;background:#6366f1;"></div></div><span style="font-size:.78rem;font-weight:700;min-width:50px;text-align:right;">${capacityMargin.toFixed(0)}%</span></div>
+    <div class="rel-meter"><span style="font-size:.78rem;color:#64748b;min-width:120px;">Battery Coverage</span><div class="rel-bar"><div class="rel-fill" style="width:${Math.min(100,(batteryHrs/6)*100)}%;background:#0891b2;"></div></div><span style="font-size:.78rem;font-weight:700;min-width:50px;text-align:right;">${batteryHrs.toFixed(1)} h</span></div>
+    <div class="mt-3 sg-alert ${reliabilityScore >= targetRel ? 'info' : 'high'}">
+      <div class="sg-alert-icon">${reliabilityScore>=targetRel?'✅':'⚠️'}</div>
+      <div class="sg-alert-content">
+        <div class="sg-alert-title">Reliability Assessment</div>
+        ${reliabilityScore >= targetRel 
+          ? `System meets ${targetRel}% reliability target. To achieve 99.9% reliability: add ${(totalPeakKW*2 - genBattery).toFixed(0)} kWh more storage and automatic transfer switch.`
+          : `System does not meet ${targetRel}% target (actual: ${reliabilityScore.toFixed(1)}%). Add ${Math.max(0,(totalPeakKW*4-genBattery)).toFixed(0)} kWh battery and ${Math.max(0,requiredCapKW-totalGenCapKW).toFixed(1)} kW additional generation.`}
+      </div>
+    </div>
+  `;
+
+  // Transformer tab
+  document.getElementById('transformerAnalysis').innerHTML = `
+    <table class="sg-table">
+      <thead><tr><th>Parameter</th><th>Value</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td>Total Connected Load</td><td>${totalPeakKW.toFixed(1)} kW</td><td>Diversity factor not applied</td></tr>
+        <tr><td>Diversity-Adjusted Load</td><td>${(totalPeakKW * 0.75).toFixed(1)} kW</td><td>Factor 0.75 assumed</td></tr>
+        <tr><td>With Spinning Reserve</td><td>${requiredCapKW.toFixed(1)} kW</td><td>At ${(spinRes*100)}% reserve</td></tr>
+        <tr><td>Required kVA</td><td>${(requiredCapKW / 0.9).toFixed(0)} kVA</td><td>pf = 0.9</td></tr>
+        <tr><td>Recommended Transformer</td><td><strong>${transKVA} kVA</strong></td><td>Next standard size up</td></tr>
+        <tr><td>Loading at Peak</td><td>${((totalPeakKW / 0.9 / transKVA)*100).toFixed(0)}%</td><td>${(totalPeakKW / 0.9 / transKVA) > 0.8 ? '⚠️ High loading' : '✅ OK'}</td></tr>
+        <tr><td>Future Growth Capacity</td><td>${(transKVA * 0.9 * 0.9 - totalPeakKW).toFixed(0)} kW</td><td>At 90% rated capacity</td></tr>
+      </tbody>
+    </table>
+    <div class="mt-2 sg-alert info">
+      <div class="sg-alert-icon">💡</div>
+      <div class="sg-alert-content">
+        <div class="sg-alert-title">Transformer Sizing Note</div>
+        A ${transKVA} kVA transformer is recommended at the generation point. For distribution lengths &gt; 2 km, consider split distribution with a second feeder transformer to reduce voltage drop and improve reliability.
+      </div>
+    </div>
+  `;
+
+  // Demand profile chart (24h simulation)
+  const hours = Array.from({length:24}, (_,i) => `${i.toString().padStart(2,'0')}:00`);
+  const baseLoad = totalPeakKW * 0.3;
+  const demandData = hours.map((_, h) => {
+    let factor = 0.3;
+    if (h >= 6 && h <= 8) factor = 0.7;
+    if (h >= 8 && h <= 17) factor = 0.55;
+    if (h >= 17 && h <= 21) factor = 1.0;
+    if (h >= 21) factor = 0.4;
+    return totalPeakKW * factor * (0.9 + Math.random()*0.2);
+  });
+  const peakHour = demandData.indexOf(Math.max(...demandData));
+  const ctx = document.getElementById('demandChart').getContext('2d');
+  if (demandChartInstance) demandChartInstance.destroy();
+  demandChartInstance = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: hours,
+      datasets: [{
+        label: 'Demand (kW)',
+        data: demandData,
+        borderColor:'#7c3aed', backgroundColor:'rgba(124,58,237,.12)',
+        fill:true, tension:0.4, borderWidth:2, pointRadius:0
+      }, {
+        label: 'Available Generation (kW)',
+        data: hours.map((_, h) => h >= 7 && h <= 18 ? genSolar * psh / 11 * Math.sin(Math.PI*(h-7)/11) * (0.85+Math.random()*0.1) + backupAvailKW : backupAvailKW),
+        borderColor:'#059669', backgroundColor:'rgba(5,150,105,.08)',
+        fill:true, tension:0.4, borderWidth:2, pointRadius:0, borderDash:[5,5]
+      }]
+    },
+    options: {
+      responsive:true, plugins:{legend:{position:'bottom'}},
+      scales:{
+        y:{ beginAtZero:true, title:{ display:true, text:'Power (kW)' }},
+        x:{ ticks:{ maxRotation:45 }}
+      }
+    }
+  });
+  document.getElementById('demandInsights').innerHTML = `
+    <div class="row g-2 mt-1">
+      <div class="col-md-4"><div class="sg-kpi amber"><div class="sg-kpi-val" style="color:#d97706;">${hours[peakHour]}</div><div class="sg-kpi-lbl">Peak Demand Time</div></div></div>
+      <div class="col-md-4"><div class="sg-kpi purple"><div class="sg-kpi-val" style="color:#7c3aed;">${(totalPeakKW * 0.45).toFixed(1)} kW</div><div class="sg-kpi-lbl">Average Demand</div></div></div>
+      <div class="col-md-4"><div class="sg-kpi green"><div class="sg-kpi-val" style="color:#059669;">${(totalDailyKWh).toFixed(0)} kWh</div><div class="sg-kpi-lbl">Daily Energy</div></div></div>
+    </div>
+  `;
+
+  // Productive use tab
+  const productiveNodes = loadNodes.filter(n => ['mill','pump','cold_room','industry'].includes(n.type));
+  document.getElementById('productiveUse').innerHTML = `
+    <div class="mb-2" style="font-size:.83rem;color:#374151;">Productive use of energy (PUOE) maximises the economic return of the mini-grid:</div>
+    <table class="sg-table">
+      <thead><tr><th>Node</th><th>Type</th><th>Load (kW)</th><th>Revenue Potential</th><th>ROI Impact</th></tr></thead>
+      <tbody>
+        ${productiveNodes.length > 0 ? productiveNodes.map(n => `
+          <tr>
+            <td>${NODE_ICONS[n.type]} ${n.name}</td><td>${n.type}</td><td>${n.kw.toFixed(1)}</td>
+            <td>High revenue generator</td><td>+ROI booster</td>
+          </tr>
+        `).join('') : `<tr><td colspan="5" style="text-align:center;color:#94a3b8;padding:1.5rem;">No productive-use nodes added. Consider adding mills, pumps, or cold rooms.</td></tr>`}
+      </tbody>
+    </table>
+    <div class="mt-2 sg-alert info">
+      <div class="sg-alert-icon">💡</div>
+      <div class="sg-alert-content">
+        <div class="sg-alert-title">Productive Use Strategy</div>
+        Productive-use loads (grain mills, water pumps, cold rooms) typically run during off-peak solar hours, improving load factor from ${((totalPeakKW*0.45/totalPeakKW)*100).toFixed(0)}% to 65%+. This significantly improves mini-grid financial viability.
+      </div>
+    </div>
+  `;
+
+  // Draw topology
+  drawTopology(loadNodes.slice(0,8), totalPeakKW, genSolar, genBackup);
+}
+
+function drawTopology(nodes, totalKW, solar, backup) {
+  const w = 680, h = 320;
+  let svg = `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg" style="max-width:100%;">`;
+  svg += `<rect width="${w}" height="${h}" fill="#0f172a" rx="10"/>`;
+
+  // Central bus
+  const busX = 340, busY = 160, busW = 120, busH = 40;
+  svg += `<rect x="${busX-busW/2}" y="${busY-busH/2}" width="${busW}" height="${busH}" rx="8" fill="#1e293b" stroke="#7c3aed" stroke-width="2"/>`;
+  svg += `<text x="${busX}" y="${busY-4}" text-anchor="middle" font-size="9" fill="#c4b5fd" font-weight="bold">MAIN BUS</text>`;
+  svg += `<text x="${busX}" y="${busY+10}" text-anchor="middle" font-size="8" fill="#7c3aed">400V / ${totalKW.toFixed(0)}kW</text>`;
+
+  // Generation sources (left side)
+  svg += `<rect x="20" y="60" width="100" height="45" rx="8" fill="#1e3a2a" stroke="#10b981" stroke-width="1.5"/>`;
+  svg += `<text x="70" y="78" text-anchor="middle" font-size="9" fill="#10b981" font-weight="bold">☀️ SOLAR</text>`;
+  svg += `<text x="70" y="92" text-anchor="middle" font-size="8" fill="#34d399">${solar} kWp</text>`;
+  svg += `<line x1="120" y1="82" x2="${busX-busW/2}" y2="${busY-8}" stroke="#10b981" stroke-width="2" stroke-dasharray="4,3"/>`;
+
+  svg += `<rect x="20" y="145" width="100" height="45" rx="8" fill="#2d1b12" stroke="#f59e0b" stroke-width="1.5"/>`;
+  svg += `<text x="70" y="163" text-anchor="middle" font-size="9" fill="#f59e0b" font-weight="bold">⚡ BACKUP</text>`;
+  svg += `<text x="70" y="177" text-anchor="middle" font-size="8" fill="#fcd34d">${backup} kVA Gen</text>`;
+  svg += `<line x1="120" y1="167" x2="${busX-busW/2}" y2="${busY+8}" stroke="#f59e0b" stroke-width="2" stroke-dasharray="4,3"/>`;
+
+  // Load nodes (right side, arranged in arc)
+  const nodeCount = Math.min(nodes.length, 6);
+  for (let i = 0; i < nodeCount; i++) {
+    const angle = (-60 + i * (120 / Math.max(nodeCount-1,1))) * (Math.PI/180);
+    const r = 200;
+    const nx = busX + r * Math.cos(angle);
+    const ny = busY + r * Math.sin(angle);
+    const n = nodes[i];
+    svg += `<line x1="${busX+busW/2}" y1="${busY}" x2="${nx-40}" y2="${ny}" stroke="#4f46e5" stroke-width="1.5"/>`;
+    svg += `<rect x="${nx-40}" y="${ny-18}" width="110" height="36" rx="7" fill="#1e1b4b" stroke="#6366f1" stroke-width="1.5"/>`;
+    svg += `<text x="${nx+15}" y="${ny-3}" text-anchor="middle" font-size="8" fill="#818cf8" font-weight="bold">${(NODE_ICONS[n.type]||'🔌')} ${n.name.substring(0,12)}</text>`;
+    svg += `<text x="${nx+15}" y="${ny+11}" text-anchor="middle" font-size="7" fill="#6366f1">${n.kw.toFixed(1)} kW</text>`;
+  }
+
+  svg += `<text x="${w/2}" y="${h-8}" text-anchor="middle" font-size="9" fill="#334155">Emajinet Smart Grid · ${totalKW.toFixed(0)} kW · ${nodes.length} Nodes</text>`;
+  svg += '</svg>';
+  document.getElementById('gridTopologySVG').innerHTML = svg;
+}
+
+function openSgTab(tabId) {
+  document.querySelectorAll('.sg-tab-content').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.sg-tab').forEach(el => el.classList.remove('active'));
+  document.getElementById(tabId).classList.add('active');
+  document.getElementById('sg-tab-' + tabId).classList.add('active');
+}
+
+renderLoadNodes();
+recalcMiniGrid();
+</script>
+{% endblock %}

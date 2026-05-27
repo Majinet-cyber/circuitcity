@@ -5,15 +5,14 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('accounts', '0005_profile_is_manager_and_more'),
+        ("accounts", "0005_profile_is_manager_and_more"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='profile',
-            name='avatar',
+            model_name="profile",
+            name="avatar",
             field=models.ImageField(blank=True, null=True, upload_to=circuitcity.accounts.models.avatar_upload_to),
         ),
     ]

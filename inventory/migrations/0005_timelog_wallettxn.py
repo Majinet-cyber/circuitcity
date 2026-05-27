@@ -7,37 +7,63 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('inventory', '0004_agentpasswordreset'),
+        ("inventory", "0004_agentpasswordreset"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='TimeLog',
+            name="TimeLog",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('logged_at', models.DateTimeField(default=django.utils.timezone.now)),
-                ('note', models.CharField(blank=True, max_length=200)),
-                ('user', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='time_logs', to=settings.AUTH_USER_MODEL)),
+                ("id", models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name="ID")),
+                ("logged_at", models.DateTimeField(default=django.utils.timezone.now)),
+                ("note", models.CharField(blank=True, max_length=200)),
+                (
+                    "user",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="time_logs",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
             ],
             options={
-                'ordering': ['-logged_at'],
+                "ordering": ["-logged_at"],
             },
         ),
         migrations.CreateModel(
-            name='WalletTxn',
+            name="WalletTxn",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('amount', models.DecimalField(decimal_places=2, max_digits=12)),
-                ('reason', models.CharField(choices=[('EARLY_BIRD', 'Early-bird bonus'), ('LATE_PENALTY', 'Late penalty'), ('SUNDAY_BONUS', 'Sunday bonus'), ('ADJUSTMENT', 'Adjustment'), ('COMMISSION', 'Commission')], default='ADJUSTMENT', max_length=32)),
-                ('created_at', models.DateTimeField(default=django.utils.timezone.now)),
-                ('memo', models.CharField(blank=True, max_length=200)),
-                ('user', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='wallet_txns', to=settings.AUTH_USER_MODEL)),
+                ("id", models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name="ID")),
+                ("amount", models.DecimalField(decimal_places=2, max_digits=12)),
+                (
+                    "reason",
+                    models.CharField(
+                        choices=[
+                            ("EARLY_BIRD", "Early-bird bonus"),
+                            ("LATE_PENALTY", "Late penalty"),
+                            ("SUNDAY_BONUS", "Sunday bonus"),
+                            ("ADJUSTMENT", "Adjustment"),
+                            ("COMMISSION", "Commission"),
+                        ],
+                        default="ADJUSTMENT",
+                        max_length=32,
+                    ),
+                ),
+                ("created_at", models.DateTimeField(default=django.utils.timezone.now)),
+                ("memo", models.CharField(blank=True, max_length=200)),
+                (
+                    "user",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="wallet_txns",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
             ],
             options={
-                'ordering': ['-created_at'],
+                "ordering": ["-created_at"],
             },
         ),
     ]

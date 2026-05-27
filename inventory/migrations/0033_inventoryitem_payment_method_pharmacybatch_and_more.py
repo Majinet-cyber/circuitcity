@@ -8,7 +8,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("inventory", "0032_add_payment_method_and_penalties"),
         ("tenants", "0011_agentinvite_temp_password_hash_and_more"),
@@ -45,21 +44,15 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "batch_number",
-                    models.CharField(
-                        help_text="Manufacturer batch/lot number", max_length=100
-                    ),
+                    models.CharField(help_text="Manufacturer batch/lot number", max_length=100),
                 ),
                 (
                     "expiry_date",
-                    models.DateField(
-                        db_index=True, help_text="Expiry date (day/month/year)"
-                    ),
+                    models.DateField(db_index=True, help_text="Expiry date (day/month/year)"),
                 ),
                 (
                     "quantity",
-                    models.PositiveIntegerField(
-                        default=0, help_text="Current quantity in stock"
-                    ),
+                    models.PositiveIntegerField(default=0, help_text="Current quantity in stock"),
                 ),
                 (
                     "reorder_level",
@@ -331,9 +324,7 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "sold_at",
-                    models.DateTimeField(
-                        db_index=True, default=django.utils.timezone.now
-                    ),
+                    models.DateTimeField(db_index=True, default=django.utils.timezone.now),
                 ),
                 ("created_at", models.DateTimeField(auto_now_add=True)),
                 ("notes", models.TextField(blank=True, default="")),
@@ -450,9 +441,7 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "note",
-                    models.TextField(
-                        blank=True, help_text="Optional note or reason for action"
-                    ),
+                    models.TextField(blank=True, help_text="Optional note or reason for action"),
                 ),
                 (
                     "ip_address",
@@ -464,9 +453,7 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "user_agent",
-                    models.CharField(
-                        blank=True, help_text="User agent string", max_length=255
-                    ),
+                    models.CharField(blank=True, help_text="User agent string", max_length=255),
                 ),
                 (
                     "created_at",
@@ -530,33 +517,23 @@ class Migration(migrations.Migration):
         ),
         migrations.AddIndex(
             model_name="pharmacybatch",
-            index=models.Index(
-                fields=["is_archived"], name="inventory_p_is_arch_67f627_idx"
-            ),
+            index=models.Index(fields=["is_archived"], name="inventory_p_is_arch_67f627_idx"),
         ),
         migrations.AlterUniqueTogether(
             name="pharmacybatch",
-            unique_together={
-                ("business", "merch_product", "batch_number", "expiry_date")
-            },
+            unique_together={("business", "merch_product", "batch_number", "expiry_date")},
         ),
         migrations.AddIndex(
             model_name="pharmacysale",
-            index=models.Index(
-                fields=["business", "-sold_at"], name="inventory_p_busines_f3ae6d_idx"
-            ),
+            index=models.Index(fields=["business", "-sold_at"], name="inventory_p_busines_f3ae6d_idx"),
         ),
         migrations.AddIndex(
             model_name="pharmacysale",
-            index=models.Index(
-                fields=["batch", "-sold_at"], name="inventory_p_batch_i_e6938a_idx"
-            ),
+            index=models.Index(fields=["batch", "-sold_at"], name="inventory_p_batch_i_e6938a_idx"),
         ),
         migrations.AddIndex(
             model_name="pharmacysale",
-            index=models.Index(
-                fields=["sold_by", "-sold_at"], name="inventory_p_sold_by_b653ce_idx"
-            ),
+            index=models.Index(fields=["sold_by", "-sold_at"], name="inventory_p_sold_by_b653ce_idx"),
         ),
         migrations.AddIndex(
             model_name="stockactivitylog",
@@ -574,9 +551,7 @@ class Migration(migrations.Migration):
         ),
         migrations.AddIndex(
             model_name="stockactivitylog",
-            index=models.Index(
-                fields=["action", "-created_at"], name="inventory_s_action_c4198b_idx"
-            ),
+            index=models.Index(fields=["action", "-created_at"], name="inventory_s_action_c4198b_idx"),
         ),
         migrations.AddIndex(
             model_name="stockactivitylog",

@@ -1,0 +1,419 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Assets - {{ business.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+/* ===== Farm Assets Premium Styles ===== */
+.farm-assets {
+    --farm-amber: #d97706;
+    --farm-amber-light: #fef3c7;
+}
+
+/* Asset Cards Grid */
+.asset-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+}
+
+@media (min-width: 576px) {
+    .asset-cards-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+@media (min-width: 768px) {
+    .asset-cards-grid {
+        grid-template-columns: repeat(4, 1fr);
+    }
+}
+
+/* Asset Card */
+.asset-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 1.25rem 0.75rem;
+    background: var(--surface);
+    border: 2px solid var(--border);
+    border-radius: var(--radius);
+    text-decoration: none;
+    color: var(--ink);
+    font-weight: 600;
+    font-size: 0.875rem;
+    transition: all 0.2s ease;
+    box-shadow: var(--shadow-xs);
+    cursor: pointer;
+    text-align: center;
+}
+
+.asset-card:hover {
+    background: var(--farm-amber-light);
+    border-color: var(--farm-amber);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+    text-decoration: none;
+    color: var(--ink);
+}
+
+.asset-card:focus {
+    outline: 2px solid var(--farm-amber);
+    outline-offset: 2px;
+}
+
+.asset-card .emoji {
+    font-size: 2rem;
+}
+
+.asset-card .label {
+    font-weight: 700;
+    font-size: 0.8125rem;
+}
+
+.asset-card .sublabel {
+    font-size: 0.6875rem;
+    color: var(--muted);
+    font-weight: 400;
+}
+
+/* Category Header */
+.asset-category {
+    margin-bottom: 2rem;
+}
+
+.asset-category h2 {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--ink);
+    margin-bottom: 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+/* Asset Form Panel */
+.asset-form-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-sm);
+    display: none;
+    margin-bottom: 1.5rem;
+}
+
+.asset-form-panel.visible {
+    display: block;
+}
+
+.asset-form-header {
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.asset-form-header .emoji {
+    font-size: 1.5rem;
+}
+
+.asset-form-header h3 {
+    font-size: 1rem;
+    font-weight: 700;
+    margin: 0;
+}
+
+.asset-form-body {
+    padding: 1.25rem;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="farm-assets container-fluid py-3" data-testid="farm-assets-page">
+    <div class="mb-4">
+        <h1 class="h3 mb-1"><span class="me-2">🔧</span>Farm Assets</h1>
+        <p class="text-muted mb-0">Track your farm equipment, tools, and infrastructure</p>
+    </div>
+
+    <p class="text-muted mb-4"><i class="bi bi-lightning-fill text-warning me-1"></i> Quick pick an asset to add</p>
+
+    <!-- Equipment & Machinery -->
+    <div class="asset-category" data-testid="asset-category-equipment">
+        <h2><span>🚜</span> Equipment & Machinery</h2>
+        <div class="asset-cards-grid" data-testid="asset-cards-equipment">
+            <button type="button" class="asset-card" data-asset="tractor" data-testid="asset-card-tractor">
+                <span class="emoji">🚜</span>
+                <span class="label">Tractor</span>
+            </button>
+            <button type="button" class="asset-card" data-asset="ox-plough" data-testid="asset-card-ox-plough">
+                <span class="emoji">🐂</span>
+                <span class="label">Ox-Plough</span>
+                <span class="sublabel">Animal-drawn</span>
+            </button>
+            <button type="button" class="asset-card" data-asset="irrigation-pump" data-testid="asset-card-irrigation-pump">
+                <span class="emoji">💧</span>
+                <span class="label">Irrigation Pump</span>
+            </button>
+            <button type="button" class="asset-card" data-asset="solar-pump" data-testid="asset-card-solar-pump">
+                <span class="emoji">☀️</span>
+                <span class="label">Solar Pump</span>
+            </button>
+            <button type="button" class="asset-card" data-asset="corn-sheller" data-testid="asset-card-corn-sheller">
+                <span class="emoji">🌽</span>
+                <span class="label">Corn Sheller</span>
+            </button>
+            <button type="button" class="asset-card" data-asset="generator" data-testid="asset-card-generator">
+                <span class="emoji">⚡</span>
+                <span class="label">Generator</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Hand Tools -->
+    <div class="asset-category" data-testid="asset-category-tools">
+        <h2><span>🛠️</span> Hand Tools</h2>
+        <div class="asset-cards-grid" data-testid="asset-cards-tools">
+            <button type="button" class="asset-card" data-asset="hoe" data-testid="asset-card-hoe">
+                <span class="emoji">⛏️</span>
+                <span class="label">Hoe</span>
+                <span class="sublabel">Khasu</span>
+            </button>
+            <button type="button" class="asset-card" data-asset="panga" data-testid="asset-card-panga">
+                <span class="emoji">🔪</span>
+                <span class="label">Panga Knife</span>
+                <span class="sublabel">Mpeni</span>
+            </button>
+            <button type="button" class="asset-card" data-asset="rake" data-testid="asset-card-rake">
+                <span class="emoji">🧹</span>
+                <span class="label">Rake</span>
+            </button>
+            <button type="button" class="asset-card" data-asset="sprayer" data-testid="asset-card-sprayer">
+                <span class="emoji">🎒</span>
+                <span class="label">Knapsack Sprayer</span>
+            </button>
+            <button type="button" class="asset-card" data-asset="wheelbarrow" data-testid="asset-card-wheelbarrow">
+                <span class="emoji">🛒</span>
+                <span class="label">Wheelbarrow</span>
+            </button>
+            <button type="button" class="asset-card" data-asset="watering-can" data-testid="asset-card-watering-can">
+                <span class="emoji">🚿</span>
+                <span class="label">Watering Can</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Storage & Infrastructure -->
+    <div class="asset-category" data-testid="asset-category-storage">
+        <h2><span>🏚️</span> Storage & Infrastructure</h2>
+        <div class="asset-cards-grid" data-testid="asset-cards-storage">
+            <button type="button" class="asset-card" data-asset="water-tank" data-testid="asset-card-water-tank">
+                <span class="emoji">🪣</span>
+                <span class="label">Water Tank</span>
+            </button>
+            <button type="button" class="asset-card" data-asset="storage-drums" data-testid="asset-card-storage-drums">
+                <span class="emoji">🛢️</span>
+                <span class="label">Storage Drums</span>
+            </button>
+            <button type="button" class="asset-card" data-asset="sacks" data-testid="asset-card-sacks">
+                <span class="emoji">🎒</span>
+                <span class="label">Sacks / Bags</span>
+            </button>
+            <button type="button" class="asset-card" data-asset="barn" data-testid="asset-card-barn">
+                <span class="emoji">🏚️</span>
+                <span class="label">Barn / Shed</span>
+            </button>
+            <button type="button" class="asset-card" data-asset="greenhouse" data-testid="asset-card-greenhouse">
+                <span class="emoji">🏡</span>
+                <span class="label">Greenhouse</span>
+            </button>
+            <button type="button" class="asset-card" data-asset="fencing" data-testid="asset-card-fencing">
+                <span class="emoji">🚧</span>
+                <span class="label">Fencing</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Land -->
+    <div class="asset-category" data-testid="asset-category-land">
+        <h2><span>🌍</span> Land</h2>
+        <div class="asset-cards-grid" data-testid="asset-cards-land">
+            <button type="button" class="asset-card" data-asset="land" data-testid="asset-card-land">
+                <span class="emoji">🏞️</span>
+                <span class="label">Land / Acres</span>
+                <span class="sublabel">Record ownership</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Asset Form Panel (appears after selecting asset) -->
+    <div class="asset-form-panel" id="assetFormPanel" data-testid="asset-add-form">
+        <div class="asset-form-header">
+            <span class="emoji" id="selectedAssetEmoji">🔧</span>
+            <h3>Add <span id="selectedAssetLabel">Asset</span></h3>
+        </div>
+        <div class="asset-form-body">
+            <form method="post" action="{% url 'verticals:farm_assets' %}" id="assetForm">
+                {% csrf_token %}
+                <input type="hidden" name="asset_type" id="assetType" value="">
+                
+                <div class="mb-3">
+                    <label for="asset_name" class="form-label">Asset Name *</label>
+                    <input type="text" class="form-control" id="asset_name" name="asset_name" required>
+                </div>
+
+                <div class="row">
+                    <div class="col-6 mb-3">
+                        <label for="quantity" class="form-label">Quantity</label>
+                        <input type="number" class="form-control" id="quantity" name="quantity" 
+                               min="1" value="1">
+                    </div>
+                    <div class="col-6 mb-3">
+                        <label for="value" class="form-label">Value (MWK)</label>
+                        <input type="number" class="form-control" id="value" name="value" 
+                               min="0" step="0.01" placeholder="e.g., 150000">
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label for="purchase_date" class="form-label">Purchase Date</label>
+                    <input type="date" class="form-control" id="purchase_date" name="purchase_date">
+                </div>
+
+                <div class="mb-3">
+                    <label for="condition" class="form-label">Condition</label>
+                    <select class="form-select" id="condition" name="condition">
+                        <option value="new">New</option>
+                        <option value="good" selected>Good</option>
+                        <option value="fair">Fair</option>
+                        <option value="poor">Poor</option>
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label for="notes" class="form-label">Notes</label>
+                    <textarea class="form-control" id="notes" name="notes" rows="2"></textarea>
+                </div>
+
+                <div class="d-grid gap-2">
+                    <button type="submit" class="btn btn-warning btn-lg text-dark" data-testid="asset-submit-btn">
+                        <i class="bi bi-check-circle me-1"></i> Add Asset
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary" id="cancelAsset">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Assets List (shows existing assets) -->
+    {% if assets %}
+    <div class="asset-category" data-testid="asset-list-section" style="margin-top: 2rem;">
+        <h2><span>📋</span> Your Assets ({{ total_assets }} items)</h2>
+        <div class="table-responsive">
+            <table class="table table-hover" data-testid="assets-table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Qty</th>
+                        <th>Condition</th>
+                        <th>Value</th>
+                        <th>Added</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for asset in assets %}
+                    <tr data-testid="asset-row-{{ asset.id }}">
+                        <td><strong>{{ asset.name }}</strong></td>
+                        <td>{{ asset.quantity }}</td>
+                        <td>
+                            <span class="badge {% if asset.condition == 'new' %}bg-success{% elif asset.condition == 'good' %}bg-primary{% elif asset.condition == 'fair' %}bg-warning text-dark{% else %}bg-danger{% endif %}">
+                                {{ asset.get_condition_display }}
+                            </span>
+                        </td>
+                        <td>{% if asset.value_mwk %}MWK {{ asset.value_mwk|floatformat:0|intcomma }}{% else %}—{% endif %}</td>
+                        <td>{{ asset.created_at|date:"M d, Y" }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                {% if total_value %}
+                <tfoot>
+                    <tr class="table-light">
+                        <th colspan="3">Total Estimated Value</th>
+                        <th colspan="2">MWK {{ total_value|floatformat:0|intcomma }}</th>
+                    </tr>
+                </tfoot>
+                {% endif %}
+            </table>
+        </div>
+    </div>
+    {% else %}
+    <div class="text-center text-muted py-4" data-testid="no-assets-message">
+        <i class="bi bi-box-seam" style="font-size: 2.5rem; opacity: 0.5;"></i>
+        <p class="mt-2">No assets recorded yet. Select an asset above to add your first!</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const formPanel = document.getElementById('assetFormPanel');
+    const selectedEmoji = document.getElementById('selectedAssetEmoji');
+    const selectedLabel = document.getElementById('selectedAssetLabel');
+    const assetType = document.getElementById('assetType');
+    const assetName = document.getElementById('asset_name');
+    
+    const assetData = {
+        'tractor': { emoji: '🚜', label: 'Tractor', name: 'Tractor' },
+        'ox-plough': { emoji: '🐂', label: 'Ox-Plough', name: 'Ox-Plough' },
+        'irrigation-pump': { emoji: '💧', label: 'Irrigation Pump', name: 'Irrigation Pump' },
+        'solar-pump': { emoji: '☀️', label: 'Solar Pump', name: 'Solar Pump' },
+        'corn-sheller': { emoji: '🌽', label: 'Corn Sheller', name: 'Corn Sheller' },
+        'generator': { emoji: '⚡', label: 'Generator', name: 'Generator' },
+        'hoe': { emoji: '⛏️', label: 'Hoe', name: 'Hoe (Khasu)' },
+        'panga': { emoji: '🔪', label: 'Panga Knife', name: 'Panga Knife' },
+        'rake': { emoji: '🧹', label: 'Rake', name: 'Rake' },
+        'sprayer': { emoji: '🎒', label: 'Knapsack Sprayer', name: 'Knapsack Sprayer' },
+        'wheelbarrow': { emoji: '🛒', label: 'Wheelbarrow', name: 'Wheelbarrow' },
+        'watering-can': { emoji: '🚿', label: 'Watering Can', name: 'Watering Can' },
+        'water-tank': { emoji: '🪣', label: 'Water Tank', name: 'Water Tank' },
+        'storage-drums': { emoji: '🛢️', label: 'Storage Drums', name: 'Storage Drums' },
+        'sacks': { emoji: '🎒', label: 'Sacks', name: 'Storage Sacks' },
+        'barn': { emoji: '🏚️', label: 'Barn', name: 'Barn / Shed' },
+        'greenhouse': { emoji: '🏡', label: 'Greenhouse', name: 'Greenhouse' },
+        'fencing': { emoji: '🚧', label: 'Fencing', name: 'Fencing' },
+        'land': { emoji: '🏞️', label: 'Land', name: 'Farm Land' },
+    };
+    
+    // Asset card selection
+    document.querySelectorAll('.asset-card').forEach(function(card) {
+        card.addEventListener('click', function() {
+            const asset = this.dataset.asset;
+            const data = assetData[asset] || { emoji: '🔧', label: 'Asset', name: 'Asset' };
+            
+            // Update form
+            selectedEmoji.textContent = data.emoji;
+            selectedLabel.textContent = data.label;
+            assetType.value = asset;
+            assetName.value = data.name;
+            
+            // Show form
+            formPanel.classList.add('visible');
+            formPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            assetName.focus();
+        });
+    });
+    
+    // Cancel button
+    document.getElementById('cancelAsset').addEventListener('click', function() {
+        formPanel.classList.remove('visible');
+    });
+});
+</script>
+{% endblock %}

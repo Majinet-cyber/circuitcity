@@ -8,9 +8,11 @@ from django.core.management import BaseCommand, CommandError
 from django.db import transaction, models
 from django.utils import timezone
 
+
 # ----------------- tolerant imports -----------------
 def _try_import(modpath: str, attr: str | None = None):
     import importlib
+
     try:
         mod = importlib.import_module(modpath)
         return getattr(mod, attr) if attr else mod
@@ -19,14 +21,8 @@ def _try_import(modpath: str, attr: str | None = None):
 
 
 Sale = _try_import("sales.models", "Sale")
-InvItem = (
-    _try_import("inventory.models", "InventoryItem")
-    or _try_import("inventory.models", "Stock")
-)
-Location = (
-    _try_import("inventory.models", "Location")
-    or _try_import("tenants.models", "Location")
-)
+InvItem = _try_import("inventory.models", "InventoryItem") or _try_import("inventory.models", "Stock")
+Location = _try_import("inventory.models", "Location") or _try_import("tenants.models", "Location")
 User = _try_import("django.contrib.auth.models", "User")
 
 # Optional “finalize” helpers (any that exist will be tried if --finalize is set)
@@ -254,12 +250,18 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument("--limit", type=int, default=5000, help="Max items to scan")
         parser.add_argument("--business-id", type=int, default=None, help="Only backfill for this business id")
-        parser.add_argument("--location-id-default", type=int, default=None, help="Default Location id when item has none")
-        parser.add_argument("--agent-id-default", type=int, default=None, help="Default Agent/User id when item provides none")
+        parser.add_argument(
+            "--location-id-default", type=int, default=None, help="Default Location id when item has none"
+        )
+        parser.add_argument(
+            "--agent-id-default", type=int, default=None, help="Default Agent/User id when item provides none"
+        )
         parser.add_argument("--dry-run", action="store_true", help="Show what would be created without saving")
         parser.add_argument("--verbose", action="store_true", help="Print per-item actions")
         parser.add_argument("--finalize", action="store_true", help="Call a finalize_sale helper if available")
-        parser.add_argument("--fix-item", action="store_true", help="Normalize item flags to SOLD after creating a Sale")
+        parser.add_argument(
+            "--fix-item", action="store_true", help="Normalize item flags to SOLD after creating a Sale"
+        )
 
     def handle(self, *args, **opts):
         if Sale is None:
@@ -323,13 +325,13 @@ class Command(BaseCommand):
         if _model_has_field(Sale, "location"):
             try:
                 f = Sale._meta.get_field("location")  # type: ignore[attr-defined]
-                location_required = (getattr(f, "null", True) is False)
+                location_required = getattr(f, "null", True) is False
             except Exception:
                 pass
         if _model_has_field(Sale, "agent"):
             try:
                 f = Sale._meta.get_field("agent")  # type: ignore[attr-defined]
-                agent_required = (getattr(f, "null", True) is False)
+                agent_required = getattr(f, "null", True) is False
             except Exception:
                 pass
 
@@ -384,9 +386,7 @@ class Command(BaseCommand):
                         kwargs[field] = price
                 if _model_has_field(Sale, "commission_pct"):
                     kwargs["commission_pct"] = (
-                        getattr(it, "commission", None)
-                        or getattr(it, "commission_pct", None)
-                        or Decimal("0.00")
+                        getattr(it, "commission", None) or getattr(it, "commission_pct", None) or Decimal("0.00")
                     )
                 if _model_has_field(Sale, "imei") and getattr(it, "imei", None):
                     kwargs["imei"] = getattr(it, "imei")

@@ -6,9 +6,6 @@
 
 {% block extra_css %}
 <style>
-  /* DEBUG PROOF: title will be pink if THIS template is loaded */
-  h1, h2, .page-title { color: #ff6ad5 !important; }
-
   /* Keep only the sidebar dark (assumes your base gives it this class/id) */
   aside, .sidebar, #sidebar { background: var(--panel) !important; }
 
@@ -32,7 +29,7 @@
 {% block content %}
   <div class="cc-card">
     <h2 class="mb-1">
-      Customer · <span class="pill" style="background: {{ color_for|default_if_none:''|default:'' }}{{ color_for(cust_name) if color_for }}">{% if color_for %}{{ cust_name }}{% else %}{{ cust_name }}{% endif %}</span>
+      Customer · <span class="pill" style="background: {{ cust_name|color_for }}">{{ cust_name }}</span>
     </h2>
     <div class="meta">Phone: {{ cust_phone }}</div>
   </div>

@@ -1,0 +1,362 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Edit Phone · {{ item.imei }} · {{ business.name }}{% endblock %}
+
+{% block extra_head %}
+<style>
+    .edit-form-card {
+        background: white;
+        border-radius: 1rem;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+        padding: 2rem;
+    }
+    
+    .field-group {
+        margin-bottom: 1.5rem;
+    }
+    .field-group label {
+        font-weight: 600;
+        color: var(--bs-gray-700);
+        margin-bottom: 0.5rem;
+    }
+    .field-group .current-value {
+        font-size: 0.85rem;
+        color: var(--bs-gray-500);
+        margin-top: 0.25rem;
+    }
+    
+    .item-summary {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 1rem;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+    }
+    .item-summary h5 {
+        margin: 0 0 0.5rem 0;
+    }
+    .item-summary .meta {
+        font-size: 0.9rem;
+        opacity: 0.9;
+    }
+    
+    .sold-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+        padding: 0.25rem 0.75rem;
+        border-radius: 1rem;
+        background: rgba(255,255,255,0.2);
+        font-size: 0.8rem;
+    }
+    
+    .danger-zone {
+        background: #fef2f2;
+        border: 1px solid #fecaca;
+        border-radius: 0.75rem;
+        padding: 1rem;
+        margin-top: 2rem;
+    }
+    .danger-zone h6 {
+        color: #dc2626;
+        margin-bottom: 0.5rem;
+    }
+    
+    .history-timeline {
+        border-left: 2px solid var(--bs-gray-300);
+        padding-left: 1rem;
+        margin-left: 0.5rem;
+    }
+    .history-item {
+        position: relative;
+        padding-bottom: 1rem;
+    }
+    .history-item::before {
+        content: '';
+        position: absolute;
+        left: -1.35rem;
+        top: 0.25rem;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: var(--bs-primary);
+    }
+    .history-item .time {
+        font-size: 0.75rem;
+        color: var(--bs-gray-500);
+    }
+    .history-item .changes {
+        font-size: 0.85rem;
+        background: var(--bs-gray-100);
+        padding: 0.5rem;
+        border-radius: 0.5rem;
+        margin-top: 0.25rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row">
+        <div class="col-lg-8">
+            <!-- Item Summary -->
+            <div class="item-summary">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <h5>{{ item.product }}</h5>
+                        <div class="meta">
+                            IMEI: <strong>{{ item.imei|default:"N/A" }}</strong>
+                        </div>
+                    </div>
+                    {% if is_sold %}
+                    <span class="sold-badge">
+                        <i class="bi bi-check-circle"></i> SOLD
+                    </span>
+                    {% else %}
+                    <span class="sold-badge">
+                        <i class="bi bi-box"></i> IN STOCK
+                    </span>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- Edit Form -->
+            <div class="edit-form-card">
+                <h5 class="mb-4">
+                    <i class="bi bi-pencil-square"></i> Correction Form
+                </h5>
+                
+                <form method="post" action="{% url 'verticals:phones_data_correction_phone_edit' item.id %}">
+                    {% csrf_token %}
+                    
+                    <!-- Reason (Required) -->
+                    <div class="field-group">
+                        <label for="reason">
+                            Reason for Correction <span class="text-danger">*</span>
+                        </label>
+                        <textarea class="form-control" 
+                                  id="reason" 
+                                  name="reason" 
+                                  rows="2" 
+                                  required
+                                  placeholder="Explain why this correction is needed..."></textarea>
+                        <div class="form-text text-muted">
+                            <i class="bi bi-info-circle"></i> 
+                            This reason will be logged for audit purposes.
+                        </div>
+                    </div>
+                    
+                    <hr class="my-4">
+                    
+                    <!-- Selling Price -->
+                    <div class="field-group">
+                        <label for="selling_price">Selling Price (MK)</label>
+                        <input type="number" 
+                               class="form-control" 
+                               id="selling_price" 
+                               name="selling_price"
+                               value="{{ item.selling_price|default:'' }}"
+                               min="0"
+                               step="0.01"
+                               placeholder="Enter new selling price">
+                        <div class="current-value">
+                            Current: MK {{ item.selling_price|floatformat:0|default:"Not set" }}
+                        </div>
+                    </div>
+                    
+                    <!-- Order/Cost Price -->
+                    <div class="field-group">
+                        <label for="order_price">Cost/Order Price (MK)</label>
+                        <input type="number" 
+                               class="form-control" 
+                               id="order_price" 
+                               name="order_price"
+                               value="{{ item.order_price|default:'' }}"
+                               min="0"
+                               step="0.01"
+                               placeholder="Enter new cost price">
+                        <div class="current-value">
+                            Current: MK {{ item.order_price|floatformat:0|default:"Not set" }}
+                        </div>
+                    </div>
+                    
+                    <!-- IMEI -->
+                    <div class="field-group">
+                        <label for="imei">IMEI</label>
+                        <input type="text" 
+                               class="form-control" 
+                               id="imei" 
+                               name="imei"
+                               value="{{ item.imei|default:'' }}"
+                               maxlength="15"
+                               pattern="\d{15}"
+                               placeholder="15-digit IMEI">
+                        <div class="current-value">
+                            Current: {{ item.imei|default:"Not set" }}
+                        </div>
+                        <div class="form-text text-warning">
+                            <i class="bi bi-exclamation-triangle"></i>
+                            Changing IMEI must be unique across all businesses.
+                        </div>
+                    </div>
+                    
+                    <!-- Payment Method -->
+                    <div class="field-group">
+                        <label for="payment_method">Payment Method</label>
+                        <select class="form-select" id="payment_method" name="payment_method">
+                            <option value="">— Keep current —</option>
+                            {% for code, label in payment_methods %}
+                            <option value="{{ code }}" {% if item.payment_method == code %}selected{% endif %}>
+                                {{ label }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <div class="current-value">
+                            Current: {{ item.get_payment_method_display|default:"CASH" }}
+                        </div>
+                    </div>
+                    
+                    <hr class="my-4">
+                    
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-lg"></i> Apply Correction
+                        </button>
+                        <a href="{% url 'verticals:phones_data_correction' %}" class="btn btn-outline-secondary">
+                            Cancel
+                        </a>
+                    </div>
+                </form>
+                
+                <!-- Danger Zone -->
+                <div class="danger-zone">
+                    <h6><i class="bi bi-exclamation-triangle-fill"></i> Danger Zone</h6>
+                    <p class="small mb-2">
+                        Voiding this record will remove it from all reports and calculations.
+                    </p>
+                    <button type="button" 
+                            class="btn btn-sm btn-outline-danger"
+                            data-bs-toggle="modal" 
+                            data-bs-target="#voidModal">
+                        <i class="bi bi-trash"></i> Void This Record
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Correction History -->
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0">
+                        <i class="bi bi-clock-history"></i> Correction History
+                    </h6>
+                </div>
+                <div class="card-body">
+                    {% if correction_history %}
+                    <div class="history-timeline">
+                        {% for log in correction_history %}
+                        <div class="history-item">
+                            <div>
+                                <strong>{{ log.get_correction_type_display }}</strong>
+                                <span class="time">{{ log.corrected_at|date:"M d, Y H:i" }}</span>
+                            </div>
+                            <div class="text-muted small">
+                                by {{ log.corrected_by.get_full_name|default:log.corrected_by.username }}
+                            </div>
+                            <div class="changes">
+                                <div class="small text-muted mb-1">{{ log.reason|truncatewords:15 }}</div>
+                                {{ log.changes_summary }}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <p class="text-muted small mb-0">
+                        No corrections have been made to this item yet.
+                    </p>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- Item Details -->
+            <div class="card mt-3">
+                <div class="card-header">
+                    <h6 class="mb-0">
+                        <i class="bi bi-info-circle"></i> Item Details
+                    </h6>
+                </div>
+                <div class="card-body small">
+                    <div class="mb-2">
+                        <span class="text-muted">Product:</span><br>
+                        {{ item.product }}
+                    </div>
+                    <div class="mb-2">
+                        <span class="text-muted">Location:</span><br>
+                        {{ item.current_location|default:"N/A" }}
+                    </div>
+                    <div class="mb-2">
+                        <span class="text-muted">Received:</span><br>
+                        {{ item.received_at|date:"M d, Y" }}
+                    </div>
+                    {% if item.sold_at %}
+                    <div class="mb-2">
+                        <span class="text-muted">Sold:</span><br>
+                        {{ item.sold_at|date:"M d, Y H:i" }}
+                    </div>
+                    {% endif %}
+                    {% if item.sold_by %}
+                    <div class="mb-2">
+                        <span class="text-muted">Sold by:</span><br>
+                        {{ item.sold_by.get_full_name|default:item.sold_by.username }}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Void Confirmation Modal -->
+<div class="modal fade" id="voidModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="post" action="{% url 'verticals:phones_data_correction_phone_void' item.id %}">
+                {% csrf_token %}
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title">
+                        <i class="bi bi-exclamation-triangle"></i> Void Record
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-warning">
+                        <strong>Warning:</strong> Voiding this record will remove it from all reports and dashboards.
+                        This action is logged and cannot be easily undone.
+                    </div>
+                    
+                    <p>You are about to void: <strong>{{ item.product }} ({{ item.imei }})</strong></p>
+                    
+                    <div class="mb-3">
+                        <label for="voidReason" class="form-label">Reason for voiding <span class="text-danger">*</span></label>
+                        <textarea class="form-control" 
+                                  id="voidReason" 
+                                  name="reason" 
+                                  rows="3" 
+                                  required
+                                  placeholder="Enter the reason for voiding this record..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-danger">
+                        <i class="bi bi-trash"></i> Void Record
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+

@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Sale Receipt - {{ business_name }}</title>
+</head>
+<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+    <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+        <h1 style="color: #16a34a;">✅ Sale Completed</h1>
+        <p>A sale was recorded for <strong>{{ business_name }}</strong>:</p>
+        <ul>
+            <li><strong>Sale ID:</strong> #{{ sale_id }}</li>
+            <li><strong>Total:</strong> MK {{ total|floatformat:2 }}</li>
+            <li><strong>Date:</strong> {{ date|date:"Y-m-d H:i" }}</li>
+        </ul>
+        <p><a href="https://emajinet.africa/sales/" style="color: #16a34a;">View Sales</a></p>
+        <hr style="border: none; border-top: 1px solid #ddd; margin: 20px 0;">
+        <p style="font-size: 0.875rem; color: #666;">Thank you for using Emajinet!</p>
+    </div>
+</body>
+</html>
+

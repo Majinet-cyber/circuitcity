@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}System Sizing – {{ business.name }}{% endblock %}
+
+{% block content %}
+<style>
+  .sizing-card{background:#fff;border-radius:16px;padding:1.2rem;border:1.5px solid #e2e8f0;transition:all .15s;text-decoration:none;color:inherit;display:block;}
+  .sizing-card:hover{border-color:#10b981;box-shadow:0 8px 24px rgba(0,0,0,.07);}
+  .sizing-status{font-size:.7rem;font-weight:700;padding:.2rem .6rem;border-radius:99px;text-transform:uppercase;letter-spacing:.04em;}
+  .st-draft{background:#fef3c7;color:#92400e;}
+  .st-final{background:#d1fae5;color:#065f46;}
+  .st-archived{background:#f1f5f9;color:#64748b;}
+  .section-head{font-size:.85rem;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.04em;margin-bottom:.75rem;}
+  .kpi-card{background:#fff;border-radius:16px;padding:1.2rem;border:1.5px solid #e2e8f0;}
+  .kpi-val{font-size:1.6rem;font-weight:800;color:#0f172a;}
+  .kpi-label{font-size:.72rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-top:.2rem;}
+</style>
+
+<div class="container-fluid py-4">
+  <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
+    <div>
+      <h4 class="fw-bold mb-0"><i class="bi bi-calculator me-2" style="color:#10b981;"></i>System Sizing</h4>
+      <div class="text-muted small">Design and size renewable energy systems — {{ business.name }}</div>
+    </div>
+    <div class="d-flex gap-2">
+      <a href="{% url 'verticals:energy_dashboard' %}" class="btn btn-outline-secondary btn-sm rounded-pill">
+        <i class="bi bi-arrow-left me-1"></i>Dashboard
+      </a>
+      <a href="{% url 'verticals:energy_sizing_create' %}" class="btn btn-success btn-sm rounded-pill">
+        <i class="bi bi-plus-lg me-1"></i>New Sizing
+      </a>
+    </div>
+  </div>
+
+  {% if messages %}{% for m in messages %}<div class="alert alert-{{ m.tags|default:'info' }} rounded-3 mb-3">{{ m }}</div>{% endfor %}{% endif %}
+
+  {# KPIs #}
+  <div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+      <div class="kpi-card text-center">
+        <div class="kpi-val">{{ runs|length }}</div>
+        <div class="kpi-label">Total Proposals</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="kpi-card text-center">
+        <div class="kpi-val" style="color:#10b981;">{% for r in runs %}{% if r.status == "final" %}{% with counter=counter|default:0|add:1 %}{% endwith %}{% endif %}{% endfor %}{{ counter|default:0 }}</div>
+        <div class="kpi-label">Finalized</div>
+      </div>
+    </div>
+  </div>
+
+  {# Filters #}
+  <div class="mb-3 d-flex gap-2">
+    <a href="{% url 'verticals:energy_sizing_list' %}" class="btn btn-sm {% if not status_filter %}btn-dark{% else %}btn-outline-secondary{% endif %} rounded-pill">All</a>
+    <a href="?status=draft" class="btn btn-sm {% if status_filter == 'draft' %}btn-dark{% else %}btn-outline-secondary{% endif %} rounded-pill">Drafts</a>
+    <a href="?status=final" class="btn btn-sm {% if status_filter == 'final' %}btn-dark{% else %}btn-outline-secondary{% endif %} rounded-pill">Final</a>
+  </div>
+
+  {# Sizing Runs List #}
+  {% if runs %}
+    <div class="row g-3">
+      {% for run in runs %}
+        <div class="col-12 col-md-6 col-lg-4">
+          <a href="{% url 'verticals:energy_sizing_detail' run.id %}" class="sizing-card">
+            <div class="d-flex align-items-start justify-content-between mb-2">
+              <div style="flex:1;min-width:0;">
+                <div class="fw-bold text-truncate" style="font-size:.95rem;color:#0f172a;">{{ run.title }}</div>
+                <div class="text-muted" style="font-size:.75rem;">v{{ run.version }} · {{ run.created_at|date:"M j, Y" }}</div>
+              </div>
+              <span class="sizing-status st-{{ run.status }}">{{ run.status }}</span>
+            </div>
+            {% if run.customer_name %}<div style="font-size:.8rem;color:#64748b;"><i class="bi bi-person me-1"></i>{{ run.customer_name }}</div>{% endif %}
+            {% if run.site %}<div style="font-size:.8rem;color:#64748b;"><i class="bi bi-geo-alt me-1"></i>{{ run.site.name }}</div>{% endif %}
+            <div class="d-flex gap-3 mt-2 pt-2 border-top" style="font-size:.78rem;">
+              {% if run.recommended_array_kw %}<span style="color:#059669;"><strong>{{ run.recommended_array_kw }} kW</strong> array</span>{% endif %}
+              {% if run.recommended_battery_kwh %}<span style="color:#6366f1;"><strong>{{ run.recommended_battery_kwh }} kWh</strong> battery</span>{% endif %}
+              {% if run.estimated_capex %}<span style="color:#0f172a;"><strong>{{ business.currency }} {{ run.estimated_capex|floatformat:0 }}</strong></span>{% endif %}
+            </div>
+          </a>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="text-center py-5">
+      <div style="font-size:4rem;opacity:.15;">🔧</div>
+      <h5 class="text-muted mt-2">No sizing runs yet</h5>
+      <p class="text-muted small">Create your first system sizing proposal to design an energy system.</p>
+      <a href="{% url 'verticals:energy_sizing_create' %}" class="btn btn-success rounded-pill mt-2">
+        <i class="bi bi-plus-lg me-1"></i>Create Sizing
+      </a>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,291 @@
+/*
+ * SSOT Design Tokens CSS
+ * Consistent buttons, colors, and typography across all verticals
+ * Primary source of truth for UI components
+ */
+
+/* ============================================================================
+   COLOR TOKENS
+   ============================================================================ */
+:root {
+  /* Primary Orange - Emajinet brand color */
+  --cc-primary: #ff6a1a;
+  --cc-primary-hover: #f25c05;
+  --cc-primary-active: #d94f04;
+  --cc-primary-focus: rgba(255, 106, 26, 0.25);
+  
+  /* Secondary colors */
+  --cc-secondary: #6b7280;
+  --cc-secondary-hover: #4b5563;
+  
+  /* Success, Warning, Danger */
+  --cc-success: #10b981;
+  --cc-success-hover: #059669;
+  --cc-warning: #f59e0b;
+  --cc-warning-hover: #d97706;
+  --cc-danger: #ef4444;
+  --cc-danger-hover: #dc2626;
+  
+  /* Neutral grays */
+  --cc-gray-50: #f9fafb;
+  --cc-gray-100: #f3f4f6;
+  --cc-gray-200: #e5e7eb;
+  --cc-gray-300: #d1d5db;
+  --cc-gray-400: #9ca3af;
+  --cc-gray-500: #6b7280;
+  --cc-gray-600: #4b5563;
+  --cc-gray-700: #374151;
+  --cc-gray-800: #1f2937;
+  --cc-gray-900: #111827;
+  
+  /* Typography */
+  --cc-font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --cc-font-size-base: 1rem;
+  --cc-font-size-sm: 0.875rem;
+  --cc-font-size-lg: 1.125rem;
+  --cc-font-weight-normal: 400;
+  --cc-font-weight-medium: 500;
+  --cc-font-weight-semibold: 600;
+  --cc-font-weight-bold: 700;
+  
+  /* Spacing */
+  --cc-spacing-xs: 0.25rem;
+  --cc-spacing-sm: 0.5rem;
+  --cc-spacing-md: 1rem;
+  --cc-spacing-lg: 1.5rem;
+  --cc-spacing-xl: 2rem;
+  
+  /* Border radius */
+  --cc-radius-sm: 0.25rem;
+  --cc-radius-md: 0.375rem;
+  --cc-radius-lg: 0.5rem;
+  --cc-radius-xl: 0.75rem;
+  
+  /* Shadows */
+  --cc-shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --cc-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --cc-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  
+  /* Transitions */
+  --cc-transition: all 0.15s ease-in-out;
+}
+
+/* ============================================================================
+   BUTTON COMPONENTS - SSOT
+   ============================================================================ */
+
+/* Base button styles */
+.btn-cc-base {
+  font-family: var(--cc-font-family);
+  font-size: var(--cc-font-size-base);
+  font-weight: var(--cc-font-weight-medium);
+  line-height: 1.5;
+  padding: 0.625rem 1.25rem;
+  border-radius: var(--cc-radius-md);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: var(--cc-transition);
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.btn-cc-base:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Primary Button - SSOT for all primary actions */
+.btn-cc-primary {
+  composes: btn-cc-base;
+  background-color: var(--cc-primary);
+  color: #ffffff;
+  border-color: var(--cc-primary);
+  box-shadow: var(--cc-shadow-sm);
+}
+
+.btn-cc-primary:hover:not(:disabled) {
+  background-color: var(--cc-primary-hover);
+  border-color: var(--cc-primary-hover);
+  box-shadow: var(--cc-shadow-md);
+  /* CRITICAL: Hover must NOT change to a different blue - just darken slightly */
+}
+
+.btn-cc-primary:active:not(:disabled) {
+  background-color: var(--cc-primary-active);
+  border-color: var(--cc-primary-active);
+  box-shadow: var(--cc-shadow-sm);
+}
+
+.btn-cc-primary:focus:not(:disabled) {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--cc-primary-focus);
+}
+
+/* Override Bootstrap .btn-primary to use SSOT styles */
+.btn-primary {
+  background-color: var(--cc-primary) !important;
+  border-color: var(--cc-primary) !important;
+  color: #ffffff !important;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background-color: var(--cc-primary-hover) !important;
+  border-color: var(--cc-primary-hover) !important;
+}
+
+.btn-primary:active:not(:disabled),
+.btn-primary:focus:not(:disabled) {
+  background-color: var(--cc-primary-active) !important;
+  border-color: var(--cc-primary-active) !important;
+  box-shadow: 0 0 0 3px var(--cc-primary-focus) !important;
+}
+
+/* Secondary Button */
+.btn-cc-secondary {
+  composes: btn-cc-base;
+  background-color: var(--cc-secondary);
+  color: #ffffff;
+  border-color: var(--cc-secondary);
+}
+
+.btn-cc-secondary:hover:not(:disabled) {
+  background-color: var(--cc-secondary-hover);
+  border-color: var(--cc-secondary-hover);
+}
+
+/* Outline Button Variant */
+.btn-cc-outline {
+  composes: btn-cc-base;
+  background-color: transparent;
+  color: var(--cc-primary);
+  border-color: var(--cc-primary);
+}
+
+.btn-cc-outline:hover:not(:disabled) {
+  background-color: var(--cc-primary);
+  color: #ffffff;
+}
+
+/* Success Button */
+.btn-cc-success {
+  composes: btn-cc-base;
+  background-color: var(--cc-success);
+  color: #ffffff;
+  border-color: var(--cc-success);
+}
+
+.btn-cc-success:hover:not(:disabled) {
+  background-color: var(--cc-success-hover);
+  border-color: var(--cc-success-hover);
+}
+
+/* Danger Button */
+.btn-cc-danger {
+  composes: btn-cc-base;
+  background-color: var(--cc-danger);
+  color: #ffffff;
+  border-color: var(--cc-danger);
+}
+
+.btn-cc-danger:hover:not(:disabled) {
+  background-color: var(--cc-danger-hover);
+  border-color: var(--cc-danger-hover);
+}
+
+/* Button Sizes */
+.btn-cc-sm {
+  padding: 0.5rem 1rem;
+  font-size: var(--cc-font-size-sm);
+}
+
+.btn-cc-lg {
+  padding: 0.75rem 1.5rem;
+  font-size: var(--cc-font-size-lg);
+}
+
+/* ============================================================================
+   TYPOGRAPHY - SSOT
+   ============================================================================ */
+
+body {
+  font-family: var(--cc-font-family);
+  font-size: var(--cc-font-size-base);
+  font-weight: var(--cc-font-weight-normal);
+  color: var(--cc-gray-900);
+  line-height: 1.5;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-weight: var(--cc-font-weight-bold);
+  color: var(--cc-gray-900);
+  line-height: 1.2;
+  margin-bottom: 0.5rem;
+}
+
+.text-cc-primary { color: var(--cc-primary); }
+.text-cc-secondary { color: var(--cc-secondary); }
+.text-cc-success { color: var(--cc-success); }
+.text-cc-danger { color: var(--cc-danger); }
+.text-cc-muted { color: var(--cc-gray-500); }
+
+/* ============================================================================
+   UTILITY CLASSES
+   ============================================================================ */
+
+.bg-cc-white { background-color: #ffffff; }
+.bg-cc-gray-50 { background-color: var(--cc-gray-50); }
+.bg-cc-gray-100 { background-color: var(--cc-gray-100); }
+
+.border-cc { border: 1px solid var(--cc-gray-200); }
+.rounded-cc { border-radius: var(--cc-radius-md); }
+.rounded-cc-lg { border-radius: var(--cc-radius-lg); }
+
+.shadow-cc-sm { box-shadow: var(--cc-shadow-sm); }
+.shadow-cc-md { box-shadow: var(--cc-shadow-md); }
+.shadow-cc-lg { box-shadow: var(--cc-shadow-lg); }
+
+/* ============================================================================
+   CARD COMPONENTS
+   ============================================================================ */
+
+.card-cc {
+  background-color: #ffffff;
+  border: 1px solid var(--cc-gray-200);
+  border-radius: var(--cc-radius-lg);
+  box-shadow: var(--cc-shadow-sm);
+  padding: var(--cc-spacing-lg);
+}
+
+/* ============================================================================
+   FORM COMPONENTS
+   ============================================================================ */
+
+.form-control-cc,
+.form-select-cc {
+  font-family: var(--cc-font-family);
+  font-size: var(--cc-font-size-base);
+  padding: 0.625rem 0.875rem;
+  border: 1px solid var(--cc-gray-300);
+  border-radius: var(--cc-radius-md);
+  background-color: #ffffff;
+  transition: var(--cc-transition);
+}
+
+.form-control-cc:focus,
+.form-select-cc:focus {
+  border-color: var(--cc-primary);
+  outline: none;
+  box-shadow: 0 0 0 3px var(--cc-primary-focus);
+}
+
+.form-label-cc {
+  font-weight: var(--cc-font-weight-semibold);
+  color: var(--cc-gray-700);
+  margin-bottom: 0.5rem;
+  display: inline-block;
+}
+

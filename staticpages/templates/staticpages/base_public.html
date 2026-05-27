@@ -1,0 +1,53 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  {# SEO: Page title #}
+  <title>{% block title %}Emajinet – Business Management SaaS for African Businesses{% endblock %}</title>
+  
+  {# SEO: Meta description #}
+  <meta name="description" content="{% block meta_description %}Emajinet is a Malawian SaaS platform built for African businesses to manage inventory, track stock, and replace manual ledgers with AI-driven insights.{% endblock %}">
+  
+  {# SEO: Canonical URL (prevents duplicate content issues) #}
+  {# Build canonical URL from request path WITHOUT query string #}
+  {# This fixes "Duplicate without user-selected canonical" in Search Console #}
+  {% block canonical %}
+  <link rel="canonical" href="{{ request.scheme }}://{{ request.get_host }}{{ request.path }}">
+  {% endblock %}
+  
+  {# Theme and branding #}
+  <meta name="theme-color" content="#0b1220">
+  <link rel="icon" href="{% static 'favicon.ico' %}">
+  <link rel="manifest" href="{% static 'manifest.webmanifest' %}">
+  
+  {# Open Graph / Social Media #}
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="{{ request.scheme }}://{{ request.get_host }}{{ request.path }}">
+  <meta property="og:title" content="{% block og_title %}Emajinet – Business Management SaaS for African Businesses{% endblock %}">
+  <meta property="og:description" content="{% block og_description %}Emajinet is a Malawian SaaS platform built for African businesses to manage inventory, track stock, and replace manual ledgers with AI-driven insights.{% endblock %}">
+  <meta property="og:site_name" content="Emajinet">
+  
+  {# Twitter Card #}
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="{% block twitter_title %}Emajinet – Business Management SaaS for African Businesses{% endblock %}">
+  <meta name="twitter:description" content="{% block twitter_description %}Emajinet is a Malawian SaaS platform built for African businesses to manage inventory, track stock, and replace manual ledgers with AI-driven insights.{% endblock %}">
+  
+  {# Extra head content #}
+  {% block extra_head %}{% endblock %}
+  
+  {# Inline styles for public pages #}
+  {% block styles %}{% endblock %}
+</head>
+<body>
+  {# Page content #}
+  {% block content %}{% endblock %}
+  
+  {# Extra scripts #}
+  {% block scripts %}{% endblock %}
+<!-- build: {{ BUILD_SHA|default:"unknown" }} -->
+</body>
+</html>
+

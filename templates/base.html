@@ -1,23 +1,25 @@
 {% load static %}
 <!doctype html>
-<html lang="en" data-theme="blue">
+<html lang="en" data-theme="light">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
   <meta name="format-detection" content="telephone=no">
   <title>{% block title %}Emajinet{% endblock %}</title>
   <meta name="description" content="{% block meta_description %}A digital record and AI driven MBA manager for every ledger and common person{% endblock %}">
-  <meta name="color-scheme" content="light dark" />
-  <meta name="theme-color" content="#0b1220" />
+  <meta name="color-scheme" content="light" />
+  <meta name="theme-color" content="#ff6a1a" />
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Emajinet">
+
   <!-- Open Graph / Social Media -->
   <meta property="og:type" content="website">
   <meta property="og:title" content="{% block og_title %}Emajinet{% endblock %}">
   <meta property="og:description" content="{% block og_description %}A digital record and AI driven MBA manager for every ledger and common person{% endblock %}">
   <meta property="og:site_name" content="Emajinet">
-  
+
   <!-- Twitter Card -->
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="{% block twitter_title %}Emajinet{% endblock %}">
@@ -26,6 +28,14 @@
   {# Provide CSRF to JS in a reliable way #}
   <meta name="csrf-token" content="{{ csrf_token }}">
   {# If you ever customize the cookie name in settings, this still works thanks to the shim checking both names below #}
+
+  {# Currency configuration for JavaScript #}
+  <script>
+    window.CC_CURRENCY = {
+      code: "{{ DISPLAY_CURRENCY|default:'MWK' }}",
+      mwk_per_usd: {{ MWK_PER_USD|default:'null' }}
+    };
+  </script>
 
   {% with ASSET_V=BUILD_ID|default:STATIC_VERSION|default:"1" %}
 
@@ -37,16 +47,77 @@
 
   <script>
     (function () {
+      // PHASE 1: Enforce light theme globally (no dark mode for now)
+      document.documentElement.setAttribute("data-theme", "light");
       try {
-        const saved = localStorage.getItem("cc-theme");
-        if (saved) document.documentElement.setAttribute("data-theme", saved);
+        localStorage.setItem("cc-theme", "light");
       } catch (_) {}
+
+      // =====================================================================
+      // GLOBAL SERVICE WORKER + CACHE CLEANUP (all environments, all users)
+      // =====================================================================
+      // Root cause: previous SW versions cached static assets with a stale
+      // VERSION key (BUILD_ID_PLACEHOLDER was not always injected correctly),
+      // causing users to see distorted/stale layouts after deploys.
+      //
+      // Fix: unregister ALL service workers and clear ALL caches on every page
+      // load.  The active SW at /sw.js is now a no-op cleanup worker that
+      // intercepts nothing.  This script handles any user whose browser still
+      // has an old SW installed before the cleanup SW was deployed.
+      //
+      // This cleanup code runs every page load (async, non-blocking).
+      // It is safe to remove after 2–3 deploy cycles once all users have
+      // received the cleanup SW.
+      // =====================================================================
+      (function swCleanup() {
+        function log() {
+          try { console.log.apply(console, arguments); } catch (_) {}
+        }
+
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.getRegistrations()
+            .then(function (registrations) {
+              return Promise.all(
+                registrations.map(function (reg) {
+                  log('[SW cleanup] Unregistering SW:', reg.scope);
+                  return reg.unregister().catch(function (err) {
+                    log('[SW cleanup] Failed to unregister SW:', err);
+                  });
+                })
+              );
+            })
+            .catch(function (err) {
+              log('[SW cleanup] Error fetching SW registrations:', err);
+            });
+        }
+
+        if ('caches' in window) {
+          caches.keys()
+            .then(function (keys) {
+              return Promise.all(
+                keys.map(function (key) {
+                  log('[SW cleanup] Deleting cache:', key);
+                  return caches.delete(key).catch(function (err) {
+                    log('[SW cleanup] Failed to delete cache', key, err);
+                  });
+                })
+              );
+            })
+            .catch(function (err) {
+              log('[SW cleanup] Error listing caches:', err);
+            });
+        }
+      })();
+      // =====================================================================
+      // END SW CLEANUP
+      // =====================================================================
+
     })();
   </script>
 
   <!-- Bootstrap & Icons -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <link rel="stylesheet" href="{% static 'vendor/bootstrap-icons/bootstrap-icons.min.css' %}">
 
   <!-- Core styles (base → app → feature) -->
   <link rel="stylesheet" href="{% static 'css/tokens.css' %}?v={{ ASSET_V }}">
@@ -54,13 +125,33 @@
   <link rel="stylesheet" href="{% static 'css/app.css' %}?v={{ ASSET_V }}">
   <link rel="stylesheet" href="{% static 'css/inventory-glass.css' %}?v={{ ASSET_V }}">
   <link rel="stylesheet" href="{% static 'css/polish.css' %}?v={{ ASSET_V }}">
+  <link rel="stylesheet" href="{% static 'css/ui-polish.css' %}?v={{ ASSET_V }}">
+  <!-- Mobile-First UI System (NEW) -->
+  <link rel="stylesheet" href="{% static 'css/mobile-system.css' %}?v={{ ASSET_V }}">
   <link rel="stylesheet" href="{% static 'css/mobile.css' %}?v={{ ASSET_V }}">
   <link rel="stylesheet" href="{% static 'css/mobile-fixes.css' %}?v={{ ASSET_V }}">
   <link rel="stylesheet" href="{% static 'css/mobile-tables-responsive.css' %}?v={{ ASSET_V }}">
+  
+  <!-- UI/UX Standardization: Shared Mobile Card Utilities -->
+  <link rel="stylesheet" href="{% static 'cc/css/ui_cards.css' %}?v={{ ASSET_V }}">
+
+  <!-- GLOBAL MOBILE GUTTER SYSTEM — Match landing page near-edge feel (2025-12-21) -->
+  <link rel="stylesheet" href="{% static 'css/mobile-gutter-system.css' %}?v={{ ASSET_V }}">
+
   <link rel="stylesheet" href="{% static 'css/glassmorphic-enhancement.css' %}?v={{ ASSET_V }}">
+  <link rel="stylesheet" href="{% static 'css/sidebar-more-features.css' %}?v={{ ASSET_V }}">
+
+  <!-- PRODUCTION ENHANCEMENTS 2025-12-19 -->
+  <link rel="stylesheet" href="{% static 'css/numeric-display.css' %}?v={{ ASSET_V }}">
+  <link rel="stylesheet" href="{% static 'css/glassmorphic-design-system.css' %}?v={{ ASSET_V }}">
+  
+  <!-- VERTICAL-SPECIFIC POLISH 2026-01-19 (Liquor, Welding, Farm, Phones) -->
+  <link rel="stylesheet" href="{% static 'css/vertical-polish-2026.css' %}?v={{ ASSET_V }}">
 
   <!-- FINAL: versioned overrides must load LAST to win the cascade -->
   <link rel="stylesheet" href="{% static 'css/v2-overrides.2025-09-25.css' %}?v={{ ASSET_V }}">
+  <!-- Premium SaaS design system — loads last to win cascade -->
+  <link rel="stylesheet" href="{% static 'css/premium-saas.css' %}?v={{ ASSET_V }}">
   {% endwith %}
 
   <style>
@@ -72,7 +163,14 @@
       --bg:#f5f7fe; --ink:#0b1220; --muted:#475569;
       --line:#d9e2ef; --card:#ffffff;
 
-      --cc-accent: var(--cc-brand, #2563eb);
+      --cc-accent: var(--cc-brand, #ff6a1a);
+
+      /* Bootstrap 5 primary → Emajinet Orange */
+      --bs-primary: #ff6a1a;
+      --bs-primary-rgb: 255, 106, 26;
+      --bs-link-color: #ff6a1a;
+      --bs-link-hover-color: #f25c05;
+      --bs-btn-color: #fff;
 
       --font-sans: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, "Noto Sans";
 
@@ -84,20 +182,23 @@
       --elevate: cubic-bezier(.2,.8,.2,1);
       --fast: 140ms;
 
-      /* Midnight Glass Sidebar */
-      --mid-bg:#0f172a;
-      --mid-ink:#cbd5e1;
-      --mid-ink-dim:#94a3b8;
-      --mid-sep: rgba(148,163,184,.15);
-      --mid-active: rgba(255,255,255,.08);
-      --mid-hover: rgba(255,255,255,.06);
+      /* Light Glass Sidebar (consistent with app) */
+      --mid-bg:#ffffff;
+      --mid-ink:#0f172a;
+      --mid-ink-dim:#64748b;
+      --mid-sep: rgba(148,163,184,.20);
+      --mid-active: rgba(255,106,26,.12);
+      --mid-hover: rgba(255,106,26,.06);
 
       /* Mobile dock */
       --safe-bottom: max(env(safe-area-inset-bottom), 0px);
       --dock-h: 64px;
 
-      /* Mobile drawer width: true one-third, with sane limits (NO !important here) */
-      --nav-drawer-w: clamp(180px, 33.33vw, 360px);
+      /* Mobile drawer width: FULL open per Dec 25 behavior */
+      --nav-drawer-w: 260px;
+
+      /* VISUAL PROOF: Sidebar width reduction active */
+      --proof-sidebar-reduced: true;
     }
 
     @media (prefers-reduced-motion: reduce){
@@ -122,27 +223,27 @@
     /* ===== Sidebar ===== */
     .cc-sidebar{
       position:sticky; top:0; width:var(--sidebar-w); flex:0 0 var(--sidebar-w);
-      height:100dvh; overflow:auto; z-index:2000; padding:16px;
+      height:100dvh; overflow:auto; z-index:1030; padding:16px;
       display:flex; flex-direction:column; gap:14px;
-      color: var(--mid-ink); color-scheme: dark;
+      color: var(--mid-ink); color-scheme: light;
       background:
-        radial-gradient(1200px 800px at -10% -10%, rgba(34,211,238,.08), transparent 40%),
-        radial-gradient(1000px 600px at 110% 110%, rgba(16,185,129,.06), transparent 45%),
+        radial-gradient(1200px 800px at -10% -10%, rgba(255,106,26,.04), transparent 40%),
+        radial-gradient(1000px 600px at 110% 110%, rgba(242,92,5,.03), transparent 45%),
         var(--mid-bg);
       border-right: 1px solid var(--mid-sep);
       -webkit-backdrop-filter: blur(14px) saturate(120%);
       backdrop-filter: blur(14px) saturate(120%);
-      box-shadow: inset 0 1px 0 rgba(255,255,255,.04);
+      box-shadow: 0 4px 16px rgba(15,23,42,.06), inset 0 1px 0 rgba(255,255,255,.6);
     }
     .navlist{ list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:8px; }
     .navlink{
       display:flex; align-items:center; gap:.6rem;
-      padding:.58rem .72rem; border-radius:12px; font-weight:700; min-height:44px;
+      padding:.58rem .72rem; border-radius:12px; font-weight:600; min-height:44px;
       color: var(--mid-ink); background: transparent; border:1px solid transparent;
       transition:transform var(--fast) var(--elevate), box-shadow var(--fast) var(--elevate), background var(--fast) var(--elevate), border-color var(--fast) var(--elevate);
     }
-    .navlink:hover{ background: var(--mid-hover); border-color: rgba(34,211,238,.28); }
-    .navlink.active{ background: var(--mid-active); border-color: rgba(34,211,238,.35); color:#eaf2ff; }
+    .navlink:hover{ background: var(--mid-hover); border-color: rgba(255,106,26,.20); }
+    .navlink.active{ background: var(--mid-active); border-color: rgba(255,106,26,.30); color:#d94f04; font-weight:700; }
 
     .cc-main{ flex:1 1 auto; min-width:0; position:relative; z-index:0; background:var(--bg); color:var(--ink); }
     .cc-page{ max-width:1200px; margin:0 auto; padding:18px; }
@@ -160,6 +261,7 @@
     .msg-danger  { background: #fef2f2; border-color:#fecaca; color:#991b1b; }
 
     /* Mobile drawer behavior */
+    /* 🔍 VISUAL PROOF: Mobile sidebar CSS loaded */
     @media (max-width: 992px){
       .cc-sidebar{
         position:fixed; left:0; top:0; height:100dvh;
@@ -167,21 +269,42 @@
         transition: transform .26s var(--elevate);
         box-shadow: 0 20px 60px rgba(0,0,0,.35);
 
-        /* NEW: true one-third width with bounds */
-        width: var(--nav-drawer-w) !important;
-        max-width: 100vw !important;
+        /* CRITICAL: Sidebar MUST be above backdrop to receive clicks */
+        z-index: 2000 !important;
+        pointer-events: auto !important;
 
-        /* Solid black, no transparency on mobile */
-        background: #0f1115 !important;
-        border-right: 1px solid #1f2937 !important;
+        /* FULL width per Dec 25 behavior */
+        width: var(--nav-drawer-w) !important;
+
+        /* Keep dark sidebar theme on mobile (matches sidebar.html styling) */
+        background: linear-gradient(180deg, #0f172a 0%, #0b1324 100%) !important;
+        border-right: 1px solid rgba(255,255,255,.06) !important;
         -webkit-backdrop-filter: none !important;
         backdrop-filter: none !important;
+
+        /* Ensure it's scrollable if content overflows */
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
       }
       body[data-drawer="open"] .cc-sidebar{ transform:translateX(0) !important; }
-      .cc-backdrop{ position:fixed; inset:0; background:rgba(2,6,23,.42); backdrop-filter:blur(2px); display:none; z-index:1990; }
-      .cc-backdrop.show{ display:block; }
+
+      /* Transparent overlay (no dim, no blur) - Dec 25 behavior */
+      /* CRITICAL: Backdrop MUST be below sidebar (z-index: 1990 < 2000) */
+      .cc-backdrop{
+        position:fixed;
+        inset:0;
+        background:transparent !important;
+        backdrop-filter:none !important;
+        -webkit-backdrop-filter:none !important;
+        display:none;
+        z-index:1990 !important;
+        pointer-events: none;
+        cursor: pointer;
+      }
+      .cc-backdrop.show{ display:block; pointer-events: auto; }
+
       .mobile-toggle{
-        position:fixed; top:12px; left:12px; z-index:2010;
+        position:fixed; top:12px; left:12px; z-index:2010 !important;
         border:0; border-radius:12px; width:42px; height:42px;
         display:grid; place-items:center; background:var(--cc-accent); color:#fff;
         box-shadow:0 10px 22px rgba(59,130,246,.35);
@@ -209,9 +332,37 @@
       backdrop-filter: blur(10px);
       background:color-mix(in oklab, var(--card) 90%, transparent);
       border-top:1px solid var(--line);
+      box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.08);
     }
-    .mobile-tabbar .tab{ flex:1; text-align:center; padding:8px 4px 6px; font-size:12px; color:var(--muted); min-height:44px; display:flex; flex-direction:column; align-items:center; gap:2px; }
-    .mobile-tabbar .tab.active{ color:var(--cc-accent); font-weight:800; }
+    .mobile-tabbar .tab{
+      flex:1;
+      text-align:center;
+      padding:8px 4px 6px;
+      font-size:11px;
+      color:var(--muted);
+      min-height:56px;
+      min-width:56px;
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      justify-content:center;
+      gap:3px;
+      text-decoration:none;
+      transition: all 0.2s ease;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .mobile-tabbar .tab i{
+      font-size:20px;
+      display:block;
+    }
+    .mobile-tabbar .tab.active{
+      color:var(--cc-accent);
+      font-weight:700;
+    }
+    .mobile-tabbar .tab:active{
+      transform: scale(0.95);
+      opacity: 0.7;
+    }
     @media (min-width: 768px){ .mobile-tabbar{ display:none; } }
 
     main.cc-page, .cc-page, .content, .page, .container{
@@ -220,13 +371,19 @@
 
     /* Compact mobile spacing */
     @media (max-width: 480px){
-      .cc-page, .container, .container-fluid, main.cc-page{padding:12px !important}
+      .cc-page, .container, .container-fluid, main.cc-page{padding:12px !important; padding-bottom: calc(var(--dock-h) + var(--safe-bottom) + 20px) !important}
       .glass-card, .card{padding:12px !important; margin:10px 0 !important; border-radius:16px}
       .section, .block, .panel{margin:10px 0 !important}
       h1,h2{margin:.35rem 0 .25rem}
       .form-group{margin:.5rem 0}
       .card > .card-body{padding:12px !important}
       .dashboard-grid,.grid,.grid-2{display:grid!important;grid-template-columns:1fr!important;gap:12px!important}
+
+      /* Ensure no content is hidden under bottom nav */
+      body.has-bottomnav main,
+      body.has-bottomnav .page {
+        padding-bottom: calc(var(--dock-h) + var(--safe-bottom) + 24px) !important;
+      }
     }
 
     /* Right→Left utility for Scan/Sold buttons (mobile) */
@@ -259,12 +416,244 @@
     .topbar-user .presence-dot{
       position:absolute; right:-2px; bottom:-2px;
       width:10px; height:10px; border-radius:999px;
-      background:#10b981; box-shadow:0 0 0 2px #fff;
+      background:#10b981; box-shadow:0 0 0 2px #fff; /* green = user online — semantic */
     }
     .topbar-user .presence-dot.offline{ background:#9ca3af; }
     .tenant-dot.offline{
       background:#9ca3af !important;
       box-shadow:0 0 0 3px rgba(156,163,175,.18) inset !important;
+    }
+
+    /* ========= Tenant Pill & Notification Button ========= */
+    .tenant-pill{
+      display:inline-flex; align-items:center; gap:.5rem;
+      padding:.5rem .75rem; border-radius:999px;
+      background:rgba(255,255,255,.98); border:1px solid var(--line);
+      font-weight:700; color:var(--ink); text-decoration:none;
+      box-shadow:0 4px 12px rgba(0,0,0,.06);
+      transition:transform .12s ease, box-shadow .12s ease;
+    }
+    .tenant-pill:hover{ transform:translateY(-1px); box-shadow:0 8px 18px rgba(0,0,0,.10); }
+    .tenant-dot{
+      width:10px; height:10px; border-radius:999px;
+      background:#ff6a1a; box-shadow:0 0 0 2px rgba(255,106,26,.25);
+    }
+    .tenant-name{ font-size:14px; }
+    .tenant-role{ font-size:12px; opacity:.75; }
+    .tenant-caret{ opacity:.6; }
+
+    .tenant-menu{
+      position:absolute; right:0; top:calc(100% + 8px);
+      min-width:220px; background:#fff; border:1px solid var(--line);
+      border-radius:12px; box-shadow:0 14px 40px rgba(0,0,0,.12);
+      display:none; z-index:1020; overflow:hidden;
+    }
+    .tenant-menu.show{ display:block; }
+    .tenant-item{
+      display:flex; align-items:center; gap:.75rem;
+      padding:.75rem 1rem; text-decoration:none; color:var(--ink);
+      font-weight:600; transition:background .12s ease;
+    }
+    .tenant-item:hover{ background:rgba(255,106,26,.06); }
+    .tenant-divider{ height:1px; background:var(--line); margin:.5rem 0; }
+
+    .notif-btn{
+      position:relative; display:inline-flex; align-items:center; justify-content:center;
+      width:40px; height:40px; border-radius:12px;
+      border:1px solid var(--line); background:#fff; color:var(--ink);
+      cursor:pointer; transition:transform .12s ease, box-shadow .12s ease;
+    }
+    .notif-btn:hover{ transform:translateY(-1px); box-shadow:0 8px 18px rgba(0,0,0,.10); }
+    .notif-dot{
+      position:absolute; right:4px; top:4px;
+      width:8px; height:8px; border-radius:999px;
+      background:#ef4444; box-shadow:0 0 0 2px #fff;
+    }
+
+    .notif-menu{
+      /* Bootstrap dropdown handles positioning and display */
+      border-radius:12px !important;
+      z-index:1080 !important;
+      /* Don't override Bootstrap's display handling */
+    }
+
+    /* CRITICAL: Dropdown menus with hidden attribute must stay hidden until JS removes it.
+       This prevents BFCache from showing stale dropdown state. 
+       NOTE: We use regular display:none (no !important) so Bootstrap can override when showing */
+    .dropdown-menu[hidden],
+    #ccNotifMenu[hidden],
+    #userMenu[hidden] {
+      display: none;
+      visibility: hidden;
+      opacity: 0;
+    }
+
+    /* ========= Dropdown z-index fix (ALL viewports) ========= */
+    /* CRITICAL: Ensure notification and user dropdowns are ALWAYS above page content */
+    /* Dropdowns must be above loaders (900), but below modals (1055) */
+    #ccNotifMenu.dropdown-menu,
+    #userMenu.dropdown-menu {
+      z-index: 1090 !important;
+    }
+
+    /* CRITICAL: Loader must be BELOW dropdowns */
+    .loader-backdrop,
+    .global-loader {
+      z-index: 900 !important;
+    }
+
+    /* ========= Global Overlay Root (Jan 2026 - Filter overlay fix) ========= */
+    /* 
+     * Z-INDEX HIERARCHY (low to high):
+     * - .cc-main: 0 (creates stacking context)
+     * - loaders: 900
+     * - sidebar: 1030
+     * - dropdown menus: 1040
+     * - filter overlay backdrop: 1055
+     * - filter overlay panel: 1056
+     * - modals: 1060
+     * - modal backdrop: 1050
+     * - notification/user dropdowns: 1090
+     * - PWA banner: 10010
+     */
+    #cc-overlay-root {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 0;
+      height: 0;
+      z-index: 1055;
+      pointer-events: none;
+    }
+
+    /* Filter overlay when rendered in portal root */
+    #cc-overlay-root .filter-backdrop,
+    #cc-overlay-root .cc-filter-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 1055;
+      background: rgba(0, 0, 0, 0.35);
+      backdrop-filter: blur(2px);
+      -webkit-backdrop-filter: blur(2px);
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.25s ease, visibility 0.25s ease;
+      pointer-events: none;
+    }
+
+    #cc-overlay-root .filter-backdrop.open,
+    #cc-overlay-root .cc-filter-backdrop.open {
+      opacity: 1;
+      visibility: visible;
+      pointer-events: auto;
+    }
+
+    #cc-overlay-root .filter-panel,
+    #cc-overlay-root .cc-filter-panel {
+      position: fixed;
+      z-index: 1056;
+      pointer-events: auto;
+    }
+
+    /* Mobile: bottom sheet positioning */
+    @media (max-width: 768px) {
+      #cc-overlay-root .filter-panel,
+      #cc-overlay-root .cc-filter-panel {
+        bottom: 0;
+        left: 0;
+        right: 0;
+        top: auto;
+        width: 100%;
+        max-width: 100%;
+        border-radius: 24px 24px 0 0;
+        transform: translateY(100%);
+        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+
+      #cc-overlay-root .filter-panel.open,
+      #cc-overlay-root .cc-filter-panel.open {
+        transform: translateY(0);
+      }
+    }
+
+    /* ========= Mobile-First Dropdown Fixes (Jan 2026) ========= */
+    @media (max-width: 576px) {
+      /* Notifications dropdown: constrain to viewport */
+      #ccNotifMenu.dropdown-menu {
+        position: fixed !important;
+        top: 60px !important;
+        left: 8px !important;
+        right: 8px !important;
+        width: calc(100vw - 16px) !important;
+        max-width: 100vw !important;
+        min-width: unset !important;
+        max-height: 60vh !important;
+        overflow-y: auto !important;
+        transform: none !important;
+        border-radius: 16px !important;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.25) !important;
+      }
+      
+      /* User menu dropdown: constrain to viewport */
+      #userMenu.dropdown-menu {
+        position: fixed !important;
+        top: 60px !important;
+        right: 8px !important;
+        left: auto !important;
+        width: min(280px, calc(100vw - 16px)) !important;
+        min-width: unset !important;
+        max-height: 70vh !important;
+        overflow-y: auto !important;
+        transform: none !important;
+        border-radius: 16px !important;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.25) !important;
+        z-index: 1091 !important;
+      }
+      
+      /* Ensure dropdowns don't overlap with trial banners */
+      .msg + .dropdown-menu,
+      [data-testid="subscription-actions"] ~ .dropdown-menu {
+        top: 120px !important;
+      }
+    }
+    
+    /* Tablet: moderate constraints */
+    @media (min-width: 577px) and (max-width: 768px) {
+      #ccNotifMenu.dropdown-menu {
+        min-width: 340px !important;
+        max-width: min(92vw, 400px) !important;
+        max-height: 70vh !important;
+        overflow-y: auto !important;
+      }
+      #userMenu.dropdown-menu {
+        min-width: 260px !important;
+        max-height: 70vh !important;
+        overflow-y: auto !important;
+      }
+    }
+    .notif-empty{
+      padding:2rem 1rem; text-align:center; color:var(--muted);
+    }
+
+    /* ========= User Button & Avatar ========= */
+    .user-btn{
+      position:relative; display:inline-flex; align-items:center; justify-content:center;
+      width:40px; height:40px; border-radius:50%;
+      border:1px solid var(--line); background:#fff; color:var(--ink);
+      cursor:pointer; transition:transform .12s ease, box-shadow .12s ease;
+      padding:0; /* reset Bootstrap dropdown-toggle padding */
+    }
+    .user-btn:hover{ transform:translateY(-1px); box-shadow:0 8px 18px rgba(0,0,0,.10); }
+    .user-btn::after{ display:none; } /* hide Bootstrap dropdown caret */
+    .user-btn .avatar{
+      display:flex; align-items:center; justify-content:center;
+      width:100%; height:100%;
+      font-weight:700; font-size:14px; color:var(--cc-accent, #ff6a1a);
+      background:rgba(255,106,26,.08); border-radius:50%;
+    }
+    .topbar-user .dropdown-menu{
+      border-radius:12px !important;
+      z-index:1081;
     }
   </style>
 
@@ -333,22 +722,28 @@
 </head>
 <body>
 
-<div class="cc-shell">
-  {% block sidebar %}{% include "partials/sidebar.html" %}{% endblock %}
+{# ===== PWA Install Banner (2025-12-25) ===== #}
+{% include "partials/pwa_install_banner.html" %}
 
-  <!-- Drawer trigger + backdrop -->
-  <button class="mobile-toggle tap focus-ring" id="sidebarOpen" aria-label="Open menu" aria-expanded="false" aria-controls="ccSidebar">
-    <i class="bi bi-list" aria-hidden="true"></i>
-    <span class="hamburger-bars" aria-hidden="true"></span>  <!-- fallback bars -->
-  </button>
-  <div class="cc-backdrop" id="ccBackdrop" aria-hidden="true"></div>
+<div class="cc-shell">
+  {# AUTHENTICATION GUARD: Only show sidebar/nav for authenticated users #}
+  {% if request.user.is_authenticated %}
+    {% block sidebar %}{% include "partials/sidebar.html" %}{% endblock %}
+
+    <!-- Drawer trigger + backdrop -->
+    <button class="mobile-toggle tap focus-ring" id="sidebarOpen" aria-label="Open menu" aria-expanded="false" aria-controls="ccSidebar">
+      <i class="bi bi-list" aria-hidden="true"></i>
+      <span class="hamburger-bars" aria-hidden="true"></span>  <!-- fallback bars -->
+    </button>
+    <div class="cc-backdrop" id="ccBackdrop" aria-hidden="true"></div>
+  {% endif %}
 
   <div class="cc-main">
 
     {# ------- URLs for routing/helpers ------- #}
     {% url 'inventory:inventory_dashboard' as url_home %}
     {% url 'inventory:scan_in'           as url_scan_in %}
-    {% url 'inventory:scan_sold'         as url_sell %}
+    {% url 'inventory:scan_sell_landing' as url_sell %}
     {% url 'inventory:stock_list'        as url_stock %}
     {% url 'wallet:agent_wallet'         as url_wallet %}
     {% url 'reports:home'                as url_reports %}
@@ -373,14 +768,15 @@
     {% url 'logout' as url_logout %}
 
     {% with path=request.path|default:'' %}
-      {% if 'accounts/settings' not in path %}
+      {# AUTHENTICATION GUARD: Only show header/topbar for authenticated users #}
+      {% if 'accounts/settings' not in path and request.user.is_authenticated %}
         <header class="cc-header">
           <div class="cc-page topbar">
             <h1 class="fw-bold d-flex align-items-center gap-2">
               {% block header_title %}Dashboard{% endblock %}
-              {% if request.business and request.business.subscription %}
-                {% with sub=request.business.subscription %}
-                  {% if sub.status == 'trial' %}
+              {% if subscription %}
+                {% with sub=subscription %}
+                  {% if sub.status == 'trial' or sub.status == 'trialing' %}
                     <span class="badge rounded-pill text-bg-info">Trial{% if sub.trial_end %} · ends {{ sub.trial_end|date:'M j' }}{% endif %}</span>
                   {% elif sub.status == 'active' %}
                     <span class="badge rounded-pill text-bg-success">Active</span>
@@ -388,14 +784,14 @@
                     <span class="badge rounded-pill text-bg-warning">Grace</span>
                   {% elif sub.status == 'past_due' %}
                     <span class="badge rounded-pill text-bg-warning">Past due</span>
-                  {% elif sub.status == 'expired' or sub.status == 'canceled' %}
+                  {% elif sub.status == 'expired' or sub.status == 'canceled' or sub.status == 'cancelled' %}
                     <span class="badge rounded-pill text-bg-danger">Inactive</span>
                   {% endif %}
                 {% endwith %}
               {% endif %}
             </h1>
 
-            {% if show_search or "inventory/dashboard" in path %}
+            {% if show_search|default:False or "inventory/dashboard" in path %}
               <div class="cc-search d-flex align-items-center gap-2">
                 <i class="bi bi-search text-muted"></i>
                 <input id="global-search" class="form-control input" type="search" placeholder="Search SKUs, agents, invoices…" autocomplete="off" />
@@ -411,7 +807,9 @@
                   <div class="tenant-pill hover-lift tap" role="button" id="tenantBtn" aria-haspopup="true" aria-expanded="false">
                     <span class="tenant-dot" aria-hidden="true"></span>
                     <span class="tenant-name">{{ request.business.name }}</span>
-                    {% if request.membership %}
+                    {% if membership %}
+                      <span class="tenant-role">· {{ membership.role|title }}</span>
+                    {% elif request.membership %}
                       <span class="tenant-role">· {{ request.membership.role|title }}</span>
                     {% elif IS_MANAGER %}
                       <span class="tenant-role">· Manager</span>
@@ -420,12 +818,40 @@
                     {% endif %}
                     <span class="tenant-caret"><i class="bi bi-chevron-down"></i></span>
                   </div>
-                  <div class="tenant-menu" id="tenantMenu" role="menu" aria-label="Business menu">
-                    <a class="tenant-item" href="{{ url_choose_business|default:'/tenants/choose/' }}"><i class="bi bi-arrow-left-right"></i> Switch business</a>
-                    {% if request.membership and request.membership.role == "MANAGER" or IS_MANAGER or request.user.is_authenticated and request.user.profile.is_manager %}
-                      <a class="tenant-item" href="{{ url_manager_agents|default:'/tenants/manager/agents/' }}"><i class="bi bi-people"></i> Agents</a>
+                  <div class="tenant-menu" id="tenantMenu" role="menu" aria-label="Workspace menu">
+
+                    {# ── Workspace switcher (shown to all users with >1 workspace) ── #}
+                    {% if user_workspaces|length > 1 %}
+                      <div style="padding:.5rem 1rem .25rem;font-size:11px;font-weight:700;color:#94a3b8;letter-spacing:.06em;text-transform:uppercase">Your Workspaces</div>
+                      {% for ws in user_workspaces %}
+                        {% if ws.business.id == active_business_id %}
+                          <div class="tenant-item" style="background:rgba(255,106,26,.07);cursor:default;">
+                            <span style="width:8px;height:8px;border-radius:50%;background:#ff6a1a;display:inline-block;flex-shrink:0"></span>
+                            <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ ws.business.name }}</span>
+                            <span style="font-size:11px;opacity:.6;font-weight:400">{{ ws.role|title }}</span>
+                          </div>
+                        {% else %}
+                          <a class="tenant-item" href="/tenants/set/{{ ws.business.id }}/" style="color:var(--ink)">
+                            <span style="width:8px;height:8px;border-radius:50%;background:#cbd5e1;display:inline-block;flex-shrink:0"></span>
+                            <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ ws.business.name }}</span>
+                            <span style="font-size:11px;opacity:.6;font-weight:400">{{ ws.role|title }}</span>
+                          </a>
+                        {% endif %}
+                      {% endfor %}
+                      <div class="tenant-divider"></div>
                     {% endif %}
-                    {% if request.user.is_staff %}
+
+                    {# ── Workspace management actions (shown to everyone) ── #}
+                    <a class="tenant-item" href="{{ url_choose_business|default:'/tenants/choose/' }}"><i class="bi bi-grid-3x3-gap"></i> All Workspaces</a>
+                    <a class="tenant-item" href="/tenants/create/"><i class="bi bi-plus-circle"></i> New Workspace</a>
+
+                    {# ── Owner/Admin/Manager only: member management ── #}
+                    {% if request.cc_is_manager or IS_MANAGER %}
+                      <div class="tenant-divider"></div>
+                      <a class="tenant-item" href="{{ url_manager_agents|default:'/tenants/manager/agents/' }}"><i class="bi bi-people"></i> Manage Members</a>
+                    {% endif %}
+
+                    {% if request.user.is_staff or request.user.is_superuser %}
                       <div class="tenant-divider"></div>
                       <a class="tenant-item" href="{{ url_admin_business }}"><i class="bi bi-shield-lock"></i> Staff approvals</a>
                     {% endif %}
@@ -436,10 +862,17 @@
                     <span class="tenant-name">Platform HQ</span>
                     <span class="tenant-role">· Admin</span>
                   </a>
+                {% elif request.user.is_authenticated %}
+                  {# User authenticated but no active workspace — prompt to choose or create #}
+                  <a class="tenant-pill hover-lift tap" href="{{ url_choose_business|default:'/tenants/choose/' }}">
+                    <span class="tenant-dot" style="background:#f59e0b"></span>
+                    <span class="tenant-name">No active workspace</span>
+                    <span class="tenant-role">· Set up</span>
+                  </a>
                 {% else %}
                   <a class="tenant-pill hover-lift tap" href="{{ url_choose_business|default:'/tenants/choose/' }}">
                     <span class="tenant-dot" style="background:#f59e0b"></span>
-                    <span class="tenant-name">No active business</span>
+                    <span class="tenant-name">No active workspace</span>
                     <span class="tenant-role">· Set up</span>
                   </a>
                 {% endif %}
@@ -448,16 +881,18 @@
               {# Notifications (Bootstrap dropdown) #}
               <div class="dropdown" id="ccNotifRoot"
                    data-scope="{% block notif_scope %}dashboard{% endblock %}"
-                   data-allow="{% block notif_allow %}{% endblock %}">
+                   data-allow="{% block notif_allow %}{% endblock %}"
+                   data-testid="notif-dropdown">
                 <button class="notif-btn focus-ring dropdown-toggle"
                         id="ccNotifBtn"
                         type="button"
                         data-bs-toggle="dropdown"
-                        data-bs-auto-close="outside"
+                        data-bs-auto-close="true"
                         aria-expanded="false"
                         aria-haspopup="true"
                         aria-controls="ccNotifMenu"
-                        title="Notifications">
+                        title="Notifications"
+                        data-testid="nav-notifications">
                   <i class="bi bi-bell"></i>
                   {% if unread_notifications_count %}
                     <span class="notif-dot" id="ccNotifDot" aria-hidden="true"></span>
@@ -471,7 +906,9 @@
                 <div class="dropdown-menu dropdown-menu-end p-0 shadow notif-menu"
                      id="ccNotifMenu"
                      aria-labelledby="ccNotifBtn"
-                     style="min-width:320px;max-height:400px;overflow-y:auto">
+                     style="min-width:320px;max-height:400px;overflow-y:auto"
+                     data-testid="notifications-panel"
+                     hidden>
                   <div class="p-2 border-bottom d-flex align-items-center justify-content-between">
                     <strong>Notifications</strong>
                     {% with latest_notifications|default:None as notif_list %}
@@ -486,7 +923,7 @@
                     {% with latest_notifications|default:None as notif_list %}
                       {% if notif_list %}
                         {% for n in notif_list %}
-                          <a class="dropdown-item small {% if not n.is_read %}fw-semibold bg-light{% endif %}" 
+                          <a class="dropdown-item small {% if not n.is_read %}fw-semibold bg-light{% endif %}"
                              href="{% url 'notifications:mark_read_and_redirect' n.id %}"
                              style="padding:.75rem 1rem;border-bottom:1px solid #e9ecef;white-space:normal">
                             <div class="d-flex align-items-start">
@@ -523,11 +960,12 @@
                       id="userMenuBtn"
                       type="button"
                       data-bs-toggle="dropdown"
-                      data-bs-auto-close="outside"
+                      data-bs-auto-close="true"
                       aria-expanded="false"
                       aria-haspopup="true"
                       aria-controls="userMenu"
-                      title="Account">
+                      title="Account"
+                      data-testid="nav-avatar">
                 <span class="avatar">
                   {% if request.user.is_authenticated %}
                     {{ request.user.first_name|default:request.user.username|slice:":1"|upper }}
@@ -537,7 +975,7 @@
                 </span>
                 <span class="presence-dot" aria-hidden="true"></span>
               </button>
-              <div id="userMenu" class="dropdown-menu dropdown-menu-end p-0 shadow" aria-labelledby="userMenuBtn" style="min-width:260px">
+              <div id="userMenu" class="dropdown-menu dropdown-menu-end p-0 shadow" aria-labelledby="userMenuBtn" style="min-width:260px" data-testid="avatar-menu" hidden>
                 <div class="px-3 py-2 text-muted">
                   {% if request.user.is_authenticated %}
                     <div class="fw-bold text-dark">{{ request.user.get_full_name|default:request.user.username }}</div>
@@ -547,16 +985,23 @@
                   {% endif %}
                 </div>
                 <div class="border-top"></div>
-                <a href="{{ url_profile_settings|default:'/accounts/settings/' }}" class="dropdown-item">
+                <a href="{{ url_profile_settings|default:'/accounts/settings/' }}" class="dropdown-item" data-testid="avatar-settings">
                   <i class="bi bi-gear me-2"></i> Profile &amp; Settings
                 </a>
+                <button type="button" class="dropdown-item" id="cc-sound-toggle-btn" onclick="ccToggleSound(this)" style="cursor:pointer;border:0;background:transparent;width:100%;text-align:left">
+                  <i class="bi bi-volume-up me-2" id="cc-sound-icon"></i>
+                  <span id="cc-sound-label">App Sounds: On</span>
+                </button>
                 <a href="{{ url_feedback_form|default:'/feedback/' }}" class="dropdown-item">
                   <i class="bi bi-chat-left-text me-2"></i> Feedback
                 </a>
                 {% if request.user.is_authenticated %}
-                  <a href="{{ url_logout|default:'/accounts/logout/' }}" class="dropdown-item text-danger">
-                    <i class="bi bi-box-arrow-right me-2"></i> Logout
-                  </a>
+                  <form method="post" action="{{ url_logout|default:'/accounts/logout/' }}" class="d-block m-0 p-0" id="logout-form">
+                    {% csrf_token %}
+                    <button type="submit" class="dropdown-item text-danger w-100 border-0 bg-transparent text-start px-3 py-2" data-testid="avatar-logout" style="cursor:pointer;">
+                      <i class="bi bi-box-arrow-right me-2"></i> Logout
+                    </button>
+                  </form>
                 {% endif %}
               </div>
             </div>
@@ -569,45 +1014,54 @@
 
     <main id="app-main" class="cc-page">
       {# ===== Billing banners ===== #}
-      {% if request.business and request.business.subscription %}
-        {% with sub=request.business.subscription %}
+      {# MANAGER-ONLY: Subscription management UI #}
+      {% if request.is_manager_plus and request.business and subscription %}
+        {% with sub=subscription %}
           {% if sub.status == 'trial' %}
-            <div class="msg msg-info fade-in d-flex align-items-center justify-content-between">
+            <div class="msg msg-info fade-in d-flex align-items-center justify-content-between" id="subscription-actions" data-testid="subscription-actions">
               <div>
                 <strong>You're on a free trial.</strong>
                 {% if sub.trial_end %} Trial ends on {{ sub.trial_end|date:"M j, Y" }}.{% endif %}
               </div>
+              {% if IS_MANAGER %}
               <div class="d-flex gap-2">
                 <a class="btn btn-sm btn-primary" href="{{ url_billing_sub|default:'/billing/subscribe/' }}"><i class="bi bi-lightning-charge"></i> Choose plan</a>
                 <a class="btn btn-sm btn-outline-primary" href="{{ url_billing_checkout|default:'/billing/checkout/' }}"><i class="bi bi-credit-card"></i> Checkout</a>
               </div>
+              {% endif %}
             </div>
           {% elif sub.status == 'grace' %}
-            <div class="msg msg-warning fade-in d-flex align-items-center justify-content-between">
+            <div class="msg msg-warning fade-in d-flex align-items-center justify-content-between" id="subscription-actions" data-testid="subscription-actions">
               <div>
-                <strong>Payment needed.</strong> You're in a grace period to restore access.
+                <strong>Payment needed.</strong> {% if IS_MANAGER %}You're in a grace period to restore access.{% else %}Contact your manager to restore access.{% endif %}
               </div>
+              {% if IS_MANAGER %}
               <div class="d-flex gap-2">
                 <a class="btn btn-sm btn-outline-secondary" href="{{ url_billing_sub|default:'/billing/subscribe/' }}"><i class="bi bi-gear"></i> Manage plan</a>
               </div>
+              {% endif %}
             </div>
           {% elif sub.status == 'past_due' %}
-            <div class="msg msg-warning fade-in d-flex align-items-center justify-content-between">
+            <div class="msg msg-warning fade-in d-flex align-items-center justify-content-between" id="subscription-actions" data-testid="subscription-actions">
               <div>
-                <strong>Payment is past due.</strong> Some features may be limited.
+                <strong>Payment is past due.</strong> {% if IS_MANAGER %}Some features may be limited.{% else %}Contact your manager.{% endif %}
               </div>
+              {% if IS_MANAGER %}
               <div class="d-flex gap-2">
                 <a class="btn btn-sm btn-warning" href="{{ url_billing_checkout|default:'/billing/checkout/' }}"><i class="bi bi-credit-card"></i> Retry payment</a>
               </div>
+              {% endif %}
             </div>
           {% elif sub.status == 'expired' or sub.status == 'canceled' %}
-            <div class="msg msg-danger fade-in d-flex align-items-center justify-content-between">
+            <div class="msg msg-danger fade-in d-flex align-items-center justify-content-between" id="subscription-actions" data-testid="subscription-actions">
               <div>
-                <strong>Subscription inactive.</strong> To continue, pick a plan and pay.
+                <strong>Subscription inactive.</strong> {% if IS_MANAGER %}To continue, pick a plan and pay.{% else %}Contact your manager to reactivate.{% endif %}
               </div>
+              {% if IS_MANAGER %}
               <div class="d-flex gap-2">
                 <a class="btn btn-sm btn-danger" href="{{ url_billing_sub|default:'/billing/subscribe/' }}"><i class="bi bi-cart-check"></i> Subscribe</a>
               </div>
+              {% endif %}
             </div>
           {% endif %}
         {% endwith %}
@@ -632,36 +1086,50 @@
       {% block main %}{% endblock %}
     </main>
 
-    <!-- Mobile bottom dock -->
+    {# AUTHENTICATION GUARD: Only show bottom nav for authenticated users #}
+    {% if request.user.is_authenticated %}
+    <!-- vertical-mobile-nav:{{ PRODUCT_MODE|default:'generic' }} -->
+    <!-- Mobile bottom dock - Vertical-aware navigation -->
     <nav class="mobile-tabbar d-flex d-md-none cc-bottom-nav">
-      <a class="tab {% if active_tab == 'home' %}active{% endif %}" href="{{ url_home|default:'/inventory/dashboard/' }}">
-        <i class="bi bi-speedometer2 d-block"></i>Home
-      </a>
-      <a class="tab {% if active_tab == 'scan_in' %}active{% endif %}" href="{{ url_scan_in|default:'/inventory/scan-in/' }}">
-        <i class="bi bi-upc-scan d-block"></i>Scan
-      </a>
-      <a class="tab {% if active_tab == 'sell' %}active{% endif %}" href="{{ url_sell|default:'/inventory/scan-sold/' }}">
-        <i class="bi bi-cart-check d-block"></i>Sell
-      </a>
-      <a class="tab {% if active_tab == 'stock' %}active{% endif %}" href="{{ url_stock|default:'/inventory/list/' }}">
-        <i class="bi bi-box-seam d-block"></i>Stock
-      </a>
-      <a class="tab {% if active_tab == 'wallet' %}active{% endif %}" href="{{ url_wallet|default:'/wallet/' }}">
-        <i class="bi bi-wallet2 d-block"></i>Wallet
-      </a>
-      {% if request.user.is_authenticated %}
-        {% if IS_MANAGER or request.user.is_staff or request.user.profile.is_manager %}
-          <a class="tab {% if active_tab == 'sim' %}active{% endif %}" href="{{ url_simulator|default:'/simulator/' }}">
-            <i class="bi bi-graph-up d-block"></i>Sim
+      {% for item in MOBILE_NAV_ITEMS|default:'' %}
+        {% if item.is_menu %}
+          <a class="tab" href="#" onclick="if(window.CC_SIDEBAR){window.CC_SIDEBAR.toggle();} return false;" data-cy="mobile-nav-menu">
+            <i class="bi {{ item.icon_class }} d-block"></i>{{ item.label }}
+          </a>
+        {% else %}
+          {# Active state handled by mobile.js based on href matching #}
+          <a class="tab {% if active_tab|default:'' == item.key %}active{% endif %}"
+             href="{{ item.url }}"
+             data-cy="mobile-nav-{{ item.key }}"
+             data-active-prefix="{{ item.active_prefix|default:'' }}">
+            <i class="bi {{ item.icon_class }} d-block"></i>{{ item.label }}
           </a>
         {% endif %}
-      {% endif %}
+      {% empty %}
+        {# Fallback to phones nav if MOBILE_NAV_ITEMS not available #}
+        <a class="tab {% if active_tab|default:'' == 'home' %}active{% endif %}" href="{{ url_home|default:'/inventory/dashboard/' }}">
+          <i class="bi bi-speedometer2 d-block"></i>Home
+        </a>
+        <a class="tab {% if active_tab|default:'' == 'scan_in' %}active{% endif %}" href="{{ url_scan_in|default:'/inventory/scan-in/' }}">
+          <i class="bi bi-upc-scan d-block"></i>Scan
+        </a>
+        <a class="tab {% if active_tab|default:'' == 'sell' %}active{% endif %}" href="{{ url_sell|default:'/inventory/phone-sale-wizard/' }}">
+          <i class="bi bi-cart-check d-block"></i>Sell
+        </a>
+        <a class="tab {% if active_tab|default:'' == 'stock' %}active{% endif %}" href="{{ url_stock|default:'/inventory/list/' }}">
+          <i class="bi bi-box-seam d-block"></i>Stock
+        </a>
+        <a class="tab" href="#" onclick="if(window.CC_SIDEBAR){window.CC_SIDEBAR.toggle();} return false;">
+          <i class="bi bi-list d-block"></i>Menu
+        </a>
+      {% endfor %}
     </nav>
+    {% endif %}
   </div>
 </div>
 
 <!-- Inbox Modal (fallback) -->
-<div class="modal fade" id="ccInbox" tabindex="-1" aria-hidden="true">
+<div class="modal fade" id="ccInbox" tabindex="-1" aria-hidden="true" style="display:none">
   <div class="modal-dialog modal-dialog-scrollable modal-xl">
     <div class="modal-content">
       <div class="modal-header">
@@ -693,6 +1161,278 @@
 
 <script src="{% with v=BUILD_ID|default:STATIC_VERSION|default:'1' %}{% static 'js/app.js' %}?v={{ v }}{% endwith %}" defer></script>
 <script src="{% with v=BUILD_ID|default:STATIC_VERSION|default:'1' %}{% static 'js/mobile.js' %}?v={{ v }}{% endwith %}" defer></script>
+<script src="{% with v=BUILD_ID|default:STATIC_VERSION|default:'1' %}{% static 'js/cc-sounds.js' %}?v={{ v }}{% endwith %}" defer></script>
+
+<!-- EMAJINET UI INITIALIZATION SYSTEM (Feb 2026 - BFCache + Vertical Navigation fix) -->
+<script src="{% with v=BUILD_ID|default:STATIC_VERSION|default:'1' %}{% static 'js/emajinet-ui-init.js' %}?v={{ v }}{% endwith %}" defer></script>
+
+<!-- ROBUST UI CLEANUP: Modal/Dropdown/Overlay State Management (Jan 2026 - BFCache fix) -->
+<!-- NOTE: This legacy cleanup code is now superseded by emajinet-ui-init.js but kept for compatibility -->
+<script>
+  /* ================================================================
+     UI CLEANUP SYSTEM v5 — BFCache/pageshow fix + click functionality (Jan 2026)
+     
+     ROOT CAUSE ADDRESSED:
+     - iOS Safari & Android Chrome use BFCache (back-forward cache)
+     - When navigating back/forward, the page is restored with previous
+       UI state (dropdowns open, modals visible, classes intact)
+     - This causes dropdowns to appear "open" on page load
+     
+     SOLUTION:
+     1. Dropdown menus have `hidden` attribute in HTML by default
+     2. Bootstrap dropdown events remove/restore `hidden` attribute
+     3. pageshow event (especially event.persisted) resets all UI state
+     4. DOMContentLoaded also ensures clean state
+     5. Mutual exclusion: only one dropdown open at a time
+     ================================================================ */
+  (function() {
+    if (window.__CC_UI_CLEANUP_V5__) return;
+    window.__CC_UI_CLEANUP_V5__ = true;
+
+    // Wait for Bootstrap to be available
+    function waitForBootstrap(callback) {
+      if (typeof bootstrap !== 'undefined' && bootstrap.Dropdown) {
+        callback();
+      } else {
+        setTimeout(function() { waitForBootstrap(callback); }, 50);
+      }
+    }
+
+    // Force close a Bootstrap dropdown by element
+    function forceCloseDropdown(el) {
+      if (!el) return;
+      var menu = document.getElementById(el.getAttribute('aria-controls') || '') || el.nextElementSibling;
+      
+      // Use Bootstrap API if available
+      if (typeof bootstrap !== 'undefined' && bootstrap.Dropdown) {
+        var instance = bootstrap.Dropdown.getInstance(el);
+        if (instance) {
+          try { instance.hide(); } catch(e) {}
+        }
+      }
+      
+      // Directly set attributes (fallback & reinforcement)
+      el.setAttribute('aria-expanded', 'false');
+      if (menu && menu.classList.contains('dropdown-menu')) {
+        menu.classList.remove('show');
+        menu.setAttribute('hidden', '');  // Hide via attribute
+      }
+    }
+
+    // Reset ALL transient UI state (dropdowns, modals, offcanvas, etc.)
+    function resetTransientUIState() {
+      // 1. Force close both navbar dropdowns
+      var notifBtn = document.getElementById("ccNotifBtn");
+      var userBtn = document.getElementById("userMenuBtn");
+      var notifMenu = document.getElementById("ccNotifMenu");
+      var userMenu = document.getElementById("userMenu");
+      
+      forceCloseDropdown(notifBtn);
+      forceCloseDropdown(userBtn);
+      
+      // Ensure hidden attribute is set on menus
+      if (notifMenu) {
+        notifMenu.classList.remove('show');
+        notifMenu.setAttribute('hidden', '');
+      }
+      if (userMenu) {
+        userMenu.classList.remove('show');
+        userMenu.setAttribute('hidden', '');
+      }
+
+      // 2. Force close any modal that's open
+      document.querySelectorAll(".modal.show").forEach(function(modal) {
+        if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+          var bsModal = bootstrap.Modal.getInstance(modal);
+          if (bsModal) { try { bsModal.hide(); } catch(e) {} }
+        }
+        modal.classList.remove("show");
+        modal.style.display = "none";
+        modal.setAttribute("aria-hidden", "true");
+      });
+
+      // 3. Force close any offcanvas that's open
+      document.querySelectorAll(".offcanvas.show").forEach(function(oc) {
+        if (typeof bootstrap !== 'undefined' && bootstrap.Offcanvas) {
+          var bsOc = bootstrap.Offcanvas.getInstance(oc);
+          if (bsOc) { try { bsOc.hide(); } catch(e) {} }
+        }
+        oc.classList.remove("show");
+      });
+
+      // 4. Close custom filter offcanvas (analytics)
+      var filterOffcanvas = document.getElementById("filterOffcanvas");
+      var filterBackdrop = document.getElementById("filterBackdrop");
+      if (filterOffcanvas) filterOffcanvas.classList.remove("show");
+      if (filterBackdrop) filterBackdrop.classList.remove("show");
+
+      // 5. Remove any orphaned backdrops
+      document.querySelectorAll(".modal-backdrop, .offcanvas-backdrop").forEach(function(el) { 
+        el.remove(); 
+      });
+
+      // 6. Remove modal-open / offcanvas-open from body
+      document.body.classList.remove("modal-open", "offcanvas-open");
+
+      // 7. Reset body scroll-lock styles (only if drawer isn't intentionally open)
+      var bodyStyle = document.body.style;
+      var drawerOpen = document.body.getAttribute("data-drawer") === "open";
+      if (!drawerOpen) {
+        if (bodyStyle.position === "fixed" || bodyStyle.overflow === "hidden") {
+          bodyStyle.position = "";
+          bodyStyle.top = "";
+          bodyStyle.left = "";
+          bodyStyle.right = "";
+          bodyStyle.width = "";
+          bodyStyle.overflow = "";
+          bodyStyle.paddingRight = "";
+        }
+      }
+
+      // 8. Catch-all: remove .show from any dropdown menu
+      document.querySelectorAll(".dropdown-menu.show").forEach(function(el) {
+        el.classList.remove("show");
+      });
+
+      // 9. Reset aria-expanded on all dropdown toggles
+      document.querySelectorAll("[data-bs-toggle='dropdown'][aria-expanded='true']").forEach(function(el) {
+        el.setAttribute('aria-expanded', 'false');
+      });
+
+      // 10. Close tenant menu if open
+      var tenantMenu = document.getElementById("tenantMenu");
+      var tenantBtn = document.getElementById("tenantBtn");
+      if (tenantMenu) tenantMenu.style.display = "none";
+      if (tenantBtn) tenantBtn.setAttribute('aria-expanded', 'false');
+    }
+
+    // Setup Bootstrap dropdown event handlers for hidden attribute management
+    function setupDropdownHiddenManagement() {
+      var notifBtn = document.getElementById("ccNotifBtn");
+      var userBtn = document.getElementById("userMenuBtn");
+      var notifMenu = document.getElementById("ccNotifMenu");
+      var userMenu = document.getElementById("userMenu");
+
+      // CRITICAL FIX: Initialize Bootstrap dropdowns explicitly and manage hidden attribute
+      // This ensures dropdowns work on first load without refresh
+      if (notifBtn && notifMenu && typeof bootstrap !== 'undefined' && bootstrap.Dropdown) {
+        // Remove hidden attribute immediately (Bootstrap needs it visible to calculate positioning)
+        notifMenu.removeAttribute('hidden');
+        
+        // Initialize Bootstrap dropdown instance
+        try {
+          var notifDropdown = new bootstrap.Dropdown(notifBtn, {
+            autoClose: true,
+            boundary: 'viewport'
+          });
+        } catch(e) {
+          console.warn('[Dropdown] Failed to initialize notif dropdown:', e);
+        }
+        
+        // Re-hide after Bootstrap initialization
+        setTimeout(function() {
+          if (!notifMenu.classList.contains('show')) {
+            notifMenu.setAttribute('hidden', '');
+          }
+        }, 0);
+        
+        // Handle show event: remove hidden
+        notifBtn.addEventListener('show.bs.dropdown', function() {
+          notifMenu.removeAttribute('hidden');
+          // Close the other dropdown
+          if (userBtn && userMenu) {
+            forceCloseDropdown(userBtn);
+          }
+        });
+        
+        // Handle hidden event: restore hidden attribute
+        notifBtn.addEventListener('hidden.bs.dropdown', function() {
+          notifMenu.setAttribute('hidden', '');
+        });
+      }
+
+      if (userBtn && userMenu && typeof bootstrap !== 'undefined' && bootstrap.Dropdown) {
+        // Remove hidden attribute immediately
+        userMenu.removeAttribute('hidden');
+        
+        // Initialize Bootstrap dropdown instance
+        try {
+          var userDropdown = new bootstrap.Dropdown(userBtn, {
+            autoClose: true,
+            boundary: 'viewport'
+          });
+        } catch(e) {
+          console.warn('[Dropdown] Failed to initialize user dropdown:', e);
+        }
+        
+        // Re-hide after Bootstrap initialization
+        setTimeout(function() {
+          if (!userMenu.classList.contains('show')) {
+            userMenu.setAttribute('hidden', '');
+          }
+        }, 0);
+        
+        // Handle show event: remove hidden
+        userBtn.addEventListener('show.bs.dropdown', function() {
+          userMenu.removeAttribute('hidden');
+          // Close the other dropdown
+          if (notifBtn && notifMenu) {
+            forceCloseDropdown(notifBtn);
+          }
+        });
+        
+        // Handle hidden event: restore hidden attribute
+        userBtn.addEventListener('hidden.bs.dropdown', function() {
+          userMenu.setAttribute('hidden', '');
+        });
+      }
+    }
+
+    // Run on DOMContentLoaded
+    document.addEventListener("DOMContentLoaded", function() {
+      waitForBootstrap(function() {
+        resetTransientUIState();
+        setupDropdownHiddenManagement();
+      });
+    });
+
+    // CRITICAL: Run on pageshow (handles BFCache restoration)
+    window.addEventListener("pageshow", function(event) {
+      // event.persisted is true when page comes from BFCache
+      // But we reset regardless to be safe (also handles forward navigation)
+      waitForBootstrap(function() {
+        resetTransientUIState();
+      });
+    });
+
+    // Run when page becomes visible (tab switch, etc.)
+    document.addEventListener("visibilitychange", function() {
+      if (document.visibilityState === "visible") {
+        waitForBootstrap(resetTransientUIState);
+      }
+    });
+
+    // Run on popstate (browser back/forward without BFCache)
+    window.addEventListener("popstate", function() {
+      waitForBootstrap(resetTransientUIState);
+    });
+
+    // Cleanup after modal hide (Bootstrap event)
+    document.addEventListener("hidden.bs.modal", function(e) {
+      document.body.classList.remove("modal-open");
+      document.querySelectorAll(".modal-backdrop").forEach(function(el) { el.remove(); });
+    });
+
+    // Cleanup after offcanvas hide
+    document.addEventListener("hidden.bs.offcanvas", function(e) {
+      document.body.classList.remove("offcanvas-open");
+      document.querySelectorAll(".offcanvas-backdrop").forEach(function(el) { el.remove(); });
+    });
+
+    window.CC_UI_CLEANUP = resetTransientUIState;
+    window.resetTransientUIState = resetTransientUIState;
+  })();
+</script>
 
 <script>
   /* ============================================================
@@ -805,7 +1545,7 @@
       URLS: Object.assign({
         home: "{{ url_home|default:'/inventory/dashboard/' }}",
         scan_in: "{{ url_scan_in|default:'/inventory/scan-in/' }}",
-        scan_sold: "{{ url_sell|default:'/inventory/scan-sold/' }}",
+        scan_sold: "{{ url_sell|default:'/inventory/phone-sale-wizard/' }}",
         stock_list: "{{ url_stock|default:'/inventory/list/' }}",
         wallet: "{{ url_wallet|default:'/wallet/' }}",
         reports: "{{ url_reports|default:'/reports/' }}",
@@ -829,76 +1569,8 @@
     });
   })();
 
-  /* ----- Rock-solid mobile sidebar: single tap open/close, no flash ----- */
-  (function(){
-    if (window.__CC_SIDEBAR_V3__) return; window.__CC_SIDEBAR_V3__ = true;
-
-    const sidebar = document.querySelector('.cc-sidebar');
-    const backdrop = document.getElementById('ccBackdrop');
-    const toggleBtn = document.getElementById('sidebarOpen');
-
-    if (!sidebar || !backdrop || !toggleBtn) return;
-
-    if (!sidebar.id) sidebar.id = 'ccSidebar';
-    if (!toggleBtn.hasAttribute('aria-controls')) toggleBtn.setAttribute('aria-controls','ccSidebar');
-
-    let openState = false;
-    let busy = false;
-    let savedY = 0;
-    let lastToggleAt = 0;       // guard against double-fires
-
-    function lockScroll(){
-      savedY = window.scrollY || 0;
-      Object.assign(document.body.style,{position:'fixed',top:`-${savedY}px`,left:'0',right:'0',width:'100%',overflow:'hidden'});
-    }
-    function unlockScroll(){
-      Object.assign(document.body.style,{position:'',top:'',left:'',right:'',width:'',overflow:''});
-      window.scrollTo(0, savedY||0);
-    }
-    function applyState(){
-      if (openState){
-        document.body.setAttribute('data-drawer','open');
-        toggleBtn.setAttribute('aria-expanded','true');
-        backdrop.classList.add('show');
-        lockScroll();
-      } else {
-        document.body.removeAttribute('data-drawer');
-        toggleBtn.setAttribute('aria-expanded','false');
-        backdrop.classList.remove('show');
-        unlockScroll();
-      }
-    }
-    function toggle(){
-      if (busy) return;
-      const now = performance.now();
-      if (now - lastToggleAt < 300) return; // 300ms guard to stop "blink"
-      lastToggleAt = now;
-
-      busy = true;
-      openState = !openState;
-      applyState();
-      setTimeout(()=>busy=false, 260); // match .26s CSS transition
-    }
-    function close(){ if (openState){ openState=false; applyState(); } }
-
-    // SINGLE handler: pointerup only (no click/touchend duplicates)
-    toggleBtn.addEventListener('pointerup', (e)=>{ e.preventDefault(); e.stopPropagation(); toggle(); }, {passive:false});
-
-    // Prevent sidebar content from closing the drawer by bubbling
-    ['click','pointerdown','touchstart','mousedown'].forEach(ev=>{
-      sidebar.addEventListener(ev, e=>e.stopPropagation(), {passive:true});
-    });
-
-    backdrop.addEventListener('click', (e)=>{ e.preventDefault(); close(); }, {passive:false});
-    document.addEventListener('keydown', ()=>{ /* esc handled below in hotfix too */ }, {passive:true});
-
-    // Close when navigating
-    sidebar.querySelectorAll('a[href]').forEach(a=>{
-      a.addEventListener('click', ()=> close(), {passive:true});
-    });
-
-    new MutationObserver(()=>{}).observe(document.body, {attributes:true,attributeFilter:['data-drawer']});
-  })();
+  /* ----- Rock-solid mobile sidebar: handled by CC Drawer Hotfix below ----- */
+  /* This section intentionally empty — sidebar logic consolidated in CC Drawer Hotfix v4 */
 
   /* ===== Tenant menu: clean toggle ===== */
   (function(){
@@ -1038,22 +1710,46 @@
   /* ===================== /MENU RESCUE (JS) ===================== */
 </script>
 
-{# ===== CC Drawer Hotfix v3.2 — kill double-toggles & blink (non-destructive) ===== #}
+{# ===== GLOBAL UI INITIALIZATION GUARD ===== #}
 <script>
 (function(){
+  // CRITICAL: Prevent double initialization of all UI components
+  // This guard ensures dropdowns, sidebar, and all interactive elements
+  // only initialize once, even if scripts run multiple times.
+  if (window.__cc_ui_initialized) {
+    console.log('[CC] UI already initialized, skipping duplicate init');
+    return;
+  }
+  window.__cc_ui_initialized = true;
+  console.log('[CC] Initializing UI components...');
+})();
+</script>
+
+{# ===== CC Drawer Hotfix v4 — Single source of truth for mobile sidebar (Dec 20 behavior) ===== #}
+<script>
+(function(){
+  // Guard: only run once
+  if (window.__CC_DRAWER_V4__) return;
+  window.__CC_DRAWER_V4__ = true;
+
   const sidebarEl   = document.querySelector('.cc-sidebar');
   const oldBtn      = document.getElementById('sidebarOpen');
   const oldBackdrop = document.getElementById('ccBackdrop');
   if (!sidebarEl || !oldBtn || !oldBackdrop) return;
 
-  // Replace button & backdrop to drop any previously-attached listeners from other scripts
+  // Replace button & backdrop to drop any previously-attached listeners
   const btn = oldBtn.cloneNode(true);
   btn.id = oldBtn.id;
+  btn.setAttribute('data-bound', '1'); // Mark as bound to prevent future handlers
   oldBtn.replaceWith(btn);
 
   const backdrop = oldBackdrop.cloneNode(true);
   backdrop.id = oldBackdrop.id;
+  backdrop.setAttribute('data-bound', '1');
   oldBackdrop.replaceWith(backdrop);
+
+  // Mark sidebar as bound too
+  sidebarEl.setAttribute('data-bound', '1');
 
   // Single source of truth state
   let open = document.body.getAttribute('data-drawer') === 'open';
@@ -1090,16 +1786,16 @@
   }
   function toggle(){ set(!open); }
 
-  // Swallow duplicate events from legacy handlers (capture-phase)
+  // Swallow duplicate events from any legacy handlers (capture-phase)
   const swallow = (e)=>{ e.preventDefault(); e.stopPropagation(); if (e.stopImmediatePropagation) e.stopImmediatePropagation(); };
 
   btn.addEventListener('click', swallow, {capture:true});
   btn.addEventListener('touchend', swallow, {capture:true});
 
-  // Primary handler (pointerup only)
+  // Primary handler (pointerup only — single event type = no double-toggle)
   btn.addEventListener('pointerup', (e)=>{ swallow(e); toggle(); }, {passive:false});
 
-  // Sidebar should not close when tapping inside
+  // Sidebar should not close when tapping inside (stop propagation)
   ['click','pointerdown','touchstart','mousedown'].forEach(ev=>{
     sidebarEl.addEventListener(ev, e=>e.stopPropagation(), {passive:true});
   });
@@ -1108,16 +1804,19 @@
   backdrop.addEventListener('click', (e)=>{ swallow(e); set(false); }, {passive:false});
   document.addEventListener('keydown', (e)=>{ if (e.key === 'Escape') set(false); }, {passive:true});
 
-  // Close on nav inside sidebar
-  sidebarEl.querySelectorAll('a[href]').forEach(a=>{
-    a.addEventListener('click', ()=> set(false), {passive:true});
-  });
+  // Close on nav inside sidebar via event delegation
+  sidebarEl.addEventListener('click', (e) => {
+    const a = e.target.closest('a[href]');
+    if (!a) return;
+    set(false); // close drawer immediately
+  }, {passive:true});
 
-  // Ensure we start closed
+  // Ensure we start CLOSED (Dec 20 behavior)
   set(false);
 
-  // Expose for quick console testing
+  // Expose API for bottom nav "Menu" button and debugging
   window.ccDrawer = { open: ()=>set(true), close: ()=>set(false), toggle };
+  window.CC_SIDEBAR = window.ccDrawer; // Compatibility with mobile nav
 })();
 </script>
 
@@ -1194,6 +1893,68 @@
 
 {% block extra_js %}{% endblock %}
 
+{# Sound toggle UI — reads localStorage after cc-sounds.js loaded #}
+<script>
+(function() {
+  function _refreshSoundUI() {
+    var btn = document.getElementById('cc-sound-toggle-btn');
+    var icon = document.getElementById('cc-sound-icon');
+    var label = document.getElementById('cc-sound-label');
+    if (!btn || !icon || !label) return;
+    var on = !window.CCSounds || window.CCSounds.isEnabled();
+    icon.className = on ? 'bi bi-volume-up me-2' : 'bi bi-volume-mute me-2';
+    label.textContent = on ? 'App Sounds: On' : 'App Sounds: Off';
+    btn.style.color = on ? '' : '#94a3b8';
+  }
+
+  window.ccToggleSound = function(btn) {
+    var nowEnabled = !window.CCSounds || window.CCSounds.isEnabled();
+    if (window.CCSounds) window.CCSounds.setEnabled(!nowEnabled);
+    _refreshSoundUI();
+    if (!nowEnabled && window.CCSounds) window.CCSounds.playSuccessSound();
+  };
+
+  document.addEventListener('DOMContentLoaded', _refreshSoundUI);
+})();
+</script>
+
+{# Global Django-message-based sound triggers (form-based sales / page-load) #}
+{% if messages %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  if (!window.CCSounds) return;
+  var messages = [
+    {% for m in messages %}"{{ m.message|escapejs }}",{% endfor %}
+  ];
+  var SALE_KEYWORDS   = ['sold', 'sale', 'transaction', 'purchase'];
+  var CREDIT_KEYWORDS = ['credit', 'layby', 'on account'];
+  var STOCK_KEYWORDS  = ['stocked', 'added', 'stock in', 'restocked', 'bottle'];
+  var PAY_KEYWORDS    = ['payment', 'paid', 'collected', 'received'];
+  function matchAny(msg, kws) {
+    var lower = msg.toLowerCase();
+    return kws.some(function(k) { return lower.indexOf(k) !== -1; });
+  }
+  var played = false;
+  messages.forEach(function(msg) {
+    if (played) return;
+    if (matchAny(msg, CREDIT_KEYWORDS)) {
+      setTimeout(function() { document.dispatchEvent(new CustomEvent('cc:credit_sale')); }, 300);
+      played = true;
+    } else if (matchAny(msg, SALE_KEYWORDS)) {
+      setTimeout(function() { document.dispatchEvent(new CustomEvent('cc:sale_success')); }, 300);
+      played = true;
+    } else if (matchAny(msg, STOCK_KEYWORDS)) {
+      setTimeout(function() { document.dispatchEvent(new CustomEvent('cc:stock_added')); }, 300);
+      played = true;
+    } else if (matchAny(msg, PAY_KEYWORDS)) {
+      setTimeout(function() { document.dispatchEvent(new CustomEvent('cc:payment_success')); }, 300);
+      played = true;
+    }
+  });
+});
+</script>
+{% endif %}
+
 <!-- App Version Check -->
 {% if APP_VERSION %}
 <script>
@@ -1216,7 +1977,7 @@
           banner.style.position = "fixed";
           banner.style.bottom = "1rem";
           banner.style.right = "1rem";
-          banner.style.zIndex = "9999";
+          banner.style.zIndex = "10005";
           banner.style.padding = "0.75rem 1.5rem";
           banner.style.borderRadius = "999px";
           banner.style.backdropFilter = "blur(12px)";
@@ -1226,7 +1987,7 @@
           banner.style.boxShadow = "0 10px 30px rgba(0,0,0,0.25)";
           banner.innerHTML = `
             <span style="margin-right: 0.75rem;">New version of Emajinet is available.</span>
-            <button type="button" style="border:none; cursor:pointer; border-radius:999px; padding:0.25rem 0.9rem; background:#4f46e5; color:#fff; font-size:0.8rem;">
+            <button type="button" style="border:none; cursor:pointer; border-radius:999px; padding:0.25rem 0.9rem; background:#ff6a1a; color:#fff; font-size:0.8rem;">
               Refresh
             </button>
           `;
@@ -1253,39 +2014,158 @@
 
   {% include "partials/loading_spinner.html" %}
 
-{# ===== PWA Service Worker Registration ===== #}
+{# ===== Overlay Portal Roots (outside stacking contexts) ===== #}
+{# CRITICAL: These portals are OUTSIDE .cc-main stacking context to avoid z-index traps #}
+
+{# Filter/dropdown overlay root - used by dashboard filters, date pickers, etc. #}
+<div id="cc-overlay-root" aria-hidden="true"></div>
+
+{# Bootstrap modals must render here to avoid z-index traps #}
+<div id="cc-modal-root"></div>
+
+{# ===== Bootstrap Modal Portal Configuration ===== #}
 <script>
 (function() {
-  // Only register service worker if supported and not in Django admin
-  if (!('serviceWorker' in navigator)) return;
-  if (window.location.pathname.startsWith('/admin/')) return;
-
-  window.addEventListener('load', function() {
-    navigator.serviceWorker.register('{% static "sw.js" %}', { scope: '/' })
-      .then(function(registration) {
-        console.log('ServiceWorker registered: ', registration.scope);
-        
-        // Check for updates periodically
-        registration.addEventListener('updatefound', function() {
-          const newWorker = registration.installing;
-          if (!newWorker) return;
-          
-          newWorker.addEventListener('statechange', function() {
-            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-              // New service worker available, could show update notification
-              console.log('New content available; refresh to update.');
+  // CRITICAL FIX: Ensure all Bootstrap modals render in #cc-modal-root
+  // This prevents modals from being trapped in stacking contexts (z-index:0 on .cc-main)
+  
+  // Wait for Bootstrap to be available
+  function waitForBootstrap(callback) {
+    if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+      callback();
+    } else {
+      setTimeout(function() { waitForBootstrap(callback); }, 50);
+    }
+  }
+  
+  document.addEventListener('DOMContentLoaded', function() {
+    waitForBootstrap(function() {
+      var modalRoot = document.getElementById('cc-modal-root');
+      if (!modalRoot) {
+        console.warn('[Modal] cc-modal-root not found, modals may be trapped in stacking contexts');
+        return;
+      }
+      
+      // Move all existing modals to the modal root
+      document.querySelectorAll('.modal').forEach(function(modal) {
+        if (modal.parentElement !== modalRoot && modal.id !== 'ccInbox') {
+          modalRoot.appendChild(modal);
+        }
+      });
+      
+      // Watch for new modals being added dynamically
+      var observer = new MutationObserver(function(mutations) {
+        mutations.forEach(function(mutation) {
+          mutation.addedNodes.forEach(function(node) {
+            if (node.nodeType === 1 && node.classList && node.classList.contains('modal')) {
+              if (node.parentElement !== modalRoot && node.id !== 'ccInbox') {
+                modalRoot.appendChild(node);
+              }
+            }
+            // Also move modal backdrops to modal root
+            if (node.nodeType === 1 && node.classList && node.classList.contains('modal-backdrop')) {
+              if (node.parentElement !== modalRoot) {
+                modalRoot.appendChild(node);
+              }
             }
           });
         });
-      })
-      .catch(function(error) {
-        // Fail silently in production, log in dev
-        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-          console.warn('ServiceWorker registration failed: ', error);
-        }
       });
+      
+      observer.observe(document.body, { childList: true, subtree: true });
+      
+      // Ensure backdrops also render in modal root
+      document.addEventListener('show.bs.modal', function() {
+        // Check for backdrops after modal animation starts
+        setTimeout(function() {
+          document.querySelectorAll('.modal-backdrop').forEach(function(backdrop) {
+            if (backdrop.parentElement !== modalRoot) {
+              modalRoot.appendChild(backdrop);
+            }
+          });
+        }, 50);
+      });
+      
+      console.log('[Modal] Portal configured: all modals will render in #cc-modal-root');
+    });
   });
 })();
 </script>
+
+{# ===== Global Premium Sound System ===== #}
+<script src="{% static 'js/cc-sounds.js' %}?v={{ BUILD_ID|default:STATIC_VERSION|default:'1' }}"></script>
+
+{# ===== Sidebar More Features Toggle ===== #}
+<script src="{% static 'js/sidebar-more-features.js' %}?v={{ BUILD_ID|default:STATIC_VERSION|default:'1' }}"></script>
+
+{# ===== Shared Navbar Dropdown Init (PART 3 FIX: Works after HTMX nav) ===== #}
+<script src="{% static 'js/shared-navbar-init.js' %}?v={{ BUILD_ID|default:STATIC_VERSION|default:'1' }}"></script>
+
+{# ===== PWA Install Banner (2025-12-25) ===== #}
+<script src="{% static 'js/pwa-install.js' %}?v={{ BUILD_ID|default:STATIC_VERSION|default:'1' }}"></script>
+
+{# ===== PWA Service Worker: REGISTRATION DISABLED (stability hotfix) ===== #}
+{#                                                                           #}
+{# ROOT CAUSE: The old caching SW caused hard-refresh rendering bugs         #}
+{# by mixing stale cached static assets (from a SW with a wrong VERSION      #}
+{# due to BUILD_ID_PLACEHOLDER not being injected on the static/sw.js path)  #}
+{# with fresh HTML responses after deploys.                                  #}
+{#                                                                           #}
+{# FIX: SW registration is permanently disabled here.  The /sw.js endpoint   #}
+{# now serves a cleanup-only no-op SW that clears all old caches and         #}
+{# intercepts no fetch requests.  The inline cleanup script above (in <head>) #}
+{# handles users who still have the old SW installed.                        #}
+{#                                                                           #}
+{# Re-enable SW registration here only after a careful audit of caching      #}
+{# strategy and after confirming stable deploys without hard-refresh issues. #}
+<script>
+(function() {
+  // Service worker registration is intentionally disabled.
+  // The global cleanup script in <head> already handles SW removal.
+  // Version marker: EMAJINET_SW_DISABLED_20260427
+  if (false) {
+    // Dead code — never runs. Kept as a reminder of the disabled registration.
+    navigator && navigator.serviceWorker;
+  }
+})();
+</script>
+{# ===== bfcache guard: force reload if page restored from back/forward cache while logged out ===== #}
+<script>
+(function () {
+  // When the browser restores a page from the Back/Forward Cache (bfcache),
+  // the pageshow event fires with event.persisted === true.
+  // In that case the DOM is a frozen snapshot — HTTP cache-control headers are
+  // irrelevant.  We must re-validate auth state ourselves.
+  //
+  // Strategy:
+  //  - If the page was restored from bfcache AND we know the user was previously
+  //    authenticated (data-auth="1" on <body>) → hit /accounts/api/check/ (or the
+  //    login URL) with cache:no-store to see whether the session is still valid.
+  //  - If the server returns 401 / redirects to login → hard-navigate to login.
+  //  - If the user is now logged in but the page shows a guest state → reload.
+  //
+  // The simpler approach (reload on every pageshow restore) is used here to be
+  // 100% safe: one extra network request on back-navigation is acceptable.
+
+  var isAuthenticated = {{ request.user.is_authenticated|yesno:"true,false" }};
+
+  window.addEventListener('pageshow', function (e) {
+    if (!e.persisted) return; // not a bfcache restore — nothing to do
+
+    if (isAuthenticated) {
+      // Page was rendered as authenticated and then restored from bfcache.
+      // Force a full reload so the server can re-render with fresh auth state.
+      // This is the fix for "avatar missing / still logged in after logout".
+      window.location.reload();
+    } else {
+      // Page was rendered as a guest (e.g. login page).
+      // If the user navigates back here while logged in they'll just see login,
+      // which is harmless; a reload would bounce them to the dashboard anyway.
+      window.location.reload();
+    }
+  });
+})();
+</script>
+<!-- build: {{ BUILD_SHA|default:"unknown" }} -->
 </body>
 </html>

@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block title %}Stock In · {{ business.name }}{% endblock %}
+{% block content %}
+<div style="max-width:700px;margin:0 auto;padding:20px 14px;">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+    <h1 style="font-size:1.3rem;font-weight:900;margin:0;">Stock In</h1>
+    <a href="{% url 'mixed_retail:products' %}" style="color:#64748b;font-size:.85rem;text-decoration:none;">← Products</a>
+  </div>
+  {% if messages %}{% for msg in messages %}<div class="msg msg-{{ msg.tags }}" style="margin-bottom:12px;">{{ msg }}</div>{% endfor %}{% endif %}
+
+  {% if not products %}
+  <div style="background:#fff;border:1px dashed #cbd5e1;border-radius:14px;padding:32px 20px;margin-bottom:20px;text-align:center;">
+    <i class="bi bi-upc-scan" style="font-size:2rem;color:#10b981;display:block;margin-bottom:10px;"></i>
+    <h3 style="font-size:1rem;font-weight:800;color:#0f172a;margin:0 0 6px;">No products added yet</h3>
+    <p style="font-size:.85rem;color:#64748b;margin:0 0 16px;">Add products first, then come back here to stock them in.</p>
+    <a href="{% url 'mixed_retail:product_add' %}" style="padding:10px 20px;background:#f97316;color:#fff;border-radius:8px;text-decoration:none;font-weight:700;font-size:.9rem;">
+      <i class="bi bi-plus-circle"></i> Add First Product
+    </a>
+  </div>
+  {% else %}
+  <div style="background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:20px;margin-bottom:20px;">
+    <form method="post">
+      {% csrf_token %}
+      <div style="margin-bottom:12px;">
+        <label style="font-size:.82rem;font-weight:600;display:block;margin-bottom:4px;">Product</label>
+        <select name="product_id" class="form-control" required style="width:100%;padding:9px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:.9rem;">
+          <option value="">— Select product —</option>
+          {% for p in products %}
+          <option value="{{ p.id }}">{{ p.name }} {% if p.department %}({{ p.department.name }}{% if p.category %} › {{ p.category.name }}{% endif %}){% endif %} — Stock: {{ p.stock_quantity|floatformat:0 }} {{ p.unit }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div>
+          <label style="font-size:.82rem;font-weight:600;display:block;margin-bottom:4px;">Quantity to Add</label>
+          <input type="number" name="quantity" step="0.01" min="0.01" class="form-control" placeholder="e.g. 10" required style="width:100%;padding:9px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:.9rem;">
+        </div>
+        <div>
+          <label style="font-size:.82rem;font-weight:600;display:block;margin-bottom:4px;">New Cost Price (optional)</label>
+          <input type="number" name="new_cost_price" step="0.01" min="0" class="form-control" placeholder="Leave blank to keep current" style="width:100%;padding:9px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:.9rem;">
+        </div>
+      </div>
+      <button type="submit" style="margin-top:14px;width:100%;padding:11px;background:#10b981;color:#fff;border:none;border-radius:10px;font-weight:700;cursor:pointer;font-size:.95rem;">Add Stock</button>
+    </form>
+  </div>
+  {% endif %}
+
+  <h2 style="font-size:.85rem;text-transform:uppercase;letter-spacing:.07em;font-weight:800;color:#475569;margin-bottom:10px;">Current Inventory</h2>
+  <div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;">
+    <table style="width:100%;border-collapse:collapse;font-size:.85rem;">
+      <thead>
+        <tr style="background:#f8fafc;">
+          <th style="padding:10px 14px;text-align:left;font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;color:#64748b;">Product</th>
+          <th style="padding:10px 14px;text-align:right;font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;color:#64748b;">Stock</th>
+          <th style="padding:10px 14px;text-align:right;font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;color:#64748b;">Cost</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in products %}
+        <tr style="border-top:1px solid #f1f5f9;">
+          <td style="padding:10px 14px;">
+            <div style="font-weight:600;">{{ p.name }}</div>
+            <div style="font-size:.72rem;color:#94a3b8;">{% if p.department %}{{ p.department.name }}{% endif %}{% if p.category %} › {{ p.category.name }}{% endif %}</div>
+          </td>
+          <td style="padding:10px 14px;text-align:right;font-weight:700;{% if p.is_out_of_stock %}color:#ef4444;{% elif p.is_low_stock %}color:#f59e0b;{% else %}color:#16a34a;{% endif %}">
+            {{ p.stock_quantity|floatformat:0 }} {{ p.unit }}
+          </td>
+          <td style="padding:10px 14px;text-align:right;color:#64748b;">MWK {{ p.cost_price|floatformat:0|intcomma }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="3" style="text-align:center;padding:30px;color:#94a3b8;">No products yet. <a href="{% url 'mixed_retail:product_add' %}">Add one</a></td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

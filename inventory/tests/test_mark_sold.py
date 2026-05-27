@@ -75,7 +75,8 @@ class MarkSoldTests(TestCase):
         # Common field names across codebases; provide conservative defaults
         # Add location if the model has such a field and we created one
         if hasattr(StockItem, "status"):
-            stock_kwargs["status"] = "in_stock"
+            # Use uppercase to match DB constraint: inv_status_allowed (IN_STOCK or SOLD)
+            stock_kwargs["status"] = "IN_STOCK"
         if hasattr(StockItem, "order_price"):
             stock_kwargs["order_price"] = Decimal("100")
         if hasattr(StockItem, "selling_price"):
@@ -86,8 +87,10 @@ class MarkSoldTests(TestCase):
         item = StockItem.objects.create(**stock_kwargs)
 
         # Prepare call to service
+        # Use imei if available (code was mapped to imei via COMPAT_MAP)
+        item_code = getattr(item, "imei", None) or getattr(item, "code", None) or code
         call_kwargs = dict(
-            code=item.code,
+            code=item_code,
             price=Decimal("900000"),
             commission_pct=Decimal("7"),
             sold_at=None,

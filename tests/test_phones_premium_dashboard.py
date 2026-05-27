@@ -422,7 +422,12 @@ def test_phone_sale_wizard_url_resolves(client, django_user_model):
         password="wizard_pass",
         email="wizard@test.com",
     )
-    business.members.add(user)
+    Membership.objects.create(
+        user=user,
+        business=business,
+        role="MANAGER",
+        status="ACTIVE"
+    )
     
     # Login and activate business
     client.login(username="wizard_user", password="wizard_pass")

@@ -3,30 +3,33 @@ from __future__ import annotations
 
 import datetime
 import json
-from datetime import datetime as dt, timedelta
-from decimal import Decimal
 from collections import deque
+from datetime import datetime as dt
+from datetime import timedelta
+from decimal import Decimal
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.core.exceptions import FieldError
 from django.core.paginator import Paginator
 from django.db import models
-from django.db.models import Count, Sum, Value, DecimalField, Q
-from django.db.models.functions import TruncDate, TruncMonth, Coalesce, Cast
+from django.db.models import Count, DecimalField, Q, Sum, Value
+from django.db.models.functions import Cast, Coalesce, TruncDate, TruncMonth
 from django.http import HttpResponse, JsonResponse
-from django.shortcuts import render, get_object_or_404, redirect
-from django.template import loader, TemplateDoesNotExist
+from django.shortcuts import get_object_or_404, redirect, render
+from django.template import TemplateDoesNotExist, loader
 from django.template.loader import select_template
 from django.urls import reverse
 from django.utils import timezone
 
+from billing.models import Invoice, Subscription  # BusinessSubscription alias
 from hq.permissions import hq_admin_required
-from hq.utils_dates import get_period_from_request, get_year_from_request, get_month_range
+from hq.services.hq_analytics import get_hq_analytics_data
+from hq.utils_dates import get_month_range, get_period_from_request, get_year_from_request
 from hq.utils_gamification import get_agent_rankings
-from tenants.models import Business, Membership
-from billing.models import Subscription, Invoice  # BusinessSubscription alias
-from inventory.models import InventoryItem
+from inventory.models import InventoryItem, Location
 from sales.models import Sale
+from tenants.models import Business, Membership
 
 # Try to import Plan model if you have one
 try:
@@ -34,33 +37,19 @@ try:
 except Exception:  # pragma: no cover
     Plan = None  # type: ignore
 
+# Check if contracts module is available
+try:
+    from hq import views_contracts
+
+    CONTRACTS_ENABLED = True
+except ImportError:
+    CONTRACTS_ENABLED = False
+
 
 # -------------------------------------------------------------------
-# Plan catalog (single source of truth for names, prices, limits)
+# Plan catalog - IMPORT FROM BILLING.PRICING (SINGLE SOURCE OF TRUTH)
 # -------------------------------------------------------------------
-PLAN_CATALOG = {
-    "starter": {
-        "code": "starter",
-        "name": "Starter",
-        "amount": Decimal("20000.00"),
-        "max_agents": 0,          # cannot add agents
-        "max_stores": 1,          # one store
-    },
-    "pro": {
-        "code": "pro",
-        "name": "Pro",
-        "amount": Decimal("35000.00"),
-        "max_agents": 5,          # up to 5 agents
-        "max_stores": None,       # unlimited
-    },
-    "promax": {
-        "code": "promax",
-        "name": "Pro Max",
-        "amount": Decimal("50000.00"),
-        "max_agents": None,       # unlimited
-        "max_stores": None,       # unlimited
-    },
-}
+from billing.pricing import PLAN_CATALOG
 
 
 # -------------------------------------------------------------------
@@ -88,11 +77,13 @@ def _date_range_from_request(request):
     if rng == "7d":
         return today - timedelta(days=7), today, rng
     if rng == "custom":
+
         def _p(x):
             try:
                 return dt.strptime(x, "%Y-%m-%d").date()
             except Exception:
                 return None
+
         s = _p(request.GET.get("start") or "")
         e = _p(request.GET.get("end") or "")
         if not s or not e or s > e:
@@ -128,6 +119,43 @@ def _json_body(request):
         return json.loads(request.body.decode("utf-8"))
     except Exception:
         return {}
+
+
+@hq_admin_required
+def business_credit_scores(request):
+    from dashboard.services_credit import calculate_business_credit_score
+
+    query = (request.GET.get("q") or "").strip()
+    businesses = Business.objects.all().order_by("name")
+    if query:
+        businesses = businesses.filter(Q(name__icontains=query) | Q(slug__icontains=query))
+
+    rows = []
+    for business in businesses[:100]:
+        credit = calculate_business_credit_score(business)
+        summary = credit.get("summary", {})
+        limit_range = credit.get("recommended_credit_limit_range") or {"low": None, "high": None}
+        rows.append(
+            {
+                "business": business,
+                "score": credit.get("score"),
+                "label": credit.get("label"),
+                "status_color": credit.get("status_color"),
+                "summary": summary,
+                "limit_range": limit_range,
+                "is_onboarding": credit.get("is_onboarding"),
+            }
+        )
+
+    return render(
+        request,
+        "hq/business_credit_scores.html",
+        {
+            "rows": rows,
+            "query": query,
+            "contracts_enabled": CONTRACTS_ENABLED,
+        },
+    )
 
 
 def _plan_info_from_subscription(sub: Subscription) -> dict:
@@ -253,12 +281,13 @@ def _dashboard_inline(ctx: dict) -> str:
 def dashboard(request):
     # Log HQ dashboard access
     from audit.utils import log_hq_action
+
     log_hq_action(request, action="VIEW_PAGE", entity_type="HQ_DASHBOARD", message="Accessed HQ dashboard")
-    
+
     now = timezone.now()
     seven = now - timedelta(days=7)
     thirty = now - timedelta(days=30)
-    
+
     # Get date filtering parameters
     start_date, end_date, period_type = get_period_from_request(request, default_to_current_month=True)
     year = get_year_from_request(request)
@@ -287,7 +316,8 @@ def dashboard(request):
     ctx["agents_total"] = Membership.objects.filter(role="AGENT").count()
     ctx["agents_new_30d"] = (
         Membership.objects.filter(role="AGENT", created_at__gte=thirty).count()
-        if _field(Membership, "created_at") else 0
+        if _field(Membership, "created_at")
+        else 0
     )
 
     # Use whichever InventoryItem manager exists
@@ -296,152 +326,533 @@ def dashboard(request):
     ctx["stock_out_7d"] = inv_mgr.filter(sold_at__isnull=False, sold_at__gte=seven).count()
 
     ctx["any_trials"] = Subscription.objects.filter(status__in=["TRIAL", "trial"]).exists()
-    
+
     # === NEW: Sales metrics for the selected period ===
     sales_qs = Sale.objects.all()
     if start_date and end_date:
         sales_qs = sales_qs.filter(sold_at__gte=start_date, sold_at__lt=end_date)
-    
+
     ctx["sales_count"] = sales_qs.count()
-    ctx["sales_revenue"] = sales_qs.aggregate(
-        total=Coalesce(Sum("price"), zero_dec)
-    )["total"]
-    
+    ctx["sales_revenue"] = sales_qs.aggregate(total=Coalesce(Sum("price"), zero_dec))["total"]
+
     # === Monthly aggregates for the selected year ===
-    year_start = dt(year, 1, 1).date()
-    year_end = dt(year + 1, 1, 1).date()
-    
-    sales_by_month = Sale.objects.filter(
-        sold_at__gte=year_start,
-        sold_at__lt=year_end
-    ).annotate(
-        month=TruncMonth('sold_at')
-    ).values('month').annotate(
-        count=Count('id'),
-        revenue=Coalesce(Sum('price'), zero_dec)
-    ).order_by('month')
-    
-    # Prepare chart data (monthly sales)
-    monthly_sales_labels = []
-    monthly_sales_data = []
-    monthly_revenue_data = []
-    
-    for item in sales_by_month:
-        month_date = item['month']
-        monthly_sales_labels.append(month_date.strftime('%B'))
-        monthly_sales_data.append(item['count'])
-        monthly_revenue_data.append(float(item['revenue']))
-    
+    year_start = timezone.make_aware(dt(year, 1, 1))
+    year_end = timezone.make_aware(dt(year + 1, 1, 1))
+
+    # SQLite-safe monthly aggregation
+    from django.db import connection
+
+    if connection.vendor == "sqlite":
+        # SQLite fallback: fetch raw data and group in Python
+        sales_raw = (
+            Sale.objects.filter(sold_at__isnull=False, sold_at__gte=year_start, sold_at__lt=year_end)
+            .values("sold_at", "price")
+            .order_by("sold_at")
+        )
+
+        # Group by month in Python
+        from collections import defaultdict
+
+        monthly_data = defaultdict(lambda: {"count": 0, "revenue": 0})
+
+        for sale in sales_raw:
+            if sale["sold_at"]:
+                # Get year-month tuple
+                sold_dt = sale["sold_at"]
+                month_key = (sold_dt.year, sold_dt.month)
+                monthly_data[month_key]["count"] += 1
+                monthly_data[month_key]["revenue"] += float(sale["price"] or 0)
+
+        # Sort and prepare chart data
+        sorted_months = sorted(monthly_data.keys())
+        monthly_sales_labels = [dt(y, m, 1).strftime("%B") for y, m in sorted_months]
+        monthly_sales_data = [monthly_data[k]["count"] for k in sorted_months]
+        monthly_revenue_data = [monthly_data[k]["revenue"] for k in sorted_months]
+    else:
+        # PostgreSQL/MySQL: use DB-level aggregation
+        sales_by_month = (
+            Sale.objects.filter(sold_at__isnull=False, sold_at__gte=year_start, sold_at__lt=year_end)
+            .annotate(month=TruncMonth("sold_at"))
+            .values("month")
+            .annotate(count=Count("id"), revenue=Coalesce(Sum("price"), zero_dec))
+            .order_by("month")
+        )
+
+        # Prepare chart data (monthly sales)
+        monthly_sales_labels = []
+        monthly_sales_data = []
+        monthly_revenue_data = []
+
+        for item in sales_by_month:
+            month_date = item["month"]
+            if month_date:
+                monthly_sales_labels.append(month_date.strftime("%B"))
+                monthly_sales_data.append(item["count"])
+                monthly_revenue_data.append(float(item["revenue"]))
+
     ctx["monthly_sales_labels"] = json.dumps(monthly_sales_labels)
     ctx["monthly_sales_data"] = json.dumps(monthly_sales_data)
     ctx["monthly_revenue_data"] = json.dumps(monthly_revenue_data)
-    
+
+    # === Chart context: totals, peak month, table data ===
+    sales_ytd_count = sum(monthly_sales_data) if monthly_sales_data else 0
+    sales_ytd_revenue = sum(monthly_revenue_data) if monthly_revenue_data else 0
+
+    # Find peak month
+    sales_peak_month_label = ""
+    sales_peak_month_count = 0
+    sales_peak_month_revenue = 0
+    if monthly_sales_data and monthly_sales_labels:
+        peak_idx = monthly_sales_data.index(max(monthly_sales_data)) if monthly_sales_data else 0
+        sales_peak_month_label = monthly_sales_labels[peak_idx] if peak_idx < len(monthly_sales_labels) else ""
+        sales_peak_month_count = monthly_sales_data[peak_idx] if peak_idx < len(monthly_sales_data) else 0
+        sales_peak_month_revenue = monthly_revenue_data[peak_idx] if peak_idx < len(monthly_revenue_data) else 0
+
+    # Build table data
+    sales_month_table = []
+    for i, label in enumerate(monthly_sales_labels):
+        sales_month_table.append(
+            {
+                "month": label,
+                "count": monthly_sales_data[i] if i < len(monthly_sales_data) else 0,
+                "revenue": monthly_revenue_data[i] if i < len(monthly_revenue_data) else 0,
+            }
+        )
+
+    ctx["sales_ytd_count"] = sales_ytd_count
+    ctx["sales_ytd_revenue"] = sales_ytd_revenue
+    ctx["sales_peak_month_label"] = sales_peak_month_label
+    ctx["sales_peak_month_count"] = sales_peak_month_count
+    ctx["sales_peak_month_revenue"] = sales_peak_month_revenue
+    ctx["sales_month_table"] = sales_month_table
+
     # === New agent onboardings by month ===
     if _field(Membership, "created_at"):
-        onboardings_by_month = Membership.objects.filter(
-            role="AGENT",
-            created_at__gte=year_start,
-            created_at__lt=year_end
-        ).annotate(
-            month=TruncMonth('created_at')
-        ).values('month').annotate(
-            count=Count('id')
-        ).order_by('month')
-        
-        monthly_onboardings_labels = []
-        monthly_onboardings_data = []
-        
-        for item in onboardings_by_month:
-            month_date = item['month']
-            monthly_onboardings_labels.append(month_date.strftime('%B'))
-            monthly_onboardings_data.append(item['count'])
-        
+        from django.db import connection
+
+        if connection.vendor == "sqlite":
+            # SQLite fallback: fetch raw data and group in Python
+            onboardings_raw = (
+                Membership.objects.filter(
+                    role="AGENT", created_at__isnull=False, created_at__gte=year_start, created_at__lt=year_end
+                )
+                .values("created_at")
+                .order_by("created_at")
+            )
+
+            # Group by month in Python
+            from collections import defaultdict
+
+            monthly_counts = defaultdict(int)
+
+            for item in onboardings_raw:
+                if item["created_at"]:
+                    created_dt = item["created_at"]
+                    month_key = (created_dt.year, created_dt.month)
+                    monthly_counts[month_key] += 1
+
+            # Sort and prepare chart data
+            sorted_months = sorted(monthly_counts.keys())
+            monthly_onboardings_labels = [dt(y, m, 1).strftime("%B") for y, m in sorted_months]
+            monthly_onboardings_data = [monthly_counts[k] for k in sorted_months]
+        else:
+            # PostgreSQL/MySQL: use DB-level aggregation
+            onboardings_by_month = (
+                Membership.objects.filter(
+                    role="AGENT", created_at__isnull=False, created_at__gte=year_start, created_at__lt=year_end
+                )
+                .annotate(month=TruncMonth("created_at"))
+                .values("month")
+                .annotate(count=Count("id"))
+                .order_by("month")
+            )
+
+            monthly_onboardings_labels = []
+            monthly_onboardings_data = []
+
+            for item in onboardings_by_month:
+                month_date = item["month"]
+                if month_date:
+                    monthly_onboardings_labels.append(month_date.strftime("%B"))
+                    monthly_onboardings_data.append(item["count"])
+
         ctx["monthly_onboardings_labels"] = json.dumps(monthly_onboardings_labels)
         ctx["monthly_onboardings_data"] = json.dumps(monthly_onboardings_data)
+
+        # === Chart context for onboardings ===
+        onb_ytd_count = sum(monthly_onboardings_data) if monthly_onboardings_data else 0
+        onb_peak_month_label = ""
+        onb_peak_month_count = 0
+        if monthly_onboardings_data and monthly_onboardings_labels:
+            peak_idx = monthly_onboardings_data.index(max(monthly_onboardings_data)) if monthly_onboardings_data else 0
+            onb_peak_month_label = (
+                monthly_onboardings_labels[peak_idx] if peak_idx < len(monthly_onboardings_labels) else ""
+            )
+            onb_peak_month_count = monthly_onboardings_data[peak_idx] if peak_idx < len(monthly_onboardings_data) else 0
+
+        onb_month_table = []
+        for i, label in enumerate(monthly_onboardings_labels):
+            onb_month_table.append(
+                {"month": label, "count": monthly_onboardings_data[i] if i < len(monthly_onboardings_data) else 0}
+            )
+
+        ctx["onb_ytd_count"] = onb_ytd_count
+        ctx["onb_peak_month_label"] = onb_peak_month_label
+        ctx["onb_peak_month_count"] = onb_peak_month_count
+        ctx["onb_month_table"] = onb_month_table
     else:
         ctx["monthly_onboardings_labels"] = json.dumps([])
         ctx["monthly_onboardings_data"] = json.dumps([])
-    
+        ctx["onb_ytd_count"] = 0
+        ctx["onb_peak_month_label"] = ""
+        ctx["onb_peak_month_count"] = 0
+        ctx["onb_month_table"] = []
+
     # === Daily drill-down if month is selected ===
     if period_type == "month" and start_date and end_date:
-        sales_by_day = Sale.objects.filter(
-            sold_at__gte=start_date,
-            sold_at__lt=end_date
-        ).annotate(
-            day=TruncDate('sold_at')
-        ).values('day').annotate(
-            count=Count('id'),
-            revenue=Coalesce(Sum('price'), zero_dec)
-        ).order_by('day')
-        
-        daily_sales_labels = []
-        daily_sales_data = []
-        daily_revenue_data = []
-        
-        for item in sales_by_day:
-            day_date = item['day']
-            daily_sales_labels.append(day_date.strftime('%d'))
-            daily_sales_data.append(item['count'])
-            daily_revenue_data.append(float(item['revenue']))
-        
+        # SQLite-safe: filter out null sold_at, then group in Python if needed
+        from django.db import connection
+
+        if connection.vendor == "sqlite":
+            # SQLite fallback: fetch raw data and group in Python
+            sales_raw = (
+                Sale.objects.filter(sold_at__isnull=False, sold_at__gte=start_date, sold_at__lt=end_date)
+                .values("sold_at", "price")
+                .order_by("sold_at")
+            )
+
+            # Group by date in Python
+            from collections import defaultdict
+
+            daily_data = defaultdict(lambda: {"count": 0, "revenue": 0})
+
+            for sale in sales_raw:
+                if sale["sold_at"]:
+                    # Convert to date
+                    day = sale["sold_at"].date() if hasattr(sale["sold_at"], "date") else sale["sold_at"]
+                    daily_data[day]["count"] += 1
+                    daily_data[day]["revenue"] += float(sale["price"] or 0)
+
+            # Sort and prepare chart data
+            sorted_days = sorted(daily_data.keys())
+            daily_sales_labels = [d.strftime("%d") for d in sorted_days]
+            daily_sales_data = [daily_data[d]["count"] for d in sorted_days]
+            daily_revenue_data = [daily_data[d]["revenue"] for d in sorted_days]
+        else:
+            # PostgreSQL/MySQL: use DB-level aggregation
+            sales_by_day = (
+                Sale.objects.filter(sold_at__isnull=False, sold_at__gte=start_date, sold_at__lt=end_date)
+                .annotate(day=TruncDate("sold_at"))
+                .values("day")
+                .annotate(count=Count("id"), revenue=Coalesce(Sum("price"), zero_dec))
+                .order_by("day")
+            )
+
+            daily_sales_labels = []
+            daily_sales_data = []
+            daily_revenue_data = []
+
+            for item in sales_by_day:
+                day_date = item["day"]
+                if day_date:
+                    daily_sales_labels.append(day_date.strftime("%d"))
+                    daily_sales_data.append(item["count"])
+                    daily_revenue_data.append(float(item["revenue"]))
+
         ctx["daily_sales_labels"] = json.dumps(daily_sales_labels)
         ctx["daily_sales_data"] = json.dumps(daily_sales_data)
         ctx["daily_revenue_data"] = json.dumps(daily_revenue_data)
-    
+
     # === Top 10 agents (global) ===
     # For simplicity, we'll aggregate across all businesses
     # In a real multi-tenant setup, you might want to scope this differently
-    top_agents = get_agent_rankings(
-        business=None,  # We'll handle this in the utility
-        start_date=start_date,
-        end_date=end_date,
-        limit=10
-    ) if start_date and end_date else []
-    
+    top_agents = (
+        get_agent_rankings(
+            business=None, start_date=start_date, end_date=end_date, limit=10  # We'll handle this in the utility
+        )
+        if start_date and end_date
+        else []
+    )
+
     # For now, let's do a simple global aggregate instead
     from django.contrib.auth import get_user_model
+
     User = get_user_model()
-    
-    agent_memberships = Membership.objects.filter(role="AGENT")
-    agent_users = [m.user_id for m in agent_memberships]
-    
-    top_agents_data = Sale.objects.filter(
-        agent_id__in=agent_users
-    )
+
+    # Include both agents and managers for HQ reporting
+    agent_memberships = Membership.objects.filter(Q(role="AGENT") | Q(role="MANAGER"))
+    agent_users = [m.user_id for m in agent_memberships if m.user_id]
+
+    # Get sales attributed to agents/managers, handling missing agent gracefully
+    top_agents_data = Sale.objects.filter(agent_id__in=agent_users) if agent_users else Sale.objects.none()
+
     if start_date and end_date:
         top_agents_data = top_agents_data.filter(sold_at__gte=start_date, sold_at__lt=end_date)
-    
-    top_agents_data = top_agents_data.values('agent').annotate(
-        sales_count=Count('id'),
-        revenue=Coalesce(Sum('price'), zero_dec)
-    ).order_by('-sales_count')[:10]
-    
+
+    top_agents_data = (
+        top_agents_data.values("agent")
+        .annotate(sales_count=Count("id"), revenue=Coalesce(Sum("price"), zero_dec))
+        .order_by("-sales_count")[:10]
+    )
+
     top_agents_list = []
     for item in top_agents_data:
+        if not item.get("agent"):
+            continue
         try:
-            agent = User.objects.get(id=item['agent'])
-            top_agents_list.append({
-                'name': agent.get_full_name() or agent.username,
-                'sales_count': item['sales_count'],
-                'revenue': item['revenue']
-            })
+            agent = User.objects.get(id=item["agent"])
+            top_agents_list.append(
+                {
+                    "name": agent.get_full_name() or agent.username,
+                    "sales_count": item["sales_count"],
+                    "revenue": item["revenue"],
+                }
+            )
         except User.DoesNotExist:
-            pass
-    
+            # Handle case where user was deleted
+            top_agents_list.append(
+                {"name": "Unknown Agent", "sales_count": item["sales_count"], "revenue": item["revenue"]}
+            )
+
     ctx["top_agents"] = top_agents_list
-    
+
     # Context for filters
     ctx["selected_year"] = year
     ctx["selected_period"] = period_type
     ctx["start_date"] = start_date
     ctx["end_date"] = end_date
-    
+
     # Year range for selector
     current_year = timezone.now().year
     ctx["year_range"] = range(current_year - 5, current_year + 2)
-    
+
     # active_tab for base.html mobile nav
     ctx["active_tab"] = "home"
+
+    # Add contracts_enabled flag for sidebar
+    ctx["contracts_enabled"] = CONTRACTS_ENABLED
+
+    # Add filter options for analytics
+    ctx["all_businesses"] = Business.objects.all().order_by("name")[:100]  # Limit for performance
+    # Include both agents and managers in filter dropdowns
+    ctx["all_agents"] = (
+        Membership.objects.filter(Q(role="AGENT") | Q(role="MANAGER"))
+        .select_related("user", "business")
+        .order_by("user__username")[:100]
+    )
+    # Build base queryset first, then optionally filter by is_active if field exists
+    locations_qs = Location.objects.select_related("business").order_by("business__name", "name")
+    try:
+        ctx["all_locations"] = locations_qs.filter(is_active=True)[:100]
+    except FieldError:
+        # Location model doesn't have is_active field, return all locations
+        ctx["all_locations"] = locations_qs[:100]
+
+    # Vertical options
+    ctx["vertical_options"] = [
+        ("", "All Verticals"),
+        ("phones", "Phones"),
+        ("clothing", "Clothing"),
+        ("liquor", "Liquor"),
+        ("pharmacy", "Pharmacy"),
+        ("gym", "Gym"),
+    ]
+
+    # Payment mode options
+    from sales.models import PaymentMethod
+
+    ctx["payment_mode_options"] = [("", "All")] + list(PaymentMethod.choices)
+
+    # Wallet balance (default to 0 if wallet feature not configured)
+    ctx["wallet_balance"] = Decimal("0")
+    ctx["wallet_currency"] = "MWK"
+
+    # -------------------------------------------------------------------
+    # Wallet incoming / outgoing (WalletTransaction model)
+    # -------------------------------------------------------------------
+    try:
+        from wallet.models import WalletTransaction, TxnType, Ledger
+
+        income_types = [TxnType.COMMISSION, TxnType.REVENUE, TxnType.BONUS, TxnType.ADJUSTMENT]
+        expense_types = [TxnType.DEDUCTION, TxnType.ADVANCE, TxnType.PENALTY, TxnType.PAYSLIP,
+                         TxnType.COST_ONCE_OFF, TxnType.COST_RECURRING]
+
+        wallet_in_agg = WalletTransaction.objects.filter(
+            effective_date__gte=thirty.date(), amount__gt=0,
+        ).aggregate(v=Coalesce(Sum("amount"), Value(0, output_field=DecimalField(max_digits=18, decimal_places=2))))
+        ctx["wallet_in_30d"] = wallet_in_agg["v"] or Decimal("0.00")
+
+        wallet_out_agg = WalletTransaction.objects.filter(
+            effective_date__gte=thirty.date(), amount__lt=0,
+        ).aggregate(v=Coalesce(Sum("amount"), Value(0, output_field=DecimalField(max_digits=18, decimal_places=2))))
+        ctx["wallet_out_30d"] = abs(wallet_out_agg["v"] or Decimal("0.00"))
+
+        wallet_bal_agg = WalletTransaction.objects.aggregate(
+            v=Coalesce(Sum("amount"), Value(0, output_field=DecimalField(max_digits=18, decimal_places=2)))
+        )
+        ctx["wallet_balance"] = wallet_bal_agg["v"] or Decimal("0.00")
+    except Exception:
+        ctx["wallet_in_30d"] = Decimal("0.00")
+        ctx["wallet_out_30d"] = Decimal("0.00")
+
+    # -------------------------------------------------------------------
+    # Revenue & Gross Profit (last 30d, all time)
+    # -------------------------------------------------------------------
+    sales_30d_qs = Sale.objects.filter(sold_at__gte=thirty)
+    revenue_30d_agg = sales_30d_qs.aggregate(
+        v=Coalesce(Sum("price"), Value(0, output_field=DecimalField(max_digits=18, decimal_places=2)))
+    )
+    ctx["revenue_30d"] = revenue_30d_agg["v"] or Decimal("0.00")
+
+    # Gross profit 30d (price minus order_price cost)
+    zero_cost = Value(0, output_field=DecimalField(max_digits=12, decimal_places=2))
+    try:
+        from django.db.models import F as _F, ExpressionWrapper as _EW
+        profit_agg = sales_30d_qs.aggregate(
+            v=Coalesce(
+                Sum(_EW(_F("price") - Coalesce(_F("item__order_price"), zero_cost),
+                        output_field=DecimalField(max_digits=18, decimal_places=2))),
+                Value(0, output_field=DecimalField(max_digits=18, decimal_places=2)),
+            )
+        )
+        ctx["gross_profit_30d"] = profit_agg["v"] or Decimal("0.00")
+    except Exception:
+        ctx["gross_profit_30d"] = ctx["revenue_30d"]
+
+    # -------------------------------------------------------------------
+    # Collection Rate
+    # -------------------------------------------------------------------
+    total_invoices = Invoice.objects.count()
+    paid_invoices = Invoice.objects.filter(status__in=["PAID", "SETTLED", "paid"]).count()
+    ctx["collection_rate"] = round(paid_invoices / total_invoices * 100) if total_invoices > 0 else 0
+
+    # -------------------------------------------------------------------
+    # Bug Monitor stats
+    # -------------------------------------------------------------------
+    try:
+        from hq.models_bugmonitor import SystemIssue, IssueStatus, IssueSeverity
+
+        ctx["bug_open"] = SystemIssue.objects.filter(
+            status__in=[IssueStatus.NEW, IssueStatus.INVESTIGATING]
+        ).count()
+        ctx["bug_critical"] = SystemIssue.objects.filter(
+            status__in=[IssueStatus.NEW, IssueStatus.INVESTIGATING],
+            severity=IssueSeverity.CRITICAL,
+        ).count()
+        ctx["bug_cleared_7d"] = SystemIssue.objects.filter(
+            status=IssueStatus.CLEARED,
+            updated_at__gte=seven,
+        ).count()
+        ctx["bug_total"] = SystemIssue.objects.count()
+        ctx["bug_monitor_enabled"] = True
+    except Exception:
+        ctx["bug_open"] = 0
+        ctx["bug_critical"] = 0
+        ctx["bug_cleared_7d"] = 0
+        ctx["bug_total"] = 0
+        ctx["bug_monitor_enabled"] = False
+
+    # -------------------------------------------------------------------
+    # DEMO FALLBACK VALUES
+    # View-level only — never touches the database.
+    # Used when genuine data is zero so the dashboard looks alive.
+    # -------------------------------------------------------------------
+    using_demo = False
+    _D = Decimal
+
+    def _demo_if_zero(ctx_key, demo_val, *, check_key=None):
+        """Replace a ctx value with demo_val if it is falsy/zero. Returns True if demo used."""
+        k = check_key or ctx_key
+        real = ctx.get(k, 0)
+        try:
+            is_zero = not real or _D(str(real)) == _D("0")
+        except Exception:
+            is_zero = not real
+        if is_zero:
+            ctx[ctx_key] = demo_val
+            return True
+        return False
+
+    # Only activate demo mode if we have no real transactions at all
+    total_sales_ever = Sale.objects.count()
+    if total_sales_ever == 0:
+        using_demo = True
+        # Platform Pulse demo values
+        _demo_if_zero("mrr_sum", _D("8700000.00"))
+        _demo_if_zero("revenue_30d", _D("12400000.00"))
+        _demo_if_zero("gross_profit_30d", _D("3200000.00"))
+        _demo_if_zero("sales_count", 386, check_key="sales_count")
+        # Stock
+        _demo_if_zero("stock_in_7d", 248)
+        _demo_if_zero("stock_out_7d", 412)
+        # Agents
+        _demo_if_zero("agents_new_30d", 6)
+        # Invoices
+        if ctx.get("open_invoices", 0) == 0:
+            ctx["open_invoices"] = 14
+            ctx["open_total"] = _D("2100000.00")
+        # Wallet
+        _demo_if_zero("wallet_in_30d", _D("9800000.00"))
+        _demo_if_zero("wallet_out_30d", _D("4300000.00"))
+        # Collection rate demo
+        if ctx.get("collection_rate", 0) == 0:
+            ctx["collection_rate"] = 87
+        # Demo monthly chart data (12 months plausible arc)
+        import json as _json
+        if not any(json.loads(ctx.get("monthly_sales_labels", "[]"))):
+            ctx["monthly_sales_labels"] = _json.dumps(
+                ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+            )
+            ctx["monthly_sales_data"] = _json.dumps([12, 19, 31, 27, 42, 38, 55, 48, 61, 53, 72, 68])
+            ctx["monthly_revenue_data"] = _json.dumps([
+                520000, 840000, 1200000, 1050000, 1680000, 1490000,
+                2200000, 1940000, 2480000, 2100000, 2900000, 2740000,
+            ])
+            ctx["sales_ytd_count"] = 526
+            ctx["sales_ytd_revenue"] = 20140000
+            ctx["sales_peak_month_label"] = "November"
+            ctx["sales_peak_month_count"] = 72
+            ctx["sales_peak_month_revenue"] = 2900000
+        # Demo top agents
+        if not ctx.get("top_agents"):
+            ctx["top_agents"] = [
+                {"name": "Takondwa Banda", "sales_count": 87, "revenue": _D("3480000")},
+                {"name": "Chisomo Phiri", "sales_count": 74, "revenue": _D("2960000")},
+                {"name": "Lumbani Mwale", "sales_count": 61, "revenue": _D("2440000")},
+                {"name": "Grace Zimba", "sales_count": 53, "revenue": _D("2120000")},
+                {"name": "Patrick Njobvu", "sales_count": 47, "revenue": _D("1880000")},
+            ]
+        # Demo sales_revenue (period metric) and agents_total
+        _demo_if_zero("sales_revenue", _D("12400000.00"))
+        _demo_if_zero("agents_total", 24)
+        _demo_if_zero("wallet_balance", _D("5500000.00"))
+
+    ctx["using_demo"] = using_demo
+
+    # -------------------------------------------------------------------
+    # Per-metric "awaiting" flags — shown even when NOT in full demo mode.
+    # These let the template render elegant non-zero states instead of plain
+    # zeros for metrics that are genuinely absent (but real data may exist
+    # outside the selected period filter).
+    # -------------------------------------------------------------------
+    ctx["mrr_awaiting"] = not using_demo and ctx.get("mrr_sum", 0) == 0
+    ctx["collection_awaiting"] = not using_demo and ctx.get("collection_rate", 0) == 0
+    ctx["wallet_awaiting"] = not using_demo and ctx.get("wallet_in_30d", 0) == 0 and ctx.get("wallet_out_30d", 0) == 0
+
+    # Net stock movement (computed once, used by template arithmetic-free)
+    _stock_in = ctx.get("stock_in_7d", 0) or 0
+    _stock_out = ctx.get("stock_out_7d", 0) or 0
+    ctx["net_stock_7d"] = _stock_in - _stock_out
+
+    # -------------------------------------------------------------------
+    # Summary context helpers for template rendering
+    # -------------------------------------------------------------------
+    # Active businesses percentage (of total) — useful for ops health gauge
+    ctx["active_biz_count"] = Business.objects.filter(status__in=["ACTIVE", "active"]).count()
+
+    # Subscription health
+    ctx["trial_subs"] = Subscription.objects.filter(status__in=["TRIAL", "trial"]).count()
+    ctx["expired_subs"] = Subscription.objects.filter(status__in=["EXPIRED", "expired", "CANCELLED", "cancelled"]).count()
 
     return _render_safe(request, "hq/dashboard.html", ctx, _dashboard_inline)
 
@@ -454,7 +865,7 @@ def monthly_drill_down_api(request):
     """
     JSON API endpoint for monthly drill-down data.
     Returns daily sales data for a specific month.
-    
+
     Query params:
     - year (int): Year to query
     - month (int): Month to query (1-12)
@@ -462,66 +873,119 @@ def monthly_drill_down_api(request):
     try:
         year = int(request.GET.get("year", timezone.now().year))
         month = int(request.GET.get("month", timezone.now().month))
-        
+
         if not (1 <= month <= 12 and 1900 <= year <= 2100):
             return JsonResponse({"error": "Invalid year or month"}, status=400)
-        
+
         # Get date range for the month
         start_date, end_date = get_month_range(year, month)
-        
-        # Aggregate sales by day
+
+        # Aggregate sales by day - SQLite-safe
         zero_dec = Value(0, output_field=DecimalField(max_digits=18, decimal_places=2))
-        sales_by_day = Sale.objects.filter(
-            sold_at__gte=start_date,
-            sold_at__lt=end_date
-        ).annotate(
-            day=TruncDate('sold_at')
-        ).values('day').annotate(
-            count=Count('id'),
-            revenue=Coalesce(Sum('price'), zero_dec)
-        ).order_by('day')
-        
-        # Format response
-        daily_data = [
-            {
-                "date": item['day'].isoformat(),
-                "day": item['day'].day,
-                "sales_count": item['count'],
-                "revenue": float(item['revenue'])
-            }
-            for item in sales_by_day
-        ]
-        
-        # Aggregate new onboardings by day (if available)
-        if _field(Membership, "created_at"):
-            onboardings_by_day = Membership.objects.filter(
-                role="AGENT",
-                created_at__gte=start_date,
-                created_at__lt=end_date
-            ).annotate(
-                day=TruncDate('created_at')
-            ).values('day').annotate(
-                count=Count('id')
-            ).order_by('day')
-            
-            onboarding_data = [
+        from django.db import connection
+
+        if connection.vendor == "sqlite":
+            # SQLite fallback: fetch raw data and group in Python
+            sales_raw = (
+                Sale.objects.filter(sold_at__isnull=False, sold_at__gte=start_date, sold_at__lt=end_date)
+                .values("sold_at", "price")
+                .order_by("sold_at")
+            )
+
+            from collections import defaultdict
+
+            daily_sales = defaultdict(lambda: {"count": 0, "revenue": 0})
+
+            for sale in sales_raw:
+                if sale["sold_at"]:
+                    day = sale["sold_at"].date() if hasattr(sale["sold_at"], "date") else sale["sold_at"]
+                    daily_sales[day]["count"] += 1
+                    daily_sales[day]["revenue"] += float(sale["price"] or 0)
+
+            daily_data = [
                 {
-                    "date": item['day'].isoformat(),
-                    "day": item['day'].day,
-                    "count": item['count']
+                    "date": day.isoformat(),
+                    "day": day.day,
+                    "sales_count": daily_sales[day]["count"],
+                    "revenue": daily_sales[day]["revenue"],
                 }
-                for item in onboardings_by_day
+                for day in sorted(daily_sales.keys())
             ]
         else:
+            # PostgreSQL/MySQL: use DB-level aggregation
+            sales_by_day = (
+                Sale.objects.filter(sold_at__isnull=False, sold_at__gte=start_date, sold_at__lt=end_date)
+                .annotate(day=TruncDate("sold_at"))
+                .values("day")
+                .annotate(count=Count("id"), revenue=Coalesce(Sum("price"), zero_dec))
+                .order_by("day")
+            )
+
+            daily_data = [
+                {
+                    "date": item["day"].isoformat(),
+                    "day": item["day"].day,
+                    "sales_count": item["count"],
+                    "revenue": float(item["revenue"]),
+                }
+                for item in sales_by_day
+                if item["day"]
+            ]
+
+        # Aggregate new onboardings by day (if available) - SQLite-safe
+        if _field(Membership, "created_at"):
+            if connection.vendor == "sqlite":
+                # SQLite fallback
+                onboardings_raw = (
+                    Membership.objects.filter(
+                        role="AGENT", created_at__isnull=False, created_at__gte=start_date, created_at__lt=end_date
+                    )
+                    .values("created_at")
+                    .order_by("created_at")
+                )
+
+                from collections import defaultdict
+
+                daily_onboardings = defaultdict(int)
+
+                for item in onboardings_raw:
+                    if item["created_at"]:
+                        day = item["created_at"].date() if hasattr(item["created_at"], "date") else item["created_at"]
+                        daily_onboardings[day] += 1
+
+                onboarding_data = [
+                    {"date": day.isoformat(), "day": day.day, "count": daily_onboardings[day]}
+                    for day in sorted(daily_onboardings.keys())
+                ]
+            else:
+                # PostgreSQL/MySQL
+                onboardings_by_day = (
+                    Membership.objects.filter(
+                        role="AGENT", created_at__isnull=False, created_at__gte=start_date, created_at__lt=end_date
+                    )
+                    .annotate(day=TruncDate("created_at"))
+                    .values("day")
+                    .annotate(count=Count("id"))
+                    .order_by("day")
+                )
+
+                onboarding_data = [
+                    {"date": item["day"].isoformat(), "day": item["day"].day, "count": item["count"]}
+                    for item in onboardings_by_day
+                    if item["day"]
+                ]
+        else:
             onboarding_data = []
-        
-        return JsonResponse({
-            "year": year,
-            "month": month,
-            "daily_sales": daily_data,
-            "daily_onboardings": onboarding_data,
-        })
-    
+
+        return JsonResponse(
+            {
+                "year": year,
+                "month": month,
+                "daily_sales": daily_data,
+                "daily_onboardings": onboarding_data,
+            }
+        )
+
     except (ValueError, TypeError) as e:
         return JsonResponse({"error": f"Invalid parameters: {str(e)}"}, status=400)
     except Exception as e:
@@ -535,8 +999,9 @@ def monthly_drill_down_api(request):
 def businesses(request):
     # Log HQ access to businesses list
     from audit.utils import log_hq_action
+
     log_hq_action(request, action="VIEW_PAGE", entity_type="BUSINESS_LIST", message="Accessed businesses list")
-    
+
     start, end, rng = _date_range_from_request(request)
     q = (request.GET.get("q") or "").strip()
 
@@ -547,23 +1012,43 @@ def businesses(request):
         rows = rows.filter(Q(name__icontains=q) | Q(slug__icontains=q))
 
     page_obj = _paginate(request, rows, per_page=25)
-    ctx = {"rows": rows, "page_obj": page_obj, "q": q, "range": rng, "start": start, "end": end, "active_tab": "businesses"}
-    return _render_safe(request, "hq/businesses.html", ctx, lambda c: "<h1 style='font-family:system-ui'>Businesses</h1>")
+    ctx = {
+        "rows": rows,
+        "page_obj": page_obj,
+        "q": q,
+        "range": rng,
+        "start": start,
+        "end": end,
+        "active_tab": "businesses",
+        "contracts_enabled": CONTRACTS_ENABLED,
+    }
+    return _render_safe(
+        request, "hq/businesses.html", ctx, lambda c: "<h1 style='font-family:system-ui'>Businesses</h1>"
+    )
 
 
 @hq_admin_required
 def business_detail(request, pk: int):
     biz = get_object_or_404(Business, pk=pk)
-    
+
     # Log HQ access to business detail
     from audit.utils import log_hq_action
-    log_hq_action(request, action="VIEW_PAGE", entity_type="Business", entity_id=pk, 
-                  message=f"Viewed business detail: {biz.name}", business=biz)
-    
+
+    log_hq_action(
+        request,
+        action="VIEW_PAGE",
+        entity_type="Business",
+        entity_id=pk,
+        message=f"Viewed business detail: {biz.name}",
+        business=biz,
+    )
+
     start, end, rng = _date_range_from_request(request)
 
     inv = Invoice.objects.filter(business=biz)
-    date_field = "issue_date" if _field(Invoice, "issue_date") else ("created_at" if _field(Invoice, "created_at") else None)
+    date_field = (
+        "issue_date" if _field(Invoice, "issue_date") else ("created_at" if _field(Invoice, "created_at") else None)
+    )
     if date_field and start and end:
         inv = _range_filter(inv, Invoice, date_field, start, end)
 
@@ -585,38 +1070,59 @@ def business_detail(request, pk: int):
             v=Coalesce(Sum("amount"), Value(0, output_field=DecimalField(max_digits=18, decimal_places=2)))
         )["v"]
 
-    trunc_base = "issue_date" if _field(Invoice, "issue_date") else ("created_at" if _field(Invoice, "created_at") else None)
+    trunc_base = (
+        "issue_date" if _field(Invoice, "issue_date") else ("created_at" if _field(Invoice, "created_at") else None)
+    )
     if trunc_base:
         paid_series_qs = (
             inv.filter(status__in=["PAID", "SETTLED", "paid"])
             .annotate(m=TruncMonth(trunc_base))
             .values("m")
             .order_by("m")
-            .annotate(amount=Coalesce(Sum("total"), Value(0, output_field=DecimalField(max_digits=18, decimal_places=2))))
+            .annotate(
+                amount=Coalesce(Sum("total"), Value(0, output_field=DecimalField(max_digits=18, decimal_places=2)))
+            )
         )
     else:
         paid_series_qs = []
 
     agents_qs = Membership.objects.filter(role="AGENT", business=biz).select_related("user")
     limits = _limits_for_business(biz)
-    
-    # Get subscription for membership controls
-    subscription = getattr(biz, 'subscription', None)
+
+    # Get subscription for membership controls - handle missing subscription safely
+    subscription = None
+    try:
+        subscription = biz.subscription
+    except Subscription.DoesNotExist:
+        subscription = None
+    except AttributeError:
+        subscription = None
+
     total_invoices = inv.count()
 
     ctx = {
         "biz": biz,
-        "range": rng, "start": start, "end": end,
-        "paid_total": paid_total, "open_total": open_total,
+        "range": rng,
+        "start": start,
+        "end": end,
+        "paid_total": paid_total,
+        "open_total": open_total,
         "total_invoices": total_invoices,
-        "active_subs": active_subs, "mrr": mrr,
+        "active_subs": active_subs,
+        "mrr": mrr,
         "agents_qs": agents_qs,
         "subscription": subscription,
-        "series_paid": [{"label": (r["m"].strftime("%Y-%m") if r["m"] else ""), "amount": float(r["amount"] or 0)} for r in paid_series_qs],
+        "series_paid": [
+            {"label": (r["m"].strftime("%Y-%m") if r["m"] else ""), "amount": float(r["amount"] or 0)}
+            for r in paid_series_qs
+        ],
         "limits": limits,
         "active_tab": "businesses",
+        "contracts_enabled": CONTRACTS_ENABLED,
     }
-    return _render_safe(request, "hq/business_detail.html", ctx, lambda c: f"<h1 style='font-family:system-ui'>{_esc(biz.name)}</h1>")
+    return _render_safe(
+        request, "hq/business_detail.html", ctx, lambda c: f"<h1 style='font-family:system-ui'>{_esc(biz.name)}</h1>"
+    )
 
 
 # -------------------------------------------------------------------
@@ -626,8 +1132,9 @@ def business_detail(request, pk: int):
 def subscriptions(request):
     # Log HQ access to subscriptions list
     from audit.utils import log_hq_action
+
     log_hq_action(request, action="VIEW_PAGE", entity_type="SUBSCRIPTION_LIST", message="Accessed subscriptions list")
-    
+
     start, end, rng = _date_range_from_request(request)
     q = (request.GET.get("q") or "").strip()
     status = (request.GET.get("status") or "").strip()
@@ -636,10 +1143,10 @@ def subscriptions(request):
 
     if q:
         qs = qs.filter(
-            Q(business__name__icontains=q) |
-            Q(business__slug__icontains=q) |
-            Q(plan__name__icontains=q) |
-            Q(plan__code__icontains=q)
+            Q(business__name__icontains=q)
+            | Q(business__slug__icontains=q)
+            | Q(plan__name__icontains=q)
+            | Q(plan__code__icontains=q)
         )
     if status:
         qs = qs.filter(status__iexact=status)
@@ -662,10 +1169,14 @@ def subscriptions(request):
         "page_obj": page,
         "count": qs.count(),
         "total": qs.count(),
-        "q": q, "status": status,
-        "range": rng, "start": start, "end": end,
+        "q": q,
+        "status": status,
+        "range": rng,
+        "start": start,
+        "end": end,
         "plan_catalog": PLAN_CATALOG,
         "active_tab": "subscriptions",
+        "contracts_enabled": CONTRACTS_ENABLED,
     }
 
     tpl = select_template(["hq/subscriptions.html", "billing/hq_subscriptions.html"])
@@ -680,23 +1191,46 @@ def subscriptions(request):
 def invoices(request):
     # Log HQ access to invoices list
     from audit.utils import log_hq_action
-    log_hq_action(request, action="VIEW_PAGE", entity_type="INVOICE_LIST", message="Accessed invoices list")
-    
-    qs = Invoice.objects.select_related('business', 'created_by')
 
-    status = (request.GET.get('status') or '').strip()
+    log_hq_action(request, action="VIEW_PAGE", entity_type="INVOICE_LIST", message="Accessed invoices list")
+
+    qs = Invoice.objects.select_related("business", "created_by")
+
+    status = (request.GET.get("status") or "").strip()
     if status:
         qs = qs.filter(status__iexact=status)
 
-    q = (request.GET.get('q') or '').strip()
+    q = (request.GET.get("q") or "").strip()
     if q:
         qs = qs.filter(Q(number__icontains=q) | Q(business__name__icontains=q))
+
+    # Business filter
+    business_id = request.GET.get("business_id")
+    if business_id:
+        try:
+            qs = qs.filter(business_id=int(business_id))
+        except (ValueError, TypeError):
+            pass
 
     order_field = "-created_at" if _field(Invoice, "created_at") else "-id"
     qs = qs.order_by(order_field)
 
-    page_obj = Paginator(qs, 25).get_page(request.GET.get('page'))
-    return render(request, 'hq/invoices.html', {'page_obj': page_obj, 'invoices': page_obj, 'active_tab': 'invoices'})
+    page_obj = Paginator(qs, 25).get_page(request.GET.get("page"))
+
+    # Get all businesses for dropdown (with subscription info)
+    businesses = Business.objects.select_related("subscription").order_by("name")[:100]
+
+    ctx = {
+        "page_obj": page_obj,
+        "invoices": page_obj,
+        "active_tab": "invoices",
+        "contracts_enabled": CONTRACTS_ENABLED,
+        "all_businesses": businesses,
+        "selected_business_id": business_id,
+        "status": status,
+        "q": q,
+    }
+    return render(request, "hq/invoices.html", ctx)
 
 
 # -------------------------------------------------------------------
@@ -704,19 +1238,54 @@ def invoices(request):
 # -------------------------------------------------------------------
 @hq_admin_required
 def agents(request):
-    # Log HQ access to agents list
-    from audit.utils import log_hq_action
-    log_hq_action(request, action="VIEW_PAGE", entity_type="AGENT_LIST", message="Accessed agents list")
-    
+    """HQ Agents list page - shows all agents and managers across all businesses"""
+    # Log HQ access to agents list (optional, don't fail if audit not available)
+    try:
+        from audit.utils import log_hq_action
+
+        log_hq_action(request, action="VIEW_PAGE", entity_type="AGENT_LIST", message="Accessed agents list")
+    except Exception:
+        pass  # Audit logging is optional
+
     q = (request.GET.get("q") or "").strip()
-    rows = Membership.objects.filter(role="AGENT").select_related("business", "user")
+    # Include both AGENT and MANAGER roles for HQ reporting
+    # Use safe select_related - location is nullable
+    try:
+        rows = Membership.objects.filter(Q(role="AGENT") | Q(role="MANAGER")).select_related("business", "user")
+        # Location might be nullable, so prefetch it separately to avoid issues
+        rows = rows.prefetch_related("location")
+    except Exception as e:
+        import logging
+
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error querying memberships: {e}", exc_info=True)
+        rows = Membership.objects.none()
+
+    # Apply search filter if provided
     if q:
-        rows = rows.filter(Q(user__username__icontains=q) | Q(business__name__icontains=q))
-    rows = rows.order_by("-created_at") if _field(Membership, "created_at") else rows.order_by("-id")
+        try:
+            rows = rows.filter(Q(user__username__icontains=q) | Q(business__name__icontains=q))
+        except Exception as e:
+            import logging
+
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Error applying search filter: {e}")
+
+    # Safe ordering - created_at exists on Membership model
+    try:
+        rows = rows.order_by("-created_at")
+    except Exception as e:
+        import logging
+
+        logger = logging.getLogger(__name__)
+        logger.warning(f"Error ordering rows: {e}")
+        rows = rows.order_by("-id")
 
     # Limits per business to enable UI nudges (e.g., â€œUpgrade to add more agentsâ€)
     biz_limits = {}
     for b_id in rows.values_list("business_id", flat=True).distinct():
+        if not b_id:
+            continue
         try:
             biz = Business.objects.get(pk=b_id)
             lim = _limits_for_business(biz)
@@ -724,10 +1293,24 @@ def agents(request):
                 agent_count = Membership.objects.filter(role="AGENT", business_id=b_id).count()
                 lim = {**lim, "agent_count": agent_count}
             biz_limits[b_id] = lim
-        except Exception:
+        except Business.DoesNotExist:
+            biz_limits[b_id] = None
+        except Exception as e:
+            # Don't crash on subscription or other errors
+            import logging
+
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Error getting limits for business {b_id}: {e}")
             biz_limits[b_id] = None
 
-    ctx = {"rows": rows, "page_obj": _paginate(request, rows, per_page=30), "q": q, "biz_limits": biz_limits, "active_tab": "agents"}
+    ctx = {
+        "rows": rows,
+        "page_obj": _paginate(request, rows, per_page=30),
+        "q": q,
+        "biz_limits": biz_limits,
+        "active_tab": "agents",
+        "contracts_enabled": CONTRACTS_ENABLED,
+    }
     return _render_safe(request, "hq/agents.html", ctx, lambda c: "<h1 style='font-family:system-ui'>Agents</h1>")
 
 
@@ -741,8 +1324,9 @@ def stock_trends(request):
     """
     # Log HQ access to stock trends
     from audit.utils import log_hq_action
+
     log_hq_action(request, action="VIEW_PAGE", entity_type="STOCK_TRENDS", message="Accessed stock trends")
-    
+
     # dates
     def _parse(dtxt, fallback):
         try:
@@ -782,21 +1366,19 @@ def stock_trends(request):
     # Daily IN
     daily_in = (
         base.filter(received_at__gte=start, received_at__lte=end)
-            .values("received_at")
-            .order_by("received_at")
-            .annotate(v=Count("id"))
+        .values("received_at")
+        .order_by("received_at")
+        .annotate(v=Count("id"))
     )
     m_in = {row["received_at"]: int(row["v"]) for row in daily_in}
 
     # Daily OUT
-    sold_qs = base.filter(sold_at__isnull=False,
-                          sold_at__date__gte=start,
-                          sold_at__date__lte=end)
+    sold_qs = base.filter(sold_at__isnull=False, sold_at__date__gte=start, sold_at__date__lte=end)
     daily_out = (
         sold_qs.annotate(d=Cast("sold_at", output_field=models.DateField()))
-               .values("d")
-               .order_by("d")
-               .annotate(v=Count("id"))
+        .values("d")
+        .order_by("d")
+        .annotate(v=Count("id"))
     )
     m_out = {row["d"]: int(row["v"]) for row in daily_out}
 
@@ -814,7 +1396,8 @@ def stock_trends(request):
     # ma7
     ma7, s, window = [], 0, deque()
     for x in series_out:
-        window.append(x); s += x
+        window.append(x)
+        s += x
         if len(window) > 7:
             s -= window.popleft()
         ma7.append(round(s / len(window), 2))
@@ -823,8 +1406,10 @@ def stock_trends(request):
     cum_in, cum_out = [], []
     acc_i = acc_o = 0
     for i, o in zip(series_in, series_out):
-        acc_i += i; acc_o += o
-        cum_in.append(acc_i); cum_out.append(acc_o)
+        acc_i += i
+        acc_o += o
+        cum_in.append(acc_i)
+        cum_out.append(acc_o)
 
     # trend (simple linear regression over index)
     n = len(series_out)
@@ -847,7 +1432,8 @@ def stock_trends(request):
     projected_monthly_run_rate = round(avg_daily_out * 30, 2)
 
     ctx = {
-        "start": start, "end": end,
+        "start": start,
+        "end": end,
         "d_labels": d_labels,
         "series_in": series_in,
         "series_out": series_out,
@@ -861,6 +1447,7 @@ def stock_trends(request):
         "avg_daily_out": avg_daily_out,
         "projected_monthly_run_rate": projected_monthly_run_rate,
         "active_tab": "stock",
+        "contracts_enabled": CONTRACTS_ENABLED,
     }
     return _render_safe(
         request,
@@ -875,22 +1462,237 @@ def stock_trends(request):
 # -------------------------------------------------------------------
 @hq_admin_required
 def wallet_home(request):
-    start, end, rng = _date_range_from_request(request)
+    """
+    Rebuilt HQ Wallet: Business table with payment tracking, filters, and graphs.
+    """
+    from audit.utils import log_hq_action
 
-    inv = Invoice.objects.all()
-    date_field = "issue_date" if _field(Invoice, "issue_date") else ("created_at" if _field(Invoice, "created_at") else None)
+    log_hq_action(request, action="VIEW_PAGE", entity_type="HQ_WALLET", message="Accessed HQ wallet")
+
+    # Parse filters
+    start, end, rng = _date_range_from_request(request)
+    plan_filter = request.GET.get("plan", "").strip()
+    status_filter = request.GET.get("status", "").strip()  # paid/unpaid
+    search_query = request.GET.get("q", "").strip()
+
+    # Build business queryset with subscription details
+    businesses = Business.objects.select_related("subscription").all()
+
+    if search_query:
+        businesses = businesses.filter(Q(name__icontains=search_query) | Q(slug__icontains=search_query))
+
+    # Plan filter
+    if plan_filter:
+        businesses = businesses.filter(subscription__plan__code=plan_filter)
+
+    # Enrich businesses with payment status
+    business_rows = []
+    for biz in businesses:
+        try:
+            sub = biz.subscription
+            plan_name = sub.plan.name if sub and hasattr(sub, "plan") and sub.plan else "No Plan"
+            plan_code = sub.plan.code if sub and hasattr(sub, "plan") and sub.plan else ""
+            amount = sub.plan.amount if sub and hasattr(sub, "plan") and sub.plan else Decimal("0.00")
+            sub_status = sub.status if sub else "none"
+
+            # Check last payment mark
+            from hq.models import HQPaymentMark
+
+            last_mark = HQPaymentMark.objects.filter(business=biz).order_by("-period_start").first()
+            paid_status = "paid" if last_mark and last_mark.period_end >= timezone.now().date() else "unpaid"
+            last_payment_date = last_mark.marked_at if last_mark else None
+
+            # Apply status filter
+            if status_filter and status_filter != paid_status:
+                continue
+
+            business_rows.append(
+                {
+                    "id": biz.id,
+                    "name": biz.name,
+                    "plan": plan_name,
+                    "plan_code": plan_code,
+                    "amount": amount,
+                    "sub_status": sub_status,
+                    "paid_status": paid_status,
+                    "last_payment_date": last_payment_date,
+                    "next_due": sub.next_billing_date if sub and hasattr(sub, "next_billing_date") else None,
+                }
+            )
+        except Exception:
+            # Handle businesses without subscriptions gracefully
+            business_rows.append(
+                {
+                    "id": biz.id,
+                    "name": biz.name,
+                    "plan": "No Plan",
+                    "plan_code": "",
+                    "amount": Decimal("0.00"),
+                    "sub_status": "none",
+                    "paid_status": "unpaid",
+                    "last_payment_date": None,
+                    "next_due": None,
+                }
+            )
+
+    # Pagination
+    paginator = Paginator(business_rows, 25)
+    page_obj = paginator.get_page(request.GET.get("page", 1))
+
+    # Graph data: Revenue over time (paid invoices)
+    zero = Value(0, output_field=DecimalField(max_digits=18, decimal_places=2))
+    inv = Invoice.objects.filter(status__in=["PAID", "SETTLED", "paid"])
+    date_field = (
+        "issue_date" if _field(Invoice, "issue_date") else ("created_at" if _field(Invoice, "created_at") else None)
+    )
+
     if date_field and start and end:
         inv = _range_filter(inv, Invoice, date_field, start, end)
 
-    zero = Value(0, output_field=DecimalField(max_digits=18, decimal_places=2))
-    income = inv.filter(status__in=["PAID", "SETTLED", "paid"]).aggregate(v=Coalesce(Sum("total"), zero))["v"]
-    expense = Decimal("0.00")
-    balance = (income or Decimal("0.00")) - (expense or Decimal("0.00"))
+    # Monthly revenue aggregation
+    if date_field:
+        from django.db import connection
 
-    ctx = {"income": income, "expense": expense, "balance": balance,
-           "range": rng, "start": start, "end": end,
-           "tx_page": None, "active_tab": "wallet"}
-    return _render_safe(request, "hq/wallet.html", ctx, lambda c: "<h1 style='font-family:system-ui'>Wallet</h1>")
+        if connection.vendor == "sqlite":
+            # SQLite fallback
+            revenue_raw = inv.values(date_field, "total").order_by(date_field)
+            from collections import defaultdict
+
+            monthly_revenue = defaultdict(float)
+            for item in revenue_raw:
+                if item[date_field]:
+                    month_key = (
+                        item[date_field].strftime("%Y-%m")
+                        if hasattr(item[date_field], "strftime")
+                        else str(item[date_field])[:7]
+                    )
+                    monthly_revenue[month_key] += float(item["total"] or 0)
+            revenue_labels = sorted(monthly_revenue.keys())
+            revenue_data = [monthly_revenue[k] for k in revenue_labels]
+        else:
+            revenue_by_month = (
+                inv.annotate(month=TruncMonth(date_field))
+                .values("month")
+                .annotate(revenue=Coalesce(Sum("total"), zero))
+                .order_by("month")
+            )
+            revenue_labels = [r["month"].strftime("%Y-%m") if r["month"] else "" for r in revenue_by_month]
+            revenue_data = [float(r["revenue"]) for r in revenue_by_month]
+    else:
+        revenue_labels = []
+        revenue_data = []
+
+    # Paid vs unpaid counts
+    paid_count = len([r for r in business_rows if r["paid_status"] == "paid"])
+    unpaid_count = len([r for r in business_rows if r["paid_status"] == "unpaid"])
+
+    # Plan distribution
+    from collections import Counter
+
+    plan_distribution = Counter([r["plan"] for r in business_rows if r["plan"] != "No Plan"])
+
+    # Total income
+    income = inv.aggregate(v=Coalesce(Sum("total"), zero))["v"]
+
+    ctx = {
+        "businesses": page_obj,
+        "page_obj": page_obj,
+        "income": income,
+        "balance": income,  # Simplified
+        "range": rng,
+        "start": start,
+        "end": end,
+        "plan_filter": plan_filter,
+        "status_filter": status_filter,
+        "search_query": search_query,
+        "revenue_labels": json.dumps(revenue_labels),
+        "revenue_data": json.dumps(revenue_data),
+        "paid_count": paid_count,
+        "unpaid_count": unpaid_count,
+        "plan_distribution": json.dumps(dict(plan_distribution)),
+        "active_tab": "wallet",
+        "contracts_enabled": CONTRACTS_ENABLED,
+    }
+    return render(request, "hq/wallet.html", ctx)
+
+
+@hq_admin_required
+def wallet_mark_paid(request):
+    """
+    Mark a business as paid for a specific period (idempotent).
+    POST: business_id, period_start, period_end, amount
+    """
+    if request.method != "POST":
+        return JsonResponse({"ok": False, "error": "POST required"}, status=405)
+
+    from audit.utils import log_hq_action
+    from hq.models import HQPaymentMark
+
+    try:
+        business_id = int(request.POST.get("business_id"))
+        period_start = request.POST.get("period_start")
+        period_end = request.POST.get("period_end")
+        amount = Decimal(request.POST.get("amount", "0"))
+        notes = request.POST.get("notes", "")
+
+        biz = get_object_or_404(Business, id=business_id)
+
+        # Parse dates
+        from datetime import datetime as dt
+
+        p_start = dt.strptime(period_start, "%Y-%m-%d").date()
+        p_end = dt.strptime(period_end, "%Y-%m-%d").date()
+
+        # Get plan code
+        plan_code = ""
+        try:
+            sub = biz.subscription
+            if sub and hasattr(sub, "plan") and sub.plan:
+                plan_code = sub.plan.code
+        except Exception:
+            pass
+
+        # Create or update mark (idempotent)
+        mark, created = HQPaymentMark.objects.update_or_create(
+            business=biz,
+            period_start=p_start,
+            period_end=p_end,
+            defaults={
+                "plan_code": plan_code,
+                "amount": amount,
+                "marked_by": request.user,
+                "marked_at": timezone.now(),
+                "notes": notes,
+            },
+        )
+
+        # Log action
+        log_hq_action(
+            request,
+            action="MARK_PAID",
+            entity_type="Business",
+            entity_id=business_id,
+            message=f"Marked {biz.name} as paid for {period_start} to {period_end}: {amount}",
+            business=biz,
+        )
+
+        return JsonResponse(
+            {
+                "ok": True,
+                "created": created,
+                "mark": {
+                    "period_start": mark.period_start.isoformat(),
+                    "period_end": mark.period_end.isoformat(),
+                    "amount": str(mark.amount),
+                    "marked_at": mark.marked_at.isoformat(),
+                },
+            }
+        )
+
+    except (ValueError, TypeError) as e:
+        return JsonResponse({"ok": False, "error": f"Invalid data: {str(e)}"}, status=400)
+    except Exception as e:
+        return JsonResponse({"ok": False, "error": str(e)}, status=500)
 
 
 # -------------------------------------------------------------------
@@ -898,38 +1700,73 @@ def wallet_home(request):
 # -------------------------------------------------------------------
 @login_required
 def api_wallet_income(request):
-    start_raw = request.GET.get('start') or ''
-    end_raw = request.GET.get('end') or ''
+    """
+    JSON API endpoint for wallet income data.
+    Returns daily income breakdown for a date range.
 
-    today = timezone.now().date()
+    Query params:
+    - start (YYYY-MM-DD, required): Start date
+    - end (YYYY-MM-DD, required): End date
+    - currency (default "MWK"): Currency filter
+    """
+    # Permission check: HQ admin only
+    if not (request.user.is_staff or request.user.is_superuser):
+        return JsonResponse({"error": "Forbidden"}, status=403)
+
+    # Parse query parameters
+    start_raw = request.GET.get("start", "").strip()
+    end_raw = request.GET.get("end", "").strip()
+    currency = request.GET.get("currency", "MWK").strip().upper()
+
+    # Validate required parameters
+    if not start_raw or not end_raw:
+        return JsonResponse({"error": "start and end parameters are required (YYYY-MM-DD)"}, status=400)
+
+    # Parse dates
     try:
-        start_d = datetime.date.fromisoformat(start_raw) if start_raw else (today - datetime.timedelta(days=29))
-        end_d = datetime.date.fromisoformat(end_raw) if end_raw else today
-    except Exception:
-        return JsonResponse([], safe=False)
+        start_d = datetime.date.fromisoformat(start_raw)
+        end_d = datetime.date.fromisoformat(end_raw)
+    except (ValueError, TypeError) as e:
+        return JsonResponse({"error": f"Invalid date format: {str(e)}. Use YYYY-MM-DD"}, status=400)
 
+    # Validate date range
+    if start_d > end_d:
+        return JsonResponse({"error": "start date must be before or equal to end date"}, status=400)
+
+    # Query paid invoices
     qs = Invoice.objects.filter(status__in=["PAID", "SETTLED", "paid"])
-    df_name = "paid_at" if _field(Invoice, "paid_at") else ("issue_date" if _field(Invoice, "issue_date") else ("created_at" if _field(Invoice, "created_at") else None))
+
+    # Filter by currency if Invoice model has currency field
+    if _field(Invoice, "currency"):
+        qs = qs.filter(currency=currency)
+
+    # Determine date field to use
+    df_name = (
+        "paid_at"
+        if _field(Invoice, "paid_at")
+        else (
+            "issue_date" if _field(Invoice, "issue_date") else ("created_at" if _field(Invoice, "created_at") else None)
+        )
+    )
     if not df_name:
         return JsonResponse([], safe=False)
 
+    # Filter by date range
     qs = _range_filter(qs, Invoice, df_name, start_d, end_d)
+
+    # Determine amount field
     amount_field = "total" if _field(Invoice, "total") else ("amount" if _field(Invoice, "amount") else None)
     if not amount_field:
         return JsonResponse([], safe=False)
 
+    # Aggregate by day
     f = _field(Invoice, df_name)
     if isinstance(f, models.DateTimeField):
-        agg = (qs.annotate(day=TruncDate(df_name))
-                .values("day")
-                .order_by("day")
-                .annotate(amount=Sum(amount_field)))
-        data = [{'date': (row['day'] or start_d).isoformat(), 'amount': float(row['amount'] or 0)} for row in agg]
+        agg = qs.annotate(day=TruncDate(df_name)).values("day").order_by("day").annotate(amount=Sum(amount_field))
+        data = [{"date": (row["day"] or start_d).isoformat(), "amount": float(row["amount"] or 0)} for row in agg]
     else:
-        agg = (qs.values(df_name)
-                .order_by(df_name)
-                .annotate(amount=Sum(amount_field)))
-        data = [{'date': (row[df_name] or start_d).isoformat(), 'amount': float(row['amount'] or 0)} for row in agg]
+        agg = qs.values(df_name).order_by(df_name).annotate(amount=Sum(amount_field))
+        data = [{"date": (row[df_name] or start_d).isoformat(), "amount": float(row["amount"] or 0)} for row in agg]
 
     return JsonResponse(data, safe=False)
 
@@ -945,9 +1782,9 @@ def api_mrr_timeseries(request):
     if created_field:
         qs = (
             qs.annotate(m=TruncMonth(created_field))
-              .values("m")
-              .order_by("m")
-              .annotate(mrr=Coalesce(Sum(amount_field), zero))
+            .values("m")
+            .order_by("m")
+            .annotate(mrr=Coalesce(Sum(amount_field), zero))
         )
         data = [{"date": (r["m"].strftime("%Y-%m") if r["m"] else ""), "mrr": float(r["mrr"] or 0)} for r in qs]
     else:
@@ -964,43 +1801,459 @@ def api_search_suggest(request):
         return JsonResponse(out, safe=False)
 
     try:
-        out.append({
-            "label": f'Businesses matching â€œ{term}â€',
-            "type": "Businesses",
-            "url": f"{reverse('hq:businesses')}?q={term}"
-        })
+        out.append(
+            {
+                "label": f"Businesses matching â€œ{term}â€",
+                "type": "Businesses",
+                "url": f"{reverse('hq:businesses')}?q={term}",
+            }
+        )
     except Exception:
         pass
     try:
-        out.append({
-            "label": f'Invoices for â€œ{term}â€',
-            "type": "Invoices",
-            "url": f"{reverse('hq:invoices')}?q={term}"
-        })
+        out.append(
+            {"label": f"Invoices for â€œ{term}â€", "type": "Invoices", "url": f"{reverse('hq:invoices')}?q={term}"}
+        )
     except Exception:
         pass
     try:
-        out.append({
-            "label": f'Subscriptions with â€œ{term}â€',
-            "type": "Subscriptions",
-            "url": f"{reverse('hq:subscriptions')}?q={term}"
-        })
+        out.append(
+            {
+                "label": f"Subscriptions with â€œ{term}â€",
+                "type": "Subscriptions",
+                "url": f"{reverse('hq:subscriptions')}?q={term}",
+            }
+        )
     except Exception:
         pass
     try:
-        out.append({
-            "label": f'Agents named â€œ{term}â€',
-            "type": "Agents",
-            "url": f"{reverse('hq:agents')}?q={term}"
-        })
+        out.append({"label": f"Agents named â€œ{term}â€", "type": "Agents", "url": f"{reverse('hq:agents')}?q={term}"})
     except Exception:
         pass
     return JsonResponse(out, safe=False)
 
 
 @hq_admin_required
-def api_notifications(request):
-    return JsonResponse([], safe=False)
+def hq_notifications_api(request):
+    """
+    HQ Notifications API endpoint.
+    Returns JSON with notification data. Supports 'since' query parameter.
+
+    Returns:
+    {
+        "items": [
+            {
+                "id": "...",
+                "level": "info|warning|danger",
+                "title": "...",
+                "body": "...",
+                "url": "...",
+                "ts": "ISO"
+            }
+        ],
+        "unread_count": N
+    }
+
+    Must never 404 - always returns 200 with at least empty list.
+    """
+    try:
+        since = request.GET.get("since", "").strip()
+        items = []
+        unread_count = 0
+
+        # Check for expiring subscriptions within 7 days
+        try:
+            from datetime import timedelta
+
+            from django.utils import timezone
+
+            from billing.models import Subscription
+
+            seven_days_from_now = timezone.now().date() + timedelta(days=7)
+            expiring_subs = Subscription.objects.filter(
+                status="ACTIVE", expires_at__lte=seven_days_from_now, expires_at__gt=timezone.now().date()
+            ).order_by("expires_at")[:10]
+
+            for sub in expiring_subs:
+                items.append(
+                    {
+                        "id": f"sub-expiring-{sub.id}",
+                        "level": "warning",
+                        "title": f"Subscription Expiring: {sub.business.name if hasattr(sub, 'business') else 'Unknown'}",
+                        "body": f"Expires on {sub.expires_at.strftime('%Y-%m-%d')}",
+                        "url": f"/hq/subscriptions/{sub.id}/",
+                        "ts": sub.expires_at.isoformat()
+                        if hasattr(sub.expires_at, "isoformat")
+                        else str(sub.expires_at),
+                    }
+                )
+        except Exception:
+            # Subscription model may not exist - skip
+            pass
+
+        # Check for failed invoices last 7 days
+        try:
+            from datetime import timedelta
+
+            from django.utils import timezone
+
+            from billing.models import Invoice
+
+            seven_days_ago = timezone.now() - timedelta(days=7)
+            failed_invoices = Invoice.objects.filter(
+                status__in=["FAILED", "OVERDUE", "UNPAID"], created_at__gte=seven_days_ago
+            ).order_by("-created_at")[:10]
+
+            for inv in failed_invoices:
+                items.append(
+                    {
+                        "id": f"inv-failed-{inv.id}",
+                        "level": "danger",
+                        "title": f"Failed Invoice: {inv.business.name if hasattr(inv, 'business') else 'Unknown'}",
+                        "body": f"Amount: {inv.amount if hasattr(inv, 'amount') else 'N/A'}",
+                        "url": f"/hq/invoices/{inv.id}/",
+                        "ts": inv.created_at.isoformat()
+                        if hasattr(inv.created_at, "isoformat")
+                        else str(inv.created_at),
+                    }
+                )
+        except Exception:
+            # Invoice model may not exist - skip
+            pass
+
+        # Check for new businesses last 7 days
+        try:
+            from datetime import timedelta
+
+            from django.utils import timezone
+
+            seven_days_ago = timezone.now() - timedelta(days=7)
+            new_businesses = Business.objects.filter(created_at__gte=seven_days_ago).order_by("-created_at")[:10]
+
+            for biz in new_businesses:
+                items.append(
+                    {
+                        "id": f"biz-new-{biz.id}",
+                        "level": "info",
+                        "title": f"New Business: {biz.name}",
+                        "body": f"Created on {biz.created_at.strftime('%Y-%m-%d') if hasattr(biz.created_at, 'strftime') else str(biz.created_at)}",
+                        "url": f"/hq/businesses/{biz.id}/",
+                        "ts": biz.created_at.isoformat()
+                        if hasattr(biz.created_at, "isoformat")
+                        else str(biz.created_at),
+                    }
+                )
+        except Exception:
+            # Business model may not exist - skip
+            pass
+
+        unread_count = len(items)
+
+        return JsonResponse(
+            {
+                "since": since,
+                "items": items,
+                "unread_count": unread_count,
+            }
+        )
+
+    except Exception as e:
+        # Never crash - return empty list
+        logger.error(f"hq_notifications_api error: {e}", exc_info=True)
+        return JsonResponse(
+            {
+                "since": request.GET.get("since", "").strip(),
+                "items": [],
+                "unread_count": 0,
+            }
+        )
+
+
+# -------------------------------------------------------------------
+# HQ Analytics API Endpoint
+# -------------------------------------------------------------------
+@hq_admin_required
+def api_analytics_data(request):
+    """
+    JSON API endpoint for HQ analytics data.
+    Returns KPIs, chart series, breakdowns, and top lists based on filters.
+
+    Query params:
+    - start_date (YYYY-MM-DD): Start date (default: 30 days ago)
+    - end_date (YYYY-MM-DD): End date (default: today)
+    - business_id (int): Filter by business
+    - agent_id (int): Filter by agent
+    - vertical (str): Filter by vertical (phones, clothing, liquor, pharmacy, gym)
+    - payment_mode (str): Filter by payment method (CASH, BANK, MOBILE_MONEY)
+    - location_id (int): Filter by location
+    - sale_type (str): Filter by sale type (credit/cash) - if supported
+    """
+    try:
+        # Parse date range
+        start_date = None
+        end_date = None
+        start_str = request.GET.get("start_date", "").strip()
+        end_str = request.GET.get("end_date", "").strip()
+
+        if start_str:
+            try:
+                start_date = dt.strptime(start_str, "%Y-%m-%d").date()
+            except ValueError:
+                pass
+
+        if end_str:
+            try:
+                end_date = dt.strptime(end_str, "%Y-%m-%d").date()
+            except ValueError:
+                pass
+
+        # Parse other filters
+        business_id = None
+        if request.GET.get("business_id"):
+            try:
+                business_id = int(request.GET.get("business_id"))
+            except (ValueError, TypeError):
+                pass
+
+        agent_id = None
+        if request.GET.get("agent_id"):
+            try:
+                agent_id = int(request.GET.get("agent_id"))
+            except (ValueError, TypeError):
+                pass
+
+        vertical = request.GET.get("vertical", "").strip() or None
+        payment_mode = request.GET.get("payment_mode", "").strip() or None
+        location_id = None
+        if request.GET.get("location_id"):
+            try:
+                location_id = int(request.GET.get("location_id"))
+            except (ValueError, TypeError):
+                pass
+
+        sale_type = request.GET.get("sale_type", "").strip() or None
+
+        # Get analytics data
+        data = get_hq_analytics_data(
+            start_date=start_date,
+            end_date=end_date,
+            business_id=business_id,
+            agent_id=agent_id,
+            vertical=vertical,
+            payment_mode=payment_mode,
+            location_id=location_id,
+            sale_type=sale_type,
+        )
+
+        return JsonResponse(data, safe=False)
+
+    except Exception as e:
+        import logging
+
+        logger = logging.getLogger(__name__)
+        logger.exception("Error in api_analytics_data")
+        return JsonResponse({"error": str(e)}, status=500)
+
+
+@hq_admin_required
+def hq_analytics(request):
+    """
+    HQ Analytics page with filters across businesses/verticals.
+    Hardened to never 500: safe filter parsing, defaults for all edge cases.
+    """
+    try:
+        # Parse date range with safe defaults
+        start_date = None
+        end_date = None
+        start_str = request.GET.get("start", "").strip()
+        end_str = request.GET.get("end", "").strip()
+        preset = request.GET.get("preset", "").strip()
+
+        today = timezone.now().date()
+
+        # Handle preset (safe: unknown presets fall through to defaults)
+        if preset == "today":
+            start_date = today
+            end_date = today
+        elif preset == "yesterday":
+            start_date = today - timedelta(days=1)
+            end_date = start_date
+        elif preset == "last_7d":
+            start_date = today - timedelta(days=6)
+            end_date = today
+        elif preset == "last_30d":
+            start_date = today - timedelta(days=29)
+            end_date = today
+        elif preset == "this_month":
+            start_date = today.replace(day=1)
+            end_date = today
+        elif preset == "last_month":
+            first_day_this_month = today.replace(day=1)
+            last_day_last_month = first_day_this_month - timedelta(days=1)
+            start_date = last_day_last_month.replace(day=1)
+            end_date = last_day_last_month
+        elif preset == "all_time":
+            start_date = today.replace(month=1, day=1, year=today.year - 2)
+            end_date = today
+        elif start_str or end_str:
+            # Custom date range (safe parsing: invalid dates ignored)
+            if start_str:
+                try:
+                    start_date = dt.strptime(start_str, "%Y-%m-%d").date()
+                except (ValueError, TypeError):
+                    pass
+            if end_str:
+                try:
+                    end_date = dt.strptime(end_str, "%Y-%m-%d").date()
+                except (ValueError, TypeError):
+                    pass
+
+        # Default: last 30 days if no valid dates parsed
+        if not start_date:
+            start_date = today - timedelta(days=30)
+        if not end_date:
+            end_date = today
+
+        # Ensure start <= end
+        if start_date > end_date:
+            start_date, end_date = end_date, start_date
+
+        # Parse filters (safe: invalid values become None)
+        business_id = None
+        if request.GET.get("business_id"):
+            try:
+                business_id = int(request.GET.get("business_id"))
+            except (ValueError, TypeError):
+                pass
+
+        vertical = request.GET.get("vertical", "").strip() or None
+        # Validate vertical against known options
+        valid_verticals = ["phones", "clothing", "liquor", "pharmacy", "gym"]
+        if vertical and vertical not in valid_verticals:
+            vertical = None
+
+        location_id = None
+        if request.GET.get("location_id"):
+            try:
+                location_id = int(request.GET.get("location_id"))
+            except (ValueError, TypeError):
+                pass
+
+        # Get analytics data (wrapped in try/except to prevent 500s)
+        try:
+            analytics_data = get_hq_analytics_data(
+                start_date=start_date,
+                end_date=end_date,
+                business_id=business_id,
+                vertical=vertical,
+                location_id=location_id,
+            )
+        except Exception:
+            # On any error, return empty analytics data structure
+            analytics_data = {
+                "kpis": {
+                    "total_revenue": 0,
+                    "total_sales": 0,
+                    "total_profit": 0,
+                    "active_businesses": 0,
+                },
+                "series": [],
+                "breakdowns": {},
+            }
+
+        # Get filter options (safe: handle missing models gracefully)
+        try:
+            all_businesses = Business.objects.filter(is_active=True).order_by("name")[:100]
+        except Exception:
+            all_businesses = []
+
+        all_locations = []
+        if business_id:
+            try:
+                all_locations = Location.objects.filter(business_id=business_id).order_by("name")[:100]
+            except Exception:
+                all_locations = []
+
+        vertical_options = [
+            ("phones", "Phones"),
+            ("clothing", "Clothing"),
+            ("liquor", "Liquor"),
+            ("pharmacy", "Pharmacy"),
+            ("gym", "Gym"),
+        ]
+
+        # Billing KPIs (safe: all wrapped in try/except)
+        billing_kpis = {}
+        try:
+            active_subs = Subscription.objects.filter(status="active").count()
+            trialing_subs = Subscription.objects.filter(status__in=["trial", "trialing"]).count()
+            churn_risk = Subscription.objects.filter(status__in=["past_due", "grace", "suspended"]).count()
+            canceled_subs = Subscription.objects.filter(status__in=["canceled", "cancelled", "expired"]).count()
+            # MRR: sum of plan amounts for active subscriptions
+            from django.db.models import Sum as _Sum
+            mrr_result = Subscription.objects.filter(status="active").aggregate(
+                mrr=Coalesce(_Sum("plan__amount"), Value(0, output_field=DecimalField()))
+            )
+            mrr = float(mrr_result["mrr"] or 0)
+            # Open invoices
+            open_invoices = Invoice.objects.filter(status__in=["issued", "sent", "overdue"]).count()
+            outstanding_result = Invoice.objects.filter(status__in=["issued", "sent", "overdue"]).aggregate(
+                total=Coalesce(_Sum("total"), Value(0, output_field=DecimalField()))
+            )
+            outstanding_amount = float(outstanding_result["total"] or 0)
+            # Collections rate
+            paid_result = Invoice.objects.filter(status="paid").aggregate(
+                total=Coalesce(_Sum("total"), Value(0, output_field=DecimalField()))
+            )
+            paid_amount = float(paid_result["total"] or 0)
+            total_invoiced = paid_amount + outstanding_amount
+            collections_rate = round((paid_amount / total_invoiced * 100) if total_invoiced > 0 else 0, 1)
+
+            billing_kpis = {
+                "active_subscriptions": active_subs,
+                "trialing_subscriptions": trialing_subs,
+                "churn_risk": churn_risk,
+                "canceled_subscriptions": canceled_subs,
+                "mrr": mrr,
+                "open_invoices": open_invoices,
+                "outstanding_amount": outstanding_amount,
+                "paid_amount": paid_amount,
+                "collections_rate": collections_rate,
+            }
+        except Exception:
+            billing_kpis = {
+                "active_subscriptions": 0,
+                "trialing_subscriptions": 0,
+                "churn_risk": 0,
+                "canceled_subscriptions": 0,
+                "mrr": 0,
+                "open_invoices": 0,
+                "outstanding_amount": 0,
+                "paid_amount": 0,
+                "collections_rate": 0,
+            }
+
+        ctx = {
+            "analytics_data": analytics_data,
+            "billing_kpis": billing_kpis,
+            "start_date": start_date,
+            "end_date": end_date,
+            "preset": preset,
+            "all_businesses": all_businesses,
+            "selected_business_id": business_id,
+            "all_locations": all_locations,
+            "selected_location_id": location_id,
+            "vertical_options": vertical_options,
+            "selected_vertical": vertical,
+        }
+
+        return render(request, "hq/analytics.html", ctx)
+    except Exception:
+        # Ultimate fallback: return minimal page with error message
+        from django.contrib import messages
+
+        messages.error(request, "An error occurred loading analytics. Please try again.")
+        return redirect("hq:dashboard")
 
 
 # -------------------------------------------------------------------
@@ -1130,6 +2383,88 @@ def invoice_refund(request, pk: int):
         return JsonResponse({"ok": False}, status=400)
 
 
+@hq_admin_required
+def invoice_create(request):
+    """
+    Create a new invoice for a business (manual generation from HQ).
+    POST: business_id, amount, description, issue_date
+    """
+    if request.method != "POST":
+        return JsonResponse({"ok": False, "error": "POST required"}, status=405)
+
+    from audit.utils import log_hq_action
+
+    try:
+        business_id = int(request.POST.get("business_id"))
+        amount = Decimal(request.POST.get("amount", "0"))
+        description = request.POST.get("description", "")
+        issue_date_str = request.POST.get("issue_date", "")
+
+        biz = get_object_or_404(Business, id=business_id)
+
+        # Parse issue date
+        from datetime import datetime as dt
+
+        if issue_date_str:
+            issue_date = dt.strptime(issue_date_str, "%Y-%m-%d").date()
+        else:
+            issue_date = timezone.localdate()
+
+        # Get subscription/plan info
+        plan_name = "Manual Invoice"
+        try:
+            sub = biz.subscription
+            if sub and hasattr(sub, "plan") and sub.plan:
+                plan_name = sub.plan.name
+        except Exception:
+            pass
+
+        # Generate invoice number
+        last_inv = Invoice.objects.order_by("-id").first()
+        next_num = (last_inv.id + 1) if last_inv else 1
+        number = f"INV-{next_num:06d}"
+
+        # Create invoice
+        invoice = Invoice.objects.create(
+            business=biz,
+            number=number,
+            total=amount,
+            status="OPEN",
+            notes=description or f"Invoice for {plan_name}",
+            currency=getattr(settings, "REPORTS_DEFAULT_CURRENCY", "MWK"),
+            issue_date=issue_date,
+            created_by=request.user if hasattr(Invoice, "created_by") else None,
+        )
+
+        # Log action
+        log_hq_action(
+            request,
+            action="CREATE_INVOICE",
+            entity_type="Invoice",
+            entity_id=invoice.id,
+            message=f"Created invoice {number} for {biz.name}: {amount}",
+            business=biz,
+        )
+
+        return JsonResponse(
+            {
+                "ok": True,
+                "invoice": {
+                    "id": invoice.id,
+                    "number": number,
+                    "amount": str(amount),
+                    "business": biz.name,
+                    "issue_date": issue_date.isoformat(),
+                },
+            }
+        )
+
+    except (ValueError, TypeError) as e:
+        return JsonResponse({"ok": False, "error": f"Invalid data: {str(e)}"}, status=400)
+    except Exception as e:
+        return JsonResponse({"ok": False, "error": str(e)}, status=500)
+
+
 # --- Extend trial by +/- days OR set specific date
 @hq_admin_required
 def sub_extend(request, pk: int):
@@ -1174,7 +2509,11 @@ def sub_extend(request, pk: int):
             sub.extend_trial(days, save=True)
         else:
             sub.trial_end = (sub.trial_end or timezone.now()) + timedelta(days=days)
-            sub.current_period_end = sub.trial_end if _field(Subscription, "current_period_end") else getattr(sub, "current_period_end", None)
+            sub.current_period_end = (
+                sub.trial_end
+                if _field(Subscription, "current_period_end")
+                else getattr(sub, "current_period_end", None)
+            )
             sub.status = "trial"
             sub.save(update_fields=["trial_end", "current_period_end", "status"])
         if request.method == "GET":
@@ -1262,10 +2601,9 @@ def sub_set_plan(request, pk: int):
                 kwargs["interval"] = "month"
 
             plan_obj = (
-                Plan.objects.filter(
-                    Q(code=kwargs.get("code", None)) |
-                    Q(name__iexact=catalog["name"])
-                ).order_by("-id").first()
+                Plan.objects.filter(Q(code=kwargs.get("code", None)) | Q(name__iexact=catalog["name"]))
+                .order_by("-id")
+                .first()
             )
             if not plan_obj:
                 plan_obj = Plan.objects.create(**kwargs)
@@ -1275,14 +2613,18 @@ def sub_set_plan(request, pk: int):
                 sub.plan_code = catalog["code"]
             if _field(Subscription, "amount"):
                 sub.amount = catalog["amount"]
-            sub.save(update_fields=[fn for fn in ["plan", "plan_code", "amount", "updated_at"] if _field(Subscription, fn)])
+            sub.save(
+                update_fields=[fn for fn in ["plan", "plan_code", "amount", "updated_at"] if _field(Subscription, fn)]
+            )
         else:
             # b) No Plan model â†’ store amount & optional plan_code on subscription
             update_fields = []
             if _field(Subscription, "amount"):
-                sub.amount = catalog["amount"]; update_fields.append("amount")
+                sub.amount = catalog["amount"]
+                update_fields.append("amount")
             if _field(Subscription, "plan_code"):
-                sub.plan_code = catalog["code"]; update_fields.append("plan_code")
+                sub.plan_code = catalog["code"]
+                update_fields.append("plan_code")
             if _field(Subscription, "updated_at"):
                 update_fields.append("updated_at")
             sub.save(update_fields=update_fields)
@@ -1296,9 +2638,3 @@ def sub_set_plan(request, pk: int):
             messages.error(request, "Could not change plan.")
             return _back_to(request)
         return JsonResponse({"ok": False}, status=400)
-
-
-
-
-
-

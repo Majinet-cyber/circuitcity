@@ -1,14 +1,14 @@
 {% extends "base.html" %}
 {% load static %}
 
-{# ============== Metadata / title ============== #}
+
 {% block title %}{% block page_title %}HQ{% endblock %} · Emajinet{% endblock %}
 {% block header_title %}{% block header %}HQ{% endblock %}{% endblock %}
 
-{# Let notifications know our scope; sidebar comes from base.html #}
+
 {% block notif_scope %}hq{% endblock %}
 
-{# If you want the global header to show the search box even off inventory pages, set this: #}
+
 {% block extra_head %}
   <meta name="cc-scope" content="hq">
   <script>
@@ -18,6 +18,9 @@
 {% endblock %}
 
 {% block extra_css %}
+<!-- HQ Mobile-First Responsive CSS -->
+<link href="{% static 'css/hq-mobile.css' %}" rel="stylesheet">
+
 <style>
   /* =========================
      Mobile-first baseline
@@ -146,10 +149,11 @@
 </style>
 {% endblock %}
 
-{# ================= BODY (inside base.html main.cc-page) ================= #}
-{% block body %}
 
-  {# ---------- Top toolbar row (chips, filters, actions). Override blocks as needed. ---------- #}
+{% block body %}
+<div class="hq-page">
+
+
   <div class="hq-toolbar" role="toolbar" aria-label="HQ toolbar">
 
     <div class="slot-chips">
@@ -175,30 +179,31 @@
 
     <div class="slot-actions">
       <div class="hq-actions">
-        {# Right-aligned actions (override in child templates) #}
+
         {% block hq_actions %}{% endblock %}
       </div>
     </div>
 
     <div class="slot-filters">
-      {# Per-page quick filters (override in child templates) #}
+
       {% block hq_filters %}{% endblock %}
     </div>
   </div>
 
-  {# Optional info row above content #}
+
   {% block hq_notices %}{% endblock %}
 
-  {# ------------------- MAIN PAGE CONTENT (override) ------------------- #}
+
   {% block page_content %}
     <div class="hq-card">
       <div class="text-muted">This is the HQ base. Extend this template and fill <code>block page_content</code>.</div>
     </div>
   {% endblock %}
+</div>
 
 {% endblock %}
 
-{# ================= Helpers / Scripts just for HQ pages ================= #}
+
 {% block extra_js %}
 <script>
   // ----- POST helper with CSRF (usable from any button/link via data-post-url) -----

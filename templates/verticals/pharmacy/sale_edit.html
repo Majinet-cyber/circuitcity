@@ -48,7 +48,7 @@
     </div>
     <div class="info-row">
       <span class="info-label">Sold By:</span>
-      <span class="info-value">{{ sale.sold_by.get_full_name|default:sale.sold_by.username }}</span>
+      <span class="info-value">{% if sale.sold_by %}{{ sale.sold_by.get_full_name|default:sale.sold_by.username }}{% else %}—{% endif %}</span>
     </div>
 
     <form method="post">

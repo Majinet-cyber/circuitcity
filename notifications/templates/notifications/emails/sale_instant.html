@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sale Completed</title>
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f5f5f5;">
+    <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0;">
+        <h1 style="margin: 0; font-size: 28px; font-weight: 600;">🎉 A sale just went through!</h1>
+        <p style="margin: 10px 0 0 0; font-size: 16px; opacity: 0.95;">{{ business_name|default:"Your business" }}</p>
+    </div>
+
+    <div style="background-color: #ffffff; padding: 30px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 8px 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+        <!-- Sale Summary Card -->
+        <div style="background-color: #f8f9fa; padding: 20px; border-radius: 6px; margin-bottom: 25px; border-left: 4px solid #667eea;">
+            <table style="width: 100%; border-collapse: collapse;">
+                <tr>
+                    <td style="padding: 6px 0; color: #666; font-size: 14px;">Sale ID:</td>
+                    <td style="padding: 6px 0; text-align: right; font-weight: 600; font-family: monospace; color: #333;">{{ sale_ref|default:"N/A" }}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 6px 0; color: #666; font-size: 14px;">Date & Time:</td>
+                    <td style="padding: 6px 0; text-align: right; color: #333;">
+                        {% if time %}{{ time|date:"F d, Y" }} at {{ time|date:"g:i A" }}{% else %}—{% endif %}
+                    </td>
+                </tr>
+                {% if location_name %}
+                <tr>
+                    <td style="padding: 6px 0; color: #666; font-size: 14px;">Location:</td>
+                    <td style="padding: 6px 0; text-align: right; color: #333;">{{ location_name }}</td>
+                </tr>
+                {% endif %}
+                <tr>
+                    <td style="padding: 6px 0; color: #666; font-size: 14px;">Sold by:</td>
+                    <td style="padding: 6px 0; text-align: right; color: #333;">{{ agent_name|default:cashier_name|default:"Unknown" }}</td>
+                </tr>
+                {% if payment_method %}
+                <tr>
+                    <td style="padding: 6px 0; color: #666; font-size: 14px;">Payment Method:</td>
+                    <td style="padding: 6px 0; text-align: right; color: #333;">{{ payment_method }}</td>
+                </tr>
+                {% endif %}
+            </table>
+        </div>
+
+        <!-- Line Items Table -->
+        <div style="margin-bottom: 25px;">
+            <h2 style="font-size: 18px; font-weight: 600; margin: 0 0 15px 0; color: #333;">Items Sold</h2>
+            <table style="width: 100%; border-collapse: collapse; background-color: #ffffff; border: 1px solid #e0e0e0; border-radius: 6px; overflow: hidden;">
+                <thead>
+                    <tr style="background-color: #f8f9fa;">
+                        <th style="padding: 12px; text-align: left; font-weight: 600; font-size: 13px; color: #666; border-bottom: 2px solid #e0e0e0;">Product</th>
+                        <th style="padding: 12px; text-align: center; font-weight: 600; font-size: 13px; color: #666; border-bottom: 2px solid #e0e0e0;">Qty</th>
+                        <th style="padding: 12px; text-align: right; font-weight: 600; font-size: 13px; color: #666; border-bottom: 2px solid #e0e0e0;">Unit Price</th>
+                        <th style="padding: 12px; text-align: right; font-weight: 600; font-size: 13px; color: #666; border-bottom: 2px solid #e0e0e0;">Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td style="padding: 12px; border-bottom: 1px solid #f0f0f0;">
+                            <div style="font-weight: 600; color: #333; margin-bottom: 4px;">{{ product_name|default:"Product" }}</div>
+                            {% if sku or imei %}
+                            <div style="font-size: 12px; color: #999; font-family: monospace;">
+                                {% if imei %}IMEI: {{ imei }}{% elif sku %}SKU: {{ sku }}{% endif %}
+                            </div>
+                            {% endif %}
+                        </td>
+                        <td style="padding: 12px; text-align: center; border-bottom: 1px solid #f0f0f0; color: #333;">{{ quantity|default:1 }}</td>
+                        <td style="padding: 12px; text-align: right; border-bottom: 1px solid #f0f0f0; color: #333;">
+                            {% if revenue and quantity %}
+                                {% widthratio revenue quantity 1 as unit_price %}
+                                MK {{ unit_price|floatformat:0|intcomma }}
+                            {% else %}
+                                —
+                            {% endif %}
+                        </td>
+                        <td style="padding: 12px; text-align: right; border-bottom: 1px solid #f0f0f0; font-weight: 600; color: #333;">MK {{ revenue|default:total|floatformat:0|intcomma }}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Financial Summary -->
+        <div style="background-color: #f8f9fa; padding: 20px; border-radius: 6px; margin-bottom: 25px;">
+            <h2 style="font-size: 18px; font-weight: 600; margin: 0 0 15px 0; color: #333;">Financial Summary</h2>
+            <table style="width: 100%; border-collapse: collapse;">
+                <tr>
+                    <td style="padding: 10px 0; border-bottom: 1px solid #e0e0e0; font-size: 15px; color: #666;">Revenue (Total):</td>
+                    <td style="padding: 10px 0; border-bottom: 1px solid #e0e0e0; text-align: right; font-size: 18px; font-weight: 600; color: #333;">MK {{ revenue|default:total|floatformat:0|intcomma }}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 10px 0; border-bottom: 1px solid #e0e0e0; font-size: 15px; color: #666;">Cost (COGS):</td>
+                    <td style="padding: 10px 0; border-bottom: 1px solid #e0e0e0; text-align: right; font-size: 15px; color: #666;">
+                        {% if cost %}MK {{ cost|floatformat:0|intcomma }}{% else %}<span style="color: #999;">Cost unavailable</span>{% endif %}
+                    </td>
+                </tr>
+                <tr>
+                    <td style="padding: 10px 0; font-size: 16px; font-weight: 600; color: #333;">Profit:</td>
+                    <td style="padding: 10px 0; text-align: right; font-size: 20px; font-weight: 700; color: #4CAF50;">
+                        {% if profit %}MK {{ profit|floatformat:0|intcomma }}{% else %}<span style="color: #999;">—</span>{% endif %}
+                    </td>
+                </tr>
+                {% if profit_margin %}
+                <tr>
+                    <td style="padding: 8px 0 0 0; font-size: 13px; color: #999;">Profit Margin:</td>
+                    <td style="padding: 8px 0 0 0; text-align: right; font-size: 13px; color: #999;">{{ profit_margin }}%</td>
+                </tr>
+                {% elif profit and revenue %}
+                {% widthratio profit revenue 100 as profit_margin_calc %}
+                {% if profit_margin_calc %}
+                <tr>
+                    <td style="padding: 8px 0 0 0; font-size: 13px; color: #999;">Profit Margin:</td>
+                    <td style="padding: 8px 0 0 0; text-align: right; font-size: 13px; color: #999;">{{ profit_margin_calc }}%</td>
+                </tr>
+                {% endif %}
+                {% endif %}
+            </table>
+        </div>
+
+        <!-- Call to Action -->
+        {% if sale_url %}
+        <div style="text-align: center; margin: 30px 0;">
+            <a href="{{ sale_url }}" style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 14px 32px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px; box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);">View Sale Details</a>
+        </div>
+        {% endif %}
+
+        <p style="color: #666; font-size: 14px; margin-top: 25px; padding-top: 20px; border-top: 1px solid #e0e0e0;">
+            You're receiving this notification because you're a manager for <strong>{{ business_name|default:"this business" }}</strong>.
+        </p>
+    </div>
+
+    <div style="text-align: center; margin-top: 20px; color: #999; font-size: 12px;">
+        <p>This is an automated email. Please do not reply directly to this message.</p>
+    </div>
+</body>
+</html>

@@ -23,7 +23,7 @@ class TestPhonesInventoryRouting(TestCase):
     def setUp(self):
         """Create a phones business with manager and agent."""
         from tenants.models import Business
-        from core.models import Profile
+        from accounts.models import Profile
         
         # Create business
         self.business = Business.objects.create(
@@ -89,7 +89,8 @@ class TestPhonesInventoryRouting(TestCase):
         labels = [item["label"] for item in sidebar_items]
         
         # Should have phones-specific items
-        self.assertIn("Inventory Dashboard", labels)
+        # Note: "Inventory Dashboard" removed for phones - replaced by "Analytics"
+        self.assertIn("Analytics", labels)
         self.assertIn("Stock", labels)
         self.assertIn("Scan IN", labels)
         
@@ -115,7 +116,7 @@ class TestGymVerticalRouting(TestCase):
     def setUp(self):
         """Create a gym business with manager."""
         from tenants.models import Business
-        from core.models import Profile
+        from accounts.models import Profile
         
         # Create business
         self.business = Business.objects.create(
@@ -217,7 +218,7 @@ class TestClothingVerticalRouting(TestCase):
     def setUp(self):
         """Create a clothing business with manager."""
         from tenants.models import Business
-        from core.models import Profile
+        from accounts.models import Profile
         
         # Create business
         self.business = Business.objects.create(
@@ -299,7 +300,7 @@ class TestLiquorVerticalRouting(TestCase):
     def setUp(self):
         """Create a liquor business with manager."""
         from tenants.models import Business
-        from core.models import Profile
+        from accounts.models import Profile
         
         # Create business
         self.business = Business.objects.create(
@@ -381,7 +382,7 @@ class TestPharmacyVerticalRouting(TestCase):
     def setUp(self):
         """Create a pharmacy business with manager."""
         from tenants.models import Business
-        from core.models import Profile
+        from accounts.models import Profile
         
         # Create business
         self.business = Business.objects.create(

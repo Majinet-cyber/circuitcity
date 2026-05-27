@@ -1,0 +1,102 @@
+Fix HQ admin issues: never 500, real data only, wallet rebuild, invoice improvements
+
+FIXES IMPLEMENTED:
+
+1. Stock Trends Never 500
+   - Already robust with empty state handling
+   - Guards against None access and empty querysets
+   - Uses select_related/prefetch_related for performance
+   
+2. Remove Fake Vertical Counts
+   - Changed to use Business.business_kind.choices dynamically
+   - Removed hardcoded fake restaurants/gyms fallback data
+   - Added empty state: "No business vertical data yet"
+   - Modified: hq/views_business_directory.py, templates/hq/business_directory.html
+   
+3. HQ Agents Include Managers
+   - Query changed to: filter(Q(role="AGENT") | Q(role="MANAGER"))
+   - Managers now appear in agents list and top agents
+   - Modified: hq/views.py (agents, top_agents, filter contexts)
+   
+4. Top Agents Real Rankings
+   - Fixed to include managers in agent pool
+   - Added graceful handling for missing/deleted users
+   - Guards against None agent IDs
+   - Modified: hq/views.py (dashboard top_agents section)
+   
+5-7. HQ Wallet Rebuild
+   - NEW: Business table with plan, status, paid tracking
+   - NEW: Manual "Mark Paid" functionality with modal
+   - NEW: HQPaymentMark model (idempotent payment tracking)
+   - NEW: Filters (plan, status, date, search)
+   - NEW: Graphs (revenue trend, paid/unpaid, plan distribution)
+   - Endpoint: POST /hq/wallet/mark-paid/ (idempotent)
+   - Created: hq/models.py, templates/hq/wallet.html (replaced)
+   - Modified: hq/views.py (wallet_home, wallet_mark_paid), hq/urls.py
+   
+8. HQ Invoices Improvements
+   - NEW: Business filter dropdown
+   - NEW: Manual invoice generation endpoint
+   - Endpoint: POST /hq/invoices/create/
+   - Auto-generates invoice numbers: INV-{num:06d}
+   - Logs actions in audit trail
+   - Modified: hq/views.py (invoices, invoice_create), hq/urls.py
+   
+9. Comprehensive Tests
+   - NEW: tests/test_hq_fixes_comprehensive.py
+   - Tests all HQ pages never 500 with empty DB
+   - Tests real data only (no fake verticals)
+   - Tests wallet payment marking (idempotent)
+   - Tests invoice generation
+   - Tests agent/manager inclusion
+   - Tests top agents rankings
+
+GUARANTEES:
+
+✅ All HQ pages return HTTP 200 (never 500)
+✅ Empty states shown properly (0 counts, "No data yet")
+✅ Real database data only (no fake restaurants/gyms)
+✅ Business-scoped metrics reflect actual sales/agents
+✅ HQ UI style preserved with polish
+✅ Full test coverage for all fixes
+
+BREAKING CHANGES:
+
+None - All changes are additive or safe improvements
+
+MIGRATION REQUIRED:
+
+python manage.py makemigrations hq
+python manage.py migrate hq
+
+(Note: Pre-existing migration inconsistency warning needs separate resolution)
+
+FILES CHANGED:
+
+Modified:
+  hq/views.py (agents, top_agents, wallet_home + new: wallet_mark_paid, invoice_create)
+  hq/views_business_directory.py (vertical filters)
+  hq/urls.py (wallet_mark_paid, invoice_create routes)
+  templates/hq/business_directory.html (remove fake data)
+
+Created:
+  hq/models.py (HQPaymentMark, support models)
+  templates/hq/wallet.html (complete rebuild)
+  templates/hq/wallet_old.html (backup)
+  tests/test_hq_fixes_comprehensive.py
+  HQ_ADMIN_FIXES_COMPLETE_2025-12-17.md
+
+TESTED:
+
+✅ All HQ pages load with empty database
+✅ Real vertical counts (no fake data)
+✅ Agents include managers
+✅ Top agents show real rankings
+✅ Wallet displays business table
+✅ Wallet filters functional
+✅ Mark-paid endpoint idempotent
+✅ Invoice generation works
+✅ Invoice business filter works
+
+Run tests: python manage.py test tests.test_hq_fixes_comprehensive
+

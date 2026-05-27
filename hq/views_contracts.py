@@ -1,8 +1,10 @@
 # hq/views_contracts.py
 """
-HQ views for managing merchant contracts.
+HQ views for managing merchant contracts and staff documentation.
 """
 from __future__ import annotations
+
+import io
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -17,6 +19,18 @@ from hq.models import MerchantContract
 from hq.permissions import hq_admin_required
 from tenants.models import Business
 
+try:
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import letter, A4
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import inch
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, PageBreak
+    from reportlab.lib.enums import TA_CENTER, TA_LEFT
+
+    REPORTLAB_AVAILABLE = True
+except ImportError:
+    REPORTLAB_AVAILABLE = False
+
 
 @login_required
 @hq_admin_required
@@ -24,7 +38,14 @@ def contract_template(request: HttpRequest) -> HttpResponse:
     """
     Show the contract template page with download link.
     """
-    return render(request, 'hq/contract_template.html')
+    return render(
+        request,
+        "hq/contract_template.html",
+        {
+            "contracts_enabled": True,
+            "active_tab": "contracts",
+        },
+    )
 
 
 @login_required
@@ -35,46 +56,54 @@ def contracts_list(request: HttpRequest) -> HttpResponse:
     Shows which businesses have signed contracts and which don't.
     """
     # Get filter params
-    status_filter = request.GET.get('status', 'all')  # all, signed, unsigned
-    search_query = request.GET.get('q', '').strip()
-    
-    # Base queryset
-    businesses = Business.objects.all().select_related('merchant_contract').order_by('-created_at')
-    
-    # Apply filters
-    if status_filter == 'signed':
-        businesses = businesses.filter(merchant_contract__isnull=False)
-    elif status_filter == 'unsigned':
-        businesses = businesses.filter(merchant_contract__isnull=True)
-    
+    status_filter = request.GET.get("status", "all")  # all, signed, unsigned
+    search_query = request.GET.get("q", "").strip()
+
+    # Base queryset - use prefetch_related for ForeignKey relationship
+    businesses = Business.objects.all().prefetch_related("contracts").order_by("-created_at")
+
+    # Apply filters (using contracts relationship)
+    if status_filter == "signed":
+        businesses = businesses.filter(contracts__isnull=False).distinct()
+    elif status_filter == "unsigned":
+        businesses = businesses.filter(contracts__isnull=True)
+
     # Apply search
     if search_query:
-        businesses = businesses.filter(
-            Q(name__icontains=search_query) |
-            Q(slug__icontains=search_query)
-        )
-    
+        businesses = businesses.filter(Q(name__icontains=search_query) | Q(slug__icontains=search_query))
+
     # Pagination
-    page_num = request.GET.get('page', 1)
+    page_num = request.GET.get("page", 1)
     paginator = Paginator(businesses, 25)
     page_obj = paginator.get_page(page_num)
-    
+
     # Build context with contract status
     businesses_with_status = []
     for biz in page_obj:
-        has_contract = hasattr(biz, 'merchant_contract') and biz.merchant_contract is not None
-        businesses_with_status.append({
-            'business': biz,
-            'has_contract': has_contract,
-            'contract': biz.merchant_contract if has_contract else None,
-        })
-    
-    return render(request, 'hq/contracts_list.html', {
-        'page_obj': page_obj,
-        'businesses_with_status': businesses_with_status,
-        'status_filter': status_filter,
-        'search_query': search_query,
-    })
+        # Get the most recent contract for this business (if any)
+        latest_contract = biz.contracts.first() if hasattr(biz, "contracts") else None
+        has_contract = latest_contract is not None
+
+        businesses_with_status.append(
+            {
+                "business": biz,
+                "has_contract": has_contract,
+                "contract": latest_contract,
+            }
+        )
+
+    return render(
+        request,
+        "hq/contracts_list.html",
+        {
+            "page_obj": page_obj,
+            "businesses_with_status": businesses_with_status,
+            "status_filter": status_filter,
+            "search_query": search_query,
+            "contracts_enabled": True,  # Always True since we're in the contracts module
+            "active_tab": "contracts",
+        },
+    )
 
 
 @login_required
@@ -85,32 +114,29 @@ def contracts_detail(request: HttpRequest, business_id: int) -> HttpResponse:
     Allows HQ to upload or replace a contract file.
     """
     business = get_object_or_404(Business, id=business_id)
-    
-    # Try to get existing contract
-    try:
-        contract = business.merchant_contract
-    except MerchantContract.DoesNotExist:
-        contract = None
-    
-    if request.method == 'POST':
+
+    # Get the most recent contract for this business
+    contract = business.contracts.first() if business.contracts.exists() else None
+
+    if request.method == "POST":
         # Handle file upload
-        uploaded_file = request.FILES.get('contract_file')
-        notes = request.POST.get('notes', '').strip()
-        
+        uploaded_file = request.FILES.get("contract_file")
+        notes = request.POST.get("notes", "").strip()
+
         if not uploaded_file:
             messages.error(request, "Please select a file to upload.")
             return redirect(request.path)
-        
+
         # Validate file type
-        if not uploaded_file.name.endswith('.pdf'):
+        if not uploaded_file.name.endswith(".pdf"):
             messages.error(request, "Only PDF files are allowed.")
             return redirect(request.path)
-        
+
         # Validate file size (max 10MB)
         if uploaded_file.size > 10 * 1024 * 1024:
             messages.error(request, "File size must be less than 10MB.")
             return redirect(request.path)
-        
+
         # Create or update contract
         if contract:
             # Update existing contract
@@ -125,16 +151,14 @@ def contracts_detail(request: HttpRequest, business_id: int) -> HttpResponse:
         else:
             # Create new contract
             contract = MerchantContract.objects.create(
-                business=business,
-                file=uploaded_file,
-                notes=notes,
-                uploaded_by=request.user
+                business=business, file=uploaded_file, notes=notes, uploaded_by=request.user
             )
             messages.success(request, f"Contract uploaded for {business.name}.")
-        
+
         # Log in audit if available
         try:
             from audit.models import AuditLog
+
             AuditLog.objects.create(
                 business=business,
                 user=request.user,
@@ -142,22 +166,28 @@ def contracts_detail(request: HttpRequest, business_id: int) -> HttpResponse:
                 resource_type="MerchantContract",
                 resource_id=contract.id,
                 details={
-                    'business_id': business.id,
-                    'business_name': business.name,
-                    'file_name': uploaded_file.name,
-                    'notes': notes,
-                }
+                    "business_id": business.id,
+                    "business_name": business.name,
+                    "file_name": uploaded_file.name,
+                    "notes": notes,
+                },
             )
         except Exception:
             pass  # Audit logging is optional
-        
-        return redirect('hq:contracts_list')
-    
+
+        return redirect("hq:contracts_list")
+
     # GET: Show upload form
-    return render(request, 'hq/contracts_detail.html', {
-        'business': business,
-        'contract': contract,
-    })
+    return render(
+        request,
+        "hq/contracts_detail.html",
+        {
+            "business": business,
+            "contract": contract,
+            "contracts_enabled": True,
+            "active_tab": "contracts",
+        },
+    )
 
 
 @login_required
@@ -167,20 +197,21 @@ def contract_download(request: HttpRequest, contract_id: int) -> HttpResponse:
     Download a contract file.
     """
     contract = get_object_or_404(MerchantContract, id=contract_id)
-    
+
     # Check if file exists
     if not contract.file:
         messages.error(request, "Contract file not found.")
-        return redirect('hq:contracts_list')
-    
+        return redirect("hq:contracts_list")
+
     try:
         # Return file as download
-        response = FileResponse(contract.file.open('rb'), content_type='application/pdf')
-        response['Content-Disposition'] = f'attachment; filename="{contract.business.slug}_contract.pdf"'
-        
+        response = FileResponse(contract.file.open("rb"), content_type="application/pdf")
+        response["Content-Disposition"] = f'attachment; filename="{contract.business.slug}_contract.pdf"'
+
         # Log download in audit
         try:
             from audit.models import AuditLog
+
             AuditLog.objects.create(
                 business=contract.business,
                 user=request.user,
@@ -188,17 +219,17 @@ def contract_download(request: HttpRequest, contract_id: int) -> HttpResponse:
                 resource_type="MerchantContract",
                 resource_id=contract.id,
                 details={
-                    'business_id': contract.business.id,
-                    'business_name': contract.business.name,
-                }
+                    "business_id": contract.business.id,
+                    "business_name": contract.business.name,
+                },
             )
         except Exception:
             pass
-        
+
         return response
     except Exception as e:
         messages.error(request, f"Error downloading contract: {str(e)}")
-        return redirect('hq:contracts_list')
+        return redirect("hq:contracts_list")
 
 
 @login_required
@@ -210,10 +241,11 @@ def contract_delete(request: HttpRequest, contract_id: int) -> HttpResponse:
     """
     contract = get_object_or_404(MerchantContract, id=contract_id)
     business = contract.business
-    
+
     # Log deletion before deleting
     try:
         from audit.models import AuditLog
+
         AuditLog.objects.create(
             business=business,
             user=request.user,
@@ -221,20 +253,747 @@ def contract_delete(request: HttpRequest, contract_id: int) -> HttpResponse:
             resource_type="MerchantContract",
             resource_id=contract.id,
             details={
-                'business_id': business.id,
-                'business_name': business.name,
-                'file_name': contract.file.name if contract.file else None,
-                'notes': contract.notes,
-            }
+                "business_id": business.id,
+                "business_name": business.name,
+                "file_name": contract.file.name if contract.file else None,
+                "notes": contract.notes,
+            },
         )
     except Exception:
         pass
-    
+
     # Delete file and contract record
     if contract.file:
         contract.file.delete(save=False)
     contract.delete()
-    
-    messages.success(request, f"Contract for {business.name} has been deleted.")
-    return redirect('hq:contracts_list')
 
+    messages.success(request, f"Contract for {business.name} has been deleted.")
+    return redirect("hq:contracts_list")
+
+
+# ============================================================================
+# HQ Staff Tour Guide
+# ============================================================================
+
+
+@login_required
+@hq_admin_required
+def staff_tour_guide(request: HttpRequest) -> HttpResponse:
+    """
+    Show the HQ staff tour guide page with PDF download link.
+    """
+    return render(
+        request,
+        "hq/staff_tour_guide.html",
+        {
+            "contracts_enabled": True,
+            "active_tab": "staff_guide",
+        },
+    )
+
+
+@login_required
+@hq_admin_required
+def staff_tour_guide_pdf(request: HttpRequest) -> HttpResponse:
+    """
+    Generate and download the HQ Staff Tour Guide as a PDF.
+
+    Returns:
+        HttpResponse with PDF attachment or error message.
+    """
+    # Check if ReportLab is available
+    if not REPORTLAB_AVAILABLE:
+        return HttpResponse(
+            "PDF generation is not available. Please install reportlab.", status=503, content_type="text/plain"
+        )
+
+    try:
+        # Create a BytesIO buffer for the PDF
+        buffer = io.BytesIO()
+
+        # Create the PDF document
+        doc = SimpleDocTemplate(
+            buffer,
+            pagesize=letter,
+            rightMargin=72,
+            leftMargin=72,
+            topMargin=72,
+            bottomMargin=18,
+        )
+
+        # Container for the 'Flowable' objects
+        elements = []
+
+        # Define styles
+        styles = getSampleStyleSheet()
+
+        # Custom styles
+        title_style = ParagraphStyle(
+            "CustomTitle",
+            parent=styles["Heading1"],
+            fontSize=24,
+            textColor=colors.HexColor("#1e40af"),
+            spaceAfter=30,
+            alignment=TA_CENTER,
+            fontName="Helvetica-Bold",
+        )
+
+        heading_style = ParagraphStyle(
+            "CustomHeading",
+            parent=styles["Heading2"],
+            fontSize=16,
+            textColor=colors.HexColor("#1e40af"),
+            spaceAfter=12,
+            spaceBefore=12,
+            fontName="Helvetica-Bold",
+        )
+
+        subheading_style = ParagraphStyle(
+            "CustomSubHeading",
+            parent=styles["Heading3"],
+            fontSize=14,
+            textColor=colors.HexColor("#374151"),
+            spaceAfter=10,
+            spaceBefore=10,
+            fontName="Helvetica-Bold",
+        )
+
+        body_style = ParagraphStyle(
+            "CustomBody",
+            parent=styles["BodyText"],
+            fontSize=11,
+            leading=14,
+            spaceAfter=10,
+        )
+
+        # Add title
+        elements.append(Paragraph("Emajinet / Circuit City", title_style))
+        elements.append(Paragraph("HQ Staff Tour Guide", title_style))
+        elements.append(Spacer(1, 0.3 * inch))
+
+        # Add introduction
+        elements.append(Paragraph("Introduction", heading_style))
+        intro_text = """
+        Welcome to the Emajinet HQ Staff Tour Guide. This comprehensive document serves as your 
+        reference for managing the Circuit City platform. As an HQ administrator, you have access 
+        to powerful tools for supporting merchants, managing subscriptions, and ensuring smooth 
+        operations across all businesses.
+        """
+        elements.append(Paragraph(intro_text, body_style))
+        elements.append(Spacer(1, 0.2 * inch))
+
+        # Section 1: HQ Dashboard Overview
+        elements.append(Paragraph("1. HQ Dashboard Overview", heading_style))
+
+        elements.append(Paragraph("Key Metrics", subheading_style))
+        dashboard_text = """
+        The HQ Dashboard provides a real-time overview of platform activity:
+        <br/><br/>
+        • <b>Total Businesses:</b> Number of registered merchant accounts<br/>
+        • <b>New Businesses (7d):</b> Recent sign-ups requiring onboarding attention<br/>
+        • <b>Active Subscriptions:</b> Businesses with trial or paid plans<br/>
+        • <b>MRR (Monthly Recurring Revenue):</b> Sum of all active subscription amounts<br/>
+        • <b>Open Invoices:</b> Unpaid or past-due invoices requiring follow-up<br/>
+        • <b>Agent Statistics:</b> Total agents and recent onboardings<br/>
+        • <b>Stock Trends:</b> Inventory movement across all businesses
+        """
+        elements.append(Paragraph(dashboard_text, body_style))
+        elements.append(Spacer(1, 0.2 * inch))
+
+        # Section 2: Business Management
+        elements.append(Paragraph("2. Business Directory & Management", heading_style))
+
+        business_text = """
+        Access the Business Directory to view and manage all merchant accounts. You can:
+        <br/><br/>
+        • <b>Search:</b> Find businesses by name or slug<br/>
+        • <b>View Details:</b> Access comprehensive business profiles including subscription history, 
+        invoices, agents, and activity metrics<br/>
+        • <b>Quick Actions:</b> Perform common tasks directly from the directory<br/>
+        • <b>Filter:</b> Sort by date, status, or subscription tier
+        """
+        elements.append(Paragraph(business_text, body_style))
+        elements.append(Spacer(1, 0.2 * inch))
+
+        # Section 3: Subscription Management
+        elements.append(Paragraph("3. Subscription Management", heading_style))
+
+        elements.append(Paragraph("Trial Extensions", subheading_style))
+        trial_text = """
+        You can extend trial periods for businesses that need more evaluation time:
+        <br/><br/>
+        • Navigate to Subscriptions list<br/>
+        • Find the business subscription<br/>
+        • Click "Extend Trial"<br/>
+        • Enter number of days or specific end date<br/>
+        • Confirm the extension
+        <br/><br/>
+        <b>Important:</b> Trials can only be extended before the first payment is received.
+        """
+        elements.append(Paragraph(trial_text, body_style))
+        elements.append(Spacer(1, 0.2 * inch))
+
+        elements.append(Paragraph("Plan Changes", subheading_style))
+        plan_text = """
+        HQ can change subscription plans for businesses:
+        <br/><br/>
+        • <b>Starter:</b> Single location, no agents (K20,000/month)<br/>
+        • <b>Pro:</b> Unlimited locations, up to 5 agents (K35,000/month)<br/>
+        • <b>Pro Max:</b> Unlimited locations and agents (K50,000/month)
+        <br/><br/>
+        Use the "Set Plan" action to upgrade or downgrade as needed.
+        """
+        elements.append(Paragraph(plan_text, body_style))
+        elements.append(Spacer(1, 0.2 * inch))
+
+        elements.append(Paragraph("Activation", subheading_style))
+        activation_text = """
+        To activate a trial subscription immediately (convert to paid):
+        <br/><br/>
+        • Select the subscription<br/>
+        • Click "Activate Now"<br/>
+        • A 30-day paid period begins immediately<br/>
+        • Next billing date is set automatically
+        """
+        elements.append(Paragraph(activation_text, body_style))
+
+        # Add page break
+        elements.append(PageBreak())
+
+        # Section 4: Invoice Management
+        elements.append(Paragraph("4. Invoice & Payment Tracking", heading_style))
+
+        invoice_text = """
+        Monitor payment status and financial health through the Invoices section:
+        <br/><br/>
+        • <b>Open Invoices:</b> Awaiting payment - may require follow-up<br/>
+        • <b>Past Due:</b> Overdue invoices requiring immediate attention<br/>
+        • <b>Paid/Settled:</b> Completed transactions<br/>
+        • <b>Refunds:</b> Process refunds or credit notes when necessary
+        <br/><br/>
+        <b>Refund Process:</b>
+        <br/>
+        1. Navigate to the invoice<br/>
+        2. Click "Refund"<br/>
+        3. A credit note is automatically generated<br/>
+        4. The original invoice is linked to the refund for audit purposes
+        """
+        elements.append(Paragraph(invoice_text, body_style))
+        elements.append(Spacer(1, 0.2 * inch))
+
+        # Section 5: Account Support
+        elements.append(Paragraph("5. Account Support Tools", heading_style))
+
+        support_text = """
+        HQ staff have access to powerful support tools for assisting merchants:
+        <br/><br/>
+        <b>Password Reset:</b><br/>
+        • Navigate to Business → Account Support<br/>
+        • Select the user<br/>
+        • Click "Reset Password"<br/>
+        • A new temporary password is generated and can be shared securely
+        <br/><br/>
+        <b>Account Unlock:</b><br/>
+        • If a user is locked out after failed login attempts<br/>
+        • Use "Unlock Account" to restore access immediately
+        <br/><br/>
+        <b>Force Logout:</b><br/>
+        • Terminate active sessions if suspicious activity is detected<br/>
+        • User must log in again with valid credentials
+        <br/><br/>
+        <b>Session Management:</b><br/>
+        • View all active sessions for a user<br/>
+        • Review IP addresses and device information<br/>
+        • Terminate individual sessions as needed
+        """
+        elements.append(Paragraph(support_text, body_style))
+        elements.append(Spacer(1, 0.2 * inch))
+
+        # Section 6: Analytics
+        elements.append(Paragraph("6. Analytics & Reporting", heading_style))
+
+        analytics_text = """
+        The HQ Analytics page provides deep insights into platform performance:
+        <br/><br/>
+        • <b>Filter by Business:</b> Focus on individual merchant metrics<br/>
+        • <b>Filter by Vertical:</b> Compare performance across Phones, Clothing, Liquor, Pharmacy, Gym<br/>
+        • <b>Date Ranges:</b> Analyze trends over custom time periods<br/>
+        • <b>Top Agents:</b> Identify high performers across all businesses<br/>
+        • <b>Revenue Trends:</b> Track sales and profit margins<br/>
+        • <b>Inventory Insights:</b> Monitor stock turnover and sell-through rates
+        """
+        elements.append(Paragraph(analytics_text, body_style))
+
+        # Add page break
+        elements.append(PageBreak())
+
+        # Section 7: Contract Management
+        elements.append(Paragraph("7. Contract Management", heading_style))
+
+        contract_text = """
+        Manage merchant service agreements through the Contracts section:
+        <br/><br/>
+        • <b>Contract Template:</b> Download the standard merchant services agreement<br/>
+        • <b>Upload Contracts:</b> Store signed agreements for each business<br/>
+        • <b>Contract Status:</b> Track which businesses have signed contracts<br/>
+        • <b>Download:</b> Retrieve contracts for review or audit purposes
+        <br/><br/>
+        <b>Best Practice:</b> Ensure all businesses on paid plans have signed contracts on file.
+        """
+        elements.append(Paragraph(contract_text, body_style))
+        elements.append(Spacer(1, 0.2 * inch))
+
+        # Section 8: Troubleshooting
+        elements.append(Paragraph("8. Common Troubleshooting", heading_style))
+
+        elements.append(Paragraph("Issue: Merchant can't log in", subheading_style))
+        troubleshoot1 = """
+        1. Check if account is locked (failed login attempts)<br/>
+        2. Use "Unlock Account" if locked<br/>
+        3. Verify email address is correct<br/>
+        4. Reset password if credentials are lost<br/>
+        5. Check if 2FA/OTP is enabled and working
+        """
+        elements.append(Paragraph(troubleshoot1, body_style))
+        elements.append(Spacer(1, 0.15 * inch))
+
+        elements.append(Paragraph("Issue: Subscription not renewing", subheading_style))
+        troubleshoot2 = """
+        1. Check subscription status (should be ACTIVE)<br/>
+        2. Verify next_billing_date is set<br/>
+        3. Check for failed payment attempts<br/>
+        4. Review business's invoice history<br/>
+        5. Manually activate if payment is confirmed
+        """
+        elements.append(Paragraph(troubleshoot2, body_style))
+        elements.append(Spacer(1, 0.15 * inch))
+
+        elements.append(Paragraph("Issue: Agent limit reached", subheading_style))
+        troubleshoot3 = """
+        1. Check business's current plan (Starter = 0, Pro = 5, Pro Max = unlimited)<br/>
+        2. Verify actual agent count in Agents section<br/>
+        3. Upgrade plan if business needs more agents<br/>
+        4. Remove inactive agents if at limit
+        """
+        elements.append(Paragraph(troubleshoot3, body_style))
+        elements.append(Spacer(1, 0.2 * inch))
+
+        # Section 9: Security & Best Practices
+        elements.append(Paragraph("9. Security & Best Practices", heading_style))
+
+        security_text = """
+        As an HQ administrator, follow these guidelines:
+        <br/><br/>
+        • <b>Data Privacy:</b> Only access business data when necessary for support<br/>
+        • <b>Password Resets:</b> Share temporary passwords through secure channels only<br/>
+        • <b>Audit Trail:</b> All HQ actions are logged - maintain professional conduct<br/>
+        • <b>Confidentiality:</b> Business data is confidential and should not be shared externally<br/>
+        • <b>Escalation:</b> For complex issues, consult with senior HQ staff or technical team<br/>
+        • <b>Documentation:</b> Record support interactions and resolutions for future reference
+        """
+        elements.append(Paragraph(security_text, body_style))
+        elements.append(Spacer(1, 0.3 * inch))
+
+        # Footer
+        footer_text = """
+        <br/><br/>
+        <i>This guide is for HQ staff only. For questions or updates to this document, 
+        contact the HQ team lead.</i>
+        <br/><br/>
+        <b>Document Version:</b> 1.0<br/>
+        <b>Last Updated:</b> December 2025
+        """
+        elements.append(Paragraph(footer_text, body_style))
+
+        # Build PDF
+        doc.build(elements)
+
+        # Get the PDF data from the buffer
+        pdf_data = buffer.getvalue()
+        buffer.close()
+
+        # Create the HTTP response with PDF
+        response = HttpResponse(content_type="application/pdf")
+        response["Content-Disposition"] = 'attachment; filename="hq_staff_tour_guide.pdf"'
+        response.write(pdf_data)
+
+        # Log download in audit if available
+        try:
+            from audit.utils import log_hq_action
+
+            log_hq_action(
+                request,
+                action="DOWNLOAD_TOUR_GUIDE",
+                entity_type="HQ_DOCUMENTATION",
+                message="Downloaded HQ Staff Tour Guide PDF",
+            )
+        except Exception:
+            pass  # Audit logging is optional
+
+        return response
+
+    except Exception as e:
+        # Never 500 - return a friendly error
+        import logging
+
+        logger = logging.getLogger(__name__)
+        logger.exception("Error generating HQ tour guide PDF")
+
+        return HttpResponse(
+            f"Unable to generate PDF at this time. Please contact support. (Error: {str(e)})",
+            status=500,
+            content_type="text/plain",
+        )
+
+
+# ============================================================================
+# Merchant Contract PDF Generator (per-business)
+# ============================================================================
+
+
+@login_required
+@hq_admin_required
+def generate_merchant_contract_pdf(request: HttpRequest, business_id: int) -> HttpResponse:
+    """
+    Generate a PDF merchant contract for a specific business.
+
+    The contract includes:
+    - Merchant / business name and owner
+    - Plan/package selected (from POST or default)
+    - Marketplace terms, payment terms, commission/fees
+    - Verification and suspension clauses
+    - Signature and date placeholders
+
+    POST params (optional): plan, commission_pct, notes
+    """
+    import logging
+    from django.utils import timezone as tz
+
+    logger = logging.getLogger(__name__)
+
+    if not REPORTLAB_AVAILABLE:
+        return HttpResponse(
+            "PDF generation requires reportlab. Please install it: pip install reportlab",
+            status=503, content_type="text/plain",
+        )
+
+    business = get_object_or_404(Business, id=business_id)
+
+    plan_name = request.POST.get("plan", request.GET.get("plan", "Pro Plan"))
+    commission_pct = request.POST.get("commission_pct", request.GET.get("commission_pct", "5"))
+    contract_notes = request.POST.get("notes", request.GET.get("notes", ""))
+
+    # Resolve owner/contact from active merchant management membership.
+    owner_name = ""
+    owner_contact = ""
+    try:
+        from tenants.models import Membership
+        owner_membership = (
+            Membership.objects.filter(
+                business=business,
+                status="ACTIVE",
+                role__in=["MANAGER", "BAR_MANAGER"],
+            )
+            .select_related("user")
+            .order_by("id")
+            .first()
+        )
+        if owner_membership:
+            u = owner_membership.user
+            owner_name = u.get_full_name() or u.username
+            owner_contact = u.email or getattr(u, "phone", "") or ""
+    except Exception:
+        pass
+    if not owner_name:
+        creator = getattr(business, "created_by", None)
+        if creator:
+            owner_name = creator.get_full_name() or creator.username
+            owner_contact = creator.email or getattr(creator, "phone", "") or ""
+    if not owner_name:
+        owner_name = "Merchant Representative"
+
+    today_str = tz.localdate().strftime("%d %B %Y")
+
+    try:
+        buffer = io.BytesIO()
+
+        doc = SimpleDocTemplate(
+            buffer,
+            pagesize=A4,
+            rightMargin=60,
+            leftMargin=60,
+            topMargin=72,
+            bottomMargin=40,
+        )
+
+        styles = getSampleStyleSheet()
+        brand_blue = colors.HexColor("#2563eb")
+        brand_green = colors.HexColor("#059669")
+        dark = colors.HexColor("#0f172a")
+        muted = colors.HexColor("#64748b")
+
+        title_style = ParagraphStyle(
+            "ContractTitle",
+            parent=styles["Heading1"],
+            fontSize=22,
+            textColor=brand_blue,
+            spaceAfter=8,
+            alignment=TA_CENTER,
+            fontName="Helvetica-Bold",
+        )
+        sub_title_style = ParagraphStyle(
+            "ContractSub",
+            parent=styles["Normal"],
+            fontSize=11,
+            textColor=muted,
+            spaceAfter=20,
+            alignment=TA_CENTER,
+        )
+        section_style = ParagraphStyle(
+            "Section",
+            parent=styles["Heading2"],
+            fontSize=12,
+            textColor=brand_blue,
+            spaceAfter=6,
+            spaceBefore=14,
+            fontName="Helvetica-Bold",
+        )
+        body_style = ParagraphStyle(
+            "Body",
+            parent=styles["BodyText"],
+            fontSize=10,
+            leading=15,
+            spaceAfter=8,
+            textColor=dark,
+        )
+        clause_style = ParagraphStyle(
+            "Clause",
+            parent=body_style,
+            leftIndent=14,
+            spaceAfter=5,
+        )
+        sign_style = ParagraphStyle(
+            "Sign",
+            parent=body_style,
+            fontSize=10,
+            spaceAfter=40,
+        )
+
+        elements = []
+
+        # ── Header ──────────────────────────────────────────────────────────
+        elements.append(Paragraph("EMAJINET MARKETPLACE", title_style))
+        elements.append(Paragraph("Merchant Participation Agreement", sub_title_style))
+        elements.append(Spacer(1, 0.15 * inch))
+
+        # ── Party details ────────────────────────────────────────────────────
+        elements.append(Paragraph("1. Parties", section_style))
+        elements.append(Paragraph(
+            f"This Merchant Participation Agreement (<b>\"Agreement\"</b>) is entered into as of "
+            f"<b>{today_str}</b>, between:",
+            body_style,
+        ))
+        elements.append(Paragraph(
+            f"<b>Platform Provider:</b> Emajinet / Circuit City Ltd., a registered technology "
+            f"company providing business management and marketplace services (<b>\"Emajinet\"</b>).",
+            clause_style,
+        ))
+        elements.append(Paragraph(
+            f"<b>Merchant:</b> <b>{business.name}</b>, registered business operating on the "
+            f"Emajinet platform, represented by <b>{owner_name}</b> (<b>\"Merchant\"</b>).",
+            clause_style,
+        ))
+        if owner_contact:
+            elements.append(Paragraph(f"<b>Merchant contact:</b> {owner_contact}", clause_style))
+
+        # ── Plan / Package ───────────────────────────────────────────────────
+        elements.append(Paragraph("2. Subscription Plan", section_style))
+        elements.append(Paragraph(
+            f"The Merchant has enrolled on the <b>{plan_name}</b> subscription package. "
+            f"This plan governs the level of marketplace access, feature limits, and support "
+            f"tier available to the Merchant. Plan details and pricing are as outlined in the "
+            f"Emajinet pricing schedule at the time of agreement.",
+            body_style,
+        ))
+
+        # ── Marketplace Terms ────────────────────────────────────────────────
+        elements.append(Paragraph("3. Marketplace Terms", section_style))
+        marketplace_clauses = [
+            "The Merchant may list products and services on the Emajinet Marketplace subject to "
+            "these terms and the platform's listing guidelines.",
+            "All listings must be accurate, lawful, and represent goods or services the Merchant "
+            "is authorised to sell. Fraudulent or misleading listings are strictly prohibited.",
+            "Emajinet reserves the right to review, reject, or remove any listing that violates "
+            "platform policies or applicable laws.",
+            "The Merchant is solely responsible for fulfilling orders placed through the "
+            "Marketplace and for the quality of goods/services provided.",
+            "Verified listings will receive a Verified Seller badge after satisfactory HQ review.",
+        ]
+        for clause in marketplace_clauses:
+            elements.append(Paragraph(f"• {clause}", clause_style))
+
+        # ── Payment Terms ────────────────────────────────────────────────────
+        elements.append(Paragraph("4. Payment Terms", section_style))
+        elements.append(Paragraph(
+            f"Subscription fees are due on the billing date agreed at sign-up. "
+            f"Marketplace commission of <b>{commission_pct}%</b> of the transaction value applies "
+            f"to sales completed through the Emajinet Marketplace checkout. "
+            f"Commission is deducted before seller net earnings are recorded. "
+            f"Emajinet will not process payouts for transactions flagged as fraudulent.",
+            body_style,
+        ))
+
+        # ── Verification Terms ───────────────────────────────────────────────
+        elements.append(Paragraph("5. Merchant Verification", section_style))
+        elements.append(Paragraph(
+            "Emajinet may require the Merchant to provide business registration documents, "
+            "national identification, or other verification materials. "
+            "Unverified merchants may have limited listing visibility until verification is complete. "
+            "Emajinet may revoke verified status if fraudulent information is discovered.",
+            body_style,
+        ))
+
+        # ── Suspension / Takedown ────────────────────────────────────────────
+        elements.append(Paragraph("6. Suspension and Takedown", section_style))
+        elements.append(Paragraph(
+            "Emajinet may immediately suspend or terminate this Agreement and remove the Merchant's "
+            "listings and storefront from the public Marketplace if the Merchant:",
+            body_style,
+        ))
+        suspension_reasons = [
+            "Provides false, misleading, or fraudulent information;",
+            "Violates consumer protection laws or platform policies;",
+            "Fails to fulfil orders or engages in deceptive practices;",
+            "Fails to maintain subscription payments for more than 30 days after due date;",
+            "Engages in behaviour that damages the reputation or security of the platform.",
+        ]
+        for reason in suspension_reasons:
+            elements.append(Paragraph(f"• {reason}", clause_style))
+        elements.append(Paragraph(
+            "The Merchant may appeal a suspension by contacting HQ support within 14 days.",
+            body_style,
+        ))
+
+        # ── Confidentiality ──────────────────────────────────────────────────
+        elements.append(Paragraph("7. Confidentiality & Data", section_style))
+        elements.append(Paragraph(
+            "Both parties agree to maintain the confidentiality of non-public information shared "
+            "under this Agreement. Emajinet processes Merchant data in accordance with its "
+            "Privacy Policy. The Merchant must not misuse access to customer data obtained "
+            "through the platform.",
+            body_style,
+        ))
+
+        # ── General ──────────────────────────────────────────────────────────
+        elements.append(Paragraph("8. General Provisions", section_style))
+        elements.append(Paragraph(
+            "This Agreement is governed by the laws of the Republic of Malawi. "
+            "Disputes shall be resolved by mutual negotiation; failing which, by mediation "
+            "in accordance with applicable law. This Agreement constitutes the entire understanding "
+            "between the parties regarding marketplace participation.",
+            body_style,
+        ))
+
+        if contract_notes:
+            elements.append(Paragraph("9. Additional Notes", section_style))
+            elements.append(Paragraph(contract_notes, body_style))
+
+        # ── Signatures ───────────────────────────────────────────────────────
+        elements.append(Spacer(1, 0.4 * inch))
+        elements.append(Paragraph("Signatures", section_style))
+
+        elements.append(Paragraph(
+            f"By signing below, both parties agree to the terms of this Agreement.",
+            body_style,
+        ))
+        elements.append(Spacer(1, 0.25 * inch))
+
+        elements.append(Paragraph(
+            f"<b>For Emajinet / Circuit City Ltd.:</b><br/>"
+            f"Signature: ___________________________<br/>"
+            f"Name: ___________________________<br/>"
+            f"Title: ___________________________<br/>"
+            f"Date: ___________________________",
+            sign_style,
+        ))
+
+        elements.append(Paragraph(
+            f"<b>For Merchant ({business.name}):</b><br/>"
+            f"Signature: ___________________________<br/>"
+            f"Name: {owner_name}<br/>"
+            f"Title: ___________________________<br/>"
+            f"Date: ___________________________",
+            sign_style,
+        ))
+
+        elements.append(Spacer(1, 0.2 * inch))
+        elements.append(Paragraph(
+            f"<i>Generated by Emajinet HQ on {today_str}. "
+            f"This document is valid only when signed by both parties.</i>",
+            ParagraphStyle("Footer", parent=body_style, fontSize=8, textColor=muted, alignment=TA_CENTER),
+        ))
+
+        doc.build(elements)
+        pdf_data = buffer.getvalue()
+        buffer.close()
+
+        # Store record in MerchantContract
+        try:
+            import os
+            from django.core.files.base import ContentFile
+            slug = getattr(business, "slug", str(business.id))
+            filename = f"{slug}_contract_{tz.localdate().strftime('%Y%m%d')}.pdf"
+            notes = (
+                f"Auto-generated merchant agreement. Plan: {plan_name}. "
+                f"Commission: {commission_pct}%. Owner/contact: {owner_name}"
+                + (f" ({owner_contact})." if owner_contact else ".")
+            )
+            if contract_notes:
+                notes = f"{notes}\n\nAdditional notes: {contract_notes}"
+            contract = (
+                MerchantContract.objects.filter(
+                    business=business,
+                    contract_type="generated_merchant_agreement",
+                )
+                .order_by("-uploaded_at")
+                .first()
+            )
+            if contract is None:
+                contract = MerchantContract(
+                    business=business,
+                    contract_type="generated_merchant_agreement",
+                    uploaded_by=request.user,
+                )
+            contract.title = "Emajinet Merchant Participation Agreement"
+            contract.notes = notes
+            contract.uploaded_by = request.user
+            contract.file.save(filename, ContentFile(pdf_data), save=True)
+        except Exception as exc:
+            logger.warning("Could not store contract record for business %d: %s", business_id, exc)
+
+        # Audit log
+        try:
+            from audit.models import AuditLog
+            AuditLog.objects.create(
+                business=business,
+                user=request.user,
+                action="GENERATE_CONTRACT_PDF",
+                resource_type="MerchantContract",
+                resource_id=business_id,
+                details={"business_name": business.name, "plan": plan_name},
+            )
+        except Exception:
+            pass
+
+        response = HttpResponse(content_type="application/pdf")
+        safe_name = (getattr(business, "slug", None) or str(business.id)).replace(" ", "_")
+        response["Content-Disposition"] = f'attachment; filename="{safe_name}_emajinet_contract.pdf"'
+        response.write(pdf_data)
+        return response
+
+    except Exception as exc:
+        logger.exception("Error generating merchant contract PDF for business %d", business_id)
+        return HttpResponse(
+            f"Unable to generate contract PDF. Error: {exc}",
+            status=500, content_type="text/plain",
+        )

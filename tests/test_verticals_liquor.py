@@ -1000,3 +1000,270 @@ class TestLiquorRegressionProtection:
         assert shift1 in location1_shifts
         assert shift2 not in location1_shifts
         assert location1_shifts.count() == 1
+
+
+@pytest.mark.django_db
+class TestLiquorDashboardMetrics:
+    """
+    Test liquor dashboard metrics calculation.
+    
+    CRITICAL REGRESSION TEST for stock value / inventory costs display:
+    - Stock Value must show current inventory value (cost basis)
+    - COGS must show cost of goods sold from sales
+    - Stock Value must be non-zero when stock exists (even with no sales)
+    """
+    
+    def test_stock_value_nonzero_with_stock_no_sales(self, client, business, manager):
+        """Test that stock value is non-zero when stock exists, even with no sales"""
+        from tenants.models import Membership
+        
+        # Create membership for manager
+        Membership.objects.create(
+            user=manager,
+            business=business,
+            role="MANAGER",
+            status="ACTIVE",
+            location=None
+        )
+        
+        # Create liquor products with stock
+        product1 = MerchProduct.objects.create(
+            business=business,
+            name="Test Whiskey",
+            kind=BusinessKind.LIQUOR,
+            category="whiskey",
+            quantity_in_stock=10,
+            cost_per_bottle=Decimal("12000.00"),
+            price_per_bottle=Decimal("15000.00"),
+            is_active=True
+        )
+        
+        product2 = MerchProduct.objects.create(
+            business=business,
+            name="Test Beer",
+            kind=BusinessKind.LIQUOR,
+            category="beer",
+            quantity_in_stock=50,
+            cost_per_bottle=Decimal("1500.00"),
+            price_per_bottle=Decimal("2000.00"),
+            is_active=True
+        )
+        
+        # Expected stock value = (10 × 12000) + (50 × 1500) = 120000 + 75000 = 195000
+        expected_stock_value = Decimal("195000.00")
+        
+        # Login and access dashboard
+        client.force_login(manager)
+        session = client.session
+        session['active_business_id'] = business.id
+        session.save()
+        
+        response = client.get('/verticals/liquor/dashboard/')
+        
+        assert response.status_code == 200
+        
+        # Check context variables
+        assert 'total_stock_value' in response.context
+        assert response.context['total_stock_value'] == expected_stock_value
+        
+        # COGS should be zero (no sales)
+        assert response.context['inventory_costs'] == Decimal("0.00")
+        
+        # Stock value should appear in rendered HTML
+        content = response.content.decode('utf-8')
+        assert 'MK 195000.00' in content or 'MK 195,000.00' in content
+        assert 'Stock Value' in content
+    
+    def test_stock_value_equals_inventory_cost(self, client, business, manager):
+        """Test that Stock Value == Inventory (cost basis) for Liquor vertical"""
+        from tenants.models import Membership
+        
+        # Create membership
+        Membership.objects.create(
+            user=manager,
+            business=business,
+            role="MANAGER",
+            status="ACTIVE",
+            location=None
+        )
+        
+        # Create products with stock
+        products_data = [
+            {"name": "Whiskey A", "qty": 20, "cost": Decimal("10000.00")},
+            {"name": "Beer B", "qty": 100, "cost": Decimal("1200.00")},
+            {"name": "Wine C", "qty": 30, "cost": Decimal("8000.00")},
+        ]
+        
+        expected_stock_value = Decimal("0.00")
+        for data in products_data:
+            MerchProduct.objects.create(
+                business=business,
+                name=data["name"],
+                kind=BusinessKind.LIQUOR,
+                category="spirits",
+                quantity_in_stock=data["qty"],
+                cost_per_bottle=data["cost"],
+                price_per_bottle=data["cost"] * Decimal("1.5"),
+                is_active=True
+            )
+            expected_stock_value += data["qty"] * data["cost"]
+        
+        # Expected: (20×10000) + (100×1200) + (30×8000) = 200000 + 120000 + 240000 = 560000
+        assert expected_stock_value == Decimal("560000.00")
+        
+        # Access dashboard
+        client.force_login(manager)
+        session = client.session
+        session['active_business_id'] = business.id
+        session.save()
+        
+        response = client.get('/verticals/liquor/dashboard/')
+        
+        assert response.status_code == 200
+        assert response.context['total_stock_value'] == expected_stock_value
+        
+        # Verify it's calculated as sum(quantity × cost_per_bottle)
+        actual_stock_value = Decimal("0.00")
+        for product in MerchProduct.objects.filter(business=business, kind=BusinessKind.LIQUOR):
+            actual_stock_value += product.quantity_in_stock * (product.cost_per_bottle or Decimal("0.00"))
+        
+        assert actual_stock_value == expected_stock_value
+    
+    def test_cogs_reflects_sales_not_stock(self, client, business, manager, bartender):
+        """Test that COGS reflects cost of goods sold from sales, not current stock value"""
+        from tenants.models import Membership
+        
+        # Create membership
+        Membership.objects.create(
+            user=manager,
+            business=business,
+            role="MANAGER",
+            status="ACTIVE",
+            location=None
+        )
+        
+        # Create product with stock
+        product = MerchProduct.objects.create(
+            business=business,
+            name="Test Whiskey",
+            kind=BusinessKind.LIQUOR,
+            category="whiskey",
+            quantity_in_stock=100,
+            cost_per_bottle=Decimal("10000.00"),
+            price_per_bottle=Decimal("15000.00"),
+            is_active=True
+        )
+        
+        # Stock value = 100 × 10000 = 1,000,000
+        expected_stock_value = Decimal("1000000.00")
+        
+        # Create some sales
+        sale1 = LiquorSale.objects.create(
+            business=business,
+            product=product,
+            unit=LiquorUnitType.BOTTLE,
+            quantity=5,
+            unit_price=product.price_per_bottle,
+            total_price=5 * product.price_per_bottle,
+            total_cost=5 * product.cost_per_bottle,
+            sold_by=bartender
+        )
+        
+        sale2 = LiquorSale.objects.create(
+            business=business,
+            product=product,
+            unit=LiquorUnitType.BOTTLE,
+            quantity=3,
+            unit_price=product.price_per_bottle,
+            total_price=3 * product.price_per_bottle,
+            total_cost=3 * product.cost_per_bottle,
+            sold_by=bartender
+        )
+        
+        # COGS = (5 + 3) × 10000 = 80,000
+        expected_cogs = Decimal("80000.00")
+        
+        # Access dashboard
+        client.force_login(manager)
+        session = client.session
+        session['active_business_id'] = business.id
+        session.save()
+        
+        response = client.get('/verticals/liquor/dashboard/')
+        
+        assert response.status_code == 200
+        
+        # Stock value should be based on current inventory (100 bottles)
+        assert response.context['total_stock_value'] == expected_stock_value
+        
+        # COGS should be based on sold quantity (8 bottles)
+        assert response.context['inventory_costs'] == expected_cogs
+        
+        # These should be different!
+        assert response.context['total_stock_value'] != response.context['inventory_costs']
+        
+        # Verify content shows both values
+        content = response.content.decode('utf-8')
+        assert 'Stock Value' in content
+        assert 'COGS' in content or 'Cost of goods sold' in content.lower()
+    
+    def test_dashboard_stock_value_matches_api_stock_value(self, client, business, manager):
+        """Test that dashboard context stock value matches the API endpoint stock value"""
+        from tenants.models import Membership
+        
+        # Create membership
+        Membership.objects.create(
+            user=manager,
+            business=business,
+            role="MANAGER",
+            status="ACTIVE",
+            location=None
+        )
+        
+        # Create products
+        product1 = MerchProduct.objects.create(
+            business=business,
+            name="Product 1",
+            kind=BusinessKind.LIQUOR,
+            category="beer",
+            quantity_in_stock=50,
+            cost_per_bottle=Decimal("1500.00"),
+            price_per_bottle=Decimal("2000.00"),
+            is_active=True
+        )
+        
+        product2 = MerchProduct.objects.create(
+            business=business,
+            name="Product 2",
+            kind=BusinessKind.LIQUOR,
+            category="spirits",
+            quantity_in_stock=20,
+            cost_per_bottle=Decimal("12000.00"),
+            price_per_bottle=Decimal("15000.00"),
+            is_active=True
+        )
+        
+        # Expected stock value = (50 × 1500) + (20 × 12000) = 75000 + 240000 = 315000
+        expected_stock_value = Decimal("315000.00")
+        
+        # Login
+        client.force_login(manager)
+        session = client.session
+        session['active_business_id'] = business.id
+        session.save()
+        
+        # Get dashboard context
+        dashboard_response = client.get('/verticals/liquor/dashboard/')
+        assert dashboard_response.status_code == 200
+        dashboard_stock_value = dashboard_response.context['total_stock_value']
+        
+        # Get API response
+        api_response = client.get('/liquor/api/business-insights/?days=30')
+        assert api_response.status_code == 200
+        api_data = api_response.json()
+        api_stock_value = Decimal(str(api_data['total_stock_value']))
+        
+        # Both should match
+        assert dashboard_stock_value == expected_stock_value
+        assert api_stock_value == expected_stock_value
+        assert dashboard_stock_value == api_stock_value

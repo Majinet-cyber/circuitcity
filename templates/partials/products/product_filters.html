@@ -1,0 +1,136 @@
+{% comment %}
+Premium Product Filters Partial
+Reusable filter bar for product/stock listings
+
+Usage:
+  {% include "partials/products/product_filters.html" with show_search=True show_category=True %}
+
+Optional context:
+  - show_search: Boolean (default True)
+  - show_category: Boolean (default False)
+  - show_status: Boolean (default False)
+  - show_view_toggle: Boolean (default True)
+  - categories: List of category choices
+  - current_category: Currently selected category
+  - current_status: Currently selected status
+  - current_view: Current view mode (grid/table)
+  - search_placeholder: Custom search placeholder
+{% endcomment %}
+
+{% with show_search=show_search|default:True %}
+{% with show_category=show_category|default:False %}
+{% with show_status=show_status|default:False %}
+{% with show_view_toggle=show_view_toggle|default:True %}
+
+<div class="premium-filters-bar" role="search">
+  <form method="get" action="{{ filter_action|default:request.path }}" class="premium-filters-row">
+    {# Preserve existing query params #}
+    {% for key, value in request.GET.items %}
+      {% if key != 'q' and key != 'category' and key != 'status' and key != 'view' and key != 'page' %}
+        <input type="hidden" name="{{ key }}" value="{{ value }}">
+      {% endif %}
+    {% endfor %}
+    
+    {# Search input #}
+    {% if show_search %}
+    <div style="flex: 1; min-width: 250px;">
+      <label for="search-{{ vertical|default:'product' }}" class="sr-only">Search products</label>
+      <input 
+        type="text" 
+        name="q" 
+        id="search-{{ vertical|default:'product' }}"
+        value="{{ request.GET.q|default:'' }}" 
+        placeholder="{{ search_placeholder|default:'Search products...' }}"
+        class="premium-filter-input"
+        style="width: 100%;"
+        autocomplete="off">
+    </div>
+    {% endif %}
+    
+    {# Category filter #}
+    {% if show_category and categories %}
+    <div>
+      <label for="category-filter-{{ vertical|default:'product' }}" class="premium-filter-label sr-only">
+        Filter by category
+      </label>
+      <select 
+        name="category" 
+        id="category-filter-{{ vertical|default:'product' }}"
+        class="premium-filter-select"
+        onchange="this.form.submit()">
+        <option value="">All Categories</option>
+        {% for cat_value, cat_label in categories %}
+          <option value="{{ cat_value }}" {% if current_category == cat_value %}selected{% endif %}>
+            {{ cat_label }}
+          </option>
+        {% endfor %}
+      </select>
+    </div>
+    {% endif %}
+    
+    {# Status filter #}
+    {% if show_status %}
+    <div>
+      <label for="status-filter-{{ vertical|default:'product' }}" class="premium-filter-label sr-only">
+        Filter by status
+      </label>
+      <select 
+        name="status" 
+        id="status-filter-{{ vertical|default:'product' }}"
+        class="premium-filter-select"
+        onchange="this.form.submit()">
+        <option value="all" {% if current_status == 'all' or not current_status %}selected{% endif %}>All Status</option>
+        <option value="in_stock" {% if current_status == 'in_stock' %}selected{% endif %}>In Stock</option>
+        <option value="low_stock" {% if current_status == 'low_stock' %}selected{% endif %}>Low Stock</option>
+        <option value="out_of_stock" {% if current_status == 'out_of_stock' %}selected{% endif %}>Out of Stock</option>
+        {% if show_expiry_filters %}
+        <option value="near_expiry" {% if current_status == 'near_expiry' %}selected{% endif %}>Near Expiry</option>
+        <option value="expired" {% if current_status == 'expired' %}selected{% endif %}>Expired</option>
+        {% endif %}
+      </select>
+    </div>
+    {% endif %}
+    
+    {# Apply button #}
+    <button type="submit" class="premium-btn premium-btn-primary">
+      <i class="bi bi-funnel"></i> Apply
+    </button>
+    
+    {# Clear filters #}
+    {% if request.GET.q or request.GET.category or request.GET.status %}
+    <a href="{{ request.path }}" class="premium-btn premium-btn-secondary" aria-label="Clear all filters">
+      <i class="bi bi-x-circle"></i> Clear
+    </a>
+    {% endif %}
+    
+    {# View toggle (grid/table) #}
+    {% if show_view_toggle %}
+    <div class="premium-view-toggle" style="margin-left: auto;">
+      <button 
+        type="submit" 
+        name="view" 
+        value="grid" 
+        class="premium-view-btn {% if current_view == 'grid' or not current_view %}active{% endif %}"
+        aria-label="Grid view"
+        aria-pressed="{% if current_view == 'grid' or not current_view %}true{% else %}false{% endif %}">
+        <i class="bi bi-grid-3x3-gap"></i> Grid
+      </button>
+      <button 
+        type="submit" 
+        name="view" 
+        value="table" 
+        class="premium-view-btn {% if current_view == 'table' %}active{% endif %}"
+        aria-label="Table view"
+        aria-pressed="{% if current_view == 'table' %}true{% else %}false{% endif %}">
+        <i class="bi bi-table"></i> Table
+      </button>
+    </div>
+    {% endif %}
+  </form>
+</div>
+
+{% endwith %}
+{% endwith %}
+{% endwith %}
+{% endwith %}
+

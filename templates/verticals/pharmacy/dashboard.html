@@ -1,366 +1,1631 @@
 {% extends "base.html" %}
 {% load humanize %}
 
-{% block title %}Pharmacy & Cosmetics · Emajinet{% endblock %}
+{% block title %}Pharmacy & Cosmetics Dashboard · Emajinet{% endblock %}
+
+{% block extra_head %}
+<!-- Bootstrap Icons CDN for funnel icon -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+<!-- Chart.js CDN -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<!-- Select2 CDN for product dropdown -->
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+{% endblock %}
 
 {% block content %}
 
-{% comment %}Branded header with greeting{% endcomment %}
-{% include "partials/dashboard_brand_header.html" %}
-
-{% comment %}Daily wisdom quotes{% endcomment %}
-{% include "partials/dashboard_quotes.html" %}
-
-{% comment %}Yesterday summary (shows once per day){% endcomment %}
-{% include "partials/dashboard_yesterday_summary.html" %}
-
-{% comment %}Payment Mix{% endcomment %}
-{% include "partials/dashboard_payment_mix.html" %}
-
 <style>
-  .vertical-page{display:flex;flex-direction:column;gap:18px;padding:18px}
-  .vertical-hero{background:linear-gradient(120deg,#06b6d4,#3b82f6);padding:24px;border-radius:20px;color:#fff;display:flex;flex-wrap:wrap;gap:18px;align-items:center;justify-content:space-between}
-  .vertical-hero h1{margin:0;font-size:clamp(24px,3vw,32px)}
-  .vertical-hero p{margin:4px 0 0}
-  .hero-actions{display:flex;gap:12px;flex-wrap:wrap}
-  .hero-actions a{border-radius:999px;padding:10px 16px;font-weight:700;text-decoration:none}
-  .hero-actions .primary{background:#fff;color:#111827}
-  .hero-actions .ghost{border:1px solid rgba(255,255,255,.8);color:#fff}
+  /* ============================================
+     PREMIUM PHARMACY DASHBOARD - EXECUTIVE VIEW
+     Mobile-first, dense, informative, stable
+     ============================================ */
   
-  /* Date filter bar */
-  .date-filter-bar{background:#fff;border-radius:18px;padding:16px;box-shadow:0 10px 30px rgba(15,23,42,.08);display:flex;gap:12px;align-items:center;flex-wrap:wrap}
-  .date-filter-bar h3{margin:0;font-size:1rem;color:#64748b}
-  .filter-buttons{display:flex;gap:8px;flex-wrap:wrap}
-  .filter-btn{border-radius:12px;padding:8px 16px;font-weight:600;text-decoration:none;border:2px solid #e2e8f0;color:#475569;transition:all .2s}
-  .filter-btn:hover{background:#f1f5f9;border-color:#cbd5e1}
-  .filter-btn.active{background:#3b82f6;color:#fff;border-color:#3b82f6}
-  .custom-date-inputs{display:flex;gap:8px;align-items:center}
-  .custom-date-inputs input{border-radius:8px;border:2px solid #e2e8f0;padding:6px 10px;font-size:.9rem}
-  .custom-date-inputs button{border-radius:8px;padding:6px 12px;background:#3b82f6;color:#fff;border:none;font-weight:600;cursor:pointer}
+  .pharmacy-dashboard {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 16px;
+  }
   
-  .metrics-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px}
-  .metric-card{background:#fff;border-radius:18px;padding:18px;box-shadow:0 10px 30px rgba(15,23,42,.08)}
-  .metric-card h3{margin:0;font-size:.9rem;text-transform:uppercase;color:#64748b}
-  .metric-card p{margin:6px 0 0;font-size:1.8rem;font-weight:800;color:#0f172a}
-  .metric-card small{font-size:.8rem;color:#64748b;font-weight:normal}
+  /* ========== HEADER WITH FILTER BUTTON ========== */
+  .dashboard-header {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    padding: 24px 28px;
+    border-radius: 16px;
+    color: #fff;
+    margin-bottom: 24px;
+    box-shadow: 0 8px 32px rgba(16, 185, 129, 0.2);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
   
-  /* Payment mix card */
-  .payment-mix-card{background:#fff;border-radius:18px;padding:18px;box-shadow:0 10px 30px rgba(15,23,42,.08)}
-  .payment-method-item{display:flex;justify-content:space-between;align-items:center;padding:12px;border-bottom:1px solid #f1f5f9}
-  .payment-method-item:last-child{border-bottom:none}
-  .payment-method-icon{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.2rem}
-  .pm-cash{background:#dcfce7;color:#16a34a}
-  .pm-bank{background:#dbeafe;color:#2563eb}
-  .pm-mobile{background:#fef3c7;color:#f59e0b}
+  .dashboard-header-left {
+    flex: 1;
+  }
   
-  .recent-block{background:#fff;border-radius:20px;padding:18px;box-shadow:0 10px 30px rgba(15,23,42,.08)}
-  .recent-list{list-style:none;margin:0;padding:0;display:grid;gap:12px}
-  .recent-item{display:flex;justify-content:space-between;gap:12px;border:1px solid #e2e8f0;border-radius:16px;padding:14px;align-items:center}
-  .badge{display:inline-flex;align-items:center;gap:6px;border-radius:20px;padding:4px 10px;font-size:.75rem;font-weight:700}
-  .badge.warning{background:#fef9c3;color:#b45309}
-  .badge.danger{background:#fee2e2;color:#dc2626}
-  .badge.info{background:#dbeafe;color:#2563eb}
-  .badge.success{background:#dcfce7;color:#16a34a}
+  .dashboard-header h1 {
+    margin: 0;
+    font-size: clamp(1.6rem, 3.5vw, 2.2rem);
+    font-weight: 800;
+    letter-spacing: -0.5px;
+  }
+  
+  .dashboard-header p {
+    margin: 6px 0 0;
+    opacity: 0.92;
+    font-size: 0.95rem;
+  }
+  
+  .filter-button {
+    background: rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: #fff;
+    padding: 12px 24px;
+    border-radius: 10px;
+    font-weight: 600;
+    font-size: 0.95rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    transition: all 0.25s ease;
+  }
+  
+  .filter-button:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  }
+  
+  .filter-button i {
+    font-size: 1.1rem;
+  }
+  
+  /* Filter Badge (Active Indicator) */
+  .filter-badge {
+    background: #ef4444;
+    color: #fff;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    margin-left: 4px;
+  }
+  
+  /* ========== OFFCANVAS FILTER PANEL ========== */
+  .offcanvas-header {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: #fff;
+    padding: 24px;
+  }
+  
+  .offcanvas-title {
+    font-weight: 700;
+    font-size: 1.3rem;
+  }
+  
+  .btn-close {
+    filter: brightness(0) invert(1);
+  }
+  
+  .offcanvas-body {
+    padding: 24px;
+  }
+  
+  .filter-group {
+    margin-bottom: 24px;
+  }
+  
+  .filter-label {
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: #0f172a;
+    margin-bottom: 8px;
+    display: block;
+  }
+  
+  .filter-preset-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+  
+  .filter-preset-btn {
+    background: #f8fafc;
+    border: 2px solid #e2e8f0;
+    padding: 10px;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #475569;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: center;
+  }
+  
+  .filter-preset-btn:hover {
+    background: #f1f5f9;
+    border-color: #cbd5e1;
+  }
+  
+  .filter-preset-btn.active {
+    background: #10b981;
+    border-color: #10b981;
+    color: #fff;
+  }
+  
+  .filter-input {
+    width: 100%;
+    padding: 10px 12px;
+    border: 2px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    transition: all 0.2s;
+  }
+  
+  .filter-input:focus {
+    outline: none;
+    border-color: #10b981;
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+  }
+  
+  .filter-actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 24px;
+  }
+  
+  .btn-apply {
+    flex: 1;
+    background: #10b981;
+    color: #fff;
+    border: none;
+    padding: 14px;
+    border-radius: 10px;
+    font-weight: 700;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  
+  .btn-apply:hover {
+    background: #059669;
+    transform: translateY(-1px);
+  }
+  
+  .btn-reset {
+    background: #f8fafc;
+    color: #475569;
+    border: 2px solid #e2e8f0;
+    padding: 14px 24px;
+    border-radius: 10px;
+    font-weight: 600;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  
+  .btn-reset:hover {
+    background: #f1f5f9;
+    border-color: #cbd5e1;
+  }
+  
+  .custom-date-inputs {
+    display: none;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 12px;
+  }
+  
+  .custom-date-inputs.show {
+    display: grid;
+  }
+  
+  /* ========== EXECUTIVE ROW (Primary KPIs) ========== */
+  .executive-row {
+    margin-bottom: 24px;
+  }
+  
+  .row-title {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-weight: 700;
+    color: #64748b;
+    margin: 0 0 12px 4px;
+  }
+  
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 14px;
+  }
+  
+  .kpi-card {
+    background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+    border-radius: 14px;
+    padding: 20px;
+    box-shadow: 0 4px 16px rgba(15, 23, 42, 0.06);
+    border: 1px solid #e2e8f0;
+    transition: all 0.25s ease;
+    position: relative;
+    overflow: hidden;
+  }
+  
+  .kpi-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, #10b981, #3b82f6);
+    opacity: 0;
+    transition: opacity 0.25s ease;
+  }
+  
+  .kpi-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 12px 32px rgba(15, 23, 42, 0.12);
+    border-color: #cbd5e1;
+  }
+  
+  .kpi-card:hover::before {
+    opacity: 1;
+  }
+  
+  .kpi-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  
+  .kpi-icon {
+    font-size: 1.3rem;
+  }
+  
+  .kpi-label {
+    font-size: 0.8rem;
+    color: #64748b;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin: 0;
+  }
+  
+  .kpi-value {
+    font-size: clamp(1.6rem, 2.5vw, 2rem);
+    font-weight: 800;
+    color: #0f172a;
+    margin: 0 0 6px 0;
+    line-height: 1.1;
+  }
+  
+  .kpi-sublabel {
+    font-size: 0.8rem;
+    color: #94a3b8;
+    margin: 0;
+    font-weight: 500;
+  }
+  
+  /* Premium: Range Badge */
+  .range-badge {
+    display: inline-block;
+    background: #dbeafe;
+    color: #1e40af;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    margin-top: 8px;
+  }
+  
+  /* ========== TREND GRAPH CARD (PREMIUM) ========== */
+  .trend-section {
+    margin-bottom: 28px;
+  }
+  
+  .trend-card {
+    background: #fff;
+    border-radius: 14px;
+    padding: 24px;
+    box-shadow: 0 4px 16px rgba(15, 23, 42, 0.06);
+    border: 1px solid #e2e8f0;
+  }
+  
+  .trend-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  
+  .trend-title-group {
+    flex: 1;
+  }
+  
+  .trend-title {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: #0f172a;
+    margin: 0 0 4px 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  
+  .trend-subtitle {
+    font-size: 0.85rem;
+    color: #94a3b8;
+    margin: 0;
+  }
+  
+  .trend-toggle {
+    display: flex;
+    background: #f1f5f9;
+    border-radius: 10px;
+    padding: 4px;
+  }
+  
+  .trend-toggle-btn {
+    background: transparent;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #64748b;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  
+  .trend-toggle-btn.active {
+    background: #fff;
+    color: #10b981;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  }
+  
+  .trend-toggle-btn:hover:not(.active) {
+    color: #0f172a;
+  }
+  
+  .chart-wrap {
+    position: relative;
+    height: 400px;
+    width: 100%;
+    padding: 8px 0;
+  }
+  
+  .chart-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 100px 20px;
+    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+    border-radius: 16px;
+    border: 2px dashed #cbd5e1;
+    min-height: 350px;
+  }
+  
+  .chart-empty-icon {
+    font-size: 5rem;
+    margin-bottom: 20px;
+    opacity: 0.25;
+    filter: grayscale(1);
+  }
+  
+  .chart-empty-text {
+    font-size: 1.1rem;
+    line-height: 1.7;
+    margin: 0 0 24px;
+    color: #64748b;
+    font-weight: 500;
+  }
+  
+  .chart-empty-cta {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 28px;
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: #fff;
+    border-radius: 12px;
+    text-decoration: none;
+    font-weight: 700;
+    font-size: 0.95rem;
+    box-shadow: 0 4px 16px rgba(16, 185, 129, 0.25);
+    transition: all 0.25s ease;
+  }
+  
+  .chart-empty-cta:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(16, 185, 129, 0.35);
+    color: #fff;
+  }
+  
+  /* ========== OPERATIONAL HEALTH ROW ========== */
+  .operational-row {
+    margin-bottom: 28px;
+  }
+  
+  .op-card {
+    background: #fff;
+    border-radius: 12px;
+    padding: 18px;
+    box-shadow: 0 2px 12px rgba(15, 23, 42, 0.05);
+    border: 1px solid #e2e8f0;
+    transition: all 0.2s ease;
+    position: relative;
+  }
+  
+  .op-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.1);
+    border-color: #cbd5e1;
+  }
+  
+  .op-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 10px;
+  }
+  
+  .op-label {
+    font-size: 0.75rem;
+    color: #64748b;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  
+  .op-badge {
+    font-size: 1rem;
+  }
+  
+  .op-value {
+    font-size: 1.8rem;
+    font-weight: 800;
+    color: #0f172a;
+    margin: 0 0 6px 0;
+  }
+  
+  .op-helper {
+    font-size: 0.75rem;
+    color: #94a3b8;
+    margin-bottom: 10px;
+  }
+  
+  .op-link {
+    font-size: 0.75rem;
+    color: #3b82f6;
+    text-decoration: none;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    transition: all 0.2s;
+  }
+  
+  .op-link:hover {
+    color: #2563eb;
+    gap: 6px;
+  }
+  
+  /* ========== INVENTORY RISK PANEL ========== */
+  .risk-section {
+    margin-bottom: 28px;
+  }
+  
+  .section-title {
+    font-size: 1.2rem;
+    font-weight: 800;
+    color: #0f172a;
+    margin: 0 0 16px 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  
+  .risk-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 14px;
+  }
+  
+  .risk-card {
+    background: #fff;
+    border-radius: 14px;
+    padding: 22px;
+    box-shadow: 0 4px 16px rgba(15, 23, 42, 0.06);
+    border: 1px solid #e2e8f0;
+    border-left: 4px solid;
+    transition: all 0.25s ease;
+  }
+  
+  .risk-card.danger {
+    border-left-color: #ef4444;
+  }
+  
+  .risk-card.danger:hover {
+    background: linear-gradient(120deg, #fef2f2, #ffffff);
+  }
+  
+  .risk-card.warning {
+    border-left-color: #f59e0b;
+  }
+  
+  .risk-card.warning:hover {
+    background: linear-gradient(120deg, #fffbeb, #ffffff);
+  }
+  
+  .risk-card.info {
+    border-left-color: #3b82f6;
+  }
+  
+  .risk-card.info:hover {
+    background: linear-gradient(120deg, #eff6ff, #ffffff);
+  }
+  
+  .risk-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 32px rgba(15, 23, 42, 0.12);
+  }
+  
+  .risk-icon {
+    font-size: 2rem;
+    margin-bottom: 10px;
+  }
+  
+  .risk-title {
+    font-size: 0.8rem;
+    color: #64748b;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin: 0 0 10px 0;
+  }
+  
+  .risk-value {
+    font-size: 2.2rem;
+    font-weight: 800;
+    color: #0f172a;
+    margin: 0 0 8px 0;
+  }
+  
+  .risk-helper {
+    font-size: 0.8rem;
+    color: #94a3b8;
+    margin: 0 0 12px 0;
+  }
+  
+  .risk-cta {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.8rem;
+    color: #3b82f6;
+    text-decoration: none;
+    font-weight: 600;
+    transition: all 0.2s;
+  }
+  
+  .risk-cta:hover {
+    color: #2563eb;
+    gap: 6px;
+  }
+  
+  .fast-movers-list {
+    margin-top: 12px;
+  }
+  
+  .fast-mover-item {
+    padding: 8px 0;
+    border-bottom: 1px solid #f1f5f9;
+    font-size: 0.85rem;
+  }
+  
+  .fast-mover-item:last-child {
+    border-bottom: none;
+  }
+  
+  .fast-mover-name {
+    font-weight: 600;
+    color: #0f172a;
+    display: block;
+    margin-bottom: 2px;
+  }
+  
+  .fast-mover-units {
+    color: #64748b;
+    font-size: 0.8rem;
+  }
+  
+  /* ========== TOP SELLERS & CATEGORIES ========== */
+  .analytics-section {
+    margin-bottom: 28px;
+  }
+  
+  .analytics-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  
+  @media (min-width: 900px) {
+    .analytics-grid {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+  
+  .table-card {
+    background: #fff;
+    border-radius: 14px;
+    padding: 24px;
+    box-shadow: 0 4px 16px rgba(15, 23, 42, 0.06);
+    border: 1px solid #e2e8f0;
+  }
+  
+  .table-header {
+    margin-bottom: 16px;
+  }
+  
+  .table-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #0f172a;
+    margin: 0 0 4px 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  
+  .table-subtitle {
+    font-size: 0.8rem;
+    color: #94a3b8;
+    margin: 0;
+  }
+  
+  .data-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  
+  .data-table thead th {
+    text-align: left;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 10px 8px;
+    border-bottom: 2px solid #e2e8f0;
+  }
+  
+  .data-table tbody tr {
+    border-bottom: 1px solid #f1f5f9;
+    transition: background 0.15s;
+  }
+  
+  .data-table tbody tr:hover {
+    background: #f8fafc;
+  }
+  
+  .data-table tbody td {
+    padding: 12px 8px;
+    font-size: 0.85rem;
+  }
+  
+  .table-product {
+    font-weight: 600;
+    color: #0f172a;
+  }
+  
+  .table-category {
+    font-size: 0.75rem;
+    color: #94a3b8;
+    display: block;
+    margin-top: 2px;
+  }
+  
+  .table-number {
+    font-weight: 600;
+    color: #475569;
+    text-align: right;
+  }
+  
+  .table-empty {
+    text-align: center;
+    padding: 40px 20px;
+    color: #94a3b8;
+    font-size: 0.9rem;
+  }
+
+  /* ========== TOP SELLERS — per-product payment breakdown ========== */
+  .top-sellers-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .seller-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 14px 0;
+    border-bottom: 1px solid #f1f5f9;
+  }
+
+  .seller-row:last-child { border-bottom: none; }
+
+  .seller-info { flex: 1; min-width: 0; }
+
+  .seller-name {
+    font-weight: 700;
+    font-size: 0.9rem;
+    color: #0f172a;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .seller-meta {
+    display: flex;
+    gap: 8px;
+    margin-top: 3px;
+    flex-wrap: wrap;
+  }
+
+  .seller-category {
+    font-size: 0.72rem;
+    color: #94a3b8;
+    background: #f1f5f9;
+    border-radius: 4px;
+    padding: 1px 6px;
+  }
+
+  .seller-units {
+    font-size: 0.72rem;
+    color: #64748b;
+  }
+
+  .seller-financials {
+    text-align: right;
+    flex-shrink: 0;
+  }
+
+  .seller-revenue {
+    font-weight: 800;
+    font-size: 0.95rem;
+    color: #0f172a;
+    white-space: nowrap;
+  }
+
+  .seller-payment-chips {
+    display: flex;
+    gap: 4px;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    margin-top: 4px;
+  }
+
+  .pay-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    border-radius: 999px;
+    padding: 2px 8px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .pay-cash   { background: #dcfce7; color: #166534; }
+  .pay-momo   { background: #fef9c3; color: #854d0e; }
+  .pay-bank   { background: #dbeafe; color: #1e40af; }
+  .pay-credit { background: #fce7f3; color: #9d174d; }
+
+  /* ========== CATEGORY PAYMENT ICONS ========== */
+  .cat-pay-icons {
+    display: inline-flex;
+    gap: 4px;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .cat-pay-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    font-size: 0.7rem;
+    cursor: default;
+    transition: transform 0.15s ease;
+  }
+
+  .cat-pay-icon:hover {
+    transform: scale(1.2);
+  }
+
+  .cat-pay-cash  { background: #dcfce7; color: #166534; }
+  .cat-pay-momo  { background: #fef9c3; color: #854d0e; }
+  .cat-pay-bank  { background: #dbeafe; color: #1e40af; }
+  .cat-pay-credit{ background: #fce7f3; color: #9d174d; }
+
+  /* ========== MOBILE RESPONSIVE ========== */
+  @media (max-width: 640px) {
+    .pharmacy-dashboard {
+      padding: 12px;
+    }
+    
+    .dashboard-header {
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+    
+    .filter-button {
+      width: 100%;
+      justify-content: center;
+    }
+    
+    .kpi-grid {
+      grid-template-columns: 1fr;
+      gap: 12px;
+    }
+    
+    .executive-row,
+    .operational-row,
+    .trend-section,
+    .risk-section,
+    .analytics-section {
+      margin-bottom: 20px;
+    }
+    
+    .trend-header {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+    
+    .trend-toggle {
+      width: 100%;
+    }
+    
+    .trend-toggle-btn {
+      flex: 1;
+      text-align: center;
+    }
+    
+    .data-table {
+      font-size: 0.8rem;
+    }
+    
+    .data-table thead th,
+    .data-table tbody td {
+      padding: 8px 6px;
+    }
+    
+    .table-category {
+      display: none;
+    }
+  }
 </style>
 
-<div class="vertical-page">
-  <header class="vertical-hero">
-    <div>
-      <h1>💊 Pharmacy & Cosmetics Dashboard</h1>
-      <p>Medicine, cosmetics, batch tracking & expiry management</p>
+<div class="pharmacy-dashboard">
+  <!-- ========== HEADER ========== -->
+  <div class="dashboard-header">
+    <div class="dashboard-header-left">
+      <h1>💊 Pharmacy &amp; Cosmetics</h1>
+      <p>{{ active_business.name }}{% if active_location %} · {{ active_location.name }}{% endif %}</p>
     </div>
-    <div class="hero-actions">
-      <a class="primary" href="{% url 'pharmacy:stock_in' %}">📦 Stock In</a>
-      <a class="primary" href="{% url 'pharmacy:sell' %}">💰 Sell</a>
-      <a class="ghost" href="{% url 'pharmacy:batch_list' %}">View Batches</a>
+    <div class="d-flex gap-2 flex-wrap align-items-center">
+      <a href="{% url 'pharmacy:sell' %}" style="background:rgba(255,255,255,.95);color:#064e3b;border:none;border-radius:999px;padding:.45rem 1rem;font-size:.82rem;font-weight:700;text-decoration:none;display:inline-flex;align-items:center;gap:.35rem;transition:all .15s;box-shadow:0 2px 8px rgba(0,0,0,.12);">
+        <i class="bi bi-bag-check-fill"></i> Sell
+      </a>
+      <a href="{% url 'pharmacy:stock_in_choice' %}" style="background:rgba(255,255,255,.18);color:#fff;border:1px solid rgba(255,255,255,.3);border-radius:999px;padding:.45rem 1rem;font-size:.82rem;font-weight:600;text-decoration:none;display:inline-flex;align-items:center;gap:.35rem;transition:all .15s;">
+        <i class="bi bi-box-arrow-in-down"></i> Stock In
+      </a>
+      <button class="filter-button" type="button" data-bs-toggle="offcanvas" data-bs-target="#filterPanel">
+        <i class="bi bi-funnel"></i>
+        <span>Filter</span>
+        {% if product_filter_name or range_param != '30d' %}
+          <span class="filter-badge">Active</span>
+        {% endif %}
+      </button>
     </div>
-  </header>
+  </div>
 
-  {# Date Filter Bar #}
-  <section class="date-filter-bar">
-    <h3>📅 Period:</h3>
-    <div class="filter-buttons">
-      <a href="?range=today" class="filter-btn {% if range_param == 'today' %}active{% endif %}">Today</a>
-      <a href="?range=7d" class="filter-btn {% if range_param == '7d' %}active{% endif %}">Last 7 Days</a>
-      <a href="?range=month" class="filter-btn {% if range_param == 'month' %}active{% endif %}">This Month</a>
-    </div>
-    <div class="custom-date-inputs" id="customDatePicker" style="{% if range_param != 'custom' %}display:none{% endif %}">
-      <input type="date" id="startDate" value="{{ start_date|date:'Y-m-d' }}">
-      <span>to</span>
-      <input type="date" id="endDate" value="{{ end_date|date:'Y-m-d' }}">
-      <button onclick="applyCustomRange()">Apply</button>
-    </div>
-    <a href="#" onclick="toggleCustomPicker(); return false;" class="filter-btn {% if range_param == 'custom' %}active{% endif %}">Custom</a>
-    <div style="margin-left:auto;color:#64748b;font-weight:600">{{ period_label }}</div>
-  </section>
-
-  {# Key Metrics #}
-  <section class="metrics-grid">
-    <article class="metric-card">
-      <h3>📦 Total Batches</h3>
-      <p>{{ total_batches|intcomma }}</p>
-      <small>Current stock status</small>
-    </article>
-    <article class="metric-card">
-      <h3>💰 Stock Value</h3>
-      <p>MWK {{ total_stock_value|floatformat:0|intcomma }}</p>
-      <small>At selling price</small>
-    </article>
-    <article class="metric-card">
-      <h3>💵 Revenue ({{ period_label }})</h3>
-      <p>MWK {{ period_revenue|floatformat:0|intcomma }}</p>
-      <small>{{ period_sales_count }} sale{{ period_sales_count|pluralize }}</small>
-    </article>
-    <article class="metric-card">
-      <h3>📈 Profit ({{ period_label }})</h3>
-      <p>MWK {{ period_profit|floatformat:0|intcomma }}</p>
-      <small>{% if period_revenue > 0 %}{% widthratio period_profit period_revenue 100 %}% margin{% endif %}</small>
-    </article>
-    <article class="metric-card">
-      <h3>💸 Costs ({{ period_label }})</h3>
-      <p>MWK {{ period_costs|floatformat:0|intcomma }}</p>
-      <small>Operating expenses</small>
-    </article>
-    <article class="metric-card">
-      <h3>🛒 Sales Count</h3>
-      <p>{{ period_sales_count|intcomma }}</p>
-      <small>Avg: MWK {{ avg_sale_value|floatformat:0|intcomma }}</small>
-    </article>
-    <article class="metric-card">
-      <h3>📦 Products</h3>
-      <p>{{ products_count|intcomma }}</p>
-      <small>In stock</small>
-    </article>
-  </section>
-
-  {# Payment Mix Card #}
-  {% if period_sales_count > 0 %}
-  <section class="payment-mix-card">
-    <h2 style="margin:0 0 16px;font-size:1.1rem">💳 Payment Mix ({{ period_label }})</h2>
-    <div>
-      <div class="payment-method-item">
-        <div style="display:flex;align-items:center;gap:12px">
-          <div class="payment-method-icon pm-cash">💵</div>
-          <div>
-            <div style="font-weight:700">Cash</div>
-            <small style="color:#64748b">{{ payment_mix.CASH.count }} transaction{{ payment_mix.CASH.count|pluralize }}</small>
-          </div>
-        </div>
-        <div style="text-align:right">
-          <div style="font-weight:700;font-size:1.1rem">MWK {{ payment_mix.CASH.amount|floatformat:0|intcomma }}</div>
-          <small style="color:#64748b">{% if period_revenue > 0 %}{% widthratio payment_mix.CASH.amount period_revenue 100 %}%{% endif %}</small>
-        </div>
-      </div>
-      <div class="payment-method-item">
-        <div style="display:flex;align-items:center;gap:12px">
-          <div class="payment-method-icon pm-bank">🏦</div>
-          <div>
-            <div style="font-weight:700">Bank</div>
-            <small style="color:#64748b">{{ payment_mix.BANK.count }} transaction{{ payment_mix.BANK.count|pluralize }}</small>
-          </div>
-        </div>
-        <div style="text-align:right">
-          <div style="font-weight:700;font-size:1.1rem">MWK {{ payment_mix.BANK.amount|floatformat:0|intcomma }}</div>
-          <small style="color:#64748b">{% if period_revenue > 0 %}{% widthratio payment_mix.BANK.amount period_revenue 100 %}%{% endif %}</small>
-        </div>
-      </div>
-      <div class="payment-method-item">
-        <div style="display:flex;align-items:center;gap:12px">
-          <div class="payment-method-icon pm-mobile">📱</div>
-          <div>
-            <div style="font-weight:700">Mobile Money</div>
-            <small style="color:#64748b">{{ payment_mix.MOBILE_MONEY.count }} transaction{{ payment_mix.MOBILE_MONEY.count|pluralize }}</small>
-          </div>
-        </div>
-        <div style="text-align:right">
-          <div style="font-weight:700;font-size:1.1rem">MWK {{ payment_mix.MOBILE_MONEY.amount|floatformat:0|intcomma }}</div>
-          <small style="color:#64748b">{% if period_revenue > 0 %}{% widthratio payment_mix.MOBILE_MONEY.amount period_revenue 100 %}%{% endif %}</small>
-        </div>
+  <!-- ========== TODAY AT A GLANCE ========== -->
+  {% if today_sales_count_actual > 0 or today_sales_amount > 0 %}
+  <div style="background:#f0fdf4;border:1.5px solid #bbf7d0;border-radius:12px;padding:14px 20px;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+    <div style="display:flex;align-items:center;gap:10px;">
+      <span style="font-size:1.4rem;">📊</span>
+      <div>
+        <div style="font-size:.72rem;font-weight:700;color:#166534;text-transform:uppercase;letter-spacing:.05em;">Today So Far</div>
+        <div style="font-size:1rem;font-weight:800;color:#14532d;">MWK {{ today_sales_amount|floatformat:0|intcomma }} · {{ today_sales_count_actual }} sale{{ today_sales_count_actual|pluralize }}</div>
       </div>
     </div>
-  </section>
+    <a href="{% url 'pharmacy:sale_list' %}" style="font-size:.8rem;color:#059669;font-weight:600;text-decoration:none;">View sales →</a>
+  </div>
+  {% endif %}
+  
+  <!-- ========== FILTER OFFCANVAS PANEL ========== -->
+  <div class="offcanvas offcanvas-end" tabindex="-1" id="filterPanel" aria-labelledby="filterPanelLabel">
+    <div class="offcanvas-header">
+      <h5 class="offcanvas-title" id="filterPanelLabel">
+        <i class="bi bi-funnel me-2"></i>Filter Dashboard
+      </h5>
+      <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+    </div>
+    <div class="offcanvas-body">
+      <form id="filterForm" method="GET" action="">
+        <!-- Date Range Presets -->
+        <div class="filter-group">
+          <label class="filter-label">Date Range</label>
+          <div class="filter-preset-grid">
+            <button type="button" class="filter-preset-btn" data-range="today" {% if range_param == 'today' %}class="filter-preset-btn active"{% endif %}>Today</button>
+            <button type="button" class="filter-preset-btn" data-range="7d" {% if range_param == '7d' %}class="filter-preset-btn active"{% endif %}>Last 7 Days</button>
+            <button type="button" class="filter-preset-btn active" data-range="30d" {% if range_param == '30d' %}class="filter-preset-btn active"{% endif %}>Last 30 Days</button>
+            <button type="button" class="filter-preset-btn" data-range="this_month" {% if range_param == 'this_month' %}class="filter-preset-btn active"{% endif %}>This Month</button>
+            <button type="button" class="filter-preset-btn" data-range="last_month" {% if range_param == 'last_month' %}class="filter-preset-btn active"{% endif %}>Last Month</button>
+            <button type="button" class="filter-preset-btn" data-range="this_year" {% if range_param == 'this_year' %}class="filter-preset-btn active"{% endif %}>This Year</button>
+            <button type="button" class="filter-preset-btn" data-range="custom" {% if range_param == 'custom' %}class="filter-preset-btn active"{% endif %}>Custom</button>
+          </div>
+          
+          <!-- Custom Date Inputs (hidden by default) -->
+          <div id="customDateInputs" class="custom-date-inputs {% if range_param == 'custom' %}show{% endif %}">
+            <div>
+              <label class="filter-label" style="font-size: 0.8rem;">Start Date</label>
+              <input type="date" id="startDate" name="start" class="filter-input" value="{{ start_date|date:'Y-m-d' }}">
+            </div>
+            <div>
+              <label class="filter-label" style="font-size: 0.8rem;">End Date</label>
+              <input type="date" id="endDate" name="end" class="filter-input" value="{{ end_date|date:'Y-m-d' }}">
+            </div>
+          </div>
+          
+          <!-- Hidden range input -->
+          <input type="hidden" id="rangeInput" name="range" value="{{ range_param }}">
+        </div>
+        
+        <!-- Product Filter -->
+        <div class="filter-group">
+          <label class="filter-label" for="productFilter">Product (Optional)</label>
+          <select id="productFilter" name="product_id" class="filter-input" style="width: 100%;">
+            <option value="">All Products</option>
+            {% for product in products_all %}
+              <option value="{{ product.id }}" {% if product_id == product.id %}selected{% endif %}>{{ product.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        
+        <!-- Actions -->
+        <div class="filter-actions">
+          <button type="button" id="resetBtn" class="btn-reset">Reset</button>
+          <button type="submit" class="btn-apply">Apply Filters</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  
+  <!-- ========== EXECUTIVE ROW (Primary KPIs) ========== -->
+  <div class="executive-row">
+    <h2 class="row-title">📊 Executive Summary</h2>
+    <div class="kpi-grid">
+      <!-- Period Revenue -->
+      <div class="kpi-card">
+        <div class="kpi-header">
+          <span class="kpi-icon">💰</span>
+          <p class="kpi-label">Revenue</p>
+        </div>
+        <h3 class="kpi-value">MWK {{ period_revenue|default:0|floatformat:0|intcomma }}</h3>
+        <p class="kpi-sublabel">
+          {% if period_sales_count %}
+            {{ period_sales_count }} transaction{{ period_sales_count|pluralize }}
+          {% else %}
+            No sales in this period
+          {% endif %}
+        </p>
+        <span class="range-badge">{{ period_label }}</span>
+      </div>
+      
+      <!-- Period Profit -->
+      <div class="kpi-card">
+        <div class="kpi-header">
+          <span class="kpi-icon">📈</span>
+          <p class="kpi-label">Profit</p>
+        </div>
+        <h3 class="kpi-value">MWK {{ period_profit|default:0|floatformat:0|intcomma }}</h3>
+        <p class="kpi-sublabel">
+          {% if period_revenue > 0 %}
+            {% widthratio period_profit period_revenue 100 %}% margin
+          {% else %}
+            No margin data
+          {% endif %}
+        </p>
+        <span class="range-badge">{{ period_label }}</span>
+      </div>
+      
+      <!-- Stock Value (Cost) -->
+      <div class="kpi-card">
+        <div class="kpi-header">
+          <span class="kpi-icon">🏦</span>
+          <p class="kpi-label">Stock Value (Cost)</p>
+        </div>
+        <h3 class="kpi-value">MWK {{ total_stock_value_cost|default:0|floatformat:0|intcomma }}</h3>
+        <p class="kpi-sublabel">Capital invested in inventory</p>
+        <span class="range-badge">Current</span>
+      </div>
+      
+      <!-- Units Sold -->
+      <div class="kpi-card">
+        <div class="kpi-header">
+          <span class="kpi-icon">📊</span>
+          <p class="kpi-label">Units Sold</p>
+        </div>
+        <h3 class="kpi-value">
+          {% if period_sales %}
+            {{ period_sales|length|intcomma }}
+          {% else %}
+            0
+          {% endif %}
+        </h3>
+        <p class="kpi-sublabel">Items sold in period</p>
+        <span class="range-badge">{{ period_label }}</span>
+      </div>
+    </div>
+  </div>
+  
+  <!-- ========== TREND GRAPH (PREMIUM) ========== -->
+  <div class="trend-section">
+    <div class="trend-card">
+      <div class="trend-header">
+        <div class="trend-title-group">
+          <h3 class="trend-title">
+            <span>📊</span> Sales Trend
+          </h3>
+          <p class="trend-subtitle">{{ period_label }}{% if product_filter_name %} · {{ product_filter_name }}{% endif %}</p>
+        </div>
+        <div class="trend-toggle">
+          <button type="button" class="trend-toggle-btn active" data-metric="revenue">Revenue</button>
+          <button type="button" class="trend-toggle-btn" data-metric="units">Units</button>
+        </div>
+      </div>
+      <div class="chart-wrap">
+        <canvas id="trendChart" style="display:none;"></canvas>
+        <div id="trendChartLoading" style="display:flex;align-items:center;justify-content:center;height:100%;gap:10px;color:#94a3b8;font-size:.9rem;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="animation:spin .9s linear infinite;"><circle cx="12" cy="12" r="10" opacity=".25"/><path d="M12 2a10 10 0 0 1 10 10"/></svg>
+          Loading chart…
+        </div>
+      </div>
+      <div id="trendChartEmpty" class="chart-empty" style="display: none;">
+        <div class="chart-empty-icon">📈</div>
+        <p class="chart-empty-text">No sales recorded yet for this period.<br>Your trend chart will appear after your first sale.</p>
+        <a href="{% url 'pharmacy:sell' %}" class="chart-empty-cta">
+          <span>💊</span> Record a Sale
+        </a>
+      </div>
+      <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
+    </div>
+  </div>
+  
+  <!-- ========== OPERATIONAL HEALTH ROW ========== -->
+  <div class="operational-row">
+    <h2 class="row-title">⚙️ Operational Health</h2>
+    <div class="kpi-grid">
+      <!-- In Stock -->
+      <div class="op-card">
+        <div class="op-card-header">
+          <p class="op-label">In Stock</p>
+          <span class="op-badge">✅</span>
+        </div>
+        <h3 class="op-value">{{ in_stock_count|default:0|intcomma }}</h3>
+        <p class="op-helper">Batches with available quantity</p>
+        <a href="{% url 'pharmacy:batch_list' %}" class="op-link">View all batches →</a>
+      </div>
+      
+      <!-- Out of Stock -->
+      <div class="op-card">
+        <div class="op-card-header">
+          <p class="op-label">Out of Stock</p>
+          <span class="op-badge">❌</span>
+        </div>
+        <h3 class="op-value">{{ out_of_stock_count|default:0|intcomma }}</h3>
+        <p class="op-helper">Need immediate restocking</p>
+        <a href="{% url 'pharmacy:stock_in_choice' %}" class="op-link">Restock now →</a>
+      </div>
+      
+      <!-- Low Stock Alerts -->
+      <div class="op-card">
+        <div class="op-card-header">
+          <p class="op-label">Low Stock Alerts</p>
+          <span class="op-badge">⚠️</span>
+        </div>
+        <h3 class="op-value">{{ low_stock_count|default:0|intcomma }}</h3>
+        <p class="op-helper">Below reorder threshold</p>
+        <a href="{% url 'pharmacy:batch_list' %}" class="op-link">See details →</a>
+      </div>
+      
+      <!-- Near Expiry (30 days) -->
+      <div class="op-card">
+        <div class="op-card-header">
+          <p class="op-label">Near Expiry (30 days)</p>
+          <span class="op-badge">⏰</span>
+        </div>
+        <h3 class="op-value">{{ near_expiry_count|default:0|intcomma }}</h3>
+        <p class="op-helper">Expiring in next 30 days</p>
+        <a href="{% url 'pharmacy:batch_list' %}" class="op-link">View list →</a>
+      </div>
+    </div>
+  </div>
+  
+  <!-- ========== INVENTORY RISK & COMPLIANCE ========== -->
+  <div class="risk-section">
+    <h2 class="section-title">🚨 Inventory Risk & Compliance</h2>
+    <div class="risk-grid">
+      <!-- Expired Batches -->
+      <div class="risk-card danger">
+        <div class="risk-icon">🚫</div>
+        <p class="risk-title">Expired Batches</p>
+        <h3 class="risk-value">{{ expired_count|default:0|intcomma }}</h3>
+        <p class="risk-helper">Remove immediately</p>
+        <a href="{% url 'pharmacy:batch_list' %}" class="risk-cta">View expired list →</a>
+      </div>
+      
+      <!-- Expiring Soon (30 days) -->
+      <div class="risk-card warning">
+        <div class="risk-icon">⏳</div>
+        <p class="risk-title">Expiring Soon (30 days)</p>
+        <h3 class="risk-value">{{ near_expiry_count|default:0|intcomma }}</h3>
+        <p class="risk-helper">Plan reorder / sell-through</p>
+        <a href="{% url 'pharmacy:batch_list' %}" class="risk-cta">Plan action →</a>
+      </div>
+      
+      <!-- Fast Movers -->
+      <div class="risk-card info">
+        <div class="risk-icon">🔥</div>
+        <p class="risk-title">Fast Movers</p>
+        {% if top_products %}
+          <h3 class="risk-value">{{ top_products|length }}</h3>
+          <p class="risk-helper">Top selling items</p>
+          <div class="fast-movers-list">
+            {% for mover in top_products|slice:":3" %}
+            <div class="fast-mover-item">
+              <span class="fast-mover-name">{{ mover.name|truncatewords:4 }}</span>
+              <span class="fast-mover-units">{{ mover.quantity|intcomma }} units sold</span>
+            </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <h3 class="risk-value">0</h3>
+          <p class="risk-helper">No fast movers identified yet</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  
+  <!-- ========== WHAT NEEDS ATTENTION ========== -->
+  {% if expired_count > 0 or near_expiry_count > 0 or out_of_stock_count > 0 or low_stock_count > 0 %}
+  <div class="risk-section" style="margin-bottom:28px;">
+    <h2 class="section-title">⚡ Needs Your Attention</h2>
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      {% if expired_count > 0 %}
+      <a href="{% url 'pharmacy:expired' %}" style="display:flex;align-items:center;gap:12px;padding:12px 18px;background:#fef2f2;border:1.5px solid #fca5a5;border-radius:12px;text-decoration:none;color:inherit;transition:all .2s;">
+        <span style="font-size:1.4rem;">🚫</span>
+        <div style="flex:1;">
+          <div style="font-weight:700;font-size:.9rem;color:#dc2626;">{{ expired_count }} Expired Batch{{ expired_count|pluralize:"es" }}</div>
+          <div style="font-size:.8rem;color:#b91c1c;">Remove from shelves immediately</div>
+        </div>
+        <i class="bi bi-arrow-right" style="color:#dc2626;"></i>
+      </a>
+      {% endif %}
+      {% if out_of_stock_count > 0 %}
+      <a href="{% url 'pharmacy:low_stock' %}" style="display:flex;align-items:center;gap:12px;padding:12px 18px;background:#fff7ed;border:1.5px solid #fed7aa;border-radius:12px;text-decoration:none;color:inherit;transition:all .2s;">
+        <span style="font-size:1.4rem;">📭</span>
+        <div style="flex:1;">
+          <div style="font-weight:700;font-size:.9rem;color:#d97706;">{{ out_of_stock_count }} Product{{ out_of_stock_count|pluralize }} Out of Stock</div>
+          <div style="font-size:.8rem;color:#b45309;">Restock to resume selling</div>
+        </div>
+        <i class="bi bi-arrow-right" style="color:#d97706;"></i>
+      </a>
+      {% endif %}
+      {% if near_expiry_count > 0 %}
+      <a href="{% url 'pharmacy:near_expiry' %}" style="display:flex;align-items:center;gap:12px;padding:12px 18px;background:#fffbeb;border:1.5px solid #fde68a;border-radius:12px;text-decoration:none;color:inherit;transition:all .2s;">
+        <span style="font-size:1.4rem;">⏳</span>
+        <div style="flex:1;">
+          <div style="font-weight:700;font-size:.9rem;color:#92400e;">{{ near_expiry_count }} Batch{{ near_expiry_count|pluralize:"es" }} Near Expiry</div>
+          <div style="font-size:.8rem;color:#78350f;">Expiring within 30 days — plan action</div>
+        </div>
+        <i class="bi bi-arrow-right" style="color:#92400e;"></i>
+      </a>
+      {% endif %}
+    </div>
+  </div>
   {% endif %}
 
-  {# Top Products & Categories Section #}
-  {% if top_products or top_categories %}
-  <div style="display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));">
-    
-    {# Top Products #}
-    {% if top_products %}
-    <section class="recent-block">
-      <h2 style="margin:0 0 16px;font-size:1.1rem">🏆 Top Products ({{ period_label }})</h2>
-      <div style="overflow-x:auto">
-        <table style="width:100%;border-collapse:collapse">
-          <thead>
-            <tr style="border-bottom:2px solid #e2e8f0;text-align:left">
-              <th style="padding:8px;font-size:.85rem;color:#64748b">Product</th>
-              <th style="padding:8px;font-size:.85rem;color:#64748b">Category</th>
-              <th style="padding:8px;font-size:.85rem;color:#64748b;text-align:right">Qty</th>
-              <th style="padding:8px;font-size:.85rem;color:#64748b;text-align:right">Revenue</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for product in top_products|slice:":8" %}
-            <tr style="border-bottom:1px solid #f1f5f9">
-              <td style="padding:10px;font-weight:600">{{ product.name }}</td>
-              <td style="padding:10px">
-                <span class="badge info">{{ product.category }}</span>
-              </td>
-              <td style="padding:10px;text-align:right;color:#64748b">{{ product.quantity|intcomma }}</td>
-              <td style="padding:10px;text-align:right;font-weight:700">MWK {{ product.revenue|floatformat:0|intcomma }}</td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-    </section>
-    {% endif %}
-
-    {# Top Categories #}
-    {% if top_categories %}
-    <section class="recent-block">
-      <h2 style="margin:0 0 16px;font-size:1.1rem">📊 Top Categories ({{ period_label }})</h2>
-      <div style="overflow-x:auto">
-        <table style="width:100%;border-collapse:collapse">
-          <thead>
-            <tr style="border-bottom:2px solid #e2e8f0;text-align:left">
-              <th style="padding:8px;font-size:.85rem;color:#64748b">Category</th>
-              <th style="padding:8px;font-size:.85rem;color:#64748b;text-align:right">Revenue</th>
-              <th style="padding:8px;font-size:.85rem;color:#64748b;text-align:right">Share</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for cat in top_categories %}
-            <tr style="border-bottom:1px solid #f1f5f9">
-              <td style="padding:10px">
-                <div style="font-weight:600">{{ cat.category }}</div>
-                <small style="color:#64748b">{{ cat.quantity|intcomma }} items sold</small>
-              </td>
-              <td style="padding:10px;text-align:right;font-weight:700">MWK {{ cat.revenue|floatformat:0|intcomma }}</td>
-              <td style="padding:10px;text-align:right">
-                <div style="display:flex;align-items:center;justify-content:flex-end;gap:8px">
-                  <div style="flex:0 0 60px;background:#e2e8f0;height:6px;border-radius:3px;overflow:hidden">
-                    <div style="width:{{ cat.revenue_pct|floatformat:0 }}%;background:#3b82f6;height:100%"></div>
-                  </div>
-                  <span style="font-size:.85rem;color:#64748b;min-width:40px">{{ cat.revenue_pct|floatformat:1 }}%</span>
+  <!-- ========== TOP SELLERS & CATEGORIES ========== -->
+  <div class="analytics-section">
+    <h2 class="section-title">🏆 Top Performers · {{ period_label }}</h2>
+    <div class="analytics-grid">
+      <!-- Top Sellers with Payment Breakdown -->
+      <div class="table-card">
+        <div class="table-header">
+          <h3 class="table-title">
+            <span>🥇</span> Top Sellers
+          </h3>
+          <p class="table-subtitle">Revenue &amp; payment breakdown per product</p>
+        </div>
+        {% if top_products %}
+          <div class="top-sellers-list">
+            {% for product in top_products|slice:":5" %}
+            <div class="seller-row">
+              <div class="seller-info">
+                <div class="seller-name">{{ product.name|truncatewords:5 }}</div>
+                <div class="seller-meta">
+                  <span class="seller-category">{{ product.category }}</span>
+                  <span class="seller-units">{{ product.quantity|intcomma }} units</span>
                 </div>
-              </td>
-            </tr>
+              </div>
+              <div class="seller-financials">
+                <div class="seller-revenue">MWK {{ product.revenue|floatformat:0|intcomma }}</div>
+                <div class="seller-payment-chips">
+                  {% if product.cash_revenue %}
+                  <span class="pay-chip pay-cash" title="Cash">
+                    <i class="bi bi-cash-stack"></i> {{ product.cash_revenue|floatformat:0|intcomma }}
+                  </span>
+                  {% endif %}
+                  {% if product.momo_revenue %}
+                  <span class="pay-chip pay-momo" title="Mobile Money">
+                    <i class="bi bi-phone"></i> {{ product.momo_revenue|floatformat:0|intcomma }}
+                  </span>
+                  {% endif %}
+                  {% if product.bank_revenue %}
+                  <span class="pay-chip pay-bank" title="Bank Transfer">
+                    <i class="bi bi-bank"></i> {{ product.bank_revenue|floatformat:0|intcomma }}
+                  </span>
+                  {% endif %}
+                  {% if product.credit_revenue %}
+                  <span class="pay-chip pay-credit" title="Credit">
+                    <i class="bi bi-clock-history"></i> {{ product.credit_revenue|floatformat:0|intcomma }}
+                  </span>
+                  {% endif %}
+                </div>
+              </div>
+            </div>
             {% endfor %}
-          </tbody>
-        </table>
+          </div>
+        {% else %}
+          <div class="table-empty">
+            <p>No sales data for this period.<br>Your top sellers will appear here after sales.</p>
+          </div>
+        {% endif %}
       </div>
-    </section>
-    {% endif %}
-    
+      
+      <!-- Top Categories -->
+      <div class="table-card">
+        <div class="table-header">
+          <h3 class="table-title">
+            <span>📦</span> Top Categories
+          </h3>
+          <p class="table-subtitle">Revenue &amp; payment breakdown per category</p>
+        </div>
+        {% if top_categories %}
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Category</th>
+                <th style="text-align: right;">Units</th>
+                <th style="text-align: right;">Revenue</th>
+                <th style="text-align: center; width: 90px;">Pay</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for category in top_categories|slice:":5" %}
+              <tr>
+                <td>
+                  <span class="table-product">{{ category.category }}</span>
+                </td>
+                <td class="table-number">{{ category.quantity|intcomma }}</td>
+                <td class="table-number">MWK {{ category.revenue|floatformat:0|intcomma }}</td>
+                <td style="text-align: center;">
+                  <div class="cat-pay-icons">
+                    {% if category.cash_revenue %}
+                    <span class="cat-pay-icon cat-pay-cash"
+                          title="Cash · MWK {{ category.cash_revenue|floatformat:0|intcomma }}">
+                      <i class="bi bi-cash-stack"></i>
+                    </span>
+                    {% endif %}
+                    {% if category.momo_revenue %}
+                    <span class="cat-pay-icon cat-pay-momo"
+                          title="Mobile Money · MWK {{ category.momo_revenue|floatformat:0|intcomma }}">
+                      <i class="bi bi-phone"></i>
+                    </span>
+                    {% endif %}
+                    {% if category.bank_revenue %}
+                    <span class="cat-pay-icon cat-pay-bank"
+                          title="Bank · MWK {{ category.bank_revenue|floatformat:0|intcomma }}">
+                      <i class="bi bi-bank"></i>
+                    </span>
+                    {% endif %}
+                    {% if category.credit_revenue %}
+                    <span class="cat-pay-icon cat-pay-credit"
+                          title="Credit · MWK {{ category.credit_revenue|floatformat:0|intcomma }}">
+                      <i class="bi bi-clock-history"></i>
+                    </span>
+                    {% endif %}
+                  </div>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        {% else %}
+          <div class="table-empty">
+            <p>No category sales yet.<br>Sales breakdown will appear here after transactions.</p>
+          </div>
+        {% endif %}
+      </div>
+    </div>
   </div>
-  {% endif %}
-
-  {# Alerts Section #}
-  <div style="display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));">
-    
-    {# Near Expiry #}
-    <section class="recent-block">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-        <h2 style="margin:0;font-size:1.1rem">⚠️ Near Expiry (30 days)</h2>
-        <a class="btn btn-sm btn-outline-warning" href="{% url 'pharmacy:near_expiry' %}">View all</a>
-      </div>
-      {% if near_expiry_batches %}
-        <ul class="recent-list">
-          {% for batch in near_expiry_batches|slice:":5" %}
-            <li class="recent-item">
-              <div>
-                <strong>{{ batch.merch_product.name }}</strong>
-                <br>
-                <small style="color:#64748b">Batch: {{ batch.batch_number }}</small>
-              </div>
-              <div style="text-align:right">
-                <span class="badge warning">{{ batch.days_to_expiry }} days</span>
-                <br>
-                <small style="color:#64748b">Qty: {{ batch.quantity }}</small>
-              </div>
-            </li>
-          {% endfor %}
-        </ul>
-      {% else %}
-        <p style="color:#64748b;text-align:center;padding:20px">No batches expiring soon ✅</p>
-      {% endif %}
-    </section>
-
-    {# Expired #}
-    <section class="recent-block">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-        <h2 style="margin:0;font-size:1.1rem">🚫 Expired Batches</h2>
-        <a class="btn btn-sm btn-outline-danger" href="{% url 'pharmacy:expired' %}">View all</a>
-      </div>
-      {% if expired_batches %}
-        <ul class="recent-list">
-          {% for batch in expired_batches|slice:":5" %}
-            <li class="recent-item">
-              <div>
-                <strong>{{ batch.merch_product.name }}</strong>
-                <br>
-                <small style="color:#64748b">Batch: {{ batch.batch_number }}</small>
-              </div>
-              <div style="text-align:right">
-                <span class="badge danger">Expired</span>
-                <br>
-                <small style="color:#64748b">{{ batch.expiry_date }}</small>
-              </div>
-            </li>
-          {% endfor %}
-        </ul>
-      {% else %}
-        <p style="color:#64748b;text-align:center;padding:20px">No expired batches ✅</p>
-      {% endif %}
-    </section>
-
-    {# Low Stock #}
-    <section class="recent-block">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-        <h2 style="margin:0;font-size:1.1rem">📉 Low Stock</h2>
-        <a class="btn btn-sm btn-outline-info" href="{% url 'pharmacy:low_stock' %}">View all</a>
-      </div>
-      {% if low_stock_batches %}
-        <ul class="recent-list">
-          {% for batch in low_stock_batches|slice:":5" %}
-            <li class="recent-item">
-              <div>
-                <strong>{{ batch.merch_product.name }}</strong>
-                <br>
-                <small style="color:#64748b">Batch: {{ batch.batch_number }}</small>
-              </div>
-              <div style="text-align:right">
-                <span class="badge info">{{ batch.quantity }} left</span>
-                <br>
-                <small style="color:#64748b">Reorder: {{ batch.reorder_level }}</small>
-              </div>
-            </li>
-          {% endfor %}
-        </ul>
-      {% else %}
-        <p style="color:#64748b;text-align:center;padding:20px">All stock levels OK ✅</p>
-      {% endif %}
-    </section>
-  </div>
-
+  
 </div>
 
+<!-- ========== JAVASCRIPT ========== -->
 <script>
-function toggleCustomPicker() {
-  const picker = document.getElementById('customDatePicker');
-  const isVisible = picker.style.display !== 'none';
-  picker.style.display = isVisible ? 'none' : 'flex';
-}
+document.addEventListener('DOMContentLoaded', function() {
+  // ========== FILTER PANEL LOGIC ==========
+  const filterForm = document.getElementById('filterForm');
+  const rangeInput = document.getElementById('rangeInput');
+  const customDateInputs = document.getElementById('customDateInputs');
+  const presetBtns = document.querySelectorAll('.filter-preset-btn');
+  const resetBtn = document.getElementById('resetBtn');
+  
+  // Handle range preset button clicks
+  presetBtns.forEach(btn => {
+    btn.addEventListener('click', function() {
+      const range = this.dataset.range;
+      
+      // Update active state
+      presetBtns.forEach(b => b.classList.remove('active'));
+      this.classList.add('active');
+      
+      // Update hidden input
+      rangeInput.value = range;
+      
+      // Show/hide custom date inputs
+      if (range === 'custom') {
+        customDateInputs.classList.add('show');
+      } else {
+        customDateInputs.classList.remove('show');
+      }
+    });
+  });
+  
+  // Reset button
+  resetBtn.addEventListener('click', function() {
+    window.location.href = window.location.pathname + '?range=30d';
+  });
+  
+  // Initialize Select2 for product filter
+  $('#productFilter').select2({
+    placeholder: 'Search products...',
+    allowClear: true,
+    dropdownParent: $('#filterPanel'),
+    width: '100%'
+  });
+  
+  // ========== TREND CHART ==========
+  let trendChart = null;
+  let trendData = null;
+  let activeMetric = 'revenue';
 
-function applyCustomRange() {
-  const start = document.getElementById('startDate').value;
-  const end = document.getElementById('endDate').value;
-  if (start && end) {
-    window.location.href = `?range=custom&start=${start}&end=${end}`;
-  } else {
-    alert('Please select both start and end dates');
+  const trendCanvas  = document.getElementById('trendChart');
+  const trendLoading = document.getElementById('trendChartLoading');
+  const trendEmpty   = document.getElementById('trendChartEmpty');
+  const toggleBtns   = document.querySelectorAll('.trend-toggle-btn');
+
+  function showTrendEmpty() {
+    if (trendCanvas)  trendCanvas.style.display  = 'none';
+    if (trendLoading) trendLoading.style.display  = 'none';
+    if (trendEmpty)   trendEmpty.style.display    = 'block';
   }
-}
+  function showTrendCanvas() {
+    if (trendCanvas)  trendCanvas.style.display  = 'block';
+    if (trendLoading) trendLoading.style.display  = 'none';
+    if (trendEmpty)   trendEmpty.style.display    = 'none';
+  }
+
+  // Build API URL with current filter params
+  const urlParams = new URLSearchParams(window.location.search);
+  const apiUrl = '{% url "verticals:pharmacy_sales_trend_json" %}?' + urlParams.toString() + '&t=' + Date.now();
+
+  // Fetch trend data
+  fetch(apiUrl, { credentials: 'same-origin' })
+    .then(response => {
+      if (!response.ok || !response.headers.get('content-type')?.includes('application/json')) {
+        throw new Error('Bad response ' + response.status);
+      }
+      return response.json();
+    })
+    .then(data => {
+      trendData = data;
+      if (!data.has_data || !data.labels || data.labels.length === 0) {
+        showTrendEmpty();
+        return;
+      }
+      // Guard: Chart.js must be loaded
+      if (typeof Chart === 'undefined') {
+        console.warn('Chart.js not loaded — showing empty state');
+        showTrendEmpty();
+        return;
+      }
+      showTrendCanvas();
+      renderTrendChart('revenue');
+    })
+    .catch(error => {
+      console.error('Trend chart fetch error:', error);
+      showTrendEmpty();
+    });
+  
+  // Toggle metric (Revenue / Units)
+  toggleBtns.forEach(btn => {
+    btn.addEventListener('click', function() {
+      const metric = this.dataset.metric;
+      
+      // Update active state
+      toggleBtns.forEach(b => b.classList.remove('active'));
+      this.classList.add('active');
+      
+      // Re-render chart with new metric
+      activeMetric = metric;
+      renderTrendChart(metric);
+    });
+  });
+  
+  // Render Chart.js trend chart — premium smooth line with gradient fill
+  function renderTrendChart(metric) {
+    if (!trendData || !trendData.labels) return;
+
+    let labels = trendData.labels.slice();
+    let values = (metric === 'revenue' ? trendData.revenue : trendData.units).slice();
+
+    // Single data point: duplicate so the line renders across the chart area
+    if (labels.length === 1) {
+      labels = ['', labels[0], ''];
+      values = [values[0], values[0], values[0]];
+    }
+
+    const label     = metric === 'revenue' ? 'Revenue (MWK)' : 'Units Sold';
+    const colorLine = metric === 'revenue' ? '#10b981' : '#3b82f6';
+    const colorFrom = metric === 'revenue' ? 'rgba(16,185,129,0.22)' : 'rgba(59,130,246,0.22)';
+    const colorTo   = metric === 'revenue' ? 'rgba(16,185,129,0)' : 'rgba(59,130,246,0)';
+    const maxValue  = Math.max(...values, 0);
+
+    if (trendChart) trendChart.destroy();
+
+    const ctx = trendCanvas.getContext('2d');
+
+    // Gradient fill under the line
+    const gradient = ctx.createLinearGradient(0, 0, 0, trendCanvas.clientHeight || 360);
+    gradient.addColorStop(0, colorFrom);
+    gradient.addColorStop(1, colorTo);
+
+    // Y-axis tick formatter
+    function yTickFmt(value) {
+      if (value !== Math.floor(value) && metric === 'units') return '';
+      if (value >= 1000000) {
+        const m = value / 1000000;
+        return (m % 1 === 0 ? m.toFixed(0) : m.toFixed(1)) + 'M';
+      }
+      if (value >= 1000) return (value / 1000).toFixed(0) + 'k';
+      if (value === 0) return '0';
+      return value.toFixed(0);
+    }
+
+    const yAxisConfig = {
+      beginAtZero: true,
+      grace: '8%',
+      ticks: {
+        maxTicksLimit: metric === 'units' ? 8 : 7,
+        font: { size: 12, weight: '600', family: 'system-ui, -apple-system, sans-serif' },
+        color: '#94a3b8',
+        padding: 10,
+        callback: yTickFmt,
+        ...(metric === 'units' && maxValue <= 20 ? { stepSize: 1 } : {}),
+      },
+    };
+
+    trendChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [{
+          label,
+          data: values,
+          borderColor: colorLine,
+          borderWidth: 2.5,
+          backgroundColor: gradient,
+          fill: true,
+          tension: 0.45,           // smooth bezier curve
+          pointRadius: 0,          // hide points by default
+          pointHoverRadius: 6,
+          pointHoverBackgroundColor: colorLine,
+          pointHoverBorderColor: '#fff',
+          pointHoverBorderWidth: 2,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        layout: { padding: { top: 8, right: 8, bottom: 0, left: 0 } },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            enabled: true,
+            mode: 'index',
+            intersect: false,
+            backgroundColor: 'rgba(15,23,42,0.96)',
+            titleColor: '#e2e8f0',
+            bodyColor: '#fff',
+            borderColor: 'rgba(148,163,184,0.2)',
+            borderWidth: 1,
+            padding: { top: 10, right: 16, bottom: 10, left: 16 },
+            cornerRadius: 12,
+            caretSize: 6,
+            titleFont: { size: 12, weight: '600', family: 'system-ui, -apple-system, sans-serif' },
+            bodyFont:  { size: 15, weight: '700', family: 'system-ui, -apple-system, sans-serif' },
+            displayColors: false,
+            callbacks: {
+              title: ctx => ctx[0].label || '',
+              label: ctx => {
+                const v = ctx.parsed.y;
+                return metric === 'revenue'
+                  ? 'MWK ' + v.toLocaleString('en-US', { maximumFractionDigits: 0 })
+                  : Math.round(v) + ' unit' + (Math.round(v) !== 1 ? 's' : '');
+              }
+            }
+          }
+        },
+        scales: {
+          y: {
+            ...yAxisConfig,
+            grid:   { color: '#f1f5f9', lineWidth: 1 },
+            border: { display: false },
+          },
+          x: {
+            grid:   { display: false },
+            border: { display: false },
+            ticks: {
+              font: { size: 11, weight: '600', family: 'system-ui, -apple-system, sans-serif' },
+              color: '#94a3b8',
+              padding: 8,
+              maxRotation: 0,
+              minRotation: 0,
+              autoSkip: true,
+              maxTicksLimit: 12,
+            },
+          }
+        },
+        interaction: { mode: 'index', intersect: false },
+        animation: { duration: 600, easing: 'easeInOutCubic' },
+        hover: { intersect: false },
+      }
+    });
+  }
+});
 </script>
+
 {% endblock %}

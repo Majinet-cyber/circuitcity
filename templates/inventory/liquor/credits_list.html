@@ -1,233 +1,493 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block title %}Credit Sales - {{ business.name }}{% endblock %}
+{% block title %}Credit Management — {{ business.name }}{% endblock %}
 
-{% block content %}
-<div class="container-fluid py-4">
-    <!-- Header -->
-    <div class="row mb-4">
-        <div class="col">
-            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
-                <div>
-                    <h2>Credit Sales</h2>
-                    <p class="text-muted mb-0">Track customer bar tabs and credit payments</p>
-                </div>
-                <a href="{% url 'liquor:sell' %}" class="btn btn-primary">
-                    <i class="bi bi-plus-circle"></i> New Sale
-                </a>
-            </div>
-        </div>
-    </div>
-
-    <!-- Filters -->
-    <div class="glass-card p-3 mb-4">
-        <form method="get" class="row g-3 align-items-end">
-            <div class="col-12 col-md-4">
-                <label class="form-label">Filter by Status</label>
-                <select name="status" class="form-select" onchange="this.form.submit()">
-                    <option value="">All Statuses</option>
-                    <option value="pending" {% if request.GET.status == "pending" %}selected{% endif %}>Pending</option>
-                    <option value="partial" {% if request.GET.status == "partial" %}selected{% endif %}>Partially Paid</option>
-                    <option value="settled" {% if request.GET.status == "settled" %}selected{% endif %}>Settled</option>
-                    <option value="written_off" {% if request.GET.status == "written_off" %}selected{% endif %}>Written Off</option>
-                </select>
-            </div>
-            <div class="col-12 col-md-4">
-                <label class="form-label">Search Customer</label>
-                <input type="text" name="search" class="form-control" placeholder="Customer name or phone" value="{{ request.GET.search }}">
-            </div>
-            <div class="col-12 col-md-4">
-                <button type="submit" class="btn btn-outline-primary w-100">
-                    <i class="bi bi-search"></i> Filter
-                </button>
-                {% if request.GET.status or request.GET.search %}
-                    <a href="{% url 'liquor:credits_list' %}" class="btn btn-outline-secondary w-100 mt-2">
-                        <i class="bi bi-x-circle"></i> Clear Filters
-                    </a>
-                {% endif %}
-            </div>
-        </form>
-    </div>
-
-    <!-- Credits Summary Cards -->
-    {% if credits %}
-        {% with total_pending=credits|length %}
-        <div class="row g-3 mb-4">
-            <div class="col-6 col-md-3">
-                <div class="glass-card p-3">
-                    <div class="small text-muted mb-1">Total Credits</div>
-                    <div class="h4 mb-0 fw-bold">{{ credits|length }}</div>
-                </div>
-            </div>
-            <div class="col-6 col-md-3">
-                <div class="glass-card p-3">
-                    <div class="small text-muted mb-1">Total Outstanding</div>
-                    <div class="h4 mb-0 fw-bold">
-                        MWK {% widthratio credits.0.business.id 1 1 as dummy %}
-                        {{ credits|length|floatformat:0 }}
-                    </div>
-                </div>
-            </div>
-        </div>
-        {% endwith %}
-    {% endif %}
-
-    <!-- Credits Table -->
-    <div class="glass-card p-0">
-        {% if credits %}
-            <div class="table-responsive">
-                <table class="table table-hover mb-0">
-                    <thead>
-                        <tr>
-                            <th>Customer</th>
-                            <th>Product</th>
-                            <th class="text-end">Amount</th>
-                            <th class="text-end">Paid</th>
-                            <th class="text-end">Balance</th>
-                            <th>Status</th>
-                            <th>Date</th>
-                            <th class="text-end">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for credit in credits %}
-                        <tr>
-                            <td>
-                                <div class="fw-semibold">{{ credit.customer_name }}</div>
-                                {% if credit.customer_phone %}
-                                    <div class="small text-muted">{{ credit.customer_phone }}</div>
-                                {% endif %}
-                            </td>
-                            <td>
-                                {% if credit.related_sale %}
-                                    <div>{{ credit.related_sale.product.name }}</div>
-                                    <div class="small text-muted">
-                                        {{ credit.related_sale.quantity }} {{ credit.related_sale.get_unit_display }}{% if credit.related_sale.quantity > 1 %}s{% endif %}
-                                    </div>
-                                {% else %}
-                                    <span class="text-muted">-</span>
-                                {% endif %}
-                            </td>
-                            <td class="text-end">
-                                <span class="fw-semibold">MWK {{ credit.amount|floatformat:2 }}</span>
-                            </td>
-                            <td class="text-end">
-                                <span class="text-success">MWK {{ credit.amount_paid|floatformat:2 }}</span>
-                            </td>
-                            <td class="text-end">
-                                {% if credit.balance > 0 %}
-                                    <span class="text-danger fw-semibold">MWK {{ credit.balance|floatformat:2 }}</span>
-                                {% else %}
-                                    <span class="text-muted">MWK 0.00</span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                {% if credit.status == "pending" %}
-                                    <span class="badge bg-warning-subtle text-warning">Pending</span>
-                                {% elif credit.status == "partial" %}
-                                    <span class="badge bg-info-subtle text-info">Partial</span>
-                                {% elif credit.status == "settled" %}
-                                    <span class="badge bg-success-subtle text-success">Settled</span>
-                                {% elif credit.status == "written_off" %}
-                                    <span class="badge bg-secondary-subtle text-secondary">Written Off</span>
-                                {% else %}
-                                    <span class="badge bg-light text-dark">{{ credit.get_status_display }}</span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                <div>{{ credit.created_at|date:"d M Y" }}</div>
-                                <div class="small text-muted">{{ credit.created_at|date:"H:i" }}</div>
-                            </td>
-                            <td class="text-end">
-                                <div class="btn-group btn-group-sm">
-                                    <a href="{% url 'liquor:credit_detail' credit_id=credit.id %}" 
-                                       class="btn btn-outline-primary btn-sm" 
-                                       title="View Details">
-                                        <i class="bi bi-eye"></i>
-                                    </a>
-                                    {% if credit.status != "settled" and credit.status != "written_off" %}
-                                        <a href="{% url 'liquor:submit_credit_payment' credit_id=credit.id %}" 
-                                           class="btn btn-outline-success btn-sm" 
-                                           title="Add Payment">
-                                            <i class="bi bi-cash"></i>
-                                        </a>
-                                    {% endif %}
-                                </div>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        {% else %}
-            <!-- Empty State -->
-            <div class="text-center py-5">
-                <div class="mb-3">
-                    <i class="bi bi-inbox" style="font-size: 3rem; opacity: 0.3;"></i>
-                </div>
-                <h5 class="text-muted mb-2">No Credit Sales Found</h5>
-                <p class="text-muted mb-4">
-                    {% if request.GET.status or request.GET.search %}
-                        No credits match your current filters. Try adjusting your search criteria.
-                    {% else %}
-                        Start recording credit sales from the POS to track customer bar tabs.
-                    {% endif %}
-                </p>
-                {% if not request.GET.status and not request.GET.search %}
-                    <a href="{% url 'liquor:sell' %}" class="btn btn-primary">
-                        <i class="bi bi-plus-circle"></i> Record First Credit Sale
-                    </a>
-                {% else %}
-                    <a href="{% url 'liquor:credits_list' %}" class="btn btn-outline-primary">
-                        <i class="bi bi-x-circle"></i> Clear Filters
-                    </a>
-                {% endif %}
-            </div>
-        {% endif %}
-    </div>
-
-    <!-- Tips Section -->
-    {% if not credits and not request.GET.status and not request.GET.search %}
-    <div class="glass-card p-3 mt-4">
-        <div class="d-flex align-items-start">
-            <i class="bi bi-lightbulb text-warning me-3" style="font-size: 1.5rem;"></i>
-            <div>
-                <h6 class="mb-2">About Credit Sales</h6>
-                <p class="small text-muted mb-0">
-                    Credit sales allow you to track customer bar tabs. When recording a sale, 
-                    select "Credit Sale" as the sale type and enter customer details. 
-                    Bartenders can submit payments with proof, and managers approve them. 
-                    All payments update the credit balance automatically.
-                </p>
-            </div>
-        </div>
-    </div>
-    {% endif %}
-</div>
-
+{% block extra_head %}
 <style>
-    .table > :not(caption) > * > * {
-        padding: 0.75rem 0.5rem;
-    }
-    
-    .table tbody tr {
-        transition: background-color 0.15s ease;
-    }
-    
-    .table tbody tr:hover {
-        background-color: rgba(var(--bs-primary-rgb), 0.03);
-    }
-    
-    @media (max-width: 768px) {
-        .table-responsive {
-            font-size: 0.875rem;
-        }
-        
-        .table th, .table td {
-            white-space: nowrap;
-        }
-    }
+/* =====================================================
+   PREMIUM CREDIT COMMAND CENTER
+   ===================================================== */
+:root {
+  --cr-red: #dc2626;
+  --cr-orange: #f59e0b;
+  --cr-green: #059669;
+  --cr-blue: #2563eb;
+  --cr-purple: #7c3aed;
+  --cr-slate: #475569;
+}
+
+.credit-page {
+  max-width: 1300px;
+  margin: 0 auto;
+  padding: clamp(12px, 3vw, 28px);
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* ===== HERO HEADER ===== */
+.credit-hero {
+  background: linear-gradient(130deg, #1e1b4b 0%, #312e81 50%, #4c1d95 100%);
+  border-radius: 24px;
+  padding: clamp(20px, 4vw, 32px);
+  color: #fff;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 16px 48px rgba(30, 27, 75, .35);
+}
+.credit-hero::before {
+  content: '';
+  position: absolute;
+  top: -60%;
+  right: -20%;
+  width: 70%;
+  height: 200%;
+  background: radial-gradient(circle, rgba(167,139,250,.2) 0%, transparent 65%);
+  pointer-events: none;
+}
+.credit-hero h1 { margin: 0; font-size: clamp(1.4rem, 4vw, 2.2rem); font-weight: 900; }
+.credit-hero p  { margin: 6px 0 0; opacity: .8; font-size: .95rem; }
+.hero-btns { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 20px; }
+.hero-btns a {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 11px 22px; border-radius: 99px; font-weight: 700; font-size: .9rem;
+  text-decoration: none; transition: all 0.2s; cursor: pointer;
+}
+.btn-primary-hero { background: #fff; color: #4c1d95; }
+.btn-primary-hero:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,.2); }
+.btn-ghost-hero { background: rgba(255,255,255,.12); color: #fff; border: 2px solid rgba(255,255,255,.4); }
+.btn-ghost-hero:hover { background: rgba(255,255,255,.2); }
+
+/* ===== KPI TILES ===== */
+.kpi-row {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px;
+}
+@media(min-width: 640px){ .kpi-row { grid-template-columns: repeat(4, 1fr); } }
+
+.kpi-tile {
+  background: #fff;
+  border-radius: 18px;
+  padding: 18px 20px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 2px 12px rgba(15,23,42,.06);
+  transition: all 0.2s;
+  position: relative;
+  overflow: hidden;
+}
+.kpi-tile::after {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+  background: var(--accent, #7c3aed); border-radius: 18px 18px 0 0;
+}
+.kpi-tile:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(15,23,42,.12); }
+.kpi-tile .label { font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: #64748b; margin-bottom: 6px; }
+.kpi-tile .value { font-size: clamp(1.2rem, 4vw, 1.75rem); font-weight: 900; color: #0f172a; line-height: 1.1; }
+.kpi-tile .sub   { font-size: .72rem; color: #94a3b8; margin-top: 4px; }
+
+/* ===== FILTER BAR ===== */
+.filter-bar {
+  background: #fff;
+  border-radius: 16px;
+  padding: 14px 18px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 2px 8px rgba(15,23,42,.05);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+.filter-chip {
+  padding: 7px 16px; border-radius: 99px; font-size: .82rem; font-weight: 600;
+  border: 2px solid #e2e8f0; background: #fff; color: #475569;
+  cursor: pointer; transition: all 0.18s; text-decoration: none;
+}
+.filter-chip:hover, .filter-chip.active {
+  background: #4c1d95; color: #fff; border-color: #4c1d95;
+}
+.filter-search {
+  flex: 1; min-width: 180px;
+  padding: 8px 14px; border-radius: 99px;
+  border: 2px solid #e2e8f0; font-size: .88rem; outline: none;
+  transition: border-color 0.2s;
+}
+.filter-search:focus { border-color: #7c3aed; }
+
+/* ===== GAMIFICATION STRIP ===== */
+.game-strip {
+  background: linear-gradient(135deg, #fef3c7, #fde68a);
+  border-radius: 16px;
+  padding: 14px 20px;
+  border: 2px solid #fbbf24;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  align-items: center;
+}
+.game-stat { text-align: center; }
+.game-stat .gval { font-size: 1.3rem; font-weight: 900; color: #92400e; }
+.game-stat .glabel { font-size: .7rem; font-weight: 700; color: #78350f; text-transform: uppercase; }
+
+/* ===== CUSTOMER CARDS ===== */
+.customer-cards { display: grid; grid-template-columns: 1fr; gap: 14px; }
+@media(min-width: 640px){ .customer-cards { grid-template-columns: repeat(2, 1fr); } }
+@media(min-width: 1100px){ .customer-cards { grid-template-columns: repeat(3, 1fr); } }
+
+.cc-card {
+  background: #fff;
+  border-radius: 18px;
+  border: 1.5px solid #e2e8f0;
+  box-shadow: 0 2px 12px rgba(15,23,42,.07);
+  overflow: hidden;
+  transition: all 0.25s;
+  display: flex;
+  flex-direction: column;
+}
+.cc-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 10px 32px rgba(15,23,42,.13);
+  border-color: rgba(124,58,237,.3);
+}
+.cc-card.risk-high  { border-left: 4px solid var(--cr-red); }
+.cc-card.risk-med   { border-left: 4px solid var(--cr-orange); }
+.cc-card.risk-low   { border-left: 4px solid var(--cr-green); }
+.cc-card.risk-clear { border-left: 4px solid var(--cr-blue); opacity: .75; }
+
+.cc-header {
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid #f1f5f9;
+}
+.cc-avatar {
+  width: 44px; height: 44px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.2rem; font-weight: 800; color: #fff; flex-shrink: 0;
+  text-transform: uppercase;
+}
+.cc-name  { font-weight: 800; font-size: 1rem; color: #0f172a; }
+.cc-phone { font-size: .78rem; color: #64748b; margin-top: 2px; }
+
+.risk-badge {
+  margin-left: auto; flex-shrink: 0;
+  padding: 4px 10px; border-radius: 99px;
+  font-size: .68rem; font-weight: 800; text-transform: uppercase; letter-spacing: .06em;
+}
+.risk-badge.high   { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
+.risk-badge.medium { background: #fff7ed; color: #c2410c; border: 1px solid #fed7aa; }
+.risk-badge.low    { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; }
+.risk-badge.clear  { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
+
+.cc-body { padding: 14px 16px; flex: 1; }
+.cc-debt  { font-size: 1.6rem; font-weight: 900; color: var(--cr-red); line-height: 1; }
+.cc-meta  { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.cc-meta-pill {
+  padding: 3px 9px; border-radius: 99px;
+  font-size: .72rem; font-weight: 600;
+  background: #f1f5f9; color: #475569;
+}
+.cc-meta-pill.overdue  { background: #fef2f2; color: #dc2626; }
+.cc-meta-pill.partial  { background: #fff7ed; color: #c2410c; }
+.cc-meta-pill.repeat   { background: #fdf4ff; color: #7c3aed; }
+
+.cc-warnings { padding: 0 16px 10px; }
+.cc-warning-row {
+  font-size: .78rem; color: #92400e;
+  background: #fffbeb; border-left: 3px solid #fbbf24;
+  border-radius: 6px; padding: 7px 10px; margin-bottom: 6px;
+  font-weight: 600;
+}
+.cc-warning-row.danger { background: #fef2f2; border-color: #f87171; color: #991b1b; }
+
+.cc-footer {
+  padding: 10px 16px 14px;
+  display: flex; gap: 8px; flex-wrap: wrap;
+  border-top: 1px solid #f1f5f9;
+}
+.cc-btn {
+  flex: 1; min-width: 90px;
+  padding: 9px 12px; border-radius: 10px; border: none;
+  font-size: .82rem; font-weight: 700; cursor: pointer;
+  text-decoration: none; display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+  transition: all 0.18s;
+}
+.cc-btn-primary { background: #4c1d95; color: #fff; }
+.cc-btn-primary:hover { background: #7c3aed; }
+.cc-btn-success { background: #059669; color: #fff; }
+.cc-btn-success:hover { background: #10b981; }
+.cc-btn-outline { background: #fff; color: #475569; border: 1.5px solid #e2e8f0; }
+.cc-btn-outline:hover { border-color: #7c3aed; color: #7c3aed; }
+
+/* ===== EMPTY STATE ===== */
+.empty-state {
+  text-align: center; padding: 60px 24px;
+  background: #fff; border-radius: 20px;
+  border: 2px dashed #e2e8f0;
+}
+.empty-state .empty-icon { font-size: 3.5rem; margin-bottom: 16px; }
+
+/* ===== MODALS ===== */
+.modal-overlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,.55); z-index: 9999;
+  align-items: center; justify-content: center; padding: 16px;
+}
+.modal-box {
+  background: #fff; border-radius: 20px;
+  width: 100%; max-width: 480px;
+  max-height: 90vh; overflow-y: auto;
+  box-shadow: 0 24px 60px rgba(0,0,0,.3);
+}
+.modal-header {
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid #f1f5f9;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.modal-title { font-size: 1.1rem; font-weight: 800; color: #0f172a; }
+.modal-body { padding: 20px 24px; }
+.modal-footer { padding: 16px 24px; border-top: 1px solid #f1f5f9; display: flex; gap: 10px; justify-content: flex-end; }
+.modal-close {
+  width: 32px; height: 32px; border-radius: 50%; border: none;
+  background: #f1f5f9; color: #64748b; cursor: pointer; font-size: 1.1rem;
+  display: flex; align-items: center; justify-content: center;
+}
+.form-group { margin-bottom: 16px; }
+.form-group label { display: block; font-size: .82rem; font-weight: 700; color: #374151; margin-bottom: 6px; }
+.form-group input, .form-group select, .form-group textarea {
+  width: 100%; padding: 10px 14px; border-radius: 10px;
+  border: 1.5px solid #e2e8f0; font-size: .9rem; outline: none;
+  transition: border-color 0.2s; box-sizing: border-box;
+}
+.form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color: #7c3aed; }
+
+@keyframes fadeUp { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
+.cc-card { animation: fadeUp 0.4s ease-out both; }
+.cc-card:nth-child(1){animation-delay:.05s}
+.cc-card:nth-child(2){animation-delay:.1s}
+.cc-card:nth-child(3){animation-delay:.15s}
+.cc-card:nth-child(4){animation-delay:.2s}
+.cc-card:nth-child(5){animation-delay:.25s}
+.cc-card:nth-child(6){animation-delay:.3s}
 </style>
 {% endblock %}
 
+{% block content %}
+<div class="credit-page">
+
+  <!-- ===== HERO ===== -->
+  <header class="credit-hero">
+    <div>
+      <p style="margin:0;opacity:.6;font-size:.75rem;text-transform:uppercase;letter-spacing:.1em">{{ business.name }} · Credit Management</p>
+      <h1>💳 Credit Command Center</h1>
+      <p>Track tabs, collect payments, protect your revenue</p>
+    </div>
+    <div class="hero-btns">
+      <a href="{% url 'liquor:record_credit_sale' %}" class="btn-primary-hero">
+        <i class="bi bi-plus-circle-fill"></i> Record Credit Sale
+      </a>
+      <a href="{% url 'liquor:sell' %}" class="btn-ghost-hero">
+        <i class="bi bi-cart-check-fill"></i> POS Sell
+      </a>
+      <a href="{% url 'liquor:pending_payments' %}" class="btn-ghost-hero">
+        <i class="bi bi-clock-history"></i> Pending Payments
+      </a>
+    </div>
+  </header>
+
+  <!-- ===== KPI TILES ===== -->
+  <section class="kpi-row">
+    <div class="kpi-tile" style="--accent:#dc2626">
+      <div class="label">Outstanding Credits</div>
+      <div class="value" style="color:#dc2626">{{ outstanding_count }}</div>
+      <div class="sub">Active tabs</div>
+    </div>
+    <div class="kpi-tile" style="--accent:#dc2626">
+      <div class="label">Total Owed</div>
+      <div class="value" style="color:#dc2626">MK {{ outstanding_balance|floatformat:0 }}</div>
+      <div class="sub">Balance to collect</div>
+    </div>
+    <div class="kpi-tile" style="--accent:#f59e0b">
+      <div class="label">Credit Issued (All Time)</div>
+      <div class="value">MK {{ outstanding_total|floatformat:0 }}</div>
+      <div class="sub">Total ever extended</div>
+    </div>
+    <div class="kpi-tile" style="--accent:#059669">
+      <div class="label">Cleared This Month</div>
+      <div class="value" style="color:#059669">{{ cleared_this_month }}</div>
+      <div class="sub">Successfully recovered</div>
+    </div>
+  </section>
+
+  <!-- ===== GAMIFICATION STRIP ===== -->
+  {% if credits %}
+  <section class="game-strip">
+    <div style="flex:1;min-width:160px">
+      <div style="font-size:.8rem;font-weight:800;color:#78350f;margin-bottom:4px">
+        <i class="bi bi-trophy-fill" style="color:#d97706"></i> Credit Recovery Dashboard
+      </div>
+      <div style="font-size:.75rem;color:#92400e">Track your collection performance</div>
+    </div>
+    <div class="game-stat">
+      <div class="gval" id="recovery-rate">
+        {% if outstanding_count > 0 and cleared_this_month > 0 %}
+          {{ cleared_this_month }}/{{ outstanding_count }}
+        {% else %}—{% endif %}
+      </div>
+      <div class="glabel">Cleared/Open</div>
+    </div>
+    <div class="game-stat">
+      <div class="gval">{{ cleared_this_month }}</div>
+      <div class="glabel">Cleared This Month</div>
+    </div>
+    <div class="game-stat">
+      <div class="gval">{{ outstanding_count }}</div>
+      <div class="glabel">Active Tabs</div>
+    </div>
+    <div class="game-stat">
+      <div class="gval" style="{% if outstanding_count > 10 %}color:#dc2626{% else %}color:#059669{% endif %}">
+        {% if outstanding_count > 10 %}High{% elif outstanding_count > 5 %}Medium{% else %}Low{% endif %}
+      </div>
+      <div class="glabel">Risk Level</div>
+    </div>
+  </section>
+  {% endif %}
+
+  <!-- ===== FILTER BAR ===== -->
+  <section class="filter-bar">
+    <a href="?status=" class="filter-chip {% if not request.GET.status %}active{% endif %}">All ({{ outstanding_count }})</a>
+    <a href="?status=open" class="filter-chip {% if request.GET.status == 'open' %}active{% endif %}">Outstanding</a>
+    <a href="?status=partial" class="filter-chip {% if request.GET.status == 'partial' %}active{% endif %}">Partial</a>
+    <a href="?status=settled" class="filter-chip {% if request.GET.status == 'settled' %}active{% endif %}">Settled ✓</a>
+    <a href="?status=cancelled" class="filter-chip {% if request.GET.status == 'cancelled' %}active{% endif %}">Cancelled</a>
+    <form method="get" style="flex:1;display:flex;gap:8px;min-width:200px">
+      {% if request.GET.status %}<input type="hidden" name="status" value="{{ request.GET.status }}">{% endif %}
+      <input type="text" name="search" class="filter-search" placeholder="🔍  Search customer name or phone…" value="{{ request.GET.search }}">
+    </form>
+    {% if request.GET.search or request.GET.status %}
+    <a href="{% url 'liquor:credits_list' %}" class="filter-chip">✕ Clear</a>
+    {% endif %}
+  </section>
+
+  <!-- ===== CUSTOMER CARDS GRID ===== -->
+  {% if credits %}
+  <section class="customer-cards" id="credits-grid">
+    {% for credit in credits %}
+    {% with balance=credit.balance days_open=credit.created_at|timesince %}
+
+    {# Determine risk level #}
+    {% if credit.status == "settled" or credit.status == "cancelled" %}
+      {% with risk_level="clear" risk_label="Cleared" risk_color="#1d4ed8" %}
+      {% include "inventory/liquor/_credit_card.html" %}
+      {% endwith %}
+    {% elif credit.balance > 100000 %}
+      {% with risk_level="high" risk_label="🔴 High Risk" risk_color="#dc2626" %}
+      {% include "inventory/liquor/_credit_card.html" %}
+      {% endwith %}
+    {% elif credit.balance > 30000 %}
+      {% with risk_level="medium" risk_label="🟠 Follow Up" risk_color="#f59e0b" %}
+      {% include "inventory/liquor/_credit_card.html" %}
+      {% endwith %}
+    {% else %}
+      {% with risk_level="low" risk_label="🟢 Reliable" risk_color="#059669" %}
+      {% include "inventory/liquor/_credit_card.html" %}
+      {% endwith %}
+    {% endif %}
+
+    {% endwith %}
+    {% endfor %}
+  </section>
+  {% else %}
+  <div class="empty-state">
+    <div class="empty-icon">💳</div>
+    <h4 style="margin:0 0 8px;color:#0f172a">
+      {% if request.GET.status or request.GET.search %}No credits match your filters{% else %}No credit sales yet{% endif %}
+    </h4>
+    <p style="color:#64748b;margin:0 0 20px">
+      {% if request.GET.status or request.GET.search %}
+        Try clearing your filters to see all credits.
+      {% else %}
+        Record your first credit sale to start tracking customer tabs.
+      {% endif %}
+    </p>
+    {% if request.GET.status or request.GET.search %}
+      <a href="{% url 'liquor:credits_list' %}" class="cc-btn cc-btn-outline" style="display:inline-flex">✕ Clear Filters</a>
+    {% else %}
+      <a href="{% url 'liquor:record_credit_sale' %}" class="cc-btn cc-btn-primary" style="display:inline-flex;background:#4c1d95">
+        <i class="bi bi-plus-circle"></i> Record First Credit Sale
+      </a>
+    {% endif %}
+  </div>
+  {% endif %}
+
+</div>
+
+<!-- ===== CLEAR CREDIT MODALS (one per credit) ===== -->
+{% for credit in credits %}
+{% if credit.status != "settled" and credit.status != "cancelled" %}
+<div class="modal-overlay" id="clearModal{{ credit.id }}">
+  <div class="modal-box">
+    <div class="modal-header">
+      <div class="modal-title"><i class="bi bi-check-circle-fill" style="color:#059669"></i> Clear Credit — {{ credit.customer_name }}</div>
+      <button class="modal-close" onclick="closeModal('clearModal{{ credit.id }}')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="background:#f0fdf4;border:2px solid #86efac;border-radius:12px;padding:14px;margin-bottom:16px">
+        <div style="font-weight:700;color:#065f46;font-size:.9rem">What happens when you clear this credit:</div>
+        <ul style="margin:8px 0 0;padding-left:18px;color:#065f46;font-size:.85rem;line-height:1.7">
+          <li>Credit is marked <strong>Settled (Paid)</strong></li>
+          <li><strong>MK {{ credit.balance|floatformat:0 }}</strong> added to your revenue</li>
+          <li>Customer restored to good standing</li>
+          <li>Updates all KPIs and profit reports</li>
+        </ul>
+      </div>
+      <div style="text-align:center;padding:16px 0">
+        <div style="font-size:.85rem;color:#64748b">Outstanding balance</div>
+        <div style="font-size:2rem;font-weight:900;color:#dc2626">MK {{ credit.balance|floatformat:0 }}</div>
+        <div style="font-size:.8rem;color:#94a3b8;margin-top:4px">{{ credit.customer_name }}{% if credit.customer_phone %} · {{ credit.customer_phone }}{% endif %}</div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button onclick="closeModal('clearModal{{ credit.id }}')" class="cc-btn cc-btn-outline">Cancel</button>
+      <form method="post" action="{% url 'liquor:clear_credit' credit_id=credit.id %}" style="display:inline">
+        {% csrf_token %}
+        <button type="submit" class="cc-btn cc-btn-success" style="min-width:160px">
+          <i class="bi bi-check-circle-fill"></i> Yes, Debt Cleared ✓
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endif %}
+{% endfor %}
+
+<script>
+function openModal(id) {
+  var m = document.getElementById(id);
+  if (m) { m.style.display = 'flex'; document.body.style.overflow = 'hidden'; }
+}
+function closeModal(id) {
+  var m = document.getElementById(id);
+  if (m) { m.style.display = 'none'; document.body.style.overflow = ''; }
+}
+// Close on backdrop click
+document.querySelectorAll('.modal-overlay').forEach(function(mo) {
+  mo.addEventListener('click', function(e) {
+    if (e.target === mo) closeModal(mo.id);
+  });
+});
+// Keyboard search
+var searchInput = document.querySelector('.filter-search');
+if (searchInput) {
+  searchInput.addEventListener('input', function() {
+    var q = this.value.toLowerCase().trim();
+    document.querySelectorAll('.cc-card').forEach(function(card) {
+      var name = (card.getAttribute('data-name') || '').toLowerCase();
+      var phone = (card.getAttribute('data-phone') || '').toLowerCase();
+      card.style.display = (!q || name.includes(q) || phone.includes(q)) ? '' : 'none';
+    });
+  });
+}
+</script>
+{% endblock %}

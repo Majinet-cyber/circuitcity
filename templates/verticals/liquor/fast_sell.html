@@ -1,0 +1,613 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Fast Sell - {{ vertical_name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+.fast-sell-container {
+    max-width: 900px;
+    margin: 2rem auto;
+    padding: 1rem;
+}
+
+.scanner-wrapper {
+    position: relative;
+    width: 100%;
+    max-width: 640px;
+    margin: 0 auto 2rem;
+    aspect-ratio: 4/3;
+    background: #1a1a2e;
+    border-radius: 1rem;
+    overflow: hidden;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+}
+
+#scanner-video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.scanner-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, rgba(26,26,46,0.95), rgba(46,46,78,0.95));
+    z-index: 10;
+}
+
+.scanner-overlay.hidden {
+    display: none;
+}
+
+.scan-frame {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 250px;
+    height: 250px;
+    border: 3px solid #4ade80;
+    border-radius: 1rem;
+    box-shadow: 0 0 0 9999px rgba(0,0,0,0.5);
+}
+
+.product-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 1rem;
+    padding: 2rem;
+    color: white;
+    margin-bottom: 2rem;
+    box-shadow: 0 8px 32px rgba(102,126,234,0.3);
+}
+
+.product-card h3 {
+    margin: 0 0 1rem 0;
+    font-size: 1.5rem;
+}
+
+.product-info {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1rem;
+    margin: 1rem 0;
+}
+
+.info-item {
+    background: rgba(255,255,255,0.1);
+    padding: 0.75rem;
+    border-radius: 0.5rem;
+    backdrop-filter: blur(10px);
+}
+
+.info-label {
+    font-size: 0.875rem;
+    opacity: 0.8;
+    margin-bottom: 0.25rem;
+}
+
+.info-value {
+    font-size: 1.25rem;
+    font-weight: 600;
+}
+
+.qty-controls {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin: 1.5rem 0;
+}
+
+.qty-btn {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.2);
+    border: none;
+    color: white;
+    font-size: 1.5rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.qty-btn:hover {
+    background: rgba(255,255,255,0.3);
+    transform: scale(1.1);
+}
+
+.qty-display {
+    font-size: 2rem;
+    font-weight: 700;
+    min-width: 60px;
+    text-align: center;
+}
+
+.payment-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 1rem;
+    margin: 1.5rem 0;
+}
+
+.payment-btn {
+    padding: 1rem;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-radius: 0.75rem;
+    background: rgba(255,255,255,0.1);
+    color: white;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.payment-btn:hover, .payment-btn.active {
+    background: rgba(255,255,255,0.3);
+    border-color: #4ade80;
+    transform: translateY(-2px);
+}
+
+.sell-btn {
+    width: 100%;
+    padding: 1.25rem;
+    background: #4ade80;
+    color: #1a1a2e;
+    border: none;
+    border-radius: 0.75rem;
+    font-size: 1.25rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+    box-shadow: 0 4px 16px rgba(74,222,128,0.4);
+}
+
+.sell-btn:hover:not(:disabled) {
+    background: #22c55e;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(74,222,128,0.6);
+}
+
+.sell-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1rem;
+    margin-top: 2rem;
+}
+
+.kpi-card {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 0.75rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.kpi-label {
+    font-size: 0.875rem;
+    color: #64748b;
+    margin-bottom: 0.5rem;
+}
+
+.kpi-value {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: #1a1a2e;
+}
+
+.toast {
+    position: fixed;
+    top: 2rem;
+    right: 2rem;
+    background: #4ade80;
+    color: white;
+    padding: 1rem 1.5rem;
+    border-radius: 0.75rem;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+    animation: slideIn 0.3s ease-out;
+    z-index: 9999;
+}
+
+@keyframes slideIn {
+    from { transform: translateX(400px); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+
+.error-toast {
+    background: #ef4444;
+}
+
+.info-toast {
+    background: #3b82f6;
+}
+
+.manual-input-panel {
+    background: white;
+    padding: 2rem;
+    border-radius: 1rem;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+    margin-bottom: 2rem;
+}
+
+.form-group {
+    margin-bottom: 1rem;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+    color: #334155;
+}
+
+.form-group input {
+    width: 100%;
+    padding: 0.75rem;
+    border: 2px solid #e2e8f0;
+    border-radius: 0.5rem;
+    font-size: 1rem;
+}
+
+.form-group input:focus {
+    outline: none;
+    border-color: #667eea;
+}
+
+.btn-lookup {
+    background: #667eea;
+    color: white;
+    padding: 0.75rem 2rem;
+    border: none;
+    border-radius: 0.5rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.btn-lookup:hover {
+    background: #5568d3;
+}
+
+{% if is_barman %}
+.agent-select {
+    margin: 1.5rem 0;
+}
+
+.agent-select select {
+    width: 100%;
+    padding: 0.75rem;
+    background: rgba(255,255,255,0.2);
+    border: 2px solid rgba(255,255,255,0.3);
+    border-radius: 0.5rem;
+    color: white;
+    font-size: 1rem;
+}
+
+.agent-select option {
+    color: #1a1a2e;
+}
+{% endif %}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="fast-sell-container">
+    <h1 class="text-3xl font-bold mb-6">⚡ Fast Sell</h1>
+    
+    <!-- Camera Scanner -->
+    <div class="scanner-wrapper" id="scanner-wrapper">
+        <video id="scanner-video" autoplay playsinline></video>
+        <div class="scanner-overlay" id="scanner-overlay">
+            <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2">
+                <rect x="3" y="3" width="18" height="18" rx="2"/>
+                <line x1="3" y1="9" x2="21" y2="9"/>
+                <line x1="3" y1="15" x2="21" y2="15"/>
+            </svg>
+            <p class="text-white text-lg mt-4">Ready to scan</p>
+            <button class="btn-lookup mt-4" onclick="startScanner()">Start Camera</button>
+        </div>
+        <div class="scan-frame hidden" id="scan-frame"></div>
+    </div>
+    
+    <!-- Manual Input Fallback -->
+    <div class="manual-input-panel" id="manual-panel">
+        <h3 class="text-xl font-bold mb-4">Manual Barcode Entry</h3>
+        <div class="form-group">
+            <label>Barcode</label>
+            <input type="text" id="manual-barcode" placeholder="Enter barcode">
+        </div>
+        <button class="btn-lookup" onclick="lookupManual()">Lookup</button>
+    </div>
+    
+    <!-- Product Card (hidden until product found) -->
+    <div class="product-card hidden" id="product-card">
+        <h3 id="product-name">Product Name</h3>
+        <div class="product-info">
+            <div class="info-item">
+                <div class="info-label">In Stock</div>
+                <div class="info-value" id="stock-qty">0</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">Price</div>
+                <div class="info-value">K <span id="selling-price">0.00</span></div>
+            </div>
+        </div>
+        
+        <!-- Quantity Controls -->
+        <div class="qty-controls">
+            <button class="qty-btn" onclick="changeQty(-1)">−</button>
+            <div class="qty-display" id="qty-display">1</div>
+            <button class="qty-btn" onclick="changeQty(1)">+</button>
+        </div>
+        
+        {% if is_barman %}
+        <!-- Agent Assignment (Barman Only) -->
+        <div class="agent-select">
+            <label class="info-label">Assign to Agent (Optional)</label>
+            <select id="agent-select">
+                <option value="">-- No Assignment --</option>
+                {% for agent in liquor_agents %}
+                <option value="{{ agent.id }}">{{ agent.first_name }} {{ agent.last_name }} ({{ agent.username }})</option>
+                {% endfor %}
+            </select>
+        </div>
+        {% endif %}
+        
+        <!-- Payment Method -->
+        <div class="info-label">Payment Method</div>
+        <div class="payment-grid">
+            <button class="payment-btn active" data-method="cash">💵 Cash</button>
+            <button class="payment-btn" data-method="bank">🏦 Bank</button>
+            <button class="payment-btn" data-method="mobile">📱 Mobile</button>
+        </div>
+        
+        <!-- Sell Button -->
+        <button class="sell-btn" onclick="completeSale()">Sell Now</button>
+    </div>
+    
+    <!-- KPIs -->
+    <div class="kpi-grid">
+        <div class="kpi-card">
+            <div class="kpi-label">Sold Today</div>
+            <div class="kpi-value" id="kpi-sold">0</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label">Revenue Today</div>
+            <div class="kpi-value">K <span id="kpi-revenue">0</span></div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label">Profit Today</div>
+            <div class="kpi-value">K <span id="kpi-profit">0</span></div>
+        </div>
+    </div>
+</div>
+
+<script>
+let currentProduct = null;
+let currentQty = 1;
+let selectedPayment = 'cash';
+let videoStream = null;
+let barcodeDetector = null;
+let scanningActive = false;
+
+// Payment method selection
+document.querySelectorAll('.payment-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('.payment-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        selectedPayment = btn.dataset.method;
+    });
+});
+
+// Initialize camera scanner
+async function startScanner() {
+    try {
+        // ⚡ ALWAYS REQUEST REAR CAMERA (environment = rear camera)
+        videoStream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: { ideal: 'environment' } },
+            audio: false
+        });
+        
+        const video = document.getElementById('scanner-video');
+        video.srcObject = videoStream;
+        
+        document.getElementById('scanner-overlay').classList.add('hidden');
+        document.getElementById('scan-frame').classList.remove('hidden');
+        
+        // Check for BarcodeDetector API
+        if ('BarcodeDetector' in window) {
+            const formats = await BarcodeDetector.getSupportedFormats();
+            barcodeDetector = new BarcodeDetector({ formats });
+            scanningActive = true;
+            showToast('📹 Scanning with rear camera...', 'info');
+            scanLoop();
+        } else {
+            showToast('Camera started. BarcodeDetector not supported - use manual entry', 'info');
+        }
+    } catch (err) {
+        console.error('Camera error:', err);
+        showToast('Camera access denied. Please use manual entry.', 'error');
+    }
+}
+
+// Barcode scanning loop
+async function scanLoop() {
+    if (!scanningActive || !barcodeDetector) return;
+    
+    try {
+        const video = document.getElementById('scanner-video');
+        if (video.readyState === video.HAVE_ENOUGH_DATA) {
+            const barcodes = await barcodeDetector.detect(video);
+            if (barcodes.length > 0) {
+                const barcode = barcodes[0].rawValue;
+                scanningActive = false;
+                lookupProduct(barcode);
+                return;
+            }
+        }
+    } catch (err) {
+        console.error('Scan error:', err);
+    }
+    
+    setTimeout(scanLoop, 300);
+}
+
+// Lookup product by barcode
+async function lookupProduct(barcode) {
+    try {
+        showToast(`🔍 Looking up: ${barcode}`, 'info');
+        
+        const resp = await fetch(`/verticals/{{ vertical }}/api/fast-sell/lookup/?barcode=${encodeURIComponent(barcode)}`);
+        const data = await resp.json();
+        
+        if (data.ok && data.found) {
+            currentProduct = data;
+            currentQty = 1;
+            displayProduct(data);
+            showToast('✅ Product found! Ready to sell.', 'success');
+        } else {
+            // ⚡ NEVER CLOSE SILENTLY - Show clear message and keep scanning
+            showToast(data.error || '❌ This product is not in your inventory.', 'error', 5000);
+            // Keep scanner active for next scan
+            resetScanner();
+        }
+    } catch (err) {
+        showToast('❌ Lookup failed. Please try again.', 'error', 5000);
+        resetScanner();
+    }
+}
+
+// Manual barcode lookup
+function lookupManual() {
+    const barcode = document.getElementById('manual-barcode').value.trim();
+    if (barcode) {
+        lookupProduct(barcode);
+    }
+}
+
+// Display product info
+function displayProduct(product) {
+    document.getElementById('product-name').textContent = product.product.name;
+    document.getElementById('stock-qty').textContent = product.stock_qty;
+    document.getElementById('selling-price').textContent = product.selling_price.toFixed(2);
+    document.getElementById('qty-display').textContent = currentQty;
+    document.getElementById('product-card').classList.remove('hidden');
+}
+
+// Change quantity
+function changeQty(delta) {
+    if (!currentProduct) return;
+    currentQty = Math.max(1, Math.min(currentQty + delta, currentProduct.stock_qty));
+    document.getElementById('qty-display').textContent = currentQty;
+}
+
+// Complete sale
+async function completeSale() {
+    if (!currentProduct) return;
+    
+    const payload = {
+        barcode: currentProduct.product.barcode || document.getElementById('manual-barcode').value,
+        quantity: currentQty,
+        payment_method: selectedPayment,
+    };
+    
+    {% if is_barman %}
+    const agentId = document.getElementById('agent-select').value;
+    if (agentId) {
+        payload.attributed_to_agent_id = parseInt(agentId);
+    }
+    {% endif %}
+    
+    try {
+        const resp = await fetch(`/verticals/{{ vertical }}/api/fast-sell/sell/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: JSON.stringify(payload)
+        });
+        
+        const data = await resp.json();
+        
+        if (data.ok) {
+            showToast('✅ ' + data.message, 'success');
+            if (payload.payment_method === 'credit') {
+                document.dispatchEvent(new CustomEvent('cc:credit_sale'));
+            } else {
+                document.dispatchEvent(new CustomEvent('cc:sale_success'));
+            }
+            refreshKPIs();
+            resetForNextSale();
+        } else {
+            showToast(data.error || 'Sale failed', 'error');
+        }
+    } catch (err) {
+        showToast('Sale failed', 'error');
+    }
+}
+
+// Reset for next sale
+function resetForNextSale() {
+    currentProduct = null;
+    currentQty = 1;
+    document.getElementById('product-card').classList.add('hidden');
+    document.getElementById('manual-barcode').value = '';
+    resetScanner();
+}
+
+// Reset scanner
+function resetScanner() {
+    scanningActive = true;
+    if (barcodeDetector) {
+        setTimeout(scanLoop, 1000);
+    }
+}
+
+// Refresh KPIs
+async function refreshKPIs() {
+    try {
+        const resp = await fetch(`/verticals/{{ vertical }}/api/fast-sell/kpis/?range=today`);
+        const data = await resp.json();
+        
+        if (data.ok) {
+            document.getElementById('kpi-sold').textContent = data.sold_today;
+            document.getElementById('kpi-revenue').textContent = data.revenue_today.toFixed(2);
+            document.getElementById('kpi-profit').textContent = data.profit_today.toFixed(2);
+        }
+    } catch (err) {
+        console.error('KPI refresh failed:', err);
+    }
+}
+
+// Show toast notification (with configurable duration)
+function showToast(message, type = 'success', duration = 3000) {
+    // Remove existing toasts to avoid stacking
+    document.querySelectorAll('.toast').forEach(t => t.remove());
+    
+    const toast = document.createElement('div');
+    toast.className = `toast ${type === 'error' ? 'error-toast' : type === 'info' ? 'info-toast' : ''}`;
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        setTimeout(() => toast.remove(), 300);
+    }, duration);
+}
+
+// Initialize
+document.addEventListener('DOMContentLoaded', () => {
+    refreshKPIs();
+});
+</script>
+{% endblock %}
+

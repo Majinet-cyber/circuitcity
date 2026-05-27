@@ -3,6 +3,175 @@
 
 {% block title %}Members - {{ business.name }}{% endblock %}
 
+{% block extra_js %}
+<script src="{% static 'js/gym-member-delete.js' %}"></script>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Premium Gym Members List Styling */
+    .premium-header-bg {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 2rem;
+        border-radius: 16px;
+        margin-bottom: 1.5rem;
+        box-shadow: 0 8px 24px rgba(102, 126, 234, 0.25);
+    }
+
+    .premium-filter-card {
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+        border: 1px solid #e2e8f0;
+        transition: all 0.3s ease;
+    }
+
+    .premium-filter-card:hover {
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    }
+
+    .premium-table-container {
+        background: white;
+        border-radius: 16px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+        overflow: hidden;
+        border: 1px solid #e2e8f0;
+    }
+
+    .premium-table {
+        margin-bottom: 0;
+    }
+
+    .premium-table thead th {
+        background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+        color: #475569;
+        font-weight: 700;
+        text-transform: uppercase;
+        font-size: 0.75rem;
+        letter-spacing: 0.05em;
+        padding: 1.25rem 1rem;
+        border: none;
+    }
+
+    .premium-table tbody tr {
+        border-bottom: 1px solid #f1f5f9;
+        transition: all 0.2s ease;
+    }
+
+    .premium-table tbody tr:hover {
+        background: linear-gradient(90deg, #f8fafc 0%, #ffffff 100%);
+        transform: scale(1.005);
+        box-shadow: 0 2px 8px rgba(102, 126, 234, 0.1);
+    }
+
+    .premium-table tbody tr:last-child {
+        border-bottom: none;
+    }
+
+    .premium-table tbody td {
+        padding: 1.25rem 1rem;
+        vertical-align: middle;
+        border: none;
+    }
+
+    .status-badge-premium {
+        padding: 0.5rem 1rem;
+        border-radius: 50px;
+        font-weight: 600;
+        font-size: 0.75rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.375rem;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .trainer-badge {
+        background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%);
+        color: white;
+        padding: 0.375rem 0.75rem;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+        box-shadow: 0 2px 6px rgba(6, 182, 212, 0.3);
+    }
+
+    .action-btn-group {
+        display: flex;
+        gap: 0.5rem;
+    }
+
+    .action-btn {
+        padding: 0.5rem 1rem;
+        border-radius: 8px;
+        font-weight: 600;
+        font-size: 0.875rem;
+        transition: all 0.3s ease;
+        border: none;
+    }
+
+    .action-btn-view {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+    }
+
+    .action-btn-view:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        color: white;
+    }
+
+    .action-btn-pay {
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        color: white;
+        box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+    }
+
+    .action-btn-pay:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+        color: white;
+    }
+
+    .action-btn-checkin {
+        background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%);
+        color: white;
+        box-shadow: 0 2px 8px rgba(6, 182, 212, 0.3);
+    }
+
+    .action-btn-checkin:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(6, 182, 212, 0.4);
+        color: white;
+    }
+
+    .empty-state-premium {
+        text-align: center;
+        padding: 4rem 2rem;
+    }
+
+    .empty-state-icon {
+        font-size: 4rem;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        opacity: 0.4;
+        margin-bottom: 1rem;
+    }
+
+    /* Checkbox styling */
+    .member-checkbox {
+        width: 18px;
+        height: 18px;
+        cursor: pointer;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="container-fluid py-4">
     <!-- Header -->
@@ -13,100 +182,181 @@
                     <h2>Gym Members</h2>
                     <p class="text-muted mb-0">Manage your gym members and memberships</p>
                 </div>
-                <a href="{% url 'gym:member_add' %}" class="btn btn-primary">
-                    <i class="bi bi-plus-circle"></i> Add Member
-                </a>
+                <div class="d-flex gap-2">
+                    <div class="btn-group">
+                        <button type="button" class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="bi bi-qr-code"></i> Bulk QR Download
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><h6 class="dropdown-header">Download QR Stickers</h6></li>
+                            <li><a class="dropdown-item" href="{% url 'gym:bulk_qr_pdf' %}?all=1&filter={{ filter_type }}">
+                                <i class="bi bi-download"></i> All {{ filter_type|default:"members" }}
+                            </a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="#" onclick="downloadSelected(); return false;">
+                                <i class="bi bi-check2-square"></i> Selected members
+                            </a></li>
+                        </ul>
+                    </div>
+                    <a href="{% url 'gym:member_add' %}" class="btn btn-primary">
+                        <i class="bi bi-plus-circle"></i> Add Member
+                    </a>
+                </div>
             </div>
         </div>
     </div>
 
     <!-- Filters -->
-    <div class="glass-card p-3 mb-4">
+    <div class="premium-filter-card p-4 mb-4">
         <form method="get" class="row g-3 align-items-end">
             <div class="col-12 col-md-4">
-                <label class="form-label">Filter by Status</label>
-                <select name="filter" class="form-select" onchange="this.form.submit()">
-                    <option value="active" {% if filter_type == "active" %}selected{% endif %}>Active Members</option>
-                    <option value="archived" {% if filter_type == "archived" %}selected{% endif %}>Archived Members</option>
-                    <option value="" {% if filter_type == "" %}selected{% endif %}>All Members</option>
+                <label class="form-label fw-semibold" style="color: #475569;">
+                    <i class="bi bi-funnel me-2"></i>Filter by Status
+                </label>
+                <select name="filter" class="form-select form-select-lg" onchange="this.form.submit()" style="border-radius: 10px; border-color: #e2e8f0;">
+                    <option value="active" {% if filter_type == "active" %}selected{% endif %}>✅ Active Members</option>
+                    <option value="archived" {% if filter_type == "archived" %}selected{% endif %}>📦 Archived Members</option>
+                    <option value="" {% if filter_type == "" %}selected{% endif %}>📊 All Members</option>
                 </select>
             </div>
         </form>
     </div>
 
     <!-- Members Table -->
-    <div class="glass-card p-0">
+    <div class="premium-table-container">
         {% if members %}
-            <div class="table-responsive">
-                <table class="table table-hover mb-0">
+            <div class="gym-table-responsive">
+                <table class="premium-table table mb-0">
                     <thead>
                         <tr>
+                            <th style="width: 40px;">
+                                <input type="checkbox" class="member-checkbox" id="select-all" onclick="toggleSelectAll(this)">
+                            </th>
                             <th>Name</th>
                             <th>Phone</th>
-                            <th>Email</th>
+                            <th>Trainer</th>
                             <th>Status</th>
+                            <th>Streak</th>
+                            <th>Level</th>
                             <th>Days Left</th>
-                            <th>Joined</th>
+                            <th>Next Payment</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for member in members %}
-                        <tr>
+                        <tr data-member-id="{{ member.id }}">
                             <td>
-                                <div class="fw-semibold">{{ member.name }}</div>
+                                <input type="checkbox" class="member-checkbox member-select" data-member-id="{{ member.id }}" onclick="updateSelectAllState()">
+                            </td>
+                            <td>
+                                <a href="{% url 'gym:member_detail' member.id %}" class="fw-semibold text-decoration-none text-primary">{{ member.name }}</a>
                             </td>
                             <td>{{ member.phone|default:"-" }}</td>
-                            <td>{{ member.email|default:"-" }}</td>
+                            <td>
+                                {% if member.trainer %}
+                                    <span class="trainer-badge">
+                                        <i class="bi bi-person-badge"></i> {{ member.trainer.name }}
+                                    </span>
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
                             <td>
                                 {% if member.is_archived %}
-                                    <span class="badge bg-secondary-subtle text-secondary">Archived</span>
-                                {% elif member.status == "PENDING_PAYMENT" %}
-                                    <span class="badge bg-warning-subtle text-warning">Pending Payment</span>
-                                {% elif member.status == "BEHIND_SCHEDULE" %}
-                                    <span class="badge bg-danger-subtle text-danger">Behind Schedule</span>
-                                {% elif member.status == "ACTIVE" %}
-                                    {% if member.days_left <= 7 %}
-                                        <span class="badge bg-info-subtle text-info">Expiring Soon</span>
+                                    <span class="status-badge-premium" style="background: #64748b; color: white;">
+                                        <i class="bi bi-archive"></i> Archived
+                                    </span>
+                                {% elif member.membership_end %}
+                                    {% now "Y-m-d" as today_str %}
+                                    {% if member.membership_end|date:"Y-m-d" >= today_str %}
+                                        {% if member.days_left <= 7 %}
+                                            <span class="status-badge-premium" style="background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%); color: white;">
+                                                <i class="bi bi-clock-history"></i> Expiring Soon
+                                            </span>
+                                        {% else %}
+                                            <span class="status-badge-premium" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white;">
+                                                <i class="bi bi-check-circle"></i> Active
+                                            </span>
+                                        {% endif %}
                                     {% else %}
-                                        <span class="badge bg-success-subtle text-success">Active</span>
+                                        <span class="status-badge-premium" style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color: white;">
+                                            <i class="bi bi-exclamation-triangle"></i> In Arrears
+                                        </span>
                                     {% endif %}
                                 {% else %}
-                                    <span class="badge bg-secondary-subtle text-secondary">{{ member.membership_status }}</span>
+                                    <span class="status-badge-premium" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white;">
+                                        <i class="bi bi-clock-history"></i> Pending Payment
+                                    </span>
                                 {% endif %}
+                            </td>
+                            <td>
+                                {% if member.streak_days > 0 %}
+                                    <span style="color: #f59e0b; font-weight: 600;">
+                                        <i class="bi bi-fire"></i> {{ member.streak_days }}
+                                    </span>
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% with level=member.get_level_display %}
+                                    <span class="badge bg-{{ level.color }}" title="{{ level.name }} Level">
+                                        {{ level.icon }} {{ level.name }}
+                                    </span>
+                                {% endwith %}
                             </td>
                             <td>
                                 {% if member.is_archived %}
                                     -
+                                {% elif member.membership_end %}
+                                    {{ member.days_left }} / {{ member.duration_days }} day{{ member.days_left|pluralize }}
                                 {% else %}
-                                    {{ member.days_left }} day{{ member.days_left|pluralize }}
+                                    <span class="text-muted">-</span>
                                 {% endif %}
                             </td>
                             <td>
-                                <div>{{ member.joined_at|date:"d M Y" }}</div>
-                                <div class="small text-muted">{{ member.joined_at|date:"H:i" }}</div>
+                                {% if member.membership_end %}
+                                    <div>{{ member.membership_end|date:"d M Y" }}</div>
+                                    <div class="small text-muted">
+                                        <i class="bi bi-calendar-event"></i>
+                                        {% if member.membership_start %}{{ member.days_attended }} days attended{% endif %}
+                                    </div>
+                                {% else %}
+                                    <span class="text-muted">Not set</span>
+                                {% endif %}
                             </td>
                             <td>
-                                <div class="btn-group" role="group">
-                                    <a href="{% url 'gym:member_detail' member.id %}" class="btn btn-sm btn-outline-primary">
-                                        <i class="bi bi-eye"></i> View
+                                <div class="action-btn-group">
+                                    <a href="{% url 'gym:member_detail' member.id %}" class="action-btn action-btn-view btn-sm">
+                                        <i class="bi bi-eye"></i>
                                     </a>
-                                    {% if not member.is_archived and member.status != "ACTIVE" %}
-                                        <form method="post" action="{% url 'gym:member_set_paid' member.id %}" style="display: inline;">
-                                            {% csrf_token %}
-                                            <button type="submit" class="btn btn-sm btn-outline-success" title="Mark as Paid / Renew">
-                                                <i class="bi bi-cash-coin"></i> Pay
-                                            </button>
-                                        </form>
-                                    {% endif %}
                                     {% if not member.is_archived %}
+                                        {% now "Y-m-d" as today_str %}
+                                        {% if not member.membership_end or member.membership_end|date:"Y-m-d" < today_str %}
+                                            <form method="post" action="{% url 'gym:member_set_paid' member.id %}" style="display: inline;">
+                                                {% csrf_token %}
+                                                <button type="submit" class="action-btn action-btn-pay btn-sm" title="Mark as Paid / Renew">
+                                                    <i class="bi bi-cash-coin"></i>
+                                                </button>
+                                            </form>
+                                        {% endif %}
                                         <form method="post" action="{% url 'gym:member_checkin' member.id %}" style="display: inline;">
                                             {% csrf_token %}
-                                            <button type="submit" class="btn btn-sm btn-outline-info" title="Check In">
+                                            <button type="submit" class="action-btn action-btn-checkin btn-sm" title="Check In">
                                                 <i class="bi bi-box-arrow-in-right"></i>
                                             </button>
                                         </form>
                                     {% endif %}
+                                    <button type="button" 
+                                            class="action-btn btn-sm js-delete-member" 
+                                            style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color: white; box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3);"
+                                            data-member-id="{{ member.id }}"
+                                            data-member-name="{{ member.name }}"
+                                            data-delete-url="{% url 'gym:member_purge' member.id %}"
+                                            title="Delete Member">
+                                        <i class="bi bi-trash-fill"></i>
+                                    </button>
                                 </div>
                             </td>
                         </tr>
@@ -116,12 +366,12 @@
             </div>
         {% else %}
             <!-- Empty State -->
-            <div class="text-center py-5">
-                <div class="mb-3">
-                    <i class="bi bi-people" style="font-size: 3rem; opacity: 0.3;"></i>
+            <div class="empty-state-premium">
+                <div class="empty-state-icon">
+                    <i class="bi bi-people"></i>
                 </div>
-                <h5 class="text-muted mb-2">No Members Found</h5>
-                <p class="text-muted mb-4">
+                <h4 style="font-weight: 700; color: #1e293b; margin-bottom: 0.75rem;">No Members Found</h4>
+                <p class="text-muted mb-4" style="font-size: 1.125rem;">
                     {% if filter_type == "archived" %}
                         No archived members found.
                     {% elif filter_type == "active" %}
@@ -130,12 +380,51 @@
                         Start adding members to manage their gym memberships.
                     {% endif %}
                 </p>
-                <a href="{% url 'gym:member_add' %}" class="btn btn-primary">
-                    <i class="bi bi-plus-circle"></i> Add First Member
+                <a href="{% url 'gym:member_add' %}" class="action-btn action-btn-view" style="padding: 0.875rem 2rem; font-size: 1rem;">
+                    <i class="bi bi-plus-circle me-2"></i> Add First Member
                 </a>
             </div>
         {% endif %}
     </div>
 </div>
-{% endblock %}
 
+<script>
+// Toggle all checkboxes
+function toggleSelectAll(selectAllCheckbox) {
+    const checkboxes = document.querySelectorAll('.member-select');
+    checkboxes.forEach(cb => {
+        cb.checked = selectAllCheckbox.checked;
+    });
+}
+
+// Update "select all" checkbox state based on individual selections
+function updateSelectAllState() {
+    const selectAllCheckbox = document.getElementById('select-all');
+    const checkboxes = document.querySelectorAll('.member-select');
+    const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+    const someChecked = Array.from(checkboxes).some(cb => cb.checked);
+    
+    selectAllCheckbox.checked = allChecked;
+    selectAllCheckbox.indeterminate = someChecked && !allChecked;
+}
+
+// Download selected members
+function downloadSelected() {
+    const checkboxes = document.querySelectorAll('.member-select:checked');
+    
+    if (checkboxes.length === 0) {
+        alert('Please select at least one member to download QR codes.');
+        return;
+    }
+    
+    // Collect selected member IDs
+    const memberIds = Array.from(checkboxes).map(cb => cb.dataset.memberId);
+    
+    // Build download URL
+    const url = "{% url 'gym:bulk_qr_pdf' %}?members=" + memberIds.join(',');
+    
+    // Trigger download
+    window.location.href = url;
+}
+</script>
+{% endblock %}

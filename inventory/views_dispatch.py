@@ -1,9 +1,9 @@
-﻿# inventory/views_dispatch.py
+# inventory/views_dispatch.py
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import redirect
 from django.urls import NoReverseMatch, reverse
 
-from tenants.decorators import require_business
+from tenants.decorators import require_business_access as require_business
 
 from .helpers import (
     PHARMACY,
@@ -11,15 +11,31 @@ from .helpers import (
     CLOTHING,
     GYM,
     LIQUOR,
+    GROCERY,
+    FARM,
+    WELDING,
+    CEMENT,
     business_vertical,
     product_new_url_for_business,
 )
+
+try:
+    from .helpers_core import CAR_DEALER, ENERGY
+except ImportError:
+    CAR_DEALER = "car_dealer"
+    ENERGY = "energy"
 
 _VERTICAL_ROUTES = {
     CLOTHING: "verticals:clothing_dashboard",
     LIQUOR: "verticals:liquor_dashboard",
     PHARMACY: "verticals:pharmacy_dashboard",
     GYM: "verticals:gym_dashboard",
+    GROCERY: "groceries:dashboard",
+    FARM: "verticals:farm_dashboard",
+    WELDING: "verticals:welding_dashboard",
+    CEMENT: "verticals:cement_dashboard",
+    CAR_DEALER: "car_dealer:dashboard",
+    ENERGY: "verticals:energy_dashboard",
 }
 _DEFAULT_ROUTE = "verticals:no_business"
 
@@ -36,20 +52,19 @@ def _safe_reverse(name: str, default: str) -> str:
 def vertical_dispatcher(request):
     """
     Route users to the correct dashboard for their business vertical.
-    
-    PHONES businesses render the PHONES premium dashboard directly (no redirect to avoid loops).
+
+    PHONES businesses now redirect to Analytics (replaces inventory dashboard).
     Other verticals redirect to their specialized dashboards.
     Falls back to a generic prompt if the vertical is unknown.
     """
     vertical = business_vertical(request)
-    
-    # PHONES: render the premium phones dashboard directly to prevent self-redirect loop
-    # (since this view IS mapped to inventory:inventory_dashboard)
+
+    # PHONES: redirect to analytics (replaces inventory dashboard)
     if vertical == PHONES:
-        # Import here to avoid circular imports
-        from inventory.verticals.phones import dashboard as phones_dashboard
-        return phones_dashboard(request)
-    
+        # Redirect to analytics router endpoint with fallback
+        analytics_url = _safe_reverse("app_router:analytics", "/app/analytics/")
+        return redirect(analytics_url)
+
     # Other verticals: redirect to their specialized dashboards
     target = _VERTICAL_ROUTES.get(vertical, _DEFAULT_ROUTE)
     return redirect(target)

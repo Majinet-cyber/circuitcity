@@ -1,233 +1,139 @@
-# Inventory Dashboard Redirect Loop Fix
+# Redirect Loop Fix Summary - 2026-01-15
 
-## Problem Summary
+## Problem
+Production domains were experiencing `ERR_TOO_MANY_REDIRECTS`:
+- https://emajinet.africa
+- https://www.emajinet.africa
 
-The URL `/inventory/dashboard/` was stuck in an infinite redirect loop, causing browser error `ERR_TOO_MANY_REDIRECTS`. Django runserver logs showed hundreds of `GET /inventory/dashboard/ HTTP/1.1" 302 0` entries.
+Render logs showed repeated GET / 301 redirect loops, making the site completely inaccessible.
 
-## Root Cause
+## Root Causes Identified
 
-The redirect loop was caused by **self-referencing redirect logic** in the vertical dispatcher:
+### 1. Canonical Host Redirect Conflict
+Django had `CanonicalHostMiddleware` configured to redirect www → apex (www.emajinet.africa → emajinet.africa), but Render's proxy was likely doing the opposite (apex → www). This created an infinite redirect loop where:
+- User requests emajinet.africa
+- Render proxy redirects to www.emajinet.africa  
+- Django middleware redirects back to emajinet.africa
+- Loop continues indefinitely
 
-1. **Entry Point**: `/inventory/dashboard/` maps to `vertical_dispatcher` (in `inventory/views_dispatch.py`)
+### 2. Proxy SSL Header Configuration
+While mostly correct, the proxy SSL header settings needed explicit reinforcement and better documentation to ensure they work correctly in production.
 
-2. **The Problem**: For PHONES businesses, the `_VERTICAL_ROUTES` dictionary mapped:
-   ```python
-   PHONES: "inventory:inventory_dashboard"
-   ```
-   And then line 44 did:
-   ```python
-   return redirect(target)  # Redirects back to itself!
-   ```
+## Fixes Applied
 
-3. **The Loop**: This created a 302 redirect from `/inventory/dashboard/` → `inventory:inventory_dashboard` → `/inventory/dashboard/` → (infinite loop)
+### A) Disabled Django-Side Canonical Host Redirects
 
-## Solution
+**File: `cc/settings.py`**
+- Changed `CANONICAL_HOST` from `"emajinet.africa"` to `""` (empty string)
+- Commented out `CanonicalHostMiddleware` in the MIDDLEWARE stack
+- Both domains remain in `ALLOWED_HOSTS` and `CSRF_TRUSTED_ORIGINS`
+- SEO canonical URLs are still handled via `<link rel="canonical">` in templates (no SEO impact)
 
-### 1. Fixed `inventory/views_dispatch.py` (Primary Fix)
+**Rationale:** Let Render handle domain canonicalization at the proxy level. Django should accept both domains without redirecting between them to avoid fighting with Render.
 
-**Changed**: Instead of redirecting PHONES businesses, the dispatcher now **renders the dashboard directly**:
+### B) Reinforced HTTPS Detection Behind Render Proxy
 
-```python
-@login_required
-@require_business
-def vertical_dispatcher(request):
-    """
-    Route users to the correct dashboard for their business vertical.
-    
-    PHONES businesses render the inventory dashboard directly (no redirect to avoid loops).
-    Other verticals redirect to their specialized dashboards.
-    """
-    vertical = business_vertical(request)
-    
-    # PHONES: render the inventory dashboard directly to prevent self-redirect loop
-    if vertical == PHONES:
-        from inventory.views_dashboard import inventory_dashboard
-        return inventory_dashboard(request)
-    
-    # Other verticals: redirect to their specialized dashboards
-    target = _VERTICAL_ROUTES.get(vertical, _DEFAULT_ROUTE)
-    return redirect(target)
-```
+**Files: `cc/settings.py`, `cc/settings_production.py`**
+- Verified `SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")`
+- Verified `USE_X_FORWARDED_HOST = True` (production only)
+- Added explicit comments explaining critical importance for redirect loop prevention
+- Updated settings_production.py to explicitly set `USE_X_FORWARDED_HOST = True`
 
-**Key Changes**:
-- Removed `PHONES: "inventory:inventory_dashboard"` from `_VERTICAL_ROUTES`
-- Added conditional logic to call `inventory_dashboard(request)` directly for PHONES
-- Other verticals (liquor, pharmacy, gym, clothing) still redirect correctly
+**Rationale:** Without these settings, Django can't detect HTTPS behind a proxy, causing `SECURE_SSL_REDIRECT` to create http→https redirect loops.
 
-### 2. Fixed `tenants/utils.py` (Guard in `require_business` Decorator)
+### C) Added Comprehensive Regression Tests
 
-**Added**: Safety check to prevent redirecting back to `/inventory/dashboard/` when no business is set:
+**File: `tests/critical/test_10_no_domain_redirect_loops.py`**
 
-```python
-# GUARD: Never redirect back to inventory:dashboard to avoid loops
-current_path = getattr(request, "path", "")
-if current_path and current_path.rstrip("/") == "/inventory/dashboard":
-    # Instead of redirecting to activate_mine and back, go straight to choose business
-    target = _safe_reverse("tenants:choose_business", "/tenants/choose/")
-else:
-    target = _safe_reverse("tenants:activate_mine", "/tenants/activate/")
-```
+Created 18 new critical tests covering:
+1. **Production Domain Testing**: Both apex and www with proxy headers
+2. **HTTPS Detection**: Validates `request.is_secure()` works behind proxy
+3. **Redirect Chain Validation**: Ensures < 2 redirects, no bouncing between hosts/schemes
+4. **Staging Domain Protection**: `.onrender.com` hosts never redirected
+5. **Settings Validation**: Checks `ALLOWED_HOSTS`, `CSRF_TRUSTED_ORIGINS`, proxy headers
+6. **Login Page Critical**: Specific test for most-accessed public endpoint
 
-### 3. Fixed `inventory/views.py` (`_require_active_business`)
+All 18 tests passing ✅
+All 200 critical tests passing ✅ (no regressions)
 
-**Changed**: Redirect to choose-business page instead of `dashboard:home` to avoid circular dependencies:
+## Impact
 
-```python
-def _require_active_business(request):
-    """
-    Attach/choose a business for this request, or show error + redirect.
-    
-    GUARD: To avoid redirect loops, redirect to choose-business page instead of dashboard:home
-    when no active business is found.
-    """
-    biz = _get_active_business(request)
-    if not biz:
-        messages.error(request, "No active business selected. Switch business and try again.")
-        # Redirect to choose-business to avoid loops (dashboard:home also needs a business)
-        try:
-            from django.urls import reverse, NoReverseMatch
-            try:
-                return redirect(reverse("tenants:choose_business"))
-            except NoReverseMatch:
-                return redirect("/tenants/choose/")
-        except Exception:
-            return redirect("/tenants/choose/")
-    return None  # OK
-```
+### Immediate
+✅ Production sites should now be accessible without redirect loops  
+✅ Both www and apex domains work without fighting each other  
+✅ Security settings (HTTPS redirect) continue to work correctly  
 
-### 4. Added `@require_business` Decorator to `dashboard/views.py`
-
-**Changed**: Added decorator to ensure `request.business` is always set:
-
-```python
-@login_required
-@require_business
-def home(request):
-    """
-    Default dashboard for managers/agents within an active business.
-    ...
-    NOTE: @require_business ensures request.business is set; if no active business,
-    user is redirected to choose-business page, preventing redirect loops.
-    """
-```
-
-## Regression Tests
-
-Created comprehensive test suite in `tests/test_inventory_dashboard_redirects.py`:
-
-### Test Coverage
-
-✅ **Test 1**: Anonymous user redirected to login (not looped)
-- Anonymous GET `/inventory/dashboard/` → 302 to `/accounts/login/?next=...`
-- Redirect target is NOT `/inventory/dashboard/` itself
-
-✅ **Test 2**: Authenticated user with NO active business redirected to choose-business (not looped)
-- Logged-in user without business → 302 to `/tenants/choose/` or `/tenants/activate/`
-- Redirect target is NOT `/inventory/dashboard/`
-
-✅ **Test 3**: Authenticated user WITH PHONES business gets 200 OK dashboard
-- User with PHONES business + active business in session → 200 OK
-- NO redirect occurs (dashboard renders directly)
-
-✅ **Test 4**: Hard guard against self-redirect
-- Any redirect from `/inventory/dashboard/` MUST NOT target itself
-- Catches self-redirect loops regardless of scenario
-
-✅ **Test 5 & 6**: Following redirects terminates cleanly
-- Anonymous user chain terminates at login (200)
-- User without business chain terminates at choose-business (200)
-- No infinite loops in the redirect chain
-
-✅ **Test 7**: Vertical dispatcher does NOT redirect PHONES to itself (CRITICAL)
-- PHONES business → 200 OK (renders directly)
-- Absolutely NO 302 redirect occurs
-
-✅ **Test 8**: Other verticals (liquor) redirect properly
-- Liquor business → 302 to `/verticals/liquor/dashboard/`
-- Does NOT redirect to `/inventory/dashboard/`
-
-### Test Results
-
-```bash
-$ python -m pytest tests/test_inventory_dashboard_redirects.py -v
-============================= test session starts =============================
-collected 8 items
-
-tests\test_inventory_dashboard_redirects.py ........                     [100%]
-
-======================= 8 passed, 20 warnings in 8.38s ========================
-```
-
-**All tests pass! ✅**
+### Long-term
+✅ Test coverage ensures this issue never happens again  
+✅ Better documentation of proxy settings for future developers  
+✅ Clear separation of concerns: Render handles domain canonicalization, Django handles HTTPS  
 
 ## Files Changed
+- `cc/settings.py`: Disabled CANONICAL_HOST, commented out middleware, improved comments
+- `cc/settings_production.py`: Added USE_X_FORWARDED_HOST, improved comments  
+- `tests/critical/test_10_no_domain_redirect_loops.py`: New comprehensive test suite (18 tests)
 
-### Modified Files
+## Verification Steps
 
-1. **`inventory/views_dispatch.py`**
-   - Fixed vertical_dispatcher to render PHONES dashboard directly instead of redirecting
-   - Removed PHONES from `_VERTICAL_ROUTES` dictionary
+1. ✅ All 18 new tests pass
+2. ✅ All 200 critical tests pass (no regressions)
+3. ✅ No linter errors
+4. ✅ Changes committed and pushed to `mobile-layout-v1` branch
 
-2. **`tenants/utils.py`**
-   - Added guard in `require_business` decorator to prevent redirecting to `/inventory/dashboard/` when no business
+## Next Steps for Deployment
 
-3. **`inventory/views.py`**
-   - Changed `_require_active_business` to redirect to choose-business instead of dashboard:home
+1. **Deploy to production** (Render will pick up the changes automatically if auto-deploy is enabled)
+2. **Monitor Render logs** for the first few minutes after deploy:
+   - Should see successful 200 responses instead of 301 loops
+   - Both domains should work without redirects
+3. **Test both domains manually**:
+   - https://emajinet.africa
+   - https://www.emajinet.africa
+4. **Verify no redirect loops** using browser dev tools (Network tab)
 
-4. **`dashboard/views.py`**
-   - Added `@require_business` decorator to `home` view for safety
+## Technical Notes
 
-### New Files
+### Why We Allow Both Domains Instead of Canonical Redirects
 
-5. **`tests/test_inventory_dashboard_redirects.py`** (NEW)
-   - Comprehensive test suite with 8 tests
-   - Guards against future regressions
+**Old approach (caused loops):**
+- Django enforces one canonical domain via middleware
+- Render's proxy may have its own canonicalization
+- Competing redirects create infinite loops
 
-## Verification
+**New approach (works with proxy):**
+- Django accepts both www and apex domains equally (no redirects)
+- Render can handle canonicalization at the proxy level if desired
+- No competition = no loops
+- SEO still protected via canonical link tags in HTML
 
-The fix has been verified through:
+### Security Implications
 
-1. **Unit Tests**: All 8 regression tests pass
-2. **Redirect Chain Mapping**: Explicitly documented the redirect chain that produced the loop
-3. **Code Comments**: Added explanatory comments at key decision points
+**No negative security impact:**
+- Both domains were already in `ALLOWED_HOSTS` (no change)
+- Both domains already in `CSRF_TRUSTED_ORIGINS` (no change)
+- HTTPS enforcement still works correctly via `SECURE_SSL_REDIRECT`
+- Session cookies work on both via `.emajinet.africa` domain cookie
 
-## Impact Assessment
+**Improvements:**
+- Better proxy SSL header handling reduces attack surface
+- Explicit `USE_X_FORWARDED_HOST` prevents host header injection behind proxy
 
-### What Changed
+## Commit
+```
+commit b6709827
+Fix redirect loop (proxy SSL + disable www/apex redirects) and add regression tests
+```
 
-- PHONES businesses now get their dashboard rendered directly (200 OK) instead of being redirected
-- Other verticals (gym, liquor, pharmacy, clothing) still redirect to their specialized dashboards
-- Redirect chains now terminate cleanly at appropriate pages (login, choose-business)
+Pushed to: `origin/mobile-layout-v1`
 
-### What Did NOT Change
+## Success Metrics
+- [ ] Production site accessible at both domains
+- [ ] Render logs show 200 responses (not 301 loops)
+- [ ] No increase in 5xx errors
+- [ ] User login flows work normally
+- [ ] All CI tests continue to pass
 
-- Tenant/business/location logic remains intact
-- HQ vs client UI separation unchanged
-- Middleware behavior for other URLs unchanged
-- No breaking changes to existing views or templates
-
-### Behavior Changes
-
-| Scenario | Before | After |
-|----------|--------|-------|
-| Anonymous user on `/inventory/dashboard/` | Infinite 302 loop | 302 → login (clean) |
-| User without business on `/inventory/dashboard/` | Infinite 302 loop | 302 → choose-business (clean) |
-| User with PHONES business on `/inventory/dashboard/` | Infinite 302 loop | 200 OK (renders dashboard) |
-| User with Liquor business on `/inventory/dashboard/` | 302 → liquor dashboard | 302 → liquor dashboard (unchanged) |
-
-## Recommendations
-
-1. **Monitor**: Watch for any issues with PHONES businesses accessing their dashboard
-2. **Test in Production**: Verify the fix works with real user accounts and businesses
-3. **Document**: Update any internal docs that mention the vertical routing behavior
-
-## Conclusion
-
-The infinite redirect loop has been fixed with a **minimal, targeted change** that:
-- ✅ Prevents self-referencing redirects for PHONES businesses
-- ✅ Maintains all existing tenant/business/location logic
-- ✅ Includes comprehensive regression tests
-- ✅ Has no breaking changes to other features
-
-The redirect chain now terminates cleanly in all scenarios.
-
+---
+**Resolution Date:** 2026-01-15  
+**Resolved By:** AI Assistant (Claude)  
+**Status:** ✅ Complete - Ready for deployment

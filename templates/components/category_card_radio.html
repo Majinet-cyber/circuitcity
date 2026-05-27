@@ -1,0 +1,150 @@
+{% comment %}
+Category Card Radio Component
+==============================
+Premium card-based radio button selector (like clothing payment method cards).
+Works as a replacement for select dropdowns while maintaining form compatibility.
+
+Usage:
+  {% include "components/category_card_radio.html" with 
+     name="category" 
+     categories=categories 
+     selected="" 
+     required=True 
+  %}
+
+categories: List of tuples like [("transport", "Transport"), ("labor", "Labor"), ...]
+name: Form field name (same as <select name="...">)
+selected: Currently selected value (for edit forms)
+required: Whether the field is required
+{% endcomment %}
+
+<div class="cc-category-cards" data-field-name="{{ name|default:'category' }}">
+  {% for value, label in categories %}
+  <label class="cc-category-card{% if selected == value %} cc-category-card--selected{% endif %}" data-value="{{ value }}">
+    <input type="radio" 
+           name="{{ name|default:'category' }}" 
+           value="{{ value }}" 
+           {% if selected == value %}checked{% endif %}
+           {% if required %}required{% endif %}
+           class="cc-category-card__input">
+    <span class="cc-category-card__icon">
+      {% if value == "transport" %}🚚{% elif value == "labor" %}👷{% elif value == "rent" %}🏠{% elif value == "utilities" %}💡{% elif value == "other" %}📦{% else %}📋{% endif %}
+    </span>
+    <span class="cc-category-card__label">{{ label }}</span>
+    <span class="cc-category-card__check">
+      <i class="bi bi-check-circle-fill"></i>
+    </span>
+  </label>
+  {% endfor %}
+</div>
+
+<style>
+.cc-category-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.cc-category-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 16px 12px;
+  background: linear-gradient(135deg, #f8fafc, #ffffff);
+  border: 2px solid #e2e8f0;
+  border-radius: 16px;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  min-height: 100px;
+  text-align: center;
+}
+
+.cc-category-card:hover {
+  border-color: #3b82f6;
+  background: linear-gradient(135deg, #eff6ff, #f8fafc);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+}
+
+.cc-category-card--selected,
+.cc-category-card:has(input:checked) {
+  border-color: #3b82f6;
+  background: linear-gradient(135deg, #dbeafe, #eff6ff);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2), 0 4px 12px rgba(59, 130, 246, 0.1);
+}
+
+.cc-category-card__input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+.cc-category-card__icon {
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.cc-category-card__label {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: #334155;
+}
+
+.cc-category-card__check {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  opacity: 0;
+  color: #3b82f6;
+  font-size: 1.1rem;
+  transition: opacity 0.2s;
+}
+
+.cc-category-card--selected .cc-category-card__check,
+.cc-category-card:has(input:checked) .cc-category-card__check {
+  opacity: 1;
+}
+
+/* Mobile: 2 columns */
+@media (max-width: 480px) {
+  .cc-category-cards {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .cc-category-card {
+    padding: 12px 8px;
+    min-height: 80px;
+  }
+  
+  .cc-category-card__icon {
+    font-size: 1.6rem;
+  }
+  
+  .cc-category-card__label {
+    font-size: 0.8rem;
+  }
+}
+</style>
+
+<script>
+// Card selection visual feedback
+(function() {
+  document.querySelectorAll('.cc-category-card').forEach(function(card) {
+    card.addEventListener('click', function() {
+      // Remove selected from siblings
+      card.parentElement.querySelectorAll('.cc-category-card').forEach(function(c) {
+        c.classList.remove('cc-category-card--selected');
+      });
+      // Add selected to clicked card
+      card.classList.add('cc-category-card--selected');
+    });
+  });
+})();
+</script>
+

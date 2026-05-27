@@ -2,6 +2,7 @@
 
 from django.utils import timezone
 
+
 def _get_business_from_request(request):
     """
     Best-effort way to find the active business for this request.
@@ -18,6 +19,7 @@ def _get_business_from_request(request):
 
     try:
         from tenants.models import Membership  # local import to avoid circulars at startup
+
         mem = (
             Membership.objects.filter(user=user, is_active=True)
             .select_related("business")
@@ -75,3 +77,20 @@ def trial_banner(request):
     return ctx
 
 
+def pricing_context(request):
+    """
+    Add pricing configuration to all templates for consistency.
+    Ensures homepage, checkout, and billing show the same prices.
+    """
+    try:
+        from billing.pricing import get_all_plans, TRIAL_DAYS, USD_TO_MWK, USD_RATE_NOTE
+
+        return {
+            "PRICING_PLANS": get_all_plans(),
+            "PRICING_TRIAL_DAYS": TRIAL_DAYS,
+            "PRICING_USD_TO_MWK": USD_TO_MWK,
+            "PRICING_USD_RATE_NOTE": USD_RATE_NOTE,
+        }
+    except Exception:
+        # Never let context processors break page rendering
+        return {}

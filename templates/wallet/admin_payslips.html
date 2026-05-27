@@ -1,120 +1,85 @@
 {% extends "base.html" %}
 {% load humanize %}
 
-{% block title %}Issue Payslips · Emajinet{% endblock %}
-{% block header_title %}<i class="bi bi-receipt me-2"></i>Issue Payslips{% endblock %}
+{% block title %}Payslips - Emajinet{% endblock %}
+{% block header_title %}<i class="bi bi-receipt me-2"></i>Payslips{% endblock %}
 
 {% block content %}
 <div class="container-xxl px-0">
-
-  <div class="alert alert-info d-flex align-items-start gap-2" role="alert">
-    <i class="bi bi-info-circle mt-1"></i>
-    <div class="small">
-      This will compute <strong>base salary + commissions + bonuses</strong>, subtract deductions for the chosen period,
-      create a payslip record, and post the net payout to the agent wallet and company ledger.
-      You can optionally email payslips immediately.
-    </div>
+  <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+    <div class="text-muted small">Issue payslips, generate PDFs, and track issued/paid status.</div>
+    <a class="btn btn-primary" href="{% url 'wallet:admin_issue_payslip' %}"><i class="bi bi-plus-circle me-1"></i>Single / Manual Payslip</a>
   </div>
 
-  <div class="row g-3">
-    <!-- Single -->
-    <div class="col-lg-5">
-      <div class="card border-0 shadow-sm h-100">
-        <div class="card-body">
-          <h5 class="mb-3">Single Payslip</h5>
-          <form method="post" action="{% url 'wallet:admin_payslips' %}">
-            {% csrf_token %}
-            <input type="hidden" name="form_kind" value="single">
-            <div class="mb-3">
-              <label class="form-label">Agent</label>
-              <select class="form-select" name="agent_ids">
-                {% for a in agents %}
-                  <option value="{{ a.id }}">{{ a.first_name }} {{ a.last_name }} ({{ a.username }})</option>
-                {% endfor %}
-              </select>
-            </div>
-            <div class="row">
-              <div class="col-6 mb-3">
-                <label class="form-label">Year</label>
-                <input type="number" class="form-control" name="year" value="{{ year }}" min="2000" max="2100" required>
-              </div>
-              <div class="col-6 mb-3">
-                <label class="form-label">Month</label>
-                <input type="number" class="form-control" name="month" value="{{ month }}" min="1" max="12" required>
-              </div>
-            </div>
-            <div class="mb-3 form-check">
-              <input class="form-check-input" type="checkbox" id="sn1" name="send_now" value="1">
-              <label class="form-check-label" for="sn1">Email payslip now</label>
-            </div>
-            <div class="mb-3">
-              <label class="form-label">Payment Method (optional / future)</label>
-              <select class="form-select" name="method">
-                <option value="">—</option>
-                <option value="NB">National Bank</option>
-                <option value="SB">Standard Bank</option>
-                <option value="AM">Airtel Money</option>
-                <option value="MANUAL">Manual</option>
-              </select>
-            </div>
-            <button class="btn btn-primary"><i class="bi bi-send-check me-1"></i>Issue Payslip</button>
-          </form>
-        </div>
-      </div>
-    </div>
-
-    <!-- Bulk -->
-    <div class="col-lg-7">
-      <div class="card border-0 shadow-sm h-100">
-        <div class="card-body">
-          <h5 class="mb-3">Bulk Payslips</h5>
-          <form method="post" action="{% url 'wallet:admin_payslips' %}">
-            {% csrf_token %}
-            <input type="hidden" name="form_kind" value="bulk">
-            <div class="mb-2 d-flex justify-content-between align-items-center">
-              <label class="form-label mb-0">Agents</label>
+  <div class="card border-0 shadow-sm mb-3">
+    <div class="card-body">
+      <h5 class="mb-3">Bulk Payslips</h5>
+      {% if staff_options %}
+      <form method="post" action="{% url 'wallet:admin_payslips' %}">
+        {% csrf_token %}
+        <div class="row g-3">
+          <div class="col-lg-5">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <label class="form-label mb-0">Active staff/agents</label>
               <button class="btn btn-sm btn-outline-secondary" type="button" id="selectAll">Select all</button>
             </div>
             <select class="form-select" name="agent_ids" id="agentsMulti" multiple size="10" required>
-              {% for a in agents %}
-                <option value="{{ a.id }}">{{ a.first_name }} {{ a.last_name }} ({{ a.username }})</option>
+              {% for a in staff_options %}
+                <option value="{{ a.id }}">{{ a.label }}</option>
               {% endfor %}
             </select>
-
-            <div class="row mt-3">
-              <div class="col-6 mb-3">
-                <label class="form-label">Year</label>
-                <input type="number" class="form-control" name="year" value="{{ year }}" min="2000" max="2100" required>
-              </div>
-              <div class="col-6 mb-3">
-                <label class="form-label">Month</label>
-                <input type="number" class="form-control" name="month" value="{{ month }}" min="1" max="12" required>
-              </div>
+          </div>
+          <div class="col-lg-7">
+            <div class="row g-3">
+              <div class="col-md-3"><label class="form-label">Month</label><input type="number" class="form-control" name="month" value="{{ month }}" min="1" max="12" required></div>
+              <div class="col-md-3"><label class="form-label">Year</label><input type="number" class="form-control" name="year" value="{{ year }}" min="2000" max="2100" required></div>
+              <div class="col-md-3"><label class="form-label">Start</label><input type="date" class="form-control" name="period_start"></div>
+              <div class="col-md-3"><label class="form-label">End</label><input type="date" class="form-control" name="period_end"></div>
+              <div class="col-md-4"><label class="form-label">Default salary</label><input class="form-control" type="number" step="0.01" min="0" name="base_salary" placeholder="Configured salary"></div>
+              <div class="col-md-4"><label class="form-label">Allowances</label><input class="form-control" type="number" step="0.01" min="0" name="allowances" value="0"></div>
+              <div class="col-md-4"><label class="form-label">Bonuses</label><input class="form-control" type="number" step="0.01" min="0" name="bonuses" value="0"></div>
+              <div class="col-md-4"><label class="form-label">Advances</label><input class="form-control" type="number" step="0.01" min="0" name="advances" value="0"></div>
+              <div class="col-md-4"><label class="form-label">Penalties</label><input class="form-control" type="number" step="0.01" min="0" name="penalties" value="0"></div>
+              <div class="col-md-4"><label class="form-label">Other deductions</label><input class="form-control" type="number" step="0.01" min="0" name="other_deductions" value="0"></div>
+              <div class="col-md-6"><label class="form-label">Payment method</label><select class="form-select" name="method"><option value="MANUAL">Manual</option><option value="NB">National Bank</option><option value="SB">Standard Bank</option><option value="AM">Airtel Money</option></select></div>
+              <div class="col-md-6 d-flex align-items-end"><div class="form-check"><input class="form-check-input" type="checkbox" id="sendBulk" name="send_now" value="1"><label class="form-check-label" for="sendBulk">Email payslips now</label></div></div>
             </div>
-
-            <div class="row">
-              <div class="col-md-6 mb-3">
-                <div class="form-check">
-                  <input class="form-check-input" type="checkbox" id="sn2" name="send_now" value="1">
-                  <label class="form-check-label" for="sn2">Email payslips now</label>
-                </div>
-              </div>
-              <div class="col-md-6 mb-3">
-                <label class="form-label">Payment Method (optional / future)</label>
-                <select class="form-select" name="method">
-                  <option value="">—</option>
-                  <option value="NB">National Bank</option>
-                  <option value="SB">Standard Bank</option>
-                  <option value="AM">Airtel Money</option>
-                  <option value="MANUAL">Manual</option>
-                </select>
-              </div>
-            </div>
-
-            <button class="btn btn-primary"><i class="bi bi-send-check me-1"></i>Issue Payslips</button>
-            <a class="btn btn-link ms-2" href="{% url 'wallet:admin_schedules' %}">Manage auto-send schedules</a>
-          </form>
+            <button class="btn btn-primary mt-3"><i class="bi bi-send-check me-1"></i>Generate Bulk Payslips</button>
+          </div>
         </div>
+      </form>
+      {% else %}
+        <div class="alert alert-light border mb-0">No staff found. Enter employee manually or add staff first.</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm">
+    <div class="card-body">
+      <h5 class="mb-3">Payslip History</h5>
+      <div class="table-responsive">
+        <table class="table align-middle">
+          <thead class="text-muted small"><tr><th>Employee</th><th>Period</th><th class="text-end">Gross</th><th class="text-end">Deductions</th><th class="text-end">Net</th><th>Status</th><th></th></tr></thead>
+          <tbody>
+            {% for p in recent_payslips %}
+            <tr>
+              <td>{{ p.display_employee_name }}</td>
+              <td>{% if p.period_start and p.period_end %}{{ p.period_start }} - {{ p.period_end }}{% else %}{{ p.year }}-{{ p.month|stringformat:"02d" }}{% endif %}</td>
+              <td class="text-end">MWK {{ p.gross|floatformat:2|intcomma }}</td>
+              <td class="text-end">MWK {{ p.deductions|floatformat:2|intcomma }}</td>
+              <td class="text-end fw-semibold">MWK {{ p.net|floatformat:2|intcomma }}</td>
+              <td><span class="badge text-bg-light">{{ p.display_status }}</span></td>
+              <td class="text-end">
+                <a class="btn btn-sm btn-outline-secondary" href="{% url 'wallet:payslip_download_by_id' p.id %}"><i class="bi bi-download"></i> PDF</a>
+                {% if p.status != "SENT" and p.status != "PAID" %}<form method="post" action="{% url 'wallet:payslip_set_status' p.id 'issued' %}" class="d-inline">{% csrf_token %}<button class="btn btn-sm btn-outline-success">Issued</button></form>{% endif %}
+                {% if p.status != "PAID" %}<form method="post" action="{% url 'wallet:payslip_set_status' p.id 'paid' %}" class="d-inline">{% csrf_token %}<button class="btn btn-sm btn-success">Paid</button></form>{% endif %}
+              </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="7" class="text-center text-muted py-4">No payslips issued yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
       </div>
     </div>
   </div>
@@ -122,11 +87,10 @@
 
 {% block extra_js %}
 <script>
-  // simple helper to select all in the multi-select
-  document.getElementById('selectAll')?.addEventListener('click', () => {
-    const el = document.getElementById('agentsMulti');
-    for (const o of el.options) o.selected = true;
-  });
+document.getElementById('selectAll')?.addEventListener('click', () => {
+  const el = document.getElementById('agentsMulti');
+  for (const o of el.options) o.selected = true;
+});
 </script>
 {% endblock %}
 {% endblock %}

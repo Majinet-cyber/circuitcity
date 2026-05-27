@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Products · Mixed Retail · {{ business.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+.mr-wrap { max-width: 1100px; margin: 0 auto; padding: 20px 14px; }
+.prod-card {
+  background: #fff; border: 1px solid #e2e8f0; border-radius: 12px;
+  padding: 14px 16px; transition: box-shadow .12s;
+}
+.prod-card:hover { box-shadow: 0 4px 12px rgba(15,23,42,.08); }
+.prod-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+.prod-name { font-weight: 700; color: #0f172a; margin-bottom: 4px; }
+.prod-meta { font-size: .75rem; color: #94a3b8; }
+.prod-price-row { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; }
+.prod-price { font-size: 1rem; font-weight: 800; color: #2563eb; }
+.prod-stock { font-size: .8rem; font-weight: 600; }
+.prod-stock.ok { color: #16a34a; }
+.prod-stock.low { color: #f59e0b; }
+.prod-stock.out { color: #ef4444; }
+.tag { display: inline-block; padding: 2px 8px; border-radius: 99px; font-size: .7rem; font-weight: 600; background: #f1f5f9; color: #475569; }
+.dept-filter-bar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+.dept-btn { padding: 6px 12px; border-radius: 99px; font-size: .78rem; font-weight: 600; border: 1px solid #e2e8f0; background: #fff; color: #475569; text-decoration: none; cursor: pointer; }
+.dept-btn.active, .dept-btn:hover { background: #10b981; border-color: #10b981; color: #fff; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="mr-wrap">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
+    <h1 style="font-size:1.3rem;font-weight:900;margin:0;">Products <span style="font-size:.8rem;color:#94a3b8;font-weight:400;">({{ total_count }})</span></h1>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <a href="{% url 'mixed_retail:product_add' %}{% if dept_id %}?dept={{ dept_id }}{% endif %}" class="dept-btn active">+ Add Product</a>
+      <a href="{% url 'mixed_retail:dashboard' %}" class="dept-btn">← Dashboard</a>
+    </div>
+  </div>
+
+  <!-- Search -->
+  <form method="get" style="display:flex;gap:8px;margin-bottom:16px;">
+    {% if dept_id %}<input type="hidden" name="dept" value="{{ dept_id }}">{% endif %}
+    {% if cat_id %}<input type="hidden" name="cat" value="{{ cat_id }}">{% endif %}
+    <input type="text" name="q" value="{{ search }}" placeholder="Search name, SKU, brand…"
+           style="flex:1;padding:8px 12px;border-radius:8px;border:1px solid #d1d5db;font-size:.9rem;">
+    <button type="submit" style="padding:8px 16px;border-radius:8px;background:#2563eb;color:#fff;border:none;font-weight:700;">Search</button>
+    {% if search or dept_id or cat_id %}<a href="{% url 'mixed_retail:products' %}" style="padding:8px 14px;border-radius:8px;border:1px solid #e2e8f0;font-size:.85rem;color:#475569;text-decoration:none;">Clear</a>{% endif %}
+  </form>
+
+  <!-- Department filter -->
+  {% if departments %}
+  <div class="dept-filter-bar">
+    <a href="{% url 'mixed_retail:products' %}" class="dept-btn {% if not dept_id %}active{% endif %}">All</a>
+    {% for dept in departments %}
+    <a href="{% url 'mixed_retail:products' %}?dept={{ dept.id }}" class="dept-btn {% if dept_id == dept.id|stringformat:'s' %}active{% endif %}">
+      {{ dept.name }}
+    </a>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <!-- Category filter (if dept selected) -->
+  {% if selected_dept and categories %}
+  <div class="dept-filter-bar" style="margin-bottom:16px;">
+    <a href="{% url 'mixed_retail:products' %}?dept={{ dept_id }}" class="dept-btn {% if not cat_id %}active{% endif %}">All {{ selected_dept.name }}</a>
+    {% for cat in categories %}
+    <a href="{% url 'mixed_retail:products' %}?dept={{ dept_id }}&cat={{ cat.id }}" class="dept-btn {% if cat_id == cat.id|stringformat:'s' %}active{% endif %}">
+      {{ cat.name }}
+    </a>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {% if products %}
+  <div class="prod-grid">
+    {% for product in products %}
+    <div class="prod-card">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;">
+        <div>
+          <div class="prod-name">{{ product.name }}</div>
+          <div class="prod-meta">
+            {% if product.brand %}{{ product.brand }} &middot; {% endif %}
+            {% if product.department %}{{ product.department.name }}{% endif %}
+            {% if product.category %} › {{ product.category.name }}{% endif %}
+          </div>
+        </div>
+        <a href="{% url 'mixed_retail:product_edit' product.id %}" style="color:#94a3b8;font-size:.8rem;text-decoration:none;">Edit</a>
+      </div>
+
+      {% if product.sku %}
+      <span class="tag">{{ product.sku }}</span>
+      {% endif %}
+
+      <div class="prod-price-row">
+        <div class="prod-price">MWK {{ product.selling_price|floatformat:0|intcomma }}</div>
+        <div class="prod-stock {% if product.is_out_of_stock %}out{% elif product.id in low_stock_ids %}low{% else %}ok{% endif %}">
+          {% if product.is_out_of_stock %}
+            <i class="bi bi-exclamation-triangle-fill"></i> Out of stock
+          {% elif product.id in low_stock_ids %}
+            <i class="bi bi-exclamation-circle"></i> Low: {{ product.stock_quantity|floatformat:0 }} {{ product.unit }}
+          {% else %}
+            <i class="bi bi-check-circle-fill"></i> {{ product.stock_quantity|floatformat:0 }} {{ product.unit }}
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  {% if search or dept_id or cat_id %}
+  <!-- Filtered empty: no match -->
+  <div style="text-align:center;padding:40px 20px;background:#fff;border:1px solid #e2e8f0;border-radius:14px;">
+    <i class="bi bi-search" style="font-size:2rem;color:#94a3b8;display:block;margin-bottom:10px;"></i>
+    <p style="font-size:1rem;font-weight:700;color:#475569;margin:0 0 6px;">No products match your filter</p>
+    <p style="font-size:.85rem;color:#94a3b8;margin:0 0 16px;">Try a different search or filter, or add a new product.</p>
+    <a href="{% url 'mixed_retail:products' %}" style="margin-right:8px;padding:8px 16px;background:#f1f5f9;color:#374151;border-radius:8px;text-decoration:none;font-weight:700;font-size:.85rem;">Clear Filter</a>
+    <a href="{% url 'mixed_retail:product_add' %}" style="padding:8px 16px;background:#f97316;color:#fff;border-radius:8px;text-decoration:none;font-weight:700;font-size:.85rem;">Add Product</a>
+  </div>
+  {% else %}
+  <!-- True empty: no products at all -->
+  <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:36px 20px;text-align:center;">
+    <i class="bi bi-box-seam" style="font-size:2.5rem;color:#10b981;display:block;margin-bottom:12px;"></i>
+    <h3 style="font-size:1.1rem;font-weight:800;color:#0f172a;margin:0 0 6px;">No products yet</h3>
+    <p style="font-size:.85rem;color:#64748b;margin:0 0 24px;">Your inventory is empty. Add products to start selling.</p>
+    <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;">
+      <a href="{% url 'mixed_retail:product_add' %}" style="padding:10px 22px;background:#f97316;color:#fff;border-radius:8px;text-decoration:none;font-weight:700;font-size:.9rem;display:flex;align-items:center;gap:6px;">
+        <i class="bi bi-plus-circle"></i> Add Product
+      </a>
+      <a href="{% url 'mixed_retail:departments' %}" style="padding:10px 22px;background:#f1f5f9;color:#374151;border:1px solid #e2e8f0;border-radius:8px;text-decoration:none;font-weight:700;font-size:.9rem;display:flex;align-items:center;gap:6px;">
+        <i class="bi bi-grid-3x3-gap"></i> Manage Departments
+      </a>
+    </div>
+    <div style="margin-top:28px;display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;text-align:left;">
+      <div style="background:#f8fafc;border-radius:10px;padding:14px 16px;">
+        <div style="width:30px;height:30px;background:#d1fae5;border-radius:8px;display:flex;align-items:center;justify-content:center;margin-bottom:8px;"><i class="bi bi-grid-3x3-gap" style="color:#059669;"></i></div>
+        <div style="font-size:.82rem;font-weight:700;color:#0f172a;margin-bottom:3px;">Enable Departments</div>
+        <div style="font-size:.72rem;color:#64748b;">Choose what your shop sells</div>
+      </div>
+      <div style="background:#f8fafc;border-radius:10px;padding:14px 16px;">
+        <div style="width:30px;height:30px;background:#dbeafe;border-radius:8px;display:flex;align-items:center;justify-content:center;margin-bottom:8px;"><i class="bi bi-plus-square" style="color:#1d4ed8;"></i></div>
+        <div style="font-size:.82rem;font-weight:700;color:#0f172a;margin-bottom:3px;">Add Products</div>
+        <div style="font-size:.72rem;color:#64748b;">Use templates or add custom</div>
+      </div>
+      <div style="background:#f8fafc;border-radius:10px;padding:14px 16px;">
+        <div style="width:30px;height:30px;background:#fef3c7;border-radius:8px;display:flex;align-items:center;justify-content:center;margin-bottom:8px;"><i class="bi bi-upc-scan" style="color:#d97706;"></i></div>
+        <div style="font-size:.82rem;font-weight:700;color:#0f172a;margin-bottom:3px;">Stock In</div>
+        <div style="font-size:.72rem;color:#64748b;">Record opening stock quantities</div>
+      </div>
+      <div style="background:#f8fafc;border-radius:10px;padding:14px 16px;">
+        <div style="width:30px;height:30px;background:#fce7f3;border-radius:8px;display:flex;align-items:center;justify-content:center;margin-bottom:8px;"><i class="bi bi-cart-plus" style="color:#be185d;"></i></div>
+        <div style="font-size:.82rem;font-weight:700;color:#0f172a;margin-bottom:3px;">Start Selling</div>
+        <div style="font-size:.72rem;color:#64748b;">Use Quick Sell for fast checkout</div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+  {% endif %}
+</div>
+{% endblock %}

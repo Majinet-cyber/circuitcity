@@ -4,7 +4,8 @@ Vertical-specific routing and configuration utilities.
 Ensures business-kind-aware dashboards, navigation, and onboarding flows.
 """
 from __future__ import annotations
-from typing import Optional, Dict, List, Tuple
+
+from typing import Dict, List, Optional, Tuple
 
 try:
     from inventory.business_kinds import BusinessKind
@@ -22,50 +23,76 @@ except ImportError:
 def get_vertical_kind(business) -> str:
     """
     Returns a normalized vertical code for the given business.
-    
+
     Args:
         business: Business model instance (or None)
-    
+
     Returns:
-        str: One of "phones", "gym", "clothing", "liquor", "pharmacy", "grocery", or "generic"
+        str: One of "phones", "gym", "clothing", "liquor", "pharmacy", "grocery", "hardware", "cement", or "generic"
     """
     if business is None:
         return "generic"
-    
+
     kind = getattr(business, "business_kind", None)
     if not kind:
-        return "phones"  # Default to phones for legacy businesses
-    
+        return "generic"  # No business_kind set = generic minimal nav
+
     # Normalize to lowercase string
     if hasattr(kind, "value"):
         kind = kind.value
     kind = str(kind).strip().lower()
-    
+
     # Map to known verticals
-    valid_kinds = ["phones", "gym", "clothing", "liquor", "pharmacy", "grocery"]
+    valid_kinds = [
+        "phones", "gym", "clothing", "liquor", "pharmacy", "grocery",
+        "hardware", "cement", "farm", "welding", "car_hire", "car_dealer", "energy",
+        "mobile_money", "mixed_retail", "consultancy", "butchery",
+    ]
     if kind in valid_kinds:
         return kind
-    
-    return "phones"  # Fallback
+
+    return "generic"  # Unknown vertical = generic minimal nav
 
 
 def get_vertical_dashboard_url(vertical_kind: str) -> Optional[str]:
     """
     Returns the named URL for a vertical-specific dashboard.
-    
+
     Args:
         vertical_kind: Vertical code (e.g., "gym", "pharmacy")
-    
+
     Returns:
         str: URL name to redirect to, or None if default dashboard should be used
     """
+    # -----------------------------------------------------------------------
+    # CANONICAL business_kind → dashboard URL name mapping.
+    #
+    # Rules:
+    #  - Every supported vertical must have an entry here.
+    #  - "phones" is intentionally absent: dashboard/views.py:home renders the
+    #    generic shell for phones users (no redirect needed); post-login the
+    #    post_auth_redirect module adds the phones-specific URL itself.
+    #  - "hardware" uses the cement/bulk-goods dashboard (same stock/sell flow).
+    #  - "generic" is the explicit fallback for unknown/legacy kinds.
+    # -----------------------------------------------------------------------
     vertical_dashboard_map = {
         "gym": "verticals:gym_dashboard",
-        "pharmacy": "verticals:pharmacy_dashboard",
+        "pharmacy": "verticals:pharmacy_hub",
         "clothing": "verticals:clothing_dashboard",
         "liquor": "verticals:liquor_dashboard",
-        # "phones" uses the default dashboard at /inventory/dashboard/
-        # "grocery" uses default dashboard (for now)
+        "grocery": "groceries:dashboard",
+        "hardware": "cement:dashboard",      # bulk-goods flow (same as cement)
+        "cement": "verticals:cement_dashboard",
+        "farm": "verticals:farm_dashboard",
+        "welding": "verticals:welding_dashboard",
+        "car_hire": "verticals:car_hire_dashboard",
+        "car_dealer": "car_dealer:dashboard",
+        "energy": "verticals:energy_dashboard",
+        "mobile_money": "mobilemoney:dashboard",
+        "mixed_retail": "mixed_retail:dashboard",
+        "consultancy": "consultancy:dashboard",
+        "butchery": "butchery:dashboard",
+        "generic": "inventory:generic_dashboard",
     }
     return vertical_dashboard_map.get(vertical_kind)
 
@@ -73,137 +100,188 @@ def get_vertical_dashboard_url(vertical_kind: str) -> Optional[str]:
 def get_onboarding_steps(vertical_kind: str, request=None) -> List[Dict[str, str]]:
     """
     Returns onboarding steps tailored to the business vertical.
-    
+
     Args:
         vertical_kind: Vertical code (e.g., "gym", "pharmacy")
         request: Optional HttpRequest for URL resolution
-    
+
     Returns:
         List of dicts with keys: 'number', 'label', 'url', 'icon'
     """
+
     # Helper to safely resolve URLs
     def safe_url(name: str, fallback: str = "#") -> str:
         if request is None:
             return fallback
         try:
             from django.urls import reverse
+
             return reverse(name)
         except Exception:
             return fallback
-    
+
     if vertical_kind == "gym":
         return [
             {
                 "number": "1",
                 "label": "Add membership plans",
                 "url": safe_url("inventory:gym_plans", "/inventory/gym/plans/"),
-                "icon": "bi-calendar-check"
+                "icon": "bi-calendar-check",
             },
             {
                 "number": "2",
                 "label": "Add your first members",
                 "url": safe_url("inventory:gym_members", "/inventory/gym/members/"),
-                "icon": "bi-people"
+                "icon": "bi-people",
             },
             {
                 "number": "3",
                 "label": "Track payments & arrears",
                 "url": safe_url("inventory:gym_dashboard", "/inventory/gym/dashboard/"),
-                "icon": "bi-wallet2"
+                "icon": "bi-wallet2",
             },
         ]
-    
+
     elif vertical_kind == "clothing":
         return [
             {
                 "number": "1",
                 "label": "Add clothing products",
                 "url": safe_url("inventory:clothing_product_new", "/inventory/clothing/products/new/"),
-                "icon": "bi-bag"
+                "icon": "bi-bag",
             },
             {
                 "number": "2",
                 "label": "Set up sizes & colors",
                 "url": safe_url("inventory:clothing_stock_list", "/inventory/clothing/stock/"),
-                "icon": "bi-palette"
+                "icon": "bi-palette",
             },
             {
                 "number": "3",
                 "label": "Start selling",
                 "url": safe_url("inventory:clothing_sell", "/inventory/clothing/sell/"),
-                "icon": "bi-cart-check"
+                "icon": "bi-cart-check",
             },
         ]
-    
+
     elif vertical_kind == "liquor":
         return [
             {
                 "number": "1",
                 "label": "Add liquor products",
                 "url": safe_url("inventory:liquor_product_new", "/inventory/liquor/products/new/"),
-                "icon": "bi-cup-straw"
+                "icon": "bi-cup-straw",
             },
             {
                 "number": "2",
                 "label": "Stock in inventory",
                 "url": safe_url("inventory:liquor_stock_list", "/inventory/liquor/stock/"),
-                "icon": "bi-boxes"
+                "icon": "bi-boxes",
             },
             {
                 "number": "3",
                 "label": "Record sales",
                 "url": safe_url("inventory:liquor_sell", "/inventory/liquor/sell/"),
-                "icon": "bi-receipt"
+                "icon": "bi-receipt",
             },
         ]
-    
+
     elif vertical_kind == "pharmacy":
         return [
             {
                 "number": "1",
                 "label": "Add products with categories",
                 "url": safe_url("pharmacy:stock_in", "/pharmacy/stock-in/"),
-                "icon": "bi-capsule"
+                "icon": "bi-capsule",
             },
             {
                 "number": "2",
                 "label": "Start selling products",
                 "url": safe_url("pharmacy:sell", "/pharmacy/sell/"),
-                "icon": "bi-bag-check"
+                "icon": "bi-bag-check",
             },
             {
                 "number": "3",
                 "label": "Track sales & analytics",
                 "url": safe_url("verticals:pharmacy_dashboard", "/verticals/pharmacy/"),
-                "icon": "bi-graph-up"
+                "icon": "bi-graph-up",
             },
         ]
-    
+
+    elif vertical_kind == "car_dealer":
+        return [
+            {
+                "number": "1",
+                "label": "Add vehicles to inventory",
+                "url": safe_url("car_dealer:stock_in", "/car-dealer/stock-in/"),
+                "icon": "bi-car-front",
+            },
+            {
+                "number": "2",
+                "label": "List vehicles on marketplace",
+                "url": safe_url("inventory:manage_listings", "/inventory/marketplace/listings/"),
+                "icon": "bi-shop",
+            },
+            {
+                "number": "3",
+                "label": "Process vehicle sales",
+                "url": safe_url("car_dealer:vehicle_list", "/car-dealer/vehicles/"),
+                "icon": "bi-receipt",
+            },
+        ]
+
+    elif vertical_kind == "energy":
+        return [
+            {
+                "number": "1",
+                "label": "Add your first energy site",
+                "url": safe_url("verticals:energy_sites", "/verticals/energy/sites/"),
+                "icon": "bi-geo-alt",
+            },
+            {
+                "number": "2",
+                "label": "Register assets (panels, batteries, inverters)",
+                "url": safe_url("verticals:energy_assets", "/verticals/energy/assets/"),
+                "icon": "bi-cpu",
+            },
+            {
+                "number": "3",
+                "label": "Review dashboard and alerts",
+                "url": safe_url("verticals:energy_dashboard", "/verticals/energy/dashboard/"),
+                "icon": "bi-speedometer2",
+            },
+        ]
+
     else:  # "phones" or default
         return [
             {
                 "number": "1",
                 "label": "Add your first product",
                 "url": safe_url("inventory:product_new", "/inventory/products/new/"),
-                "icon": "bi-phone"
+                "icon": "bi-phone",
             },
             {
                 "number": "2",
                 "label": "Stock in items",
                 "url": safe_url("inventory:scan_in", "/inventory/scan-in/"),
-                "icon": "bi-upc-scan"
+                "icon": "bi-upc-scan",
             },
             {
                 "number": "3",
                 "label": "Invite/approve agents",
                 "url": safe_url("tenants:manager_review_agents", "/tenants/manager/agents/"),
-                "icon": "bi-people"
+                "icon": "bi-people",
             },
         ]
 
 
 def get_vertical_display_name(vertical_kind: str) -> str:
-    """Returns human-friendly display name for a vertical."""
+    """
+    Returns human-friendly display name for a vertical.
+
+    SINGLE SOURCE OF TRUTH for vertical display names across the entire app.
+    Use this function everywhere instead of hardcoding labels.
+    """
     display_names = {
         "phones": "Phones & Electronics",
         "gym": "Gym & Fitness",
@@ -211,156 +289,3090 @@ def get_vertical_display_name(vertical_kind: str) -> str:
         "liquor": "Liquor Store",
         "pharmacy": "Pharmacy & Cosmetics",
         "grocery": "Grocery Store",
+        "hardware": "Hardware & General Dealers",  # NEW: Hardware vertical
+        "cement": "Cement / Building Materials",  # Legacy: Cement vertical
+        "farm": "Farm Manager",  # Farm profitability tracking
+        "welding": "Welding Workshop",  # Welding job estimation
+        "car_hire": "Car Hire Service",  # Vehicle rental and fleet management
+        "car_dealer": "Car Dealer",  # Vehicle dealership and marketplace
+        "energy": "Renewable Energy",  # Solar, battery, and energy management
+        "mobile_money": "Mobile Money Agent",  # Agent float management
+        "mixed_retail": "Mixed Retail",  # Multi-department retail
+        "consultancy": "Consultancy & Services",  # Consulting, freelance, agencies
+        "butchery": "Butchery",  # Butchery / meat shop
         "generic": "Business",
     }
     return display_names.get(vertical_kind, vertical_kind.title())
 
 
+def _get_data_correction_menu_item(vertical: str) -> dict:
+    """
+    Helper: Generate a Data Correction menu item for any vertical.
+    
+    This is a manager-only feature that allows safe correction of erroneous data
+    with full audit trail, preview, and rollback support.
+    
+    Args:
+        vertical: Vertical key (phones, gym, clothing, etc.)
+    
+    Returns:
+        Sidebar menu item dict for Data Correction
+    """
+    # Check if this vertical is registered in the corrections framework
+    try:
+        from corrections.registry import registry
+        adapter = registry.get_adapter(vertical)
+        if not adapter:
+            # Vertical not registered, don't show menu item
+            return None
+    except ImportError:
+        # Corrections framework not available
+        return None
+    
+    return {
+        "section": "MAIN",
+        "key": "data_correction",
+        "url": f"/corrections/{vertical}/",  # Direct URL (no named route needed)
+        "label": "Data Correction",
+        "icon": "bi-pencil-square",
+        "active_prefix": f"/corrections/{vertical}/",
+        "active_pattern": f"/corrections/{vertical}/",
+        "require_manager": True,
+        "is_menu": False,
+        "is_header": False,
+        "testid": f"nav-{vertical}-data-correction",
+    }
+
+
 def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
     """
     Returns a list of sidebar navigation items for the given business kind.
-    
+
     Each item is a dict with keys:
         - section: str (e.g., "MAIN", "TIME", "MONEY", "BUSINESS", "LAYBY")
+        - key: str (unique identifier for the item, e.g., "dashboard", "analytics")
         - url: str (URL or named route)
         - label: str (display label)
         - icon: str (Bootstrap icon class, e.g., "bi-speedometer2")
-        - active_pattern: str (optional, for path matching)
-    
+        - active_prefix: str (URL prefix for active state matching)
+        - active_pattern: str (alias for active_prefix, for backward compatibility)
+        - is_menu: bool (default False, True if item opens menu drawer)
+        - is_header: bool (default False, True if item is a section header)
+        - require_manager: bool (default False, True if item requires manager role)
+        - group: str (optional, "more" for items in collapsible More section)
+
     Args:
-        business_kind: Vertical code (e.g., "phones", "gym", "clothing", "liquor", "pharmacy")
-    
+        business_kind: Vertical code (e.g., "phones", "gym", "clothing", "liquor", "pharmacy", "cement", "generic")
+
     Returns:
         List of nav items organized by section
     """
+    # CRITICAL: Handle None/unknown business_kind FIRST (before any vertical-specific nav)
+    if business_kind in (None, "", "generic", "none"):
+        return [
+            # Minimal nav for businesses without a vertical set
+            {
+                "section": "MAIN",
+                "key": "home",
+                "url": "verticals:no_business",
+                "label": "Home",
+                "icon": "bi-house",
+                "active_prefix": "/verticals/none",
+                "active_pattern": "/verticals/none",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+            },
+            {
+                "section": "MAIN",
+                "key": "settings",
+                "url": "settings_root",
+                "label": "Business Settings",
+                "icon": "bi-gear",
+                "active_prefix": "/settings/",
+                "active_pattern": "/settings/",
+                "require_manager": True,
+                "is_menu": False,
+                "is_header": False,
+            },
+        ]
+
     if business_kind == "gym":
-        return [
-            # MAIN section - gym-specific operations
-            {"section": "MAIN", "url": "verticals:gym_dashboard", "label": "Dashboard", "icon": "bi-speedometer2", "active_pattern": "/verticals/gym/", "require_manager": False},
-            {"section": "MAIN", "url": "gym:members_list", "label": "Members", "icon": "bi-people", "active_pattern": "/gym/members/", "require_manager": False},
-            {"section": "MAIN", "url": "inventory:time_checkin", "label": "Scan Check-ins", "icon": "bi-clipboard-check", "active_pattern": "/inventory/time/check-in", "require_manager": False},
-            
-            # TIME section
-            {"section": "TIME", "url": "inventory:time_logs", "label": "Time Logs", "icon": "bi-journal-text", "active_pattern": "/inventory/time/logs", "require_manager": False},
-            
-            # MONEY section
-            {"section": "MONEY", "url": "wallet:agent_wallet", "label": "My Wallet", "icon": "bi-wallet2", "active_pattern": "/wallet/", "require_manager": False},
-            {"section": "MONEY", "url": "wallet:admin_home", "label": "Admin Wallet", "icon": "bi-briefcase", "active_pattern": "/wallet/admin/", "require_manager": True},
-            {"section": "MONEY", "url": "wallet:admin_cost_list", "label": "Costs", "icon": "bi-cash-stack", "active_pattern": "/wallet/admin/costs/", "require_manager": True},
-            
-            # BUSINESS section (for managers)
-            {"section": "BUSINESS", "url": "simulator:business_home", "label": "Simulator", "icon": "bi-cpu", "active_pattern": "/simulator/business/", "require_manager": True},
-            {"section": "BUSINESS", "url": "tenants:manager_review_agents", "label": "Trainers", "icon": "bi-people", "active_pattern": "/tenants/manager/agents/", "require_manager": True},
-            {"section": "BUSINESS", "url": "tenants:manager_locations", "label": "Locations", "icon": "bi-geo", "active_pattern": "/tenants/manager/locations/", "require_manager": True},
-            {"section": "BUSINESS", "url": "backups:manager_list", "label": "Data Backup", "icon": "bi-cloud-download", "active_pattern": "/backups/", "require_manager": True},
-            {"section": "BUSINESS", "url": "billing:plans", "label": "Choose Plan", "icon": "bi-credit-card-2-front", "active_pattern": "/billing/plans", "require_manager": True},
+        items = [
+            # MAIN section — 4 primary actions only (membership-based, NOT inventory)
+            {
+                "section": "MAIN",
+                "key": "dashboard",
+                "url": "verticals:gym_dashboard",
+                "label": "Dashboard",
+                "icon": "bi-speedometer2",
+                "active_prefix": "/verticals/gym/",
+                "active_pattern": "/verticals/gym/",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+            },
+            {
+                "section": "MAIN",
+                "key": "members",
+                "url": "gym:members_list",
+                "label": "Members",
+                "icon": "bi-people",
+                "active_prefix": "/gym/members/",
+                "active_pattern": "/gym/members/",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+            },
+            {
+                "section": "MAIN",
+                "key": "checkin",
+                "url": "gym:checkin_page",
+                "label": "Member Check-ins",
+                "icon": "bi-clipboard-check",
+                "active_prefix": "/gym/checkin",
+                "active_pattern": "/gym/checkin",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+            },
+            {
+                "section": "MAIN",
+                "key": "analytics",
+                "url": "app_router:analytics",
+                "label": "Analytics",
+                "icon": "bi-graph-up",
+                "active_prefix": "/app/analytics",
+                "active_pattern": "/app/analytics",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+            },
+            # MORE section standard tools
+            {
+                "section": "MORE",
+                "key": "wallet",
+                "url": "wallet:agent_wallet",
+                "label": "Wallet",
+                "icon": "bi-wallet2",
+                "active_prefix": "/wallet/",
+                "active_pattern": "/wallet/",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
+            {
+                "section": "MORE",
+                "key": "time_logs",
+                "url": "inventory:time_logs",
+                "label": "Time Logs",
+                "icon": "bi-journal-text",
+                "active_prefix": "/inventory/time/logs",
+                "active_pattern": "/inventory/time/logs",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
+            {
+                "section": "MORE",
+                "key": "reports",
+                "url": "reports:home",
+                "label": "Reports",
+                "icon": "bi-file-earmark-bar-graph",
+                "active_prefix": "/reports/",
+                "active_pattern": "/reports/",
+                "require_manager": True,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
+            {
+                "section": "MORE",
+                "key": "simulator",
+                "url": "simulator:business_home",
+                "label": "Simulator",
+                "icon": "bi-cpu",
+                "active_prefix": "/simulator/business/",
+                "active_pattern": "/simulator/business/",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
+            {
+                "section": "MORE",
+                "key": "admin_wallet",
+                "url": "wallet:admin_home",
+                "label": "Admin Wallet",
+                "icon": "bi-briefcase",
+                "active_prefix": "/wallet/admin/",
+                "active_pattern": "/wallet/admin/",
+                "require_manager": True,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
+            {
+                "section": "MORE",
+                "key": "costs",
+                "url": "wallet:admin_cost_list",
+                "label": "Costs",
+                "icon": "bi-cash-stack",
+                "active_prefix": "/wallet/admin/costs/",
+                "active_pattern": "/wallet/admin/costs/",
+                "require_manager": True,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
+            {
+                "section": "MORE",
+                "key": "trainers",
+                "url": "gym:trainers_list",
+                "label": "Trainers",
+                "icon": "bi-people",
+                "active_prefix": "/gym/trainers/",
+                "active_pattern": "/gym/trainers/",
+                "require_manager": True,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
+            {
+                "section": "MORE",
+                "key": "settings",
+                "url": "gym:settings",
+                "label": "Settings",
+                "icon": "bi-gear",
+                "active_prefix": "/gym/settings",
+                "active_pattern": "/gym/settings",
+                "require_manager": True,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
+            {
+                "section": "MORE",
+                "key": "locations",
+                "url": "tenants:manager_locations",
+                "label": "Locations",
+                "icon": "bi-geo",
+                "active_prefix": "/tenants/manager/locations/",
+                "active_pattern": "/tenants/manager/locations/",
+                "require_manager": True,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
+            {
+                "section": "MORE",
+                "key": "backups",
+                "url": "backups:manager_list",
+                "label": "Data Backup",
+                "icon": "bi-cloud-download",
+                "active_prefix": "/backups/",
+                "active_pattern": "/backups/",
+                "require_manager": True,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
+            {
+                "section": "MORE",
+                "key": "billing",
+                "url": "billing:plans",
+                "label": "Choose Plan",
+                "icon": "bi-credit-card-2-front",
+                "active_prefix": "/billing/plans",
+                "active_pattern": "/billing/plans",
+                "require_manager": True,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
+            {
+                "section": "MORE",
+                "key": "billing_checkout",
+                "url": "billing:checkout",
+                "label": "Billing Checkout",
+                "icon": "bi-cart-check",
+                "active_prefix": "/billing/checkout",
+                "active_pattern": "/billing/checkout",
+                "require_manager": True,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
         ]
-    
+        
+        return _inject_data_correction_into_sidebar(items, "gym")
+
     elif business_kind == "clothing":
-        return [
-            # MAIN section
-            {"section": "MAIN", "url": "verticals:clothing_dashboard", "label": "Dashboard", "icon": "bi-speedometer2", "active_pattern": "/verticals/clothing/dashboard", "require_manager": False},
-            {"section": "MAIN", "url": "verticals:clothing_hub", "label": "Clothing Hub", "icon": "bi-person-bounding-box", "active_pattern": "/verticals/clothing/hub", "require_manager": False},
-            {"section": "MAIN", "url": "inventory:clothing_product_new_v2", "label": "Add Product", "icon": "bi-plus-square", "active_pattern": "/clothing/products/new", "require_manager": False},
-            {"section": "MAIN", "url": "verticals:clothing_scan_in", "label": "Scan IN", "icon": "bi-upc-scan", "active_pattern": "/verticals/clothing/scan-in", "require_manager": False},
-            {"section": "MAIN", "url": "verticals:clothing_sell", "label": "Sell", "icon": "bi-bag-check", "active_pattern": "/verticals/clothing/sell", "require_manager": False},
-            
-            # TIME section
-            {"section": "TIME", "url": "inventory:time_logs", "label": "Time Logs", "icon": "bi-journal-text", "active_pattern": "/inventory/time/logs", "require_manager": False},
-            
-            # MONEY section
-            {"section": "MONEY", "url": "wallet:agent_wallet", "label": "My Wallet", "icon": "bi-wallet2", "active_pattern": "/wallet/", "require_manager": False},
-            {"section": "MONEY", "url": "wallet:admin_home", "label": "Admin Wallet", "icon": "bi-briefcase", "active_pattern": "/wallet/admin/", "require_manager": True},
-            {"section": "MONEY", "url": "wallet:admin_cost_list", "label": "Costs", "icon": "bi-cash-stack", "active_pattern": "/wallet/admin/costs/", "require_manager": True},
-            
-            # BUSINESS section (for managers)
-            {"section": "BUSINESS", "url": "simulator:business_home", "label": "Simulator", "icon": "bi-cpu", "active_pattern": "/simulator/business/", "require_manager": True},
-            {"section": "BUSINESS", "url": "tenants:manager_review_agents", "label": "Agents", "icon": "bi-people", "active_pattern": "/tenants/manager/agents/", "require_manager": True},
-            {"section": "BUSINESS", "url": "tenants:manager_locations", "label": "Locations", "icon": "bi-geo", "active_pattern": "/tenants/manager/locations/", "require_manager": True},
-            {"section": "BUSINESS", "url": "backups:manager_list", "label": "Data Backup", "icon": "bi-cloud-download", "active_pattern": "/backups/", "require_manager": True},
-            {"section": "BUSINESS", "url": "billing:plans", "label": "Choose Plan", "icon": "bi-credit-card-2-front", "active_pattern": "/billing/plans", "require_manager": True},
-            {"section": "BUSINESS", "url": "inventory:orders_list", "label": "Orders", "icon": "bi-clipboard-data", "active_pattern": "/inventory/orders/", "require_manager": True},
+        items = [
+            # MAIN section — 4 primary actions only
+            {
+                "section": "MAIN",
+                "key": "dashboard",
+                "url": "verticals:clothing_dashboard",
+                "label": "Dashboard",
+                "icon": "bi-speedometer2",
+                "active_prefix": "/verticals/clothing/dashboard",
+                "active_pattern": "/verticals/clothing/dashboard",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+            },
+            {
+                "section": "MAIN",
+                "key": "scan_in",
+                "url": "verticals:clothing_scan_in",
+                "label": "Scan IN",
+                "icon": "bi-upc-scan",
+                "active_prefix": "/verticals/clothing/scan-in",
+                "active_pattern": "/verticals/clothing/scan-in",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+            },
+            {
+                "section": "MAIN",
+                "key": "sell",
+                "url": "verticals:clothing_sell",
+                "label": "Sell",
+                "icon": "bi-bag-check",
+                "active_prefix": "/verticals/clothing/sell",
+                "active_pattern": "/verticals/clothing/sell",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+            },
+            {
+                "section": "MAIN",
+                "key": "fast_sell",
+                "url": "verticals:clothing_fast_sell",
+                "label": "Fast Sell",
+                "icon": "bi-lightning-charge",
+                "active_prefix": "/verticals/clothing/fast-sell",
+                "active_pattern": "/verticals/clothing/fast-sell",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+            },
+            # MORE section — everything else
+            {
+                "section": "MORE",
+                "key": "analytics",
+                "url": "app_router:analytics",
+                "label": "Analytics",
+                "icon": "bi-graph-up",
+                "active_prefix": "/app/analytics",
+                "active_pattern": "/app/analytics",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
+            {
+                "section": "MORE",
+                "key": "hub",
+                "url": "verticals:clothing_hub",
+                "label": "Clothing Hub",
+                "icon": "bi-person-bounding-box",
+                "active_prefix": "/verticals/clothing/hub",
+                "active_pattern": "/verticals/clothing/hub",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
+            {
+                "section": "MORE",
+                "key": "add_product",
+                "url": "inventory:clothing_wizard",
+                "label": "Add Product",
+                "icon": "bi-plus-square",
+                "active_prefix": "/inventory/wizard/clothing",
+                "active_pattern": "/inventory/wizard/clothing",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
+            # MORE section standard tools
+            {
+                "section": "MORE",
+                "key": "wallet",
+                "url": "wallet:agent_wallet",
+                "label": "Wallet",
+                "icon": "bi-wallet2",
+                "active_prefix": "/wallet/",
+                "active_pattern": "/wallet/",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
+            {
+                "section": "MORE",
+                "key": "time_logs",
+                "url": "inventory:time_logs",
+                "label": "Time Logs",
+                "icon": "bi-journal-text",
+                "active_prefix": "/inventory/time/logs",
+                "active_pattern": "/inventory/time/logs",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
+            {
+                "section": "MORE",
+                "key": "reports",
+                "url": "reports:home",
+                "label": "Reports",
+                "icon": "bi-file-earmark-bar-graph",
+                "active_prefix": "/reports/",
+                "active_pattern": "/reports/",
+                "require_manager": True,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
+            {
+                "section": "MORE",
+                "key": "simulator",
+                "url": "simulator:business_home",
+                "label": "Simulator",
+                "icon": "bi-cpu",
+                "active_prefix": "/simulator/business/",
+                "active_pattern": "/simulator/business/",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
+            {
+                "section": "MORE",
+                "key": "admin_wallet",
+                "url": "wallet:admin_home",
+                "label": "Admin Wallet",
+                "icon": "bi-briefcase",
+                "active_prefix": "/wallet/admin/",
+                "active_pattern": "/wallet/admin/",
+                "require_manager": True,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
+            {
+                "section": "MORE",
+                "key": "costs",
+                "url": "wallet:admin_cost_list",
+                "label": "Costs",
+                "icon": "bi-cash-stack",
+                "active_prefix": "/wallet/admin/costs/",
+                "active_pattern": "/wallet/admin/costs/",
+                "require_manager": True,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
+            {
+                "section": "MORE",
+                "key": "agents",
+                "url": "tenants:manager_review_agents",
+                "label": "Agents",
+                "icon": "bi-people",
+                "active_prefix": "/tenants/manager/agents/",
+                "active_pattern": "/tenants/manager/agents/",
+                "require_manager": True,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+                "testid": "sidebar-agents",
+            },
+            {
+                "section": "MORE",
+                "key": "locations",
+                "url": "tenants:manager_locations",
+                "label": "Locations",
+                "icon": "bi-geo",
+                "active_prefix": "/tenants/manager/locations/",
+                "active_pattern": "/tenants/manager/locations/",
+                "require_manager": True,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
+            {
+                "section": "MORE",
+                "key": "backups",
+                "url": "backups:manager_list",
+                "label": "Data Backup",
+                "icon": "bi-cloud-download",
+                "active_prefix": "/backups/",
+                "active_pattern": "/backups/",
+                "require_manager": True,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
+            {
+                "section": "MORE",
+                "key": "billing",
+                "url": "billing:plans",
+                "label": "Choose Plan",
+                "icon": "bi-credit-card-2-front",
+                "active_prefix": "/billing/plans",
+                "active_pattern": "/billing/plans",
+                "require_manager": True,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
+            {
+                "section": "MORE",
+                "key": "orders",
+                "url": "inventory:orders_list",
+                "label": "Orders",
+                "icon": "bi-clipboard-data",
+                "active_prefix": "/inventory/orders/",
+                "active_pattern": "/inventory/orders/",
+                "require_manager": True,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
         ]
-    
+        
+        return _inject_data_correction_into_sidebar(items, "clothing")
+
     elif business_kind == "liquor":
-        return [
-            # MAIN section
-            {"section": "MAIN", "url": "verticals:liquor_dashboard", "label": "Dashboard", "icon": "bi-speedometer2", "active_pattern": "/verticals/liquor/", "require_manager": False},
-            {"section": "MAIN", "url": "liquor:inventory_dashboard", "label": "Liquor Hub", "icon": "bi-cup-straw", "active_pattern": "/liquor/inventory/", "require_manager": False},
-            {"section": "MAIN", "url": "liquor:stock_overview", "label": "Stock", "icon": "bi-box-seam", "active_pattern": "/liquor/stock/", "require_manager": False},
-            {"section": "MAIN", "url": "inventory:liquor_product_new_v2", "label": "Add Product", "icon": "bi-droplet-half", "active_pattern": "/liquor/products/new", "require_manager": False},
-            {"section": "MAIN", "url": "liquor:sell", "label": "Sell", "icon": "bi-lightning-charge", "active_pattern": "/liquor/sell", "require_manager": False},
-            
-            # TIME section
-            {"section": "TIME", "url": "inventory:time_logs", "label": "Time Logs", "icon": "bi-journal-text", "active_pattern": "/inventory/time/logs", "require_manager": False},
-            
-            # MONEY section
-            {"section": "MONEY", "url": "wallet:agent_wallet", "label": "My Wallet", "icon": "bi-wallet2", "active_pattern": "/wallet/", "require_manager": False},
-            {"section": "MONEY", "url": "liquor:credits_list", "label": "Credits", "icon": "bi-person-lines-fill", "active_pattern": "/liquor/credits/", "require_manager": False},
-            {"section": "MONEY", "url": "wallet:admin_home", "label": "Admin Wallet", "icon": "bi-briefcase", "active_pattern": "/wallet/admin/", "require_manager": True},
-            {"section": "MONEY", "url": "wallet:admin_cost_list", "label": "Costs", "icon": "bi-cash-stack", "active_pattern": "/wallet/admin/costs/", "require_manager": True},
-            
-            # BUSINESS section (for managers)
-            {"section": "BUSINESS", "url": "tenants:manager_review_agents", "label": "Agents", "icon": "bi-people", "active_pattern": "/tenants/manager/agents/", "require_manager": True},
-            {"section": "BUSINESS", "url": "tenants:manager_locations", "label": "Locations", "icon": "bi-geo", "active_pattern": "/tenants/manager/locations/", "require_manager": True},
-            {"section": "BUSINESS", "url": "backups:manager_list", "label": "Data Backup", "icon": "bi-cloud-download", "active_pattern": "/backups/", "require_manager": True},
-            {"section": "BUSINESS", "url": "billing:plans", "label": "Choose Plan", "icon": "bi-credit-card-2-front", "active_pattern": "/billing/plans", "require_manager": True},
+        items = [
+            # MAIN section — 4 primary actions only
+            {
+                "section": "MAIN",
+                "key": "dashboard",
+                "url": "verticals:liquor_dashboard",
+                "label": "Dashboard",
+                "icon": "bi-speedometer2",
+                "active_prefix": "/verticals/liquor/",
+                "active_pattern": "/verticals/liquor/",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+            },
+            {
+                "section": "MAIN",
+                "key": "scan_in",
+                "url": "liquor:scan_in",
+                "label": "Scan In",
+                "icon": "bi-upc-scan",
+                "active_prefix": "/liquor/scan-in",
+                "active_pattern": "/liquor/scan-in",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+            },
+            {
+                "section": "MAIN",
+                "key": "sell",
+                "url": "liquor:sell",
+                "label": "Sell",
+                "icon": "bi-lightning-charge",
+                "active_prefix": "/liquor/sell",
+                "active_pattern": "/liquor/sell",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+            },
+            {
+                "section": "MAIN",
+                "key": "credits",
+                "url": "liquor:credits_list",
+                "label": "Credit",
+                "icon": "bi-person-lines-fill",
+                "active_prefix": "/liquor/credits/",
+                "active_pattern": "/liquor/credits/",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+            },
+            # MORE section — everything else goes here
+            {
+                "section": "MORE",
+                "key": "analytics",
+                "url": "app_router:analytics",
+                "label": "Analytics",
+                "icon": "bi-graph-up",
+                "active_prefix": "/app/analytics",
+                "active_pattern": "/app/analytics",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
+            {
+                "section": "MORE",
+                "key": "hub",
+                "url": "liquor:inventory_dashboard",
+                "label": "Liquor Hub",
+                "icon": "bi-cup-straw",
+                "active_prefix": "/liquor/inventory/",
+                "active_pattern": "/liquor/inventory/",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
+            {
+                "section": "MORE",
+                "key": "stock",
+                "url": "liquor:stock_overview",
+                "label": "Stock",
+                "icon": "bi-box-seam",
+                "active_prefix": "/liquor/stock/",
+                "active_pattern": "/liquor/stock/",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
+            {
+                "section": "MORE",
+                "key": "my_stock",
+                "url": "liquor:my_stock",
+                "label": "My Stock",
+                "icon": "bi-bag-check",
+                "active_prefix": "/liquor/my-stock/",
+                "active_pattern": "/liquor/my-stock/",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+                "testid": "nav-liquor-my-stock",
+            },
+            {
+                "section": "MORE",
+                "key": "assignments",
+                "url": "liquor:assignment_list",
+                "label": "Assignments",
+                "icon": "bi-clipboard-check",
+                "active_prefix": "/liquor/assignments/",
+                "active_pattern": "/liquor/assignments/",
+                "require_manager": True,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+                "testid": "nav-liquor-assignments",
+            },
+            {
+                "section": "MORE",
+                "key": "reconciliation",
+                "url": "liquor:reconciliation",
+                "label": "Reconciliation",
+                "icon": "bi-calculator",
+                "active_prefix": "/liquor/reconciliation/",
+                "active_pattern": "/liquor/reconciliation/",
+                "require_manager": True,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+                "testid": "nav-liquor-reconciliation",
+            },
+            {
+                "section": "MORE",
+                "key": "performance",
+                "url": "liquor:agent_performance",
+                "label": "Performance",
+                "icon": "bi-trophy",
+                "active_prefix": "/liquor/performance/",
+                "active_pattern": "/liquor/performance/",
+                "require_manager": True,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+                "testid": "nav-liquor-performance",
+            },
+            {
+                "section": "MORE",
+                "key": "add_product",
+                "url": "inventory:liquor_wizard",
+                "label": "Add Product",
+                "icon": "bi-droplet-half",
+                "active_prefix": "/inventory/wizard/liquor",
+                "active_pattern": "/inventory/wizard/liquor",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
+            # MORE section standard tools
+            {
+                "section": "MORE",
+                "key": "wallet",
+                "url": "wallet:agent_wallet",
+                "label": "Wallet",
+                "icon": "bi-wallet2",
+                "active_prefix": "/wallet/",
+                "active_pattern": "/wallet/",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
+            {
+                "section": "MORE",
+                "key": "time_logs",
+                "url": "inventory:time_logs",
+                "label": "Time Logs",
+                "icon": "bi-journal-text",
+                "active_prefix": "/inventory/time/logs",
+                "active_pattern": "/inventory/time/logs",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
+            {
+                "section": "MORE",
+                "key": "reports",
+                "url": "reports:home",
+                "label": "Reports",
+                "icon": "bi-file-earmark-bar-graph",
+                "active_prefix": "/reports/",
+                "active_pattern": "/reports/",
+                "require_manager": True,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
+            {
+                "section": "MORE",
+                "key": "simulator",
+                "url": "simulator:business_home",
+                "label": "Simulator",
+                "icon": "bi-cpu",
+                "active_prefix": "/simulator/business/",
+                "active_pattern": "/simulator/business/",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
+            {
+                "section": "MORE",
+                "key": "admin_wallet",
+                "url": "wallet:admin_home",
+                "label": "Admin Wallet",
+                "icon": "bi-briefcase",
+                "active_prefix": "/wallet/admin/",
+                "active_pattern": "/wallet/admin/",
+                "require_manager": True,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
+            {
+                "section": "MORE",
+                "key": "costs",
+                "url": "wallet:admin_cost_list",
+                "label": "Costs",
+                "icon": "bi-cash-stack",
+                "active_prefix": "/wallet/admin/costs/",
+                "active_pattern": "/wallet/admin/costs/",
+                "require_manager": True,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
+            {
+                "section": "MORE",
+                "key": "agents",
+                "url": "tenants:manager_review_agents",
+                "label": "Agents",
+                "icon": "bi-people",
+                "active_prefix": "/tenants/manager/agents/",
+                "active_pattern": "/tenants/manager/agents/",
+                "require_manager": True,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+                "testid": "sidebar-agents",
+            },
+            {
+                "section": "MORE",
+                "key": "locations",
+                "url": "tenants:manager_locations",
+                "label": "Locations",
+                "icon": "bi-geo",
+                "active_prefix": "/tenants/manager/locations/",
+                "active_pattern": "/tenants/manager/locations/",
+                "require_manager": True,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
+            {
+                "section": "MORE",
+                "key": "backups",
+                "url": "backups:manager_list",
+                "label": "Data Backup",
+                "icon": "bi-cloud-download",
+                "active_prefix": "/backups/",
+                "active_pattern": "/backups/",
+                "require_manager": True,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
+            {
+                "section": "MORE",
+                "key": "billing",
+                "url": "billing:plans",
+                "label": "Choose Plan",
+                "icon": "bi-credit-card-2-front",
+                "active_prefix": "/billing/plans",
+                "active_pattern": "/billing/plans",
+                "require_manager": True,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
         ]
-    
+        
+        return _inject_data_correction_into_sidebar(items, "liquor")
+
     elif business_kind == "pharmacy":
-        return [
-            # MAIN section - pharmacy & cosmetics vertical-aware flows
-            {"section": "MAIN", "url": "dashboard:home", "label": "Dashboard", "icon": "bi-speedometer2", "active_pattern": "/dashboard/", "require_manager": False},
-            {"section": "MAIN", "url": "verticals:pharmacy_dashboard", "label": "Pharmacy & Cosmetics Hub", "icon": "bi-prescription2", "active_pattern": "/verticals/pharmacy/", "require_manager": False},
-            {"section": "MAIN", "url": "pharmacy:stock_in", "label": "Stock In", "icon": "bi-box-arrow-in-down", "active_pattern": "/pharmacy/stock-in", "require_manager": False},
-            {"section": "MAIN", "url": "pharmacy:sell", "label": "Sell", "icon": "bi-bag-check", "active_pattern": "/pharmacy/sell", "require_manager": False},
-            {"section": "MAIN", "url": "pharmacy:batch_list", "label": "Batches", "icon": "bi-boxes", "active_pattern": "/pharmacy/batches", "require_manager": False},
-            
-            # TIME section
-            {"section": "TIME", "url": "inventory:time_logs", "label": "Time Logs", "icon": "bi-journal-text", "active_pattern": "/inventory/time/logs", "require_manager": False},
-            
-            # MONEY section
-            {"section": "MONEY", "url": "wallet:agent_wallet", "label": "My Wallet", "icon": "bi-wallet2", "active_pattern": "/wallet/", "require_manager": False},
-            {"section": "MONEY", "url": "wallet:admin_home", "label": "Admin Wallet", "icon": "bi-briefcase", "active_pattern": "/wallet/admin/", "require_manager": True},
-            {"section": "MONEY", "url": "wallet:admin_cost_list", "label": "Costs", "icon": "bi-cash-stack", "active_pattern": "/wallet/admin/costs/", "require_manager": True},
-            
-            # BUSINESS section (for managers)
-            {"section": "BUSINESS", "url": "tenants:manager_review_agents", "label": "Agents", "icon": "bi-people", "active_pattern": "/tenants/manager/agents/", "require_manager": True},
-            {"section": "BUSINESS", "url": "tenants:manager_locations", "label": "Locations", "icon": "bi-geo", "active_pattern": "/tenants/manager/locations/", "require_manager": True},
-            {"section": "BUSINESS", "url": "backups:manager_list", "label": "Data Backup", "icon": "bi-cloud-download", "active_pattern": "/backups/", "require_manager": True},
-            {"section": "BUSINESS", "url": "billing:plans", "label": "Choose Plan", "icon": "bi-credit-card-2-front", "active_pattern": "/billing/plans", "require_manager": True},
+        items = [
+            # MAIN section — 4 primary actions only
+            {
+                "section": "MAIN",
+                "key": "dashboard",
+                "url": "verticals:pharmacy_dashboard",
+                "label": "Dashboard",
+                "icon": "bi-speedometer2",
+                "active_prefix": "/verticals/pharmacy/dashboard",
+                "active_pattern": "/verticals/pharmacy/dashboard",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+            },
+            {
+                "section": "MAIN",
+                "key": "stock_in",
+                "url": "pharmacy:stock_in",
+                "label": "Stock In",
+                "icon": "bi-box-arrow-in-down",
+                "active_prefix": "/pharmacy/stock-in",
+                "active_pattern": "/pharmacy/stock-in",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+            },
+            {
+                "section": "MAIN",
+                "key": "sell",
+                "url": "pharmacy:sell",
+                "label": "Sell",
+                "icon": "bi-bag-check",
+                "active_prefix": "/pharmacy/sell",
+                "active_pattern": "/pharmacy/sell",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+            },
+            {
+                "section": "MAIN",
+                "key": "fast_sell",
+                "url": "verticals:pharmacy_fast_sell",
+                "label": "Fast Sell",
+                "icon": "bi-lightning-charge-fill",
+                "active_prefix": "/verticals/pharmacy/fast-sell",
+                "active_pattern": "/verticals/pharmacy/fast-sell",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+            },
+            # MORE section — everything else
+            {
+                "section": "MORE",
+                "key": "analytics",
+                "url": "app_router:analytics",
+                "label": "Analytics",
+                "icon": "bi-graph-up",
+                "active_prefix": "/app/analytics",
+                "active_pattern": "/app/analytics",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
+            {
+                "section": "MORE",
+                "key": "hub",
+                "url": "verticals:pharmacy_hub",
+                "label": "Pharmacy & Cosmetics Hub",
+                "icon": "bi-grid-3x3-gap",
+                "active_prefix": "/verticals/pharmacy/hub",
+                "active_pattern": "/verticals/pharmacy/hub",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
+            {
+                "section": "MORE",
+                "key": "batches",
+                "url": "pharmacy:batch_list",
+                "label": "Batches",
+                "icon": "bi-boxes",
+                "active_prefix": "/pharmacy/batches",
+                "active_pattern": "/pharmacy/batches",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
+            # MORE section standard tools
+            {
+                "section": "MORE",
+                "key": "wallet",
+                "url": "wallet:agent_wallet",
+                "label": "Wallet",
+                "icon": "bi-wallet2",
+                "active_prefix": "/wallet/",
+                "active_pattern": "/wallet/",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
+            {
+                "section": "MORE",
+                "key": "time_logs",
+                "url": "inventory:time_logs",
+                "label": "Time Logs",
+                "icon": "bi-journal-text",
+                "active_prefix": "/inventory/time/logs",
+                "active_pattern": "/inventory/time/logs",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
+            {
+                "section": "MORE",
+                "key": "reports",
+                "url": "reports:home",
+                "label": "Reports",
+                "icon": "bi-file-earmark-bar-graph",
+                "active_prefix": "/reports/",
+                "active_pattern": "/reports/",
+                "require_manager": True,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
+            {
+                "section": "MORE",
+                "key": "simulator",
+                "url": "simulator:business_home",
+                "label": "Simulator",
+                "icon": "bi-cpu",
+                "active_prefix": "/simulator/business/",
+                "active_pattern": "/simulator/business/",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
+            {
+                "section": "MORE",
+                "key": "admin_wallet",
+                "url": "wallet:admin_home",
+                "label": "Admin Wallet",
+                "icon": "bi-briefcase",
+                "active_prefix": "/wallet/admin/",
+                "active_pattern": "/wallet/admin/",
+                "require_manager": True,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
+            {
+                "section": "MORE",
+                "key": "costs",
+                "url": "wallet:admin_cost_list",
+                "label": "Costs",
+                "icon": "bi-cash-stack",
+                "active_prefix": "/wallet/admin/costs/",
+                "active_pattern": "/wallet/admin/costs/",
+                "require_manager": True,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
+            {
+                "section": "MORE",
+                "key": "agents",
+                "url": "tenants:manager_review_agents",
+                "label": "Agents",
+                "icon": "bi-people",
+                "active_prefix": "/tenants/manager/agents/",
+                "active_pattern": "/tenants/manager/agents/",
+                "require_manager": True,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+                "testid": "sidebar-agents",
+            },
+            {
+                "section": "MORE",
+                "key": "locations",
+                "url": "tenants:manager_locations",
+                "label": "Locations",
+                "icon": "bi-geo",
+                "active_prefix": "/tenants/manager/locations/",
+                "active_pattern": "/tenants/manager/locations/",
+                "require_manager": True,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
+            {
+                "section": "MORE",
+                "key": "backups",
+                "url": "backups:manager_list",
+                "label": "Data Backup",
+                "icon": "bi-cloud-download",
+                "active_prefix": "/backups/",
+                "active_pattern": "/backups/",
+                "require_manager": True,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
+            {
+                "section": "MORE",
+                "key": "billing",
+                "url": "billing:plans",
+                "label": "Choose Plan",
+                "icon": "bi-credit-card-2-front",
+                "active_prefix": "/billing/plans",
+                "active_pattern": "/billing/plans",
+                "require_manager": True,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
         ]
-    
+        
+        return _inject_data_correction_into_sidebar(items, "pharmacy")
+
+    elif business_kind == "grocery":
+        items = [
+            # MAIN section — 4 primary actions only
+            {
+                "section": "MAIN",
+                "key": "dashboard",
+                "url": "groceries:dashboard",
+                "label": "Dashboard",
+                "icon": "bi-speedometer2",
+                "active_prefix": "/groceries/dashboard",
+                "active_pattern": "/groceries/dashboard",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+            },
+            {
+                "section": "MAIN",
+                "key": "stock_in",
+                "url": "groceries:stock_in",
+                "label": "Stock In",
+                "icon": "bi-box-arrow-in-down",
+                "active_prefix": "/groceries/stock-in",
+                "active_pattern": "/groceries/stock-in",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+            },
+            {
+                "section": "MAIN",
+                "key": "sell",
+                "url": "groceries:sell",
+                "label": "Sell",
+                "icon": "bi-bag-check",
+                "active_prefix": "/groceries/sell",
+                "active_pattern": "/groceries/sell",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+            },
+            {
+                "section": "MAIN",
+                "key": "stock",
+                "url": "groceries:stock_list",
+                "label": "Stock",
+                "icon": "bi-box-seam",
+                "active_prefix": "/groceries/stock",
+                "active_pattern": "/groceries/stock",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+            },
+            # MORE section — everything else
+            {
+                "section": "MORE",
+                "key": "analytics",
+                "url": "groceries:analytics",
+                "label": "Analytics",
+                "icon": "bi-graph-up",
+                "active_prefix": "/groceries/analytics",
+                "active_pattern": "/groceries/analytics",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
+            {
+                "section": "MORE",
+                "key": "intelligence",
+                "url": "groceries:inventory_intelligence",
+                "label": "Intelligence",
+                "icon": "bi-bar-chart-line",
+                "active_prefix": "/groceries/intelligence",
+                "active_pattern": "/groceries/intelligence",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+                "testid": "nav-groceries-intelligence",
+            },
+            {
+                "section": "MORE",
+                "key": "sales_analytics",
+                "url": "groceries:sales_analytics",
+                "label": "Sales Analytics",
+                "icon": "bi-graph-up",
+                "active_prefix": "/groceries/sales-analytics",
+                "active_pattern": "/groceries/sales-analytics",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+                "testid": "nav-groceries-sales-analytics",
+            },
+            {
+                "section": "MORE",
+                "key": "restocking",
+                "url": "groceries:smart_restocking",
+                "label": "Smart Restocking",
+                "icon": "bi-arrow-repeat",
+                "active_prefix": "/groceries/restocking",
+                "active_pattern": "/groceries/restocking",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+                "testid": "nav-groceries-restocking",
+            },
+            # MORE section standard tools
+            {
+                "section": "MORE",
+                "key": "wallet",
+                "url": "wallet:agent_wallet",
+                "label": "Wallet",
+                "icon": "bi-wallet2",
+                "active_prefix": "/wallet/",
+                "active_pattern": "/wallet/",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
+            {
+                "section": "MORE",
+                "key": "time_logs",
+                "url": "inventory:time_logs",
+                "label": "Time Logs",
+                "icon": "bi-journal-text",
+                "active_prefix": "/inventory/time/logs",
+                "active_pattern": "/inventory/time/logs",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
+            {
+                "section": "MORE",
+                "key": "admin_wallet",
+                "url": "wallet:admin_home",
+                "label": "Admin Wallet",
+                "icon": "bi-briefcase",
+                "active_prefix": "/wallet/admin/",
+                "active_pattern": "/wallet/admin/",
+                "require_manager": True,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
+            {
+                "section": "MORE",
+                "key": "agents",
+                "url": "tenants:manager_review_agents",
+                "label": "Agents",
+                "icon": "bi-people",
+                "active_prefix": "/tenants/manager/agents/",
+                "active_pattern": "/tenants/manager/agents/",
+                "require_manager": True,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+                "testid": "sidebar-agents",
+            },
+            {
+                "section": "MORE",
+                "key": "locations",
+                "url": "tenants:manager_locations",
+                "label": "Locations",
+                "icon": "bi-geo",
+                "active_prefix": "/tenants/manager/locations/",
+                "active_pattern": "/tenants/manager/locations/",
+                "require_manager": True,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
+            {
+                "section": "MORE",
+                "key": "billing",
+                "url": "billing:plans",
+                "label": "Choose Plan",
+                "icon": "bi-credit-card-2-front",
+                "active_prefix": "/billing/plans",
+                "active_pattern": "/billing/plans",
+                "require_manager": True,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
+        ]
+        
+        return _inject_data_correction_into_sidebar(items, "grocery")
+
+    elif business_kind == "cement":
+        items = [
+            # MAIN section — 4 primary actions only
+            {
+                "section": "MAIN",
+                "key": "dashboard",
+                "url": "verticals:cement_dashboard",
+                "label": "Dashboard",
+                "icon": "bi-speedometer2",
+                "active_prefix": "/verticals/cement/dashboard",
+                "active_pattern": "/verticals/cement/dashboard",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+            },
+            {
+                "section": "MAIN",
+                "key": "stock_in",
+                "url": "cement:stock_in",
+                "label": "Stock In",
+                "icon": "bi-box-arrow-in-down",
+                "active_prefix": "/cement/stock-in",
+                "active_pattern": "/cement/stock-in",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+            },
+            {
+                "section": "MAIN",
+                "key": "sell",
+                "url": "cement:sell",
+                "label": "Sell",
+                "icon": "bi-bag-check",
+                "active_prefix": "/cement/sell",
+                "active_pattern": "/cement/sell",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+            },
+            {
+                "section": "MAIN",
+                "key": "products",
+                "url": "cement:products_catalog",
+                "label": "Products",
+                "icon": "bi-grid-3x3-gap",
+                "active_prefix": "/cement/products",
+                "active_pattern": "/cement/products",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "testid": "nav-hardware-products",
+            },
+            # MORE section — everything else
+            {
+                "section": "MORE",
+                "key": "stock",
+                "url": "cement:stock_list",
+                "label": "Stock",
+                "icon": "bi-box-seam",
+                "active_prefix": "/cement/stock",
+                "active_pattern": "/cement/stock",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
+            {
+                "section": "MORE",
+                "key": "costs",
+                "url": "cement:costs",
+                "label": "Costs",
+                "icon": "bi-cash-stack",
+                "active_prefix": "/cement/costs",
+                "active_pattern": "/cement/costs",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
+            {
+                "section": "MORE",
+                "key": "analytics",
+                "url": "cement:analytics",
+                "label": "Analytics",
+                "icon": "bi-graph-up",
+                "active_prefix": "/cement/analytics",
+                "active_pattern": "/cement/analytics",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
+            # MORE section standard tools
+            {
+                "section": "MORE",
+                "key": "wallet",
+                "url": "wallet:agent_wallet",
+                "label": "Wallet",
+                "icon": "bi-wallet2",
+                "active_prefix": "/wallet/",
+                "active_pattern": "/wallet/",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
+            {
+                "section": "MORE",
+                "key": "time_logs",
+                "url": "inventory:time_logs",
+                "label": "Time Logs",
+                "icon": "bi-journal-text",
+                "active_prefix": "/inventory/time/logs",
+                "active_pattern": "/inventory/time/logs",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
+            {
+                "section": "MORE",
+                "key": "admin_wallet",
+                "url": "wallet:admin_home",
+                "label": "Admin Wallet",
+                "icon": "bi-briefcase",
+                "active_prefix": "/wallet/admin/",
+                "active_pattern": "/wallet/admin/",
+                "require_manager": True,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
+            {
+                "section": "MORE",
+                "key": "agents",
+                "url": "tenants:manager_review_agents",
+                "label": "Agents",
+                "icon": "bi-people",
+                "active_prefix": "/tenants/manager/agents/",
+                "active_pattern": "/tenants/manager/agents/",
+                "require_manager": True,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+                "testid": "sidebar-agents",
+            },
+            {
+                "section": "MORE",
+                "key": "locations",
+                "url": "tenants:manager_locations",
+                "label": "Locations",
+                "icon": "bi-geo",
+                "active_prefix": "/tenants/manager/locations/",
+                "active_pattern": "/tenants/manager/locations/",
+                "require_manager": True,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
+            {
+                "section": "MORE",
+                "key": "billing",
+                "url": "billing:plans",
+                "label": "Choose Plan",
+                "icon": "bi-credit-card-2-front",
+                "active_prefix": "/billing/plans",
+                "active_pattern": "/billing/plans",
+                "require_manager": True,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
+        ]
+        
+        return _inject_data_correction_into_sidebar(items, "cement")
+
+    elif business_kind == "hardware":
+        items = [
+            # MAIN section — 4 primary actions only
+            {
+                "section": "MAIN",
+                "key": "dashboard",
+                "url": "inventory:generic_dashboard",
+                "label": "Dashboard",
+                "icon": "bi-speedometer2",
+                "active_prefix": "/inventory/generic-dashboard",
+                "active_pattern": "/inventory/generic-dashboard",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+            },
+            {
+                "section": "MAIN",
+                "key": "scan_in",
+                "url": "inventory:scan_in",
+                "label": "Scan IN",
+                "icon": "bi-upc-scan",
+                "active_prefix": "/inventory/scan-in",
+                "active_pattern": "/inventory/scan-in",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+            },
+            {
+                "section": "MAIN",
+                "key": "sell",
+                "url": "inventory:scan_sold",
+                "label": "Sell",
+                "icon": "bi-bag-check",
+                "active_prefix": "/inventory/scan-sold",
+                "active_pattern": "/inventory/scan-sold",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+            },
+            {
+                "section": "MAIN",
+                "key": "products",
+                "url": "inventory:product_list",
+                "label": "Products",
+                "icon": "bi-grid-3x3-gap",
+                "active_prefix": "/inventory/products/",
+                "active_pattern": "/inventory/products/",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+            },
+            # MORE section — everything else
+            {
+                "section": "MORE",
+                "key": "stock",
+                "url": "inventory:stock_list",
+                "label": "Stock",
+                "icon": "bi-box-seam",
+                "active_prefix": "/inventory/list/",
+                "active_pattern": "/inventory/list/",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
+            {
+                "section": "MORE",
+                "key": "analytics",
+                "url": "app_router:analytics",
+                "label": "Analytics",
+                "icon": "bi-graph-up",
+                "active_prefix": "/app/analytics",
+                "active_pattern": "/app/analytics",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
+            # MORE section standard tools
+            {
+                "section": "MORE",
+                "key": "wallet",
+                "url": "wallet:agent_wallet",
+                "label": "Wallet",
+                "icon": "bi-wallet2",
+                "active_prefix": "/wallet/",
+                "active_pattern": "/wallet/",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
+            {
+                "section": "MORE",
+                "key": "time_logs",
+                "url": "inventory:time_logs",
+                "label": "Time Logs",
+                "icon": "bi-journal-text",
+                "active_prefix": "/inventory/time/logs",
+                "active_pattern": "/inventory/time/logs",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
+            {
+                "section": "MORE",
+                "key": "reports",
+                "url": "reports:home",
+                "label": "Reports",
+                "icon": "bi-file-earmark-bar-graph",
+                "active_prefix": "/reports/",
+                "active_pattern": "/reports/",
+                "require_manager": True,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
+            {
+                "section": "MORE",
+                "key": "simulator",
+                "url": "simulator:business_home",
+                "label": "Simulator",
+                "icon": "bi-cpu",
+                "active_prefix": "/simulator/business/",
+                "active_pattern": "/simulator/business/",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
+            {
+                "section": "MORE",
+                "key": "admin_wallet",
+                "url": "wallet:admin_home",
+                "label": "Admin Wallet",
+                "icon": "bi-briefcase",
+                "active_prefix": "/wallet/admin/",
+                "active_pattern": "/wallet/admin/",
+                "require_manager": True,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
+            {
+                "section": "MORE",
+                "key": "costs",
+                "url": "wallet:admin_cost_list",
+                "label": "Costs",
+                "icon": "bi-cash-stack",
+                "active_prefix": "/wallet/admin/costs/",
+                "active_pattern": "/wallet/admin/costs/",
+                "require_manager": True,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
+            {
+                "section": "MORE",
+                "key": "agents",
+                "url": "tenants:manager_review_agents",
+                "label": "Agents",
+                "icon": "bi-people",
+                "active_prefix": "/tenants/manager/agents/",
+                "active_pattern": "/tenants/manager/agents/",
+                "require_manager": True,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+                "testid": "sidebar-agents",
+            },
+            {
+                "section": "MORE",
+                "key": "locations",
+                "url": "tenants:manager_locations",
+                "label": "Locations",
+                "icon": "bi-geo",
+                "active_prefix": "/tenants/manager/locations/",
+                "active_pattern": "/tenants/manager/locations/",
+                "require_manager": True,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
+            {
+                "section": "MORE",
+                "key": "backups",
+                "url": "backups:manager_list",
+                "label": "Data Backup",
+                "icon": "bi-cloud-download",
+                "active_prefix": "/backups/",
+                "active_pattern": "/backups/",
+                "require_manager": True,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
+            {
+                "section": "MORE",
+                "key": "billing",
+                "url": "billing:plans",
+                "label": "Choose Plan",
+                "icon": "bi-credit-card-2-front",
+                "active_prefix": "/billing/plans",
+                "active_pattern": "/billing/plans",
+                "require_manager": True,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
+        ]
+        
+        return _inject_data_correction_into_sidebar(items, "hardware")
+
+    elif business_kind == "farm":
+        items = [
+            # MAIN section — 4 primary actions only
+            {
+                "section": "MAIN",
+                "key": "dashboard",
+                "url": "verticals:farm_dashboard",
+                "label": "Dashboard",
+                "icon": "bi-speedometer2",
+                "active_prefix": "/verticals/farm/dashboard",
+                "active_pattern": "/verticals/farm/dashboard",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "testid": "nav-farm-dashboard",
+            },
+            {
+                "section": "MAIN",
+                "key": "sales",
+                "url": "verticals:farm_sales",
+                "label": "Sales",
+                "icon": "bi-cart-check",
+                "active_prefix": "/verticals/farm/sales",
+                "active_pattern": "/verticals/farm/sales",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "testid": "nav-farm-sales",
+            },
+            {
+                "section": "MAIN",
+                "key": "crops",
+                "url": "verticals:farm_crops_list",
+                "label": "Crops",
+                "icon": "bi-flower1",
+                "active_prefix": "/verticals/farm/crops",
+                "active_pattern": "/verticals/farm/crops",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "testid": "nav-farm-crops",
+            },
+            {
+                "section": "MAIN",
+                "key": "expenses",
+                "url": "verticals:farm_expenses",
+                "label": "Expenses",
+                "icon": "bi-receipt-cutoff",
+                "active_prefix": "/verticals/farm/expenses",
+                "active_pattern": "/verticals/farm/expenses",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "testid": "nav-farm-expenses",
+            },
+            # MORE section — everything else
+            {
+                "section": "MORE",
+                "key": "livestock",
+                "url": "verticals:farm_livestock_list",
+                "label": "Livestock",
+                "icon": "bi-piggy-bank",
+                "active_prefix": "/verticals/farm/livestock",
+                "active_pattern": "/verticals/farm/livestock",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+                "testid": "nav-farm-livestock",
+            },
+            {
+                "section": "MORE",
+                "key": "assets",
+                "url": "verticals:farm_assets",
+                "label": "Assets",
+                "icon": "bi-tools",
+                "active_prefix": "/verticals/farm/assets",
+                "active_pattern": "/verticals/farm/assets",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+                "testid": "nav-farm-assets",
+            },
+            {
+                "section": "MORE",
+                "key": "locations",
+                "url": "verticals:farm_locations",
+                "label": "Locations",
+                "icon": "bi-geo-alt",
+                "active_prefix": "/verticals/farm/locations",
+                "active_pattern": "/verticals/farm/locations",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+                "testid": "nav-farm-locations",
+            },
+            {
+                "section": "MORE",
+                "key": "reports",
+                "url": "verticals:farm_reports",
+                "label": "Metrics & Reports",
+                "icon": "bi-graph-up-arrow",
+                "active_prefix": "/verticals/farm/reports",
+                "active_pattern": "/verticals/farm/reports",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+                "testid": "nav-farm-reports",
+            },
+            # SUBSCRIPTION section (manager-only)
+            {
+                "section": "SUBSCRIPTION",
+                "key": "billing",
+                "url": "billing:plans",
+                "label": "Billing",
+                "icon": "bi-credit-card-2-front",
+                "active_prefix": "/billing/",
+                "active_pattern": "/billing/",
+                "require_manager": True,
+                "is_menu": False,
+                "is_header": False,
+                "testid": "nav-farm-billing",
+            },
+            {
+                "section": "SUBSCRIPTION",
+                "key": "settings",
+                "url": "settings_root",
+                "label": "Settings",
+                "icon": "bi-gear",
+                "active_prefix": "/settings/",
+                "active_pattern": "/settings/",
+                "require_manager": True,
+                "is_menu": False,
+                "is_header": False,
+                "testid": "nav-farm-settings",
+            },
+        ]
+        
+        return _inject_data_correction_into_sidebar(items, "farm")
+
+    elif business_kind == "welding":
+        items = [
+            # MAIN section — 4 primary actions only
+            {
+                "section": "MAIN",
+                "key": "dashboard",
+                "url": "verticals:welding_dashboard",
+                "label": "Dashboard",
+                "icon": "bi-speedometer2",
+                "active_prefix": "/verticals/welding/dashboard",
+                "active_pattern": "/verticals/welding/dashboard",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+            },
+            {
+                "section": "MAIN",
+                "key": "create_quote",
+                "url": "verticals:welding_quote_create",
+                "label": "Create Quote",
+                "icon": "bi-plus-square",
+                "active_prefix": "/verticals/welding/quotes/create",
+                "active_pattern": "/verticals/welding/quotes/create",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+            },
+            {
+                "section": "MAIN",
+                "key": "jobs",
+                "url": "verticals:welding_jobs_list",
+                "label": "Jobs",
+                "icon": "bi-kanban",
+                "active_prefix": "/verticals/welding/jobs",
+                "active_pattern": "/verticals/welding/jobs",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+            },
+            {
+                "section": "MAIN",
+                "key": "sales",
+                "url": "verticals:welding_sales",
+                "label": "Sales",
+                "icon": "bi-cart-check",
+                "active_prefix": "/verticals/welding/sales",
+                "active_pattern": "/verticals/welding/sales",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "testid": "nav-welding-sales",
+            },
+            {
+                "section": "MAIN",
+                "key": "marketplace",
+                "url": "inventory:manage_listings",
+                "label": "Marketplace",
+                "icon": "bi-shop-window",
+                "active_prefix": "/inventory/marketplace",
+                "active_pattern": "/inventory/marketplace",
+                "require_manager": True,
+                "is_menu": False,
+                "is_header": False,
+                "testid": "nav-welding-marketplace",
+            },
+            # MORE section — everything else
+            {
+                "section": "MORE",
+                "key": "quotes",
+                "url": "verticals:welding_quotes_list",
+                "label": "Quotes",
+                "icon": "bi-file-text",
+                "active_prefix": "/verticals/welding/quotes",
+                "active_pattern": "/verticals/welding/quotes",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
+            {
+                "section": "MORE",
+                "key": "invoices",
+                "url": "verticals:welding_invoices_list",
+                "label": "Invoices",
+                "icon": "bi-receipt",
+                "active_prefix": "/verticals/welding/invoices",
+                "active_pattern": "/verticals/welding/invoices",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
+            {
+                "section": "MORE",
+                "key": "materials",
+                "url": "verticals:welding_materials_list",
+                "label": "Materials",
+                "icon": "bi-box-seam",
+                "active_prefix": "/verticals/welding/materials",
+                "active_pattern": "/verticals/welding/materials",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
+            {
+                "section": "MORE",
+                "key": "stock_in",
+                "url": "verticals:welding_stock_in",
+                "label": "Stock In",
+                "icon": "bi-box-arrow-in-down",
+                "active_prefix": "/verticals/welding/stock-in",
+                "active_pattern": "/verticals/welding/stock-in",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
+            {
+                "section": "MORE",
+                "key": "clients",
+                "url": "verticals:welding_client_management",
+                "label": "Clients",
+                "icon": "bi-people",
+                "active_prefix": "/verticals/welding/clients",
+                "active_pattern": "/verticals/welding/clients",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+                "testid": "nav-welding-clients",
+            },
+            {
+                "section": "MORE",
+                "key": "notebook",
+                "url": "verticals:welding_notebook_list",
+                "label": "Notebook",
+                "icon": "bi-journal-text",
+                "active_prefix": "/verticals/welding/notebook",
+                "active_pattern": "/verticals/welding/notebook",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
+            {
+                "section": "MORE",
+                "key": "branding",
+                "url": "verticals:welding_branding_settings",
+                "label": "Quotation Branding",
+                "icon": "bi-patch-check",
+                "active_prefix": "/verticals/welding/branding",
+                "active_pattern": "/verticals/welding/branding",
+                "require_manager": True,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
+            {
+                "section": "MORE",
+                "key": "intelligence",
+                "url": "verticals:welding_intelligence",
+                "label": "Intelligence",
+                "icon": "bi-graph-up-arrow",
+                "active_prefix": "/verticals/welding/intelligence",
+                "active_pattern": "/verticals/welding/intelligence",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+                "testid": "nav-welding-intelligence",
+            },
+            {
+                "section": "MORE",
+                "key": "simulations",
+                "url": "verticals:welding_simulations",
+                "label": "Simulations",
+                "icon": "bi-bezier2",
+                "active_prefix": "/verticals/welding/simulations",
+                "active_pattern": "/verticals/welding/simulations",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+                "testid": "nav-welding-simulations",
+            },
+            # MORE section standard tools
+            {
+                "section": "MORE",
+                "key": "wallet",
+                "url": "wallet:agent_wallet",
+                "label": "Wallet",
+                "icon": "bi-wallet2",
+                "active_prefix": "/wallet/",
+                "active_pattern": "/wallet/",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
+            {
+                "section": "MORE",
+                "key": "reports",
+                "url": "verticals:welding_reports",
+                "label": "Reports",
+                "icon": "bi-file-earmark-bar-graph",
+                "active_prefix": "/verticals/welding/reports",
+                "active_pattern": "/verticals/welding/reports",
+                "require_manager": True,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
+            {
+                "section": "MORE",
+                "key": "admin_wallet",
+                "url": "wallet:admin_home",
+                "label": "Admin Wallet",
+                "icon": "bi-briefcase",
+                "active_prefix": "/wallet/admin/",
+                "active_pattern": "/wallet/admin/",
+                "require_manager": True,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
+            {
+                "section": "MORE",
+                "key": "locations",
+                "url": "tenants:manager_locations",
+                "label": "Locations",
+                "icon": "bi-geo",
+                "active_prefix": "/tenants/manager/locations/",
+                "active_pattern": "/tenants/manager/locations/",
+                "require_manager": True,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
+            {
+                "section": "MORE",
+                "key": "billing",
+                "url": "billing:plans",
+                "label": "Choose Plan",
+                "icon": "bi-credit-card-2-front",
+                "active_prefix": "/billing/plans",
+                "active_pattern": "/billing/plans",
+                "require_manager": True,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
+        ]
+        
+        return _inject_data_correction_into_sidebar(items, "welding")
+
+    elif business_kind == "car_hire":
+        items = [
+            # MAIN section — 4 primary actions only
+            {
+                "section": "MAIN",
+                "key": "dashboard",
+                "url": "verticals:car_hire_dashboard",
+                "label": "Dashboard",
+                "icon": "bi-speedometer2",
+                "active_prefix": "/verticals/car_hire/dashboard",
+                "active_pattern": "/verticals/car_hire/dashboard",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "testid": "nav-car-hire-dashboard",
+            },
+            {
+                "section": "MAIN",
+                "key": "add_trip",
+                "url": "verticals:car_hire_trip_add",
+                "label": "Add Trip",
+                "icon": "bi-plus-circle",
+                "active_prefix": "/verticals/car_hire/trips/new",
+                "active_pattern": "/verticals/car_hire/trips/new",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "testid": "nav-car-hire-add-trip",
+            },
+            {
+                "section": "MAIN",
+                "key": "vehicles",
+                "url": "verticals:car_hire_vehicles",
+                "label": "Vehicles",
+                "icon": "bi-truck",
+                "active_prefix": "/verticals/car_hire/vehicles",
+                "active_pattern": "/verticals/car_hire/vehicles",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "testid": "nav-car-hire-vehicles",
+            },
+            {
+                "section": "MAIN",
+                "key": "revenue",
+                "url": "verticals:car_hire_revenue",
+                "label": "Revenue",
+                "icon": "bi-graph-up-arrow",
+                "active_prefix": "/verticals/car_hire/revenue",
+                "active_pattern": "/verticals/car_hire/revenue",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "testid": "nav-car-hire-revenue",
+            },
+            # MORE section — everything else
+            {
+                "section": "MORE",
+                "key": "trips",
+                "url": "verticals:car_hire_trips",
+                "label": "Trips / Bookings",
+                "icon": "bi-calendar-check",
+                "active_prefix": "/verticals/car_hire/trips",
+                "active_pattern": "/verticals/car_hire/trips",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+                "testid": "nav-car-hire-trips",
+            },
+            {
+                "section": "MORE",
+                "key": "add_vehicle",
+                "url": "verticals:car_hire_vehicle_add",
+                "label": "Add Vehicle",
+                "icon": "bi-plus-square",
+                "active_prefix": "/verticals/car_hire/vehicles/new",
+                "active_pattern": "/verticals/car_hire/vehicles/new",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+                "testid": "nav-car-hire-add-vehicle",
+            },
+            {
+                "section": "MORE",
+                "key": "maintenance",
+                "url": "verticals:car_hire_maintenance",
+                "label": "Maintenance",
+                "icon": "bi-wrench-adjustable",
+                "active_prefix": "/verticals/car_hire/maintenance",
+                "active_pattern": "/verticals/car_hire/maintenance",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+                "testid": "nav-car-hire-maintenance",
+            },
+            {
+                "section": "MORE",
+                "key": "costs",
+                "url": "verticals:car_hire_costs",
+                "label": "Costs",
+                "icon": "bi-cash-stack",
+                "active_prefix": "/verticals/car_hire/costs",
+                "active_pattern": "/verticals/car_hire/costs",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+                "testid": "nav-car-hire-costs",
+            },
+            # SUBSCRIPTION section (manager-only)
+            {
+                "section": "SUBSCRIPTION",
+                "key": "billing",
+                "url": "billing:plans",
+                "label": "Billing",
+                "icon": "bi-credit-card-2-front",
+                "active_prefix": "/billing/",
+                "active_pattern": "/billing/",
+                "require_manager": True,
+                "is_menu": False,
+                "is_header": False,
+                "testid": "nav-car-hire-billing",
+            },
+            {
+                "section": "SUBSCRIPTION",
+                "key": "settings",
+                "url": "settings_root",
+                "label": "Settings",
+                "icon": "bi-gear",
+                "active_prefix": "/settings/",
+                "active_pattern": "/settings/",
+                "require_manager": True,
+                "is_menu": False,
+                "is_header": False,
+                "testid": "nav-car-hire-settings",
+            },
+        ]
+        
+        return _inject_data_correction_into_sidebar(items, "car_hire")
+
+    elif business_kind == "car_dealer":
+        items = [
+            {
+                "section": "MAIN",
+                "key": "dashboard",
+                "url": "car_dealer:dashboard",
+                "label": "Dashboard",
+                "icon": "bi-speedometer2",
+                "active_prefix": "/car-dealer/",
+                "active_pattern": "/car-dealer/",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "testid": "nav-car-dealer-dashboard",
+            },
+            {
+                "section": "MAIN",
+                "key": "vehicles",
+                "url": "car_dealer:vehicle_list",
+                "label": "Vehicles",
+                "icon": "bi-car-front",
+                "active_prefix": "/car-dealer/vehicles",
+                "active_pattern": "/car-dealer/vehicles",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "testid": "nav-car-dealer-vehicles",
+            },
+            {
+                "section": "MAIN",
+                "key": "stock_in",
+                "url": "car_dealer:stock_in",
+                "label": "Add Vehicle",
+                "icon": "bi-plus-square",
+                "active_prefix": "/car-dealer/vehicles/add",
+                "active_pattern": "/car-dealer/vehicles/add",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "testid": "nav-car-dealer-stock-in",
+            },
+            {
+                "section": "MAIN",
+                "key": "marketplace",
+                "url": "inventory:manage_listings",
+                "label": "Marketplace Listings",
+                "icon": "bi-shop",
+                "active_prefix": "/inventory/marketplace",
+                "active_pattern": "/inventory/marketplace",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "testid": "nav-car-dealer-marketplace",
+            },
+            {
+                "section": "SUBSCRIPTION",
+                "key": "billing",
+                "url": "billing:plans",
+                "label": "Billing",
+                "icon": "bi-credit-card-2-front",
+                "active_prefix": "/billing/",
+                "active_pattern": "/billing/",
+                "require_manager": True,
+                "is_menu": False,
+                "is_header": False,
+                "testid": "nav-car-dealer-billing",
+            },
+            {
+                "section": "SUBSCRIPTION",
+                "key": "settings",
+                "url": "settings_root",
+                "label": "Settings",
+                "icon": "bi-gear",
+                "active_prefix": "/settings/",
+                "active_pattern": "/settings/",
+                "require_manager": True,
+                "is_menu": False,
+                "is_header": False,
+                "testid": "nav-car-dealer-settings",
+            },
+        ]
+        return _inject_data_correction_into_sidebar(items, "car_dealer")
+
+    elif business_kind == "energy":
+        items = [
+            # MAIN section — 4 primary actions only
+            {
+                "section": "MAIN",
+                "key": "dashboard",
+                "url": "verticals:energy_dashboard",
+                "label": "Overview",
+                "icon": "bi-speedometer2",
+                "active_prefix": "/verticals/energy/dashboard",
+                "active_pattern": "/verticals/energy/dashboard",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "testid": "nav-energy-dashboard",
+            },
+            {
+                "section": "MAIN",
+                "key": "sites",
+                "url": "verticals:energy_sites",
+                "label": "Sites",
+                "icon": "bi-geo-alt",
+                "active_prefix": "/verticals/energy/sites",
+                "active_pattern": "/verticals/energy/sites",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "testid": "nav-energy-sites",
+            },
+            {
+                "section": "MAIN",
+                "key": "monitoring",
+                "url": "verticals:energy_monitoring",
+                "label": "Monitoring",
+                "icon": "bi-display",
+                "active_prefix": "/verticals/energy/monitoring",
+                "active_pattern": "/verticals/energy/monitoring",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "testid": "nav-energy-monitoring",
+            },
+            {
+                "section": "MAIN",
+                "key": "alerts",
+                "url": "verticals:energy_alerts",
+                "label": "Alerts & Incidents",
+                "icon": "bi-bell",
+                "active_prefix": "/verticals/energy/alerts",
+                "active_pattern": "/verticals/energy/alerts",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "testid": "nav-energy-alerts",
+            },
+            # MORE section — everything else
+            {
+                "section": "MORE",
+                "key": "assets",
+                "url": "verticals:energy_assets",
+                "label": "Assets",
+                "icon": "bi-cpu",
+                "active_prefix": "/verticals/energy/assets",
+                "active_pattern": "/verticals/energy/assets",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+                "testid": "nav-energy-assets",
+            },
+            {
+                "section": "MORE",
+                "key": "maintenance",
+                "url": "verticals:energy_maintenance",
+                "label": "Predictive Maintenance",
+                "icon": "bi-wrench-adjustable",
+                "active_prefix": "/verticals/energy/maintenance",
+                "active_pattern": "/verticals/energy/maintenance",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+                "testid": "nav-energy-maintenance",
+            },
+            {
+                "section": "MORE",
+                "key": "forecasting",
+                "url": "verticals:energy_forecasting",
+                "label": "Demand Forecasting",
+                "icon": "bi-graph-up-arrow",
+                "active_prefix": "/verticals/energy/forecasting",
+                "active_pattern": "/verticals/energy/forecasting",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+                "testid": "nav-energy-forecasting",
+            },
+            {
+                "section": "MORE",
+                "key": "load_management",
+                "url": "verticals:energy_load_management",
+                "label": "Load Management",
+                "icon": "bi-bar-chart-steps",
+                "active_prefix": "/verticals/energy/load-management",
+                "active_pattern": "/verticals/energy/load-management",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+                "testid": "nav-energy-load-management",
+            },
+            {
+                "section": "MORE",
+                "key": "sizing",
+                "url": "verticals:energy_sizing_list",
+                "label": "System Sizing",
+                "icon": "bi-calculator",
+                "active_prefix": "/verticals/energy/sizing",
+                "active_pattern": "/verticals/energy/sizing",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+                "testid": "nav-energy-sizing",
+            },
+            {
+                "section": "MORE",
+                "key": "simulations",
+                "testid": "nav-energy-simulations",
+                "url": "verticals:energy_simulations",
+                "label": "Simulations",
+                "icon": "bi-play-circle",
+                "active_prefix": "/verticals/energy/simulations",
+                "active_pattern": "/verticals/energy/simulations",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+                "testid": "nav-energy-simulations",
+            },
+            {
+                "section": "MORE",
+                "key": "economics",
+                "url": "verticals:energy_economics",
+                "label": "Costs & Savings",
+                "icon": "bi-cash-coin",
+                "active_prefix": "/verticals/energy/economics",
+                "active_pattern": "/verticals/energy/economics",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+                "testid": "nav-energy-economics",
+            },
+            {
+                "section": "MORE",
+                "key": "technicians",
+                "url": "verticals:energy_technicians",
+                "label": "Technicians",
+                "icon": "bi-person-badge",
+                "active_prefix": "/verticals/energy/technicians",
+                "active_pattern": "/verticals/energy/technicians",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+                "testid": "nav-energy-technicians",
+            },
+            {
+                "section": "MORE",
+                "key": "portfolio",
+                "url": "verticals:energy_portfolio",
+                "label": "Portfolio",
+                "icon": "bi-building-gear",
+                "active_prefix": "/verticals/energy/portfolio",
+                "active_pattern": "/verticals/energy/portfolio",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+                "testid": "nav-energy-portfolio",
+            },
+            {
+                "section": "MORE",
+                "key": "copilot",
+                "url": "verticals:energy_copilot",
+                "label": "Energy Copilot",
+                "icon": "bi-cpu",
+                "active_prefix": "/verticals/energy/copilot",
+                "active_pattern": "/verticals/energy/copilot",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+                "testid": "nav-energy-copilot",
+            },
+            {
+                "section": "MORE",
+                "key": "data_upload",
+                "url": "verticals:energy_data_upload",
+                "label": "Data Upload",
+                "icon": "bi-cloud-upload",
+                "active_prefix": "/verticals/energy/data-upload",
+                "active_pattern": "/verticals/energy/data-upload",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+                "testid": "nav-energy-data-upload",
+            },
+            {
+                "section": "MORE",
+                "key": "reports",
+                "url": "verticals:energy_reports",
+                "label": "Reports",
+                "icon": "bi-file-earmark-bar-graph",
+                "active_prefix": "/verticals/energy/reports",
+                "active_pattern": "/verticals/energy/reports",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+                "testid": "nav-energy-reports",
+            },
+            {
+                "section": "SUBSCRIPTION",
+                "key": "billing",
+                "url": "billing:plans",
+                "label": "Billing",
+                "icon": "bi-credit-card-2-front",
+                "active_prefix": "/billing/",
+                "active_pattern": "/billing/",
+                "require_manager": True,
+                "is_menu": False,
+                "is_header": False,
+                "testid": "nav-energy-billing",
+            },
+            {
+                "section": "SUBSCRIPTION",
+                "key": "settings",
+                "url": "settings_root",
+                "label": "Settings",
+                "icon": "bi-gear",
+                "active_prefix": "/settings/",
+                "active_pattern": "/settings/",
+                "require_manager": True,
+                "is_menu": False,
+                "is_header": False,
+                "testid": "nav-energy-settings",
+            },
+        ]
+        return _inject_data_correction_into_sidebar(items, "energy")
+
+    elif business_kind == "mobile_money":
+        items = [
+            {"section": "MAIN", "key": "dashboard", "url": "mobilemoney:dashboard", "label": "Dashboard",
+             "icon": "bi-speedometer2", "active_prefix": "/mobile-money/dashboard", "active_pattern": "/mobile-money/dashboard",
+             "require_manager": False, "is_menu": False, "is_header": False},
+            {"section": "MAIN", "key": "transactions", "url": "mobilemoney:transactions", "label": "Transactions",
+             "icon": "bi-arrow-left-right", "active_prefix": "/mobile-money/transactions", "active_pattern": "/mobile-money/transactions",
+             "require_manager": False, "is_menu": False, "is_header": False},
+            {"section": "MAIN", "key": "reconciliation", "url": "mobilemoney:reconciliation", "label": "Reconciliation",
+             "icon": "bi-calculator", "active_prefix": "/mobile-money/reconciliation", "active_pattern": "/mobile-money/reconciliation",
+             "require_manager": False, "is_menu": False, "is_header": False},
+            {"section": "MAIN", "key": "commissions", "url": "mobilemoney:commissions", "label": "Commissions",
+             "icon": "bi-percent", "active_prefix": "/mobile-money/commissions", "active_pattern": "/mobile-money/commissions",
+             "require_manager": False, "is_menu": False, "is_header": False},
+            {"section": "MORE", "key": "credits", "url": "mobilemoney:credits", "label": "Credits & Debts",
+             "icon": "bi-credit-card", "active_prefix": "/mobile-money/credits", "active_pattern": "/mobile-money/credits",
+             "require_manager": False, "is_menu": False, "is_header": False, "group": "more"},
+            {"section": "MORE", "key": "settlements", "url": "mobilemoney:settlements", "label": "Agent Settlements",
+             "icon": "bi-people", "active_prefix": "/mobile-money/settlements", "active_pattern": "/mobile-money/settlements",
+             "require_manager": True, "is_menu": False, "is_header": False, "group": "more"},
+            {"section": "MORE", "key": "reports", "url": "reports:home", "label": "Reports",
+             "icon": "bi-file-earmark-bar-graph", "active_prefix": "/reports/", "active_pattern": "/reports/",
+             "require_manager": True, "is_menu": False, "is_header": False, "group": "more"},
+            {"section": "MORE", "key": "health", "url": "dashboard:business_health", "label": "Business Health",
+             "icon": "bi-heart-pulse", "active_prefix": "/dashboard/health", "active_pattern": "/dashboard/health",
+             "require_manager": True, "is_menu": False, "is_header": False, "group": "more"},
+        ]
+        return items
+
+    elif business_kind == "mixed_retail":
+        items = [
+            # ── MAIN ──────────────────────────────────────────────────────────
+            {"section": "MAIN", "key": "dashboard", "url": "mixed_retail:dashboard", "label": "Dashboard",
+             "icon": "bi-speedometer2", "active_prefix": "/mixed-retail/dashboard", "active_pattern": "/mixed-retail/dashboard",
+             "require_manager": False, "is_menu": False, "is_header": False},
+            {"section": "MAIN", "key": "sell", "url": "mixed_retail:sell", "label": "Quick Sell",
+             "icon": "bi-cart-plus", "active_prefix": "/mixed-retail/sell", "active_pattern": "/mixed-retail/sell",
+             "require_manager": False, "is_menu": False, "is_header": False},
+            {"section": "MAIN", "key": "stock_in", "url": "mixed_retail:stock_in", "label": "Scan IN / Stock In",
+             "icon": "bi-upc-scan", "active_prefix": "/mixed-retail/stock-in", "active_pattern": "/mixed-retail/stock-in",
+             "require_manager": False, "is_menu": False, "is_header": False},
+            # ── PRODUCTS ──────────────────────────────────────────────────────
+            {"section": "PRODUCTS", "key": "products", "url": "mixed_retail:products", "label": "Products",
+             "icon": "bi-box-seam", "active_prefix": "/mixed-retail/products", "active_pattern": "/mixed-retail/products",
+             "require_manager": False, "is_menu": False, "is_header": False},
+            {"section": "PRODUCTS", "key": "product_add", "url": "mixed_retail:product_add", "label": "Add Product",
+             "icon": "bi-plus-square", "active_prefix": "/mixed-retail/products/add", "active_pattern": "/mixed-retail/products/add",
+             "require_manager": False, "is_menu": False, "is_header": False},
+            {"section": "PRODUCTS", "key": "departments", "url": "mixed_retail:departments", "label": "Departments",
+             "icon": "bi-grid-3x3-gap", "active_prefix": "/mixed-retail/departments", "active_pattern": "/mixed-retail/departments",
+             "require_manager": False, "is_menu": False, "is_header": False},
+            # ── SALES ─────────────────────────────────────────────────────────
+            {"section": "SALES", "key": "sales", "url": "mixed_retail:sales", "label": "Sales History",
+             "icon": "bi-receipt", "active_prefix": "/mixed-retail/sales", "active_pattern": "/mixed-retail/sales",
+             "require_manager": False, "is_menu": False, "is_header": False},
+            # ── FINANCE ───────────────────────────────────────────────────────
+            {"section": "FINANCE", "key": "expenses", "url": "mixed_retail:expenses", "label": "Costs & Expenses",
+             "icon": "bi-cash-stack", "active_prefix": "/mixed-retail/expenses", "active_pattern": "/mixed-retail/expenses",
+             "require_manager": False, "is_menu": False, "is_header": False},
+            # ── REPORTS ───────────────────────────────────────────────────────
+            {"section": "REPORTS", "key": "reports", "url": "mixed_retail:reports", "label": "Reports",
+             "icon": "bi-bar-chart-line", "active_prefix": "/mixed-retail/reports", "active_pattern": "/mixed-retail/reports",
+             "require_manager": True, "is_menu": False, "is_header": False},
+            {"section": "REPORTS", "key": "health", "url": "dashboard:business_health", "label": "Business Health",
+             "icon": "bi-heart-pulse", "active_prefix": "/dashboard/health", "active_pattern": "/dashboard/health",
+             "require_manager": True, "is_menu": False, "is_header": False},
+            # ── SETTINGS ──────────────────────────────────────────────────────
+            {"section": "SETTINGS", "key": "biz_settings", "url": "/dashboard/settings/", "label": "Business Settings",
+             "icon": "bi-gear", "active_prefix": "/dashboard/settings", "active_pattern": "/dashboard/settings",
+             "require_manager": True, "is_menu": False, "is_header": False},
+        ]
+        return items
+
+    elif business_kind == "butchery":
+        items = [
+            # ── MAIN ──────────────────────────────────────────────────────────
+            {"section": "MAIN", "key": "dashboard", "url": "butchery:dashboard", "label": "Dashboard",
+             "icon": "bi-speedometer2", "active_prefix": "/butchery/dashboard", "active_pattern": "/butchery/dashboard",
+             "require_manager": False, "is_menu": False, "is_header": False},
+            {"section": "MAIN", "key": "daily_sales", "url": "butchery:daily_sales", "label": "Record Daily Sales",
+             "icon": "bi-journal-plus", "active_prefix": "/butchery/daily-sales", "active_pattern": "/butchery/daily-sales",
+             "require_manager": False, "is_menu": False, "is_header": False},
+            {"section": "MAIN", "key": "sell", "url": "butchery:sell", "label": "Quick Sell",
+             "icon": "bi-cart-plus", "active_prefix": "/butchery/sell", "active_pattern": "/butchery/sell",
+             "require_manager": False, "is_menu": False, "is_header": False},
+            {"section": "MAIN", "key": "intake", "url": "butchery:intake", "label": "Intake / Stock In",
+             "icon": "bi-truck", "active_prefix": "/butchery/intake", "active_pattern": "/butchery/intake",
+             "require_manager": False, "is_menu": False, "is_header": False},
+            {"section": "MAIN", "key": "processing", "url": "butchery:processing", "label": "Processing / Cutting",
+             "icon": "bi-scissors", "active_prefix": "/butchery/processing", "active_pattern": "/butchery/processing",
+             "require_manager": False, "is_menu": False, "is_header": False},
+            # ── PRODUCTS ──────────────────────────────────────────────────────
+            {"section": "PRODUCTS", "key": "products", "url": "butchery:products", "label": "Cuts & Products",
+             "icon": "bi-box-seam", "active_prefix": "/butchery/products", "active_pattern": "/butchery/products",
+             "require_manager": False, "is_menu": False, "is_header": False},
+            {"section": "PRODUCTS", "key": "product_add", "url": "butchery:product_add", "label": "Add Cut / Product",
+             "icon": "bi-plus-square", "active_prefix": "/butchery/products/add", "active_pattern": "/butchery/products/add",
+             "require_manager": False, "is_menu": False, "is_header": False},
+            # ── SALES ─────────────────────────────────────────────────────────
+            {"section": "SALES", "key": "sales", "url": "butchery:sales", "label": "Sales History",
+             "icon": "bi-receipt", "active_prefix": "/butchery/sales", "active_pattern": "/butchery/sales",
+             "require_manager": False, "is_menu": False, "is_header": False},
+            # ── FINANCE ───────────────────────────────────────────────────────
+            {"section": "FINANCE", "key": "expenses", "url": "butchery:expenses", "label": "Costs & Expenses",
+             "icon": "bi-cash-stack", "active_prefix": "/butchery/expenses", "active_pattern": "/butchery/expenses",
+             "require_manager": False, "is_menu": False, "is_header": False},
+            # ── REPORTS ───────────────────────────────────────────────────────
+            {"section": "REPORTS", "key": "reports", "url": "butchery:reports", "label": "Reports",
+             "icon": "bi-bar-chart-line", "active_prefix": "/butchery/reports", "active_pattern": "/butchery/reports",
+             "require_manager": True, "is_menu": False, "is_header": False},
+            {"section": "REPORTS", "key": "export_csv", "url": "butchery:reports_export_csv", "label": "Export CSV",
+             "icon": "bi-file-earmark-spreadsheet", "active_prefix": "/butchery/reports/export/csv", "active_pattern": "/butchery/reports/export/csv",
+             "require_manager": True, "is_menu": False, "is_header": False},
+            {"section": "REPORTS", "key": "export_pdf", "url": "butchery:reports_export_pdf", "label": "Export PDF",
+             "icon": "bi-file-earmark-pdf", "active_prefix": "/butchery/reports/export/pdf", "active_pattern": "/butchery/reports/export/pdf",
+             "require_manager": True, "is_menu": False, "is_header": False},
+            {"section": "REPORTS", "key": "health", "url": "dashboard:business_health", "label": "Business Health",
+             "icon": "bi-heart-pulse", "active_prefix": "/dashboard/health", "active_pattern": "/dashboard/health",
+             "require_manager": True, "is_menu": False, "is_header": False},
+            # ── SETTINGS ──────────────────────────────────────────────────────
+            {"section": "SETTINGS", "key": "biz_settings", "url": "/dashboard/settings/", "label": "Business Settings",
+             "icon": "bi-gear", "active_prefix": "/dashboard/settings", "active_pattern": "/dashboard/settings",
+             "require_manager": True, "is_menu": False, "is_header": False},
+        ]
+        return items
+
+    elif business_kind == "consultancy":
+        items = [
+            {"section": "MAIN", "key": "dashboard", "url": "consultancy:dashboard", "label": "Dashboard",
+             "icon": "bi-speedometer2", "active_prefix": "/consultancy/dashboard", "active_pattern": "/consultancy/dashboard",
+             "require_manager": False, "is_menu": False, "is_header": False},
+            {"section": "MAIN", "key": "clients", "url": "consultancy:clients", "label": "Clients",
+             "icon": "bi-people", "active_prefix": "/consultancy/clients", "active_pattern": "/consultancy/clients",
+             "require_manager": False, "is_menu": False, "is_header": False},
+            {"section": "MAIN", "key": "projects", "url": "consultancy:projects", "label": "Projects",
+             "icon": "bi-kanban", "active_prefix": "/consultancy/projects", "active_pattern": "/consultancy/projects",
+             "require_manager": False, "is_menu": False, "is_header": False},
+            {"section": "MAIN", "key": "quotes", "url": "consultancy:quotes", "label": "Quotes",
+             "icon": "bi-file-earmark-text", "active_prefix": "/consultancy/quotes", "active_pattern": "/consultancy/quotes",
+             "require_manager": False, "is_menu": False, "is_header": False},
+            {"section": "MAIN", "key": "invoices", "url": "consultancy:invoices", "label": "Invoices",
+             "icon": "bi-receipt-cutoff", "active_prefix": "/consultancy/invoices", "active_pattern": "/consultancy/invoices",
+             "require_manager": False, "is_menu": False, "is_header": False},
+            {"section": "MORE", "key": "expenses", "url": "consultancy:expenses", "label": "Expenses",
+             "icon": "bi-cash-stack", "active_prefix": "/consultancy/expenses", "active_pattern": "/consultancy/expenses",
+             "require_manager": True, "is_menu": False, "is_header": False, "group": "more"},
+            {"section": "MORE", "key": "health", "url": "dashboard:business_health", "label": "Business Health",
+             "icon": "bi-heart-pulse", "active_prefix": "/dashboard/health", "active_pattern": "/dashboard/health",
+             "require_manager": True, "is_menu": False, "is_header": False, "group": "more"},
+        ]
+        return items
+
     else:  # "phones" or default
-        return [
-            # MAIN section
-            {"section": "MAIN", "url": "dashboard:home", "label": "Dashboard", "icon": "bi-speedometer2", "active_pattern": "/dashboard/", "require_manager": False},
-            {"section": "MAIN", "url": "inventory:inventory_dashboard", "label": "Inventory Dashboard", "icon": "bi-columns-gap", "active_pattern": "/inventory/dashboard", "require_manager": False},
-            {"section": "MAIN", "url": "inventory:stock_list", "label": "Stock", "icon": "bi-box-seam", "active_pattern": "/inventory/list/", "require_manager": False},
-            {"section": "MAIN", "url": "inventory:phone_products", "label": "Products", "icon": "bi-grid-3x3-gap", "active_pattern": "/inventory/phone-products", "require_manager": False},
-            {"section": "MAIN", "url": "inventory:scan_in", "label": "Scan IN", "icon": "bi-upc-scan", "active_pattern": "/inventory/scan", "require_manager": False},
-            {"section": "MAIN", "url": "inventory:phone_sale_wizard", "label": "Scan & Sell", "icon": "bi-bag-check", "active_pattern": "/inventory/phone-sale-wizard/", "require_manager": False},
-            
-            # TIME section
-            {"section": "TIME", "url": "inventory:time_logs", "label": "Time Logs", "icon": "bi-journal-text", "active_pattern": "/inventory/time/logs", "require_manager": False},
-            
-            # MONEY section
-            {"section": "MONEY", "url": "wallet:agent_wallet", "label": "My Wallet", "icon": "bi-wallet2", "active_pattern": "/wallet/", "require_manager": False},
-            {"section": "MONEY", "url": "wallet:admin_home", "label": "Admin Wallet", "icon": "bi-briefcase", "active_pattern": "/wallet/admin/", "require_manager": True},
-            {"section": "MONEY", "url": "wallet:admin_cost_list", "label": "Costs", "icon": "bi-cash-stack", "active_pattern": "/wallet/admin/costs/", "require_manager": True},
-            
-            # BUSINESS section (for managers)
-            {"section": "BUSINESS", "url": "simulator:business_home", "label": "Simulator", "icon": "bi-cpu", "active_pattern": "/simulator/business/", "require_manager": True},
-            {"section": "BUSINESS", "url": "reports:home", "label": "Reports", "icon": "bi-graph-up", "active_pattern": "/reports/", "require_manager": True},
-            {"section": "BUSINESS", "url": "tenants:manager_review_agents", "label": "Agents", "icon": "bi-people", "active_pattern": "/tenants/manager/agents/", "require_manager": True},
-            {"section": "BUSINESS", "url": "tenants:manager_locations", "label": "Locations", "icon": "bi-geo", "active_pattern": "/tenants/manager/locations/", "require_manager": True},
-            {"section": "BUSINESS", "url": "backups:manager_list", "label": "Data Backup", "icon": "bi-cloud-download", "active_pattern": "/backups/", "require_manager": True},
-            {"section": "BUSINESS", "url": "billing:plans", "label": "Choose Plan", "icon": "bi-credit-card-2-front", "active_pattern": "/billing/plans", "require_manager": True},
-            {"section": "BUSINESS", "url": "inventory:orders_list", "label": "Orders", "icon": "bi-clipboard-data", "active_pattern": "/inventory/orders/", "require_manager": True},
-            
+        items = [
+            # MAIN section — 4 primary actions only
+            {
+                "section": "MAIN",
+                "key": "dashboard",
+                "url": "inventory_verticals:phones_dashboard",
+                "label": "Dashboard",
+                "icon": "bi-speedometer2",
+                "active_prefix": "/inventory/verticals/phones",
+                "active_pattern": "/inventory/verticals/phones",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "testid": "sidebar-dashboard",
+            },
+            {
+                "section": "MAIN",
+                "key": "scan_in",
+                "url": "inventory:scan_in",
+                "label": "Scan IN",
+                "icon": "bi-upc-scan",
+                "active_prefix": "/inventory/scan",
+                "active_pattern": "/inventory/scan",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "testid": "sidebar-scan-in",
+            },
+            {
+                "section": "MAIN",
+                "key": "sell",
+                "url": "inventory:phone_sale_wizard",
+                "label": "Scan & Sell",
+                "icon": "bi-bag-check",
+                "active_prefix": "/inventory/phone-sale-wizard/",
+                "active_pattern": "/inventory/phone-sale-wizard/",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "testid": "sidebar-sell",
+            },
+            {
+                "section": "MAIN",
+                "key": "stock",
+                "url": "inventory:stock_list",
+                "label": "Stock",
+                "icon": "bi-box-seam",
+                "active_prefix": "/inventory/list/",
+                "active_pattern": "/inventory/list/",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "testid": "sidebar-stock",
+            },
+            # MORE section — accessories and analytics
+            {
+                "section": "MORE",
+                "key": "analytics",
+                "url": "app_router:analytics",
+                "label": "Analytics",
+                "icon": "bi-graph-up",
+                "active_prefix": "/app/analytics",
+                "active_pattern": "/app/analytics",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+                "testid": "sidebar-analytics",
+            },
+            {
+                "section": "MORE",
+                "key": "accessories",
+                "url": "verticals:phones_accessories_dashboard",
+                "label": "Accessories",
+                "icon": "bi-box-seam",
+                "active_prefix": "/verticals/phones/accessories/",
+                "active_pattern": "/verticals/phones/accessories/",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+                "testid": "nav-phones-accessories",
+            },
+            {
+                "section": "MORE",
+                "key": "accessories_stock_in",
+                "url": "verticals:phones_accessories_stock_in",
+                "label": "Stock In Accessories",
+                "icon": "bi-box-arrow-in-down",
+                "active_prefix": "/verticals/phones/accessories/stock-in/",
+                "active_pattern": "/verticals/phones/accessories/stock-in/",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+                "testid": "nav-phones-accessories-stockin",
+            },
+            {
+                "section": "MORE",
+                "key": "accessories_sell",
+                "url": "verticals:phones_accessories_sell",
+                "label": "Sell Accessories",
+                "icon": "bi-cart-check",
+                "active_prefix": "/verticals/phones/accessories/sell/",
+                "active_pattern": "/verticals/phones/accessories/sell/",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+                "testid": "nav-phones-accessories-sell",
+            },
             # LAYBY section (phones specific)
-            {"section": "LAYBY", "url": "layby:dashboard", "label": "Layby", "icon": "bi-journal-check", "active_pattern": "/layby/", "require_manager": False},
+            {
+                "section": "LAYBY",
+                "key": "layby",
+                "url": "layby:dashboard",
+                "label": "Layby",
+                "icon": "bi-journal-check",
+                "active_prefix": "/layby/",
+                "active_pattern": "/layby/",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+            },
+            # SALES & TEAM section (MORE section items)
+            {
+                "section": "MORE",
+                "key": "sales_history",
+                "url": "sales:list",
+                "label": "Sales History",
+                "icon": "bi-receipt",
+                "active_prefix": "/sales/",
+                "active_pattern": "/sales/",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+                "testid": "sidebar-sales-history",
+            },
+            # MORE section - Collapsible tools (Wallet & Time Logs accessible to all, manager tools below)
+            {
+                "section": "MORE",
+                "key": "wallet",
+                "url": "wallet:agent_wallet",
+                "label": "Wallet",
+                "icon": "bi-wallet2",
+                "active_prefix": "/wallet/",
+                "active_pattern": "/wallet/",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
+            {
+                "section": "MORE",
+                "key": "time_logs",
+                "url": "inventory:time_logs",
+                "label": "Time Logs",
+                "icon": "bi-journal-text",
+                "active_prefix": "/inventory/time/logs",
+                "active_pattern": "/inventory/time/logs",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
+            {
+                "section": "MORE",
+                "key": "reports",
+                "url": "reports:home",
+                "label": "Reports",
+                "icon": "bi-file-earmark-bar-graph",
+                "active_prefix": "/reports/",
+                "active_pattern": "/reports/",
+                "require_manager": True,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+                "testid": "sidebar-reports",
+            },
+            {
+                "section": "MORE",
+                "key": "simulator",
+                "url": "simulator:business_home",
+                "label": "Simulator",
+                "icon": "bi-cpu",
+                "active_prefix": "/simulator/business/",
+                "active_pattern": "/simulator/business/",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
+            {
+                "section": "MORE",
+                "key": "products",
+                "url": "inventory:phone_products",
+                "label": "Products",
+                "icon": "bi-grid-3x3-gap",
+                "active_prefix": "/inventory/phone-products",
+                "active_pattern": "/inventory/phone-products",
+                "require_manager": True,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
+            {
+                "section": "MORE",
+                "key": "admin_wallet",
+                "url": "wallet:admin_home",
+                "label": "Admin Wallet",
+                "icon": "bi-briefcase",
+                "active_prefix": "/wallet/admin/",
+                "active_pattern": "/wallet/admin/",
+                "require_manager": True,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
+            {
+                "section": "MORE",
+                "key": "costs",
+                "url": "wallet:admin_cost_list",
+                "label": "Costs",
+                "icon": "bi-cash-stack",
+                "active_prefix": "/wallet/admin/costs/",
+                "active_pattern": "/wallet/admin/costs/",
+                "require_manager": True,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
+            {
+                "section": "MORE",
+                "key": "agents",
+                "url": "tenants:manager_review_agents",
+                "label": "Agents",
+                "icon": "bi-people",
+                "active_prefix": "/tenants/manager/agents/",
+                "active_pattern": "/tenants/manager/agents/",
+                "require_manager": True,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+                "testid": "sidebar-agents",
+            },
+            {
+                "section": "MORE",
+                "key": "locations",
+                "url": "tenants:manager_locations",
+                "label": "Locations",
+                "icon": "bi-geo",
+                "active_prefix": "/tenants/manager/locations/",
+                "active_pattern": "/tenicals/manager/locations/",
+                "require_manager": True,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
+            {
+                "section": "MORE",
+                "key": "backups",
+                "url": "backups:manager_list",
+                "label": "Data Backup",
+                "icon": "bi-cloud-download",
+                "active_prefix": "/backups/",
+                "active_pattern": "/backups/",
+                "require_manager": True,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
+            {
+                "section": "MORE",
+                "key": "billing",
+                "url": "billing:plans",
+                "label": "Choose Plan",
+                "icon": "bi-credit-card-2-front",
+                "active_prefix": "/billing/plans",
+                "active_pattern": "/billing/plans",
+                "require_manager": True,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
+            {
+                "section": "MORE",
+                "key": "orders",
+                "url": "inventory:orders_list",
+                "label": "Orders",
+                "icon": "bi-clipboard-data",
+                "active_prefix": "/inventory/orders/",
+                "active_pattern": "/inventory/orders/",
+                "require_manager": True,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
         ]
+        
+        return _inject_data_correction_into_sidebar(items, "phones")
+
+
+def _marketplace_sidebar_item(vertical: str) -> dict:
+    return {
+        "section": "MAIN",
+        "key": "marketplace",
+        "url": "inventory:manage_listings",
+        "label": "Marketplace",
+        "icon": "bi-shop",
+        "active_prefix": "/inventory/marketplace",
+        "active_pattern": "/inventory/marketplace",
+        "require_manager": True,
+        "is_menu": False,
+        "is_header": False,
+        "testid": f"nav-{vertical}-marketplace",
+    }
+
+
+def _inject_marketplace_into_sidebar(items: list[dict], vertical: str) -> list[dict]:
+    """
+    Ensure every vertical sidebar has one seller-side Marketplace entry.
+
+    Existing entries are normalized instead of duplicated so vertical-specific
+    sidebars keep their placement while pointing to the tenant-scoped seller
+    management page.
+    """
+    marketplace_item = _marketplace_sidebar_item(vertical)
+    for item in items:
+        if item.get("key") == "marketplace":
+            item.update(marketplace_item)
+            return items
+
+    preferred_after_keys = {
+        "sales",
+        "revenue",
+        "sell",
+        "jobs",
+        "vehicles",
+        "products",
+        "stock",
+        "stock_list",
+        "inventory",
+    }
+    insert_idx = None
+    for idx, item in enumerate(items):
+        if item.get("section") == "MAIN" and item.get("key") in preferred_after_keys:
+            insert_idx = idx + 1
+    if insert_idx is None:
+        main_items = [i for i in items if i.get("section") == "MAIN"]
+        if main_items:
+            insert_idx = len(items) - 1 - items[::-1].index(main_items[-1]) + 1
+
+    if insert_idx is None:
+        items.append(marketplace_item)
+    else:
+        items.insert(insert_idx, marketplace_item)
+    return items
+
+
+def _inject_data_correction_into_sidebar(items: list[dict], vertical: str) -> list[dict]:
+    """
+    Helper function to inject Data Correction menu item into any vertical's sidebar.
+    
+    This ensures ALL verticals get the Data Correction feature without duplicating code.
+    
+    Args:
+        items: List of sidebar menu items for a vertical
+        vertical: Vertical key (phones, gym, clothing, etc.)
+    
+    Returns:
+        Updated list with Data Correction item injected (if vertical is registered)
+    """
+    items = _inject_marketplace_into_sidebar(items, vertical)
+    correction_item = _get_data_correction_menu_item(vertical)
+    if correction_item:
+        # Insert after the last MAIN section item, before MORE section
+        main_items = [i for i in items if i.get("section") == "MAIN"]
+        if main_items:
+            # Find the index of the last MAIN item
+            last_main_idx = len(items) - 1 - items[::-1].index(main_items[-1])
+            # Insert Data Correction right after
+            items.insert(last_main_idx + 1, correction_item)
+        else:
+            # No MAIN section, just append
+            items.append(correction_item)
+    
+    return items
 
 
 __all__ = [
@@ -370,4 +3382,3 @@ __all__ = [
     "get_vertical_display_name",
     "get_vertical_sidebar_items",
 ]
-

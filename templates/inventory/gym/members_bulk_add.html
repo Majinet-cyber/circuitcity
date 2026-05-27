@@ -1,0 +1,143 @@
+{% extends "inventory/base.html" %}
+{% load static %}
+
+{% block title %}Bulk Add Members - {{ business.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .paste-area {
+        font-family: 'Courier New', monospace;
+        font-size: 14px;
+    }
+    .format-example {
+        background-color: #f8f9fa;
+        padding: 15px;
+        border-radius: 5px;
+        border-left: 4px solid #0d6efd;
+        margin-bottom: 20px;
+    }
+    .format-example pre {
+        margin-bottom: 0;
+        font-size: 13px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-md-10 offset-md-1">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">
+                        <i class="bi bi-people-fill"></i> Bulk Add Members
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <h5><i class="bi bi-info-circle"></i> How it works:</h5>
+                        <ol class="mb-0">
+                            <li>Paste member data below (one per line)</li>
+                            <li>Supported formats: CSV or pipe-separated</li>
+                            <li>Members are created with status "Pending Payment"</li>
+                            <li>Add payments individually later as normal</li>
+                            <li>Duplicates are automatically detected and skipped</li>
+                        </ol>
+                    </div>
+
+                    <div class="format-example">
+                        <h6><i class="bi bi-file-text"></i> Format Examples:</h6>
+                        <pre><strong>CSV format:</strong>
+John Doe, 0999123456, john@example.com
+Jane Smith, 0888765432, jane@example.com
+Bob Wilson, 0777654321
+
+<strong>Pipe-separated format:</strong>
+John Doe | 0999123456 | john@example.com
+Jane Smith | 0888765432 | jane@example.com
+Bob Wilson | 0777654321</pre>
+                        <p class="mb-0 mt-2"><small class="text-muted">
+                            <strong>Note:</strong> Name is required. Phone and email are optional but recommended.
+                        </small></p>
+                    </div>
+
+                    <form method="post">
+                        {% csrf_token %}
+
+                        <div class="mb-3">
+                            <label for="{{ form.default_trainer.id_for_label }}" class="form-label">
+                                {{ form.default_trainer.label }}
+                            </label>
+                            {{ form.default_trainer }}
+                            <small class="form-text text-muted">
+                                {{ form.default_trainer.help_text }}
+                            </small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="{{ form.bulk_data.id_for_label }}" class="form-label">
+                                <strong>{{ form.bulk_data.label }}</strong> <span class="text-danger">*</span>
+                            </label>
+                            {{ form.bulk_data }}
+                            <small class="form-text text-muted">
+                                {{ form.bulk_data.help_text }}
+                            </small>
+                        </div>
+
+                        <div class="alert alert-warning">
+                            <h6>⚠️ Important Notes:</h6>
+                            <ul class="mb-0">
+                                <li><strong>Duplicate Detection:</strong> Members with the same name (ignoring case/spacing) will be skipped</li>
+                                <li><strong>Validation:</strong> Invalid phone/email formats will be reported but won't block other members</li>
+                                <li><strong>No Payments:</strong> This only creates members. Add payments individually as normal</li>
+                                <li><strong>Audit Trail:</strong> All creations are logged with your user account</li>
+                            </ul>
+                        </div>
+
+                        <div class="d-flex justify-content-between">
+                            <a href="{% url 'gym:members_list' %}" class="btn btn-secondary">
+                                <i class="bi bi-arrow-left"></i> Cancel
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-people-fill"></i> Create Members
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Quick Reference Card -->
+            <div class="card mt-3">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-question-circle"></i> Quick Tips</h5>
+                </div>
+                <div class="card-body">
+                    <ul class="mb-0">
+                        <li><strong>Excel/Google Sheets:</strong> Copy cells and paste directly (comma-separated)</li>
+                        <li><strong>Empty fields:</strong> Leave phone or email blank if unknown</li>
+                        <li><strong>Name format:</strong> Letters, spaces, hyphens, and apostrophes only</li>
+                        <li><strong>Phone format:</strong> At least 7 digits (separators like spaces/dashes are OK)</li>
+                        <li><strong>After creation:</strong> Members will appear in the members list with "Pending Payment" status</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

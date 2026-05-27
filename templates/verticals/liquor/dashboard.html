@@ -22,70 +22,498 @@
 {% include "partials/dashboard_payment_mix.html" %}
 
 <style>
-  .vertical-page{display:flex;flex-direction:column;gap:18px;padding:18px}
-  .vertical-hero{background:linear-gradient(120deg,#a855f7,#ec4899);padding:24px;border-radius:20px;color:#fff;display:flex;flex-wrap:wrap;gap:18px;align-items:center;justify-content:space-between}
-  .vertical-hero h1{margin:0;font-size:clamp(24px,3vw,32px)}
-  .vertical-hero p{margin:4px 0 0}
-  .hero-actions{display:flex;gap:12px;flex-wrap:wrap}
-  .hero-actions a{border-radius:999px;padding:10px 16px;font-weight:700;text-decoration:none}
+  /* ===== MOBILE-FIRST LIQUOR DASHBOARD ===== */
+  .vertical-page{
+    display:flex;
+    flex-direction:column;
+    gap:24px;
+    padding:clamp(12px,3vw,24px);
+    max-width:1400px;
+    margin:0 auto;
+  }
+  
+  .vertical-hero{
+    background:linear-gradient(120deg,#a855f7,#ec4899);
+    padding:clamp(20px,4vw,32px);
+    border-radius:24px;
+    color:#fff;
+    display:flex;
+    flex-direction:column;
+    gap:20px;
+    box-shadow:0 16px 40px rgba(168,85,247,0.25);
+    position:relative;
+    overflow:hidden;
+  }
+  
+  .vertical-hero::before{
+    content:'';
+    position:absolute;
+    top:-50%;
+    right:-50%;
+    width:200%;
+    height:200%;
+    background:radial-gradient(circle,rgba(255,255,255,0.15) 0%,transparent 70%);
+    pointer-events:none;
+  }
+  
+  .vertical-hero h1{
+    margin:0;
+    font-size:clamp(24px,5vw,36px);
+    font-weight:800;
+  }
+  
+  .vertical-hero p{margin:4px 0 0;font-size:clamp(14px,2vw,16px)}
+  
+  .hero-actions{
+    display:flex;
+    gap:12px;
+    flex-wrap:wrap;
+    width:100%;
+  }
+  
+  .hero-actions a{
+    border-radius:999px;
+    padding:12px 20px;
+    font-weight:700;
+    text-decoration:none;
+    transition:all 0.2s;
+  }
+  
   .hero-actions .primary{background:#fff;color:#111827}
-  .hero-actions .ghost{border:1px solid rgba(255,255,255,.8);color:#fff}
-  .metrics-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px}
-  .metric-card{background:#fff;border-radius:18px;padding:18px;box-shadow:0 10px 30px rgba(15,23,42,.08)}
-  .metric-card h3{margin:0;font-size:.9rem;text-transform:uppercase;color:#64748b}
-  .metric-card p{margin:6px 0 0;font-size:1.8rem;font-weight:800;color:#0f172a}
-  .metric-card small{display:block;margin-top:4px;font-size:.85rem}
-  .recent-block{background:#fff;border-radius:20px;padding:18px;box-shadow:0 10px 30px rgba(15,23,42,.08)}
-  .recent-list{list-style:none;margin:0;padding:0;display:grid;gap:12px}
-  .recent-item{display:flex;justify-content:space-between;gap:12px;border:1px solid #e2e8f0;border-radius:16px;padding:14px}
-  .badge{display:inline-flex;align-items:center;gap:6px;border-radius:20px;padding:4px 10px;font-size:.75rem;font-weight:700}
+  .hero-actions .ghost{border:2px solid rgba(255,255,255,.8);color:#fff}
+  .hero-actions a:hover{transform:translateY(-2px);opacity:0.9}
+  
+  /* ===== METRICS GRID (Mobile-First) ===== */
+  .metrics-grid{
+    display:grid;
+    grid-template-columns:1fr;
+    gap:16px;
+    min-width:0;
+  }
+  
+  .metric-card{
+    background:#fff;
+    border-radius:20px;
+    padding:24px;
+    box-shadow:0 4px 20px rgba(15,23,42,.08);
+    min-width:0;
+    transition:all 0.3s cubic-bezier(0.4,0,0.2,1);
+    border:1px solid rgba(226,232,240,0.5);
+    position:relative;
+    overflow:hidden;
+    /* Entry animation */
+    opacity:0;
+    animation:fadeSlideUp 0.6s ease-out forwards;
+  }
+  
+  @keyframes fadeSlideUp{
+    from{
+      opacity:0;
+      transform:translateY(20px);
+    }
+    to{
+      opacity:1;
+      transform:translateY(0);
+    }
+  }
+  
+  /* Stagger animation for cards */
+  .metric-card:nth-child(1){animation-delay:0.1s}
+  .metric-card:nth-child(2){animation-delay:0.2s}
+  .metric-card:nth-child(3){animation-delay:0.3s}
+  .metric-card:nth-child(4){animation-delay:0.4s}
+  .metric-card:nth-child(5){animation-delay:0.5s}
+  .metric-card:nth-child(6){animation-delay:0.6s}
+  
+  .metric-card::before{
+    content:'';
+    position:absolute;
+    top:0;
+    left:0;
+    right:0;
+    height:4px;
+    background:linear-gradient(90deg,transparent,rgba(168,85,247,0.4),transparent);
+    opacity:0;
+    transition:opacity 0.3s;
+  }
+  
+  .metric-card:hover::before{
+    opacity:1;
+  }
+  
+  .metric-card:hover{
+    transform:translateY(-8px) scale(1.02);
+    box-shadow:0 16px 48px rgba(168,85,247,.18);
+    border-color:rgba(168,85,247,0.3);
+  }
+  
+  .metric-card h3{
+    margin:0 0 10px 0;
+    font-size:.9rem;
+    text-transform:uppercase;
+    color:#64748b;
+    font-weight:700;
+    letter-spacing:0.8px;
+  }
+  
+  .metric-card p{
+    margin:0;
+    font-size:clamp(1.5rem,6vw,2rem);
+    font-weight:800;
+    color:#0f172a;
+    line-height:1.1;
+    word-wrap:break-word;
+  }
+  
+  .metric-card small{
+    display:block;
+    margin-top:6px;
+    font-size:.85rem;
+    color:#64748b;
+    line-height:1.3;
+  }
+  
+  /* ===== TABLET+ (2 columns) ===== */
+  @media (min-width:640px){
+    .metrics-grid{
+      grid-template-columns:repeat(2,1fr);
+      gap:20px;
+    }
+    
+    .vertical-hero{
+      flex-direction:row;
+      align-items:center;
+      justify-content:space-between;
+    }
+    
+    .hero-actions{
+      width:auto;
+    }
+  }
+  
+  /* ===== DESKTOP (3+ columns) ===== */
+  @media (min-width:1024px){
+    .metrics-grid{
+      grid-template-columns:repeat(3,1fr);
+    }
+  }
+  
+  /* ===== PANELS ===== */
+  .recent-block{
+    background:#fff;
+    border-radius:20px;
+    padding:clamp(20px,4vw,28px);
+    box-shadow:0 4px 20px rgba(15,23,42,.08);
+    border:1px solid rgba(226,232,240,0.5);
+    transition:all 0.3s ease;
+  }
+  
+  .recent-block:hover{
+    box-shadow:0 8px 32px rgba(15,23,42,.12);
+    border-color:rgba(168,85,247,0.2);
+  }
+  
+  .recent-block h2{
+    font-size:clamp(1rem,2.5vw,1.25rem);
+  }
+  
+  .recent-list{
+    list-style:none;
+    margin:0;
+    padding:0;
+    display:grid;
+    gap:12px;
+  }
+  
+  .recent-item{
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+    border:1px solid #e2e8f0;
+    border-radius:16px;
+    padding:16px;
+  }
+  
+  @media (min-width:640px){
+    .recent-item{
+      flex-direction:row;
+      justify-content:space-between;
+      align-items:center;
+    }
+  }
+  
+  .badge{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    border-radius:20px;
+    padding:6px 12px;
+    font-size:.8rem;
+    font-weight:700;
+  }
+  
   .badge.shots{background:#fef9c3;color:#b45309}
   .badge.scan{background:#ecfeff;color:#0369a1}
 </style>
 
 <div class="vertical-page">
+
+  <!-- ===== PREMIUM HERO COMMAND CENTER ===== -->
   <header class="vertical-hero">
     <div>
-      <p style="margin:0;opacity:.8;text-transform:uppercase;letter-spacing:.08em;font-size:.8rem">{{ business.name }} · {{ location_label }}</p>
-      <h1>{{ hero_title }}</h1>
-      <p>{{ hero_blurb }}</p>
+      <p style="margin:0;opacity:.75;text-transform:uppercase;letter-spacing:.1em;font-size:.75rem">{{ business.name }} · {{ location_label }}</p>
+      <h1 style="font-size:clamp(1.6rem,4vw,2.4rem);margin:4px 0">{{ hero_title }}</h1>
+      <p style="margin:0;opacity:.85;font-size:.95rem">{{ hero_blurb }}</p>
     </div>
     <div class="hero-actions">
-      <a class="primary" href="{{ liquor_add_url|default:'/inventory/liquor/products/new/v2/' }}">Add liquor item</a>
-      <a class="ghost" href="/liquor/inventory/">Liquor Hub</a>
-      <a class="ghost" href="/liquor/sell/">Sell</a>
+      <a href="{% url 'liquor:sell' %}" style="background:#fff;color:#7c3aed;font-size:1.05rem;padding:14px 26px;border-radius:999px;font-weight:800;box-shadow:0 6px 20px rgba(0,0,0,.2);display:inline-flex;align-items:center;gap:8px;text-decoration:none;transition:all 0.2s" onmouseenter="this.style.transform='translateY(-2px)'" onmouseleave="this.style.transform=''">
+        <i class="bi bi-cart-check-fill"></i> Sell Now
+      </a>
+      <a href="{% url 'liquor:scan_in' %}" style="background:rgba(255,255,255,.15);color:#fff;border:2px solid rgba(255,255,255,.8);font-size:.95rem;padding:12px 22px;border-radius:999px;font-weight:700;display:inline-flex;align-items:center;gap:8px;text-decoration:none;transition:all 0.2s" onmouseenter="this.style.background='rgba(255,255,255,.25)'" onmouseleave="this.style.background='rgba(255,255,255,.15)'">
+        <i class="bi bi-upc-scan"></i> Scan In
+      </a>
+      <a href="{% url 'liquor:credits_list' %}" style="background:rgba(239,68,68,.3);color:#fff;border:2px solid rgba(239,68,68,.7);font-size:.95rem;padding:12px 22px;border-radius:999px;font-weight:700;display:inline-flex;align-items:center;gap:8px;text-decoration:none;transition:all 0.2s">
+        <i class="bi bi-person-credit-card"></i> Credit
+      </a>
+      {% include "partials/vertical_more_dropdown.html" %}
     </div>
   </header>
 
+  <!-- ===== TODAY AT A GLANCE — 8 KPI Command Cards ===== -->
+  <section id="today-kpi-section">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <h2 style="margin:0;font-size:1rem;font-weight:800;color:#0f172a;text-transform:uppercase;letter-spacing:.08em">
+        <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#10b981;margin-right:8px;animation:pulse-dot 2s infinite"></span>
+        Today at a Glance
+      </h2>
+      <span id="today-kpi-ts" style="font-size:.75rem;color:#94a3b8"></span>
+    </div>
+    <style>
+      @keyframes pulse-dot{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(1.4)}}
+      .kpi-cmd{
+        background:#fff;
+        border-radius:16px;
+        padding:18px 20px;
+        border:1px solid #e2e8f0;
+        box-shadow:0 2px 12px rgba(15,23,42,.06);
+        transition:all 0.25s cubic-bezier(0.4,0,0.2,1);
+        cursor:default;
+        position:relative;
+        overflow:hidden;
+      }
+      .kpi-cmd::after{
+        content:'';
+        position:absolute;
+        top:0;left:0;right:0;height:3px;
+        background:var(--kpi-accent,#a855f7);
+        border-radius:16px 16px 0 0;
+      }
+      .kpi-cmd:hover{transform:translateY(-4px);box-shadow:0 8px 28px rgba(15,23,42,.13);border-color:rgba(168,85,247,.25)}
+      .kpi-label{font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#64748b;margin-bottom:6px}
+      .kpi-val{font-size:clamp(1.4rem,4vw,1.9rem);font-weight:900;color:#0f172a;line-height:1}
+      .kpi-sub{font-size:.75rem;color:#94a3b8;margin-top:4px}
+      .kpi-icon{position:absolute;top:14px;right:14px;font-size:1.4rem;opacity:.18}
+      .kpi-grid-today{
+        display:grid;
+        grid-template-columns:repeat(2,1fr);
+        gap:12px;
+      }
+      @media(min-width:600px){.kpi-grid-today{grid-template-columns:repeat(4,1fr)}}
+      @media(min-width:1100px){.kpi-grid-today{grid-template-columns:repeat(4,1fr)}}
+      /* Alert panel */
+      .alert-panel{background:#fff;border-radius:16px;padding:20px;border:1px solid #e2e8f0;box-shadow:0 2px 12px rgba(15,23,42,.06)}
+      .alert-row{display:flex;align-items:flex-start;gap:12px;padding:12px 0;border-bottom:1px solid #f1f5f9}
+      .alert-row:last-child{border-bottom:none;padding-bottom:0}
+      .alert-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;margin-top:5px}
+      .alert-dot.danger{background:#ef4444}
+      .alert-dot.warn{background:#f59e0b}
+      .alert-dot.success{background:#10b981}
+      .alert-dot.info{background:#3b82f6}
+      .alert-title{font-weight:700;font-size:.9rem;color:#0f172a}
+      .alert-desc{font-size:.8rem;color:#64748b;margin-top:2px}
+      .alert-time{font-size:.7rem;color:#94a3b8;white-space:nowrap;margin-left:auto;flex-shrink:0}
+    </style>
+    <div class="kpi-grid-today" id="today-kpi-grid">
+      <!-- Skeleton placeholders -->
+      {% for _ in "12345678" %}
+      <div class="kpi-cmd" style="opacity:.5">
+        <div class="kpi-label" style="background:#f1f5f9;height:10px;border-radius:6px;width:60%">&nbsp;</div>
+        <div class="kpi-val" style="background:#f1f5f9;height:28px;border-radius:6px;width:80%;margin-top:8px">&nbsp;</div>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <!-- ===== SMART ALERTS PANEL ===== -->
+  <section id="smart-alerts-section">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <h2 style="margin:0;font-size:1rem;font-weight:800;color:#0f172a;text-transform:uppercase;letter-spacing:.08em">
+        <i class="bi bi-bell-fill" style="color:#f59e0b;margin-right:6px"></i>Smart Alerts
+      </h2>
+      <button onclick="document.getElementById('smart-alerts-section').style.display='none'"
+              style="border:0;background:none;color:#94a3b8;font-size:.8rem;cursor:pointer">Dismiss all</button>
+    </div>
+    <div class="alert-panel" id="smart-alerts-panel">
+      <div style="text-align:center;padding:20px;color:#94a3b8;font-size:.9rem" id="alerts-loading">
+        <i class="bi bi-hourglass-split"></i> Loading alerts...
+      </div>
+      <div id="alerts-content" style="display:none"></div>
+      <div id="alerts-empty" style="display:none;text-align:center;padding:16px;color:#94a3b8;font-size:.9rem">
+        <i class="bi bi-check-circle" style="color:#10b981;font-size:1.5rem"></i>
+        <div style="margin-top:6px;font-weight:600;color:#059669">All clear! No active alerts.</div>
+      </div>
+    </div>
+  </section>
+
+  <script>
+  (function() {
+    function fmtMK(v) {
+      var n = Math.round(parseFloat(v || 0));
+      return 'MK ' + n.toLocaleString();
+    }
+    function fmtNum(v) { return Math.round(parseFloat(v || 0)).toLocaleString(); }
+    function ago(d) {
+      if (!d) return '';
+      var diff = Math.floor((Date.now() - new Date(d)) / 60000);
+      if (diff < 1) return 'just now';
+      if (diff < 60) return diff + 'm ago';
+      if (diff < 1440) return Math.floor(diff / 60) + 'h ago';
+      return Math.floor(diff / 1440) + 'd ago';
+    }
+
+    function renderTodayKPIs(data) {
+      var grid = document.getElementById('today-kpi-grid');
+      if (!grid) return;
+      var ts = document.getElementById('today-kpi-ts');
+      if (ts) ts.textContent = 'Updated ' + ago(new Date().toISOString());
+
+      var todaySales = parseFloat(data.today_revenue || 0);
+      var todayCash = parseFloat(data.today_cash || 0);
+      var todayCredit = parseFloat(data.today_credit_issued || 0);
+      var outstandingCredit = parseFloat(data.outstanding_credit || 0);
+      var lowStockCount = parseInt(data.low_stock_count || 0);
+      var outOfStockCount = parseInt(data.out_of_stock_count || 0);
+      var todayProfit = parseFloat(data.today_profit || 0);
+      var bestSeller = data.today_best_seller || '—';
+      var repeatDebtors = parseInt(data.repeat_debtors || 0);
+      var totalSalesCount = parseInt(data.today_sales_count || 0);
+
+      var kpis = [
+        {label:'Today\'s Sales', val: fmtMK(todaySales), sub: totalSalesCount + ' transactions', icon:'bi-bag-check-fill', accent:'#7c3aed', good: todaySales > 0},
+        {label:'Cash Today', val: fmtMK(todayCash), sub: 'Direct payments', icon:'bi-cash-stack', accent:'#059669', good: todayCash > 0},
+        {label:'Credit Issued Today', val: fmtMK(todayCredit), sub: 'New credit sales', icon:'bi-person-credit-card', accent:'#dc2626', good: false},
+        {label:'Outstanding Credit', val: fmtMK(outstandingCredit), sub: 'Total owed to you', icon:'bi-exclamation-circle-fill', accent: outstandingCredit > 0 ? '#dc2626' : '#059669', good: outstandingCredit === 0},
+        {label:'Low Stock Alerts', val: lowStockCount + (outOfStockCount > 0 ? ' (+' + outOfStockCount + ' out)' : ''), sub: 'Products need restocking', icon:'bi-exclamation-triangle-fill', accent: lowStockCount > 0 ? '#f59e0b' : '#059669', good: lowStockCount === 0},
+        {label:'Best Seller Today', val: bestSeller, sub: 'Top product', icon:'bi-trophy-fill', accent:'#d97706', good: bestSeller !== '—'},
+        {label:'Profit Today', val: fmtMK(todayProfit), sub: todayProfit >= 0 ? 'Revenue minus costs' : 'Review pricing', icon:'bi-graph-up-arrow', accent: todayProfit >= 0 ? '#059669' : '#dc2626', good: todayProfit >= 0},
+        {label:'Repeat Debtor Risk', val: repeatDebtors > 0 ? repeatDebtors + ' flagged' : 'None', sub: 'Customers overdue 2+ times', icon:'bi-shield-exclamation', accent: repeatDebtors > 0 ? '#dc2626' : '#059669', good: repeatDebtors === 0},
+      ];
+
+      grid.innerHTML = kpis.map(function(k) {
+        return '<div class="kpi-cmd" style="--kpi-accent:' + k.accent + '">' +
+          '<i class="bi ' + k.icon + ' kpi-icon"></i>' +
+          '<div class="kpi-label">' + k.label + '</div>' +
+          '<div class="kpi-val" style="color:' + k.accent + '">' + k.val + '</div>' +
+          '<div class="kpi-sub">' + k.sub + '</div>' +
+          '</div>';
+      }).join('');
+    }
+
+    function renderAlerts(data) {
+      var loading = document.getElementById('alerts-loading');
+      var content = document.getElementById('alerts-content');
+      var empty = document.getElementById('alerts-empty');
+      if (!loading || !content || !empty) return;
+
+      var alerts = [];
+
+      if (data.low_stock_items && data.low_stock_items.length > 0) {
+        data.low_stock_items.slice(0, 3).forEach(function(item) {
+          alerts.push({type:'warn', title:'⚠ ' + item.name + ' — Low Stock', desc: item.stock_display || 'Running low'});
+        });
+      }
+      if (data.out_of_stock_items && data.out_of_stock_items.length > 0) {
+        data.out_of_stock_items.slice(0, 2).forEach(function(item) {
+          alerts.push({type:'danger', title:'✕ ' + item.name + ' — Out of Stock', desc: 'Cannot be sold until restocked'});
+        });
+      }
+      if (parseFloat(data.outstanding_credit || 0) > 0) {
+        alerts.push({type:'warn', title:'💳 Outstanding Credit: MK ' + Math.round(data.outstanding_credit).toLocaleString(), desc: (data.open_credits_count || 0) + ' customers owe you money — collect today'});
+      }
+      if (parseInt(data.repeat_debtors || 0) > 0) {
+        alerts.push({type:'danger', title:'🔴 ' + data.repeat_debtors + ' Repeat Late Payer' + (data.repeat_debtors > 1 ? 's' : ''), desc: 'Review before extending more credit'});
+      }
+      if (data.top_items && data.top_items.length > 0) {
+        alerts.push({type:'success', title:'🔥 ' + data.top_items[0].name + ' — Highest Seller', desc: 'MK ' + Math.round(data.top_items[0].revenue || 0).toLocaleString() + ' revenue — great margin product'});
+      }
+      if (parseInt(data.low_stock_count || 0) === 0 && parseInt(data.out_of_stock_count || 0) === 0) {
+        alerts.push({type:'success', title:'✅ Stock levels healthy', desc: 'All products have sufficient stock'});
+      }
+
+      loading.style.display = 'none';
+      if (alerts.length === 0) {
+        empty.style.display = 'block';
+      } else {
+        content.style.display = 'block';
+        content.innerHTML = alerts.map(function(a) {
+          var dotColor = {danger:'#ef4444', warn:'#f59e0b', success:'#10b981', info:'#3b82f6'}[a.type] || '#94a3b8';
+          return '<div class="alert-row">' +
+            '<div class="alert-dot" style="background:' + dotColor + '"></div>' +
+            '<div><div class="alert-title">' + a.title + '</div><div class="alert-desc">' + a.desc + '</div></div>' +
+            '</div>';
+        }).join('');
+      }
+    }
+
+    function loadTodayData() {
+      fetch('/liquor/api/business-insights/?days=1')
+        .then(function(r) { return r.ok ? r.json() : Promise.reject(); })
+        .then(function(data) {
+          renderTodayKPIs(data);
+          renderAlerts(data);
+        })
+        .catch(function() {
+          var grid = document.getElementById('today-kpi-grid');
+          if (grid) grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:20px;color:#94a3b8">Could not load today\'s data. <button onclick="loadTodayData()" style="border:0;background:none;color:#7c3aed;text-decoration:underline;cursor:pointer">Retry</button></div>';
+          var loading = document.getElementById('alerts-loading');
+          if (loading) loading.textContent = 'Could not load alerts.';
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', loadTodayData);
+  })();
+  </script>
+
   <!-- Financial KPIs: Enhanced with cost breakdown -->
-  <section class="metrics-grid" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr))">
+  <section class="metrics-grid">
     <article class="metric-card">
-      <h3>Revenue ({{ period_days }} days)</h3>
-      <p style="color:#16a34a">MK {{ revenue|floatformat:2|default:"0.00" }}</p>
-      <small style="color:#64748b">Total sales revenue</small>
+      <h3>💰 Revenue ({{ period_days }} days)</h3>
+      <p style="color:#16a34a">MK {{ revenue|floatformat:0|default:"0" }}</p>
+      <small>Total sales revenue</small>
     </article>
     <article class="metric-card">
-      <h3>Inventory Costs</h3>
-      <p>MK {{ inventory_costs|floatformat:2|default:"0.00" }}</p>
-      <small style="color:#64748b">Cost of goods sold</small>
+      <h3>📦 Stock Value</h3>
+      <p>MK {{ total_stock_value|floatformat:0|default:"0" }}</p>
+      <small>Current inventory cost</small>
     </article>
     <article class="metric-card">
-      <h3>Admin Costs ({{ period_days }} days)</h3>
-      <p>MK {{ admin_costs|floatformat:2|default:"0.00" }}</p>
-      <small style="color:#64748b">Operational expenses</small>
+      <h3>⚙️ Admin Costs ({{ period_days }} days)</h3>
+      <p>MK {{ admin_costs|floatformat:0|default:"0" }}</p>
+      <small>Operational expenses</small>
     </article>
     <article class="metric-card">
-      <h3>Total Costs</h3>
-      <p style="color:#dc2626">MK {{ total_costs|floatformat:2|default:"0.00" }}</p>
-      <small style="color:#64748b">Inventory + Admin</small>
+      <h3>💸 COGS ({{ period_days }} days)</h3>
+      <p style="color:#dc2626">MK {{ inventory_costs|floatformat:0|default:"0" }}</p>
+      <small>Inventory purchases (last {{ period_days }} days)</small>
+      <!-- LIQUOR_DASH_COGS_V3 -->
     </article>
-    <article class="metric-card" style="grid-column:span 2">
-      <h3>{% if net_profit >= 0 %}Net Profit{% else %}Net Loss{% endif %} ({{ period_days }} days)</h3>
-      <p style="{% if net_profit < 0 %}color:#dc2626{% else %}color:#16a34a{% endif %};font-size:2.2rem">MK {{ net_profit|floatformat:2|default:"0.00" }}</p>
-      <small style="color:#64748b">Revenue minus all costs</small>
+    <article class="metric-card" style="grid-column:span 1">
+      <h3>{% if net_profit >= 0 %}✅ Net Profit{% else %}⚠️ Net Loss{% endif %} ({{ period_days }} days)</h3>
+      <p style="{% if net_profit < 0 %}color:#dc2626{% else %}color:#16a34a{% endif %}">MK {{ net_profit|floatformat:0|default:"0" }}</p>
+      <small>Revenue minus all costs</small>
       {% if net_profit < 0 %}
-        <div style="margin-top:10px;padding:8px;background:#fef2f2;border-left:3px solid #dc2626;border-radius:6px">
-          <small style="color:#991b1b;font-weight:600">⚠️ Loss period - review costs and pricing</small>
+        <div style="margin-top:12px;padding:12px;background:#fef2f2;border-left:3px solid #dc2626;border-radius:8px">
+          <small style="color:#991b1b;font-weight:600;font-size:.85rem">⚠️ Loss period - review costs and pricing</small>
         </div>
       {% endif %}
     </article>
@@ -159,11 +587,322 @@
     {% endif %}
   </section>
 
+  <!-- Business Insights Section -->
+  <section class="recent-block">
+    <h2 style="margin:0 0 16px;font-size:1.1rem">
+      <i class="bi bi-graph-up"></i> Business Insights
+    </h2>
+    
+    <!-- Loading State -->
+    <div id="insights-loading" style="text-align:center;padding:48px">
+      <div class="spinner-border text-primary" role="status" style="width:3rem;height:3rem">
+        <span class="visually-hidden">Loading...</span>
+      </div>
+      <p style="margin-top:12px;color:#64748b;font-weight:600">Loading insights...</p>
+    </div>
+    
+    <!-- Insights Content (Hidden initially) -->
+    <div id="insights-content" style="display:none">
+      <!-- Revenue Trend Chart — Premium -->
+      <div id="revenue-trend-card" style="margin-bottom:24px;background:linear-gradient(135deg,#0f172a 0%,#1e1b4b 100%);border-radius:20px;padding:24px;box-shadow:0 20px 60px rgba(124,58,237,0.2);position:relative;overflow:hidden">
+        <!-- Decorative glow -->
+        <div style="position:absolute;top:-60px;right:-60px;width:200px;height:200px;background:radial-gradient(circle,rgba(168,85,247,0.3) 0%,transparent 70%);pointer-events:none"></div>
+        <!-- Header -->
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;position:relative;z-index:1">
+          <div>
+            <div style="font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:#a78bfa;font-weight:700;margin-bottom:4px">Revenue Trend</div>
+            <div style="font-size:1.5rem;font-weight:800;color:#fff" id="trend-total-display">Loading...</div>
+            <div style="font-size:.8rem;color:#94a3b8;margin-top:2px" id="trend-period-display">Last 30 days</div>
+          </div>
+          <div id="trend-change-badge" style="display:none;padding:6px 12px;border-radius:999px;font-size:.8rem;font-weight:700"></div>
+        </div>
+        <!-- Chart area -->
+        <div id="revenue-chart-wrap" style="position:relative;z-index:1">
+          <canvas id="revenueTrendChart" style="max-height:220px"></canvas>
+        </div>
+        <!-- Single data point message -->
+        <div id="single-point-msg" style="display:none;text-align:center;padding:24px 16px;position:relative;z-index:1">
+          <div style="font-size:2.5rem;margin-bottom:10px">📈</div>
+          <div style="color:#e2e8f0;font-weight:700;font-size:1rem;margin-bottom:6px">Only one sale recorded so far.</div>
+          <div style="color:#94a3b8;font-size:.875rem">Keep selling to build a stronger trend.</div>
+        </div>
+      </div>
+      
+      <!-- Quick Stats Grid -->
+      <div class="metrics-grid" style="margin-bottom:24px">
+        <article class="metric-card">
+          <h3>Total Revenue</h3>
+          <p id="total-revenue" style="color:#16a34a">MK 0.00</p>
+          <small id="total-sales-count">0 sales</small>
+        </article>
+        <article class="metric-card">
+          <h3>Stock Value</h3>
+          <p id="stock-value">MK 0.00</p>
+          <small>Current inventory cost</small>
+        </article>
+        <article class="metric-card">
+          <h3>Stock Alerts</h3>
+          <p id="stock-alerts" style="color:#f59e0b">0</p>
+          <small id="stock-alerts-detail">low stock</small>
+        </article>
+      </div>
+      
+      <!-- Top Selling Items -->
+      <div>
+        <h3 style="font-size:0.95rem;color:#64748b;text-transform:uppercase;margin-bottom:12px">Top Selling Items</h3>
+        <div id="top-items-list" class="recent-list">
+          <!-- Will be populated by JS -->
+        </div>
+      </div>
+    </div>
+    
+    <!-- Error State (Hidden initially) -->
+    <div id="insights-error" style="display:none;text-align:center;padding:48px;background:#fef2f2;border-radius:12px">
+      <div style="font-size:48px;margin-bottom:12px">⚠️</div>
+      <p style="margin:0;color:#991b1b;font-weight:600">Failed to load insights</p>
+      <button onclick="loadBusinessInsights()" class="btn btn-sm btn-outline-danger" style="margin-top:12px">Retry</button>
+    </div>
+  </section>
+  
+  <script>
+    let revenueChart = null;
+    
+    function loadBusinessInsights() {
+      const loading = document.getElementById('insights-loading');
+      const content = document.getElementById('insights-content');
+      const error = document.getElementById('insights-error');
+      
+      // Show loading
+      loading.style.display = 'block';
+      content.style.display = 'none';
+      error.style.display = 'none';
+      
+      // Fetch insights data
+      fetch('/liquor/api/business-insights/?days=30')
+        .then(response => {
+          if (!response.ok) throw new Error('Failed to fetch insights');
+          return response.json();
+        })
+        .then(data => {
+          // Hide loading, show content
+          loading.style.display = 'none';
+          content.style.display = 'block';
+          
+          // Format MWK without decimals, with thousands separators
+          function fmtMK(val) {
+            return 'MK ' + Math.round(parseFloat(val || 0)).toLocaleString();
+          }
+          
+          // Update quick stats
+          document.getElementById('total-revenue').textContent = fmtMK(data.total_revenue);
+          document.getElementById('total-sales-count').textContent = 
+            (data.total_sales_count || 0) + ' sales';
+          document.getElementById('stock-value').textContent = fmtMK(data.total_stock_value);
+          document.getElementById('stock-alerts').textContent = 
+            (data.low_stock_count || 0);
+          document.getElementById('stock-alerts-detail').textContent = 
+            (data.low_stock_count || 0) + ' low stock, ' + (data.out_of_stock_count || 0) + ' out';
+          
+          // Render revenue trend chart
+          renderRevenueChart(data.revenue_trend || []);
+          
+          // Render top items list
+          renderTopItems(data.top_items || []);
+        })
+        .catch(err => {
+          console.error('Error loading insights:', err);
+          loading.style.display = 'none';
+          error.style.display = 'block';
+        });
+    }
+    
+    function renderRevenueChart(trend) {
+      const ctx = document.getElementById('revenueTrendChart');
+      const chartWrap = document.getElementById('revenue-chart-wrap');
+      const singleMsg = document.getElementById('single-point-msg');
+      const totalDisplay = document.getElementById('trend-total-display');
+      const changeBadge = document.getElementById('trend-change-badge');
+      if (!ctx) return;
+
+      // Destroy existing chart
+      if (revenueChart) { revenueChart.destroy(); revenueChart = null; }
+
+      // Build fallback demo data if none
+      const DEMO = trend && trend.length >= 2;
+      let data = trend && trend.length > 0 ? trend : (() => {
+        const base = [2800, 3400, 2900, 4200, 3100, 5600, 4800, 6200, 5100, 7400, 6300, 8200,
+                      7100, 9500, 8400, 7800, 9100, 10200, 8900, 11400, 9800, 12100, 10500, 11800,
+                      10200, 13500, 11900, 12800, 14200, 15600];
+        const today = new Date();
+        return base.map((rev, i) => {
+          const d = new Date(today); d.setDate(today.getDate() - (29 - i));
+          return { date: d.toISOString().slice(0, 10), revenue: rev };
+        });
+      })();
+
+      // Single data point — special state
+      if (data.length === 1) {
+        if (chartWrap) chartWrap.style.display = 'none';
+        if (singleMsg) singleMsg.style.display = 'block';
+        const rev = parseFloat(data[0].revenue || 0);
+        if (totalDisplay) totalDisplay.textContent = 'MK ' + Math.round(rev).toLocaleString();
+        return;
+      }
+
+      // Show chart, hide single-point msg
+      if (chartWrap) chartWrap.style.display = 'block';
+      if (singleMsg) singleMsg.style.display = 'none';
+
+      const revenues = data.map(d => parseFloat(d.revenue || 0));
+      const totalRev = revenues.reduce((a, b) => a + b, 0);
+      const labels = data.map(d => {
+        const dt = new Date(d.date + 'T00:00:00');
+        return dt.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+      });
+
+      // Compute period-on-period change (first half vs second half)
+      let changePct = null;
+      if (revenues.length >= 4) {
+        const mid = Math.floor(revenues.length / 2);
+        const firstHalf = revenues.slice(0, mid).reduce((a,b)=>a+b,0);
+        const secondHalf = revenues.slice(mid).reduce((a,b)=>a+b,0);
+        if (firstHalf > 0) changePct = ((secondHalf - firstHalf) / firstHalf * 100).toFixed(1);
+      }
+
+      if (totalDisplay) {
+        totalDisplay.textContent = 'MK ' + Math.round(totalRev).toLocaleString();
+        if (!DEMO) totalDisplay.style.color = '#fff';
+      }
+      if (changeBadge && changePct !== null) {
+        const up = parseFloat(changePct) >= 0;
+        changeBadge.style.display = 'block';
+        changeBadge.style.background = up ? 'rgba(16,185,129,0.2)' : 'rgba(239,68,68,0.2)';
+        changeBadge.style.color = up ? '#6ee7b7' : '#fca5a5';
+        changeBadge.textContent = (up ? '▲' : '▼') + ' ' + Math.abs(changePct) + '%';
+      }
+
+      // Gradient fill plugin using canvas gradient
+      const gradient = ctx.getContext('2d').createLinearGradient(0, 0, 0, 220);
+      gradient.addColorStop(0, 'rgba(168,85,247,0.45)');
+      gradient.addColorStop(0.5, 'rgba(168,85,247,0.12)');
+      gradient.addColorStop(1, 'rgba(168,85,247,0)');
+
+      revenueChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: 'Revenue',
+            data: revenues,
+            borderColor: '#a855f7',
+            borderWidth: 2.5,
+            backgroundColor: gradient,
+            tension: 0.45,
+            fill: true,
+            pointRadius: revenues.length <= 14 ? 4 : 2,
+            pointHoverRadius: 7,
+            pointBackgroundColor: '#a855f7',
+            pointBorderColor: '#fff',
+            pointBorderWidth: 2,
+            pointHoverBackgroundColor: '#fff',
+            pointHoverBorderColor: '#a855f7',
+            pointHoverBorderWidth: 2,
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: 'rgba(15,23,42,0.95)',
+              borderColor: 'rgba(168,85,247,0.4)',
+              borderWidth: 1,
+              titleColor: '#e2e8f0',
+              bodyColor: '#a78bfa',
+              padding: 12,
+              callbacks: {
+                title: ctx => ctx[0].label,
+                label: ctx => '  Revenue: MK ' + Math.round(ctx.parsed.y).toLocaleString(),
+              }
+            }
+          },
+          scales: {
+            x: {
+              grid: { display: false },
+              ticks: {
+                color: '#64748b',
+                font: { size: 11 },
+                maxTicksLimit: 8,
+                maxRotation: 0,
+              },
+              border: { display: false },
+            },
+            y: {
+              beginAtZero: true,
+              grid: { color: 'rgba(255,255,255,0.05)' },
+              ticks: {
+                color: '#64748b',
+                font: { size: 11 },
+                callback: v => {
+                  if (v >= 1000000) return 'MK ' + (v/1000000).toFixed(1) + 'M';
+                  if (v >= 1000) return 'MK ' + (v/1000).toFixed(0) + 'k';
+                  return 'MK ' + v;
+                },
+                maxTicksLimit: 5,
+              },
+              border: { display: false },
+            }
+          },
+          animation: { duration: 800, easing: 'easeInOutQuart' },
+        }
+      });
+      
+      // Demo data watermark
+      if (!DEMO && (!trend || trend.length === 0)) {
+        const note = document.createElement('div');
+        note.style.cssText = 'text-align:center;margin-top:10px;font-size:.75rem;color:#475569;font-style:italic;position:relative;z-index:1';
+        note.textContent = 'Sample trend — start selling to see real data';
+        ctx.parentElement.appendChild(note);
+      }
+    }
+    
+    function renderTopItems(items) {
+      const container = document.getElementById('top-items-list');
+      if (!container) return;
+      
+      if (items.length === 0) {
+        container.innerHTML = '<li class="recent-item" style="text-align:center;padding:24px;color:#94a3b8">No sales data yet</li>';
+        return;
+      }
+      
+      container.innerHTML = items.map((item, i) => `
+        <li class="recent-item" style="display:flex;justify-content:space-between;align-items:center;gap:12px">
+          <div style="flex:1">
+            <strong style="color:#0f172a">#${i + 1} ${item.name}</strong>
+            <div style="font-size:0.85rem;color:#64748b;margin-top:4px">
+              ${item.category || 'Uncategorized'} · ${item.quantity} units · ${item.sales_count} sales
+            </div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-weight:800;color:#16a34a">MK ${Math.round(parseFloat(item.revenue)).toLocaleString()}</div>
+          </div>
+        </li>
+      `).join('');
+    }
+    
+    // Load insights on page load
+    document.addEventListener('DOMContentLoaded', function() {
+      loadBusinessInsights();
+    });
+  </script>
+
   {% comment %}Rotating Insights Panel{% endcomment %}
   {% include "partials/dashboard_rotating_insights.html" %}
 
   {% comment %}Payment Mix Card - fallback if PAYMENT_MIX not available{% endcomment %}
-  {% if not PAYMENT_MIX and payment_mix %}
+  {% if payment_mix %}
   <section class="recent-block">
     <h2 style="margin:0 0 10px;font-size:1.1rem">Payment Mix ({{ period_days }} days)</h2>
     
@@ -190,7 +929,7 @@
       {% for pm in payment_mix %}
       <article class="metric-card">
         <h3>{{ pm.method }}</h3>
-        <p>MK {{ pm.amount|floatformat:2 }}</p>
+        <p>MK {{ pm.amount|floatformat:0 }}</p>
         <small style="color:#64748b">{{ pm.count }} transaction{{ pm.count|pluralize }}{% if pm.percent %} · {{ pm.percent }}%{% endif %}</small>
       </article>
       {% endfor %}

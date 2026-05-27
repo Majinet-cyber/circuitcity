@@ -1,7 +1,14 @@
 {% extends "base.html" %}
 {% load static %}
+{% load humanize %}
+{% load clothing_tags %}
 
 {% block title %}Clothing · Emajinet{% endblock %}
+
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<link rel="stylesheet" href="{% static 'css/clothing-dashboard-premium.css' %}">
+{% endblock %}
 
 {% block content %}
 {% url 'inventory:clothing_product_new_v2' as clothing_add_url %}
@@ -19,41 +26,71 @@
 {% include "partials/dashboard_payment_mix.html" %}
 
 <style>
-  .vertical-page{display:flex;flex-direction:column;gap:18px;padding:18px}
-  .vertical-hero{background:linear-gradient(120deg,#0ea5e9,#38bdf8);padding:24px;border-radius:20px;color:#fff;display:flex;flex-wrap:wrap;gap:18px;align-items:center;justify-content:space-between}
-  .vertical-hero .eyebrow{opacity:.8;text-transform:uppercase;font-size:.8rem;letter-spacing:.12em;margin:0}
-  .vertical-hero h1{margin:4px 0;font-size:clamp(24px,3vw,32px)}
-  .vertical-hero p{margin:0}
-  .hero-actions{display:flex;gap:12px;flex-wrap:wrap}
-  .hero-actions a{border-radius:30px;padding:10px 16px;font-weight:700;text-decoration:none}
+  .vertical-page{display:flex;flex-direction:column;gap:20px;padding:20px;max-width:1400px;margin:0 auto}
+  .vertical-hero{background:linear-gradient(135deg,#0ea5e9 0%,#38bdf8 50%,#60a5fa 100%);padding:28px;border-radius:24px;color:#fff;display:flex;flex-wrap:wrap;gap:20px;align-items:center;justify-content:space-between;box-shadow:0 20px 60px rgba(14,165,233,0.2);position:relative;overflow:hidden}
+  .vertical-hero::before{content:'';position:absolute;top:-50%;right:-50%;width:200%;height:200%;background:radial-gradient(circle,rgba(255,255,255,0.1) 0%,transparent 70%);pointer-events:none}
+  .vertical-hero .eyebrow{opacity:.9;text-transform:uppercase;font-size:.8rem;letter-spacing:.15em;margin:0;font-weight:600}
+  .vertical-hero h1{margin:6px 0;font-size:clamp(26px,4vw,36px);font-weight:800;text-shadow:0 2px 10px rgba(0,0,0,0.1)}
+  .vertical-hero p{margin:0;opacity:.95;font-size:1rem}
+  .hero-actions{display:flex;gap:12px;flex-wrap:wrap;z-index:1;position:relative}
+  .hero-actions a{border-radius:30px;padding:12px 20px;font-weight:700;text-decoration:none;transition:all 0.3s cubic-bezier(0.4,0,0.2,1);box-shadow:0 4px 12px rgba(0,0,0,0.15)}
   .hero-actions .primary{background:#fff;color:#0f172a}
-  .hero-actions .ghost{border:1px solid rgba(255,255,255,.8);color:#fff}
-  .metrics-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px}
-  .metric-card{background:#fff;border-radius:18px;padding:18px;box-shadow:0 10px 30px rgba(15,23,42,.08)}
-  .metric-card h3{margin:0;font-size:.9rem;text-transform:uppercase;color:#64748b;letter-spacing:.08em}
-  .metric-card p{margin:6px 0 0;font-size:1.9rem;font-weight:800;color:#0f172a}
-  .recent-block{background:#fff;border-radius:20px;padding:18px;box-shadow:0 10px 30px rgba(15,23,42,.08)}
-  .recent-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:12px}
-  .recent-item{display:flex;justify-content:space-between;gap:12px;border-bottom:1px solid #e2e8f0;padding-bottom:12px}
+  .hero-actions .primary:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(0,0,0,0.2);background:#f8fafc}
+  .hero-actions .ghost{border:2px solid rgba(255,255,255,.9);color:#fff;background:rgba(255,255,255,0.1);backdrop-filter:blur(10px)}
+  .hero-actions .ghost:hover{background:rgba(255,255,255,0.2);transform:translateY(-2px);box-shadow:0 6px 20px rgba(255,255,255,0.2)}
+  .metric-card{background:#fff;border-radius:20px;padding:24px;box-shadow:0 4px 20px rgba(15,23,42,.08);transition:all 0.3s cubic-bezier(0.4,0,0.2,1);position:relative;overflow:hidden;border:1px solid rgba(226,232,240,0.5);min-width:0}
+  .metric-card::before{content:'';position:absolute;top:0;left:0;right:0;height:4px;background:linear-gradient(90deg,transparent,rgba(59,130,246,0.4),transparent);opacity:0;transition:opacity 0.3s}
+  .metric-card:hover::before{opacity:1}
+  .metric-card:hover{transform:translateY(-6px);box-shadow:0 12px 40px rgba(15,23,42,.12);border-color:rgba(59,130,246,0.2)}
+  .metric-card h3{margin:0 0 10px;font-size:.85rem;text-transform:uppercase;color:#64748b;letter-spacing:.12em;font-weight:600;display:flex;align-items:center;gap:8px}
+  .metric-card p{margin:0;font-size:2.25rem;font-weight:800;color:#0f172a;line-height:1.1;letter-spacing:-0.02em;min-width:0}
+  .metric-card small{display:block;margin-top:8px;font-size:0.75rem;color:#94a3b8;line-height:1.5;opacity:0.9}
+  .metric-card-clickable{cursor:pointer;text-decoration:none;display:block;color:inherit}
+  .metric-card-clickable:hover{transform:translateY(-6px);box-shadow:0 15px 45px rgba(15,23,42,.15)}
+  .recent-block{background:#fff;border-radius:20px;padding:24px;box-shadow:0 4px 20px rgba(15,23,42,.08);border:1px solid rgba(226,232,240,0.5);transition:all 0.3s}
+  .recent-block:hover{box-shadow:0 8px 30px rgba(15,23,42,.1)}
+  .recent-block h2{margin:0 0 18px;font-size:1.15rem;font-weight:700;color:#0f172a;display:flex;align-items:center;gap:8px}
+  .recent-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:14px}
+  .recent-item{display:flex;justify-content:space-between;gap:14px;border-bottom:1px solid #e2e8f0;padding-bottom:14px;transition:all 0.2s}
   .recent-item:last-child{border-bottom:0;padding-bottom:0}
-  .recent-item strong{display:block;font-size:1rem}
-  .badge{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:4px 10px;font-size:.75rem;font-weight:700}
-  .badge.scan{background:#ecfeff;color:#0891b2}
-  .badge.track{background:#f0fdf4;color:#15803d}
+  .recent-item:hover{background:rgba(59,130,246,0.02);margin:0 -12px;padding:14px 12px;border-radius:12px;border-bottom-color:transparent}
+  .recent-item strong{display:block;font-size:1rem;font-weight:600;color:#0f172a}
+  .badge{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:5px 12px;font-size:.75rem;font-weight:700;transition:all 0.2s}
+  .badge.scan{background:linear-gradient(135deg,#ecfeff,#cffafe);color:#0891b2;border:1px solid rgba(8,145,178,0.2)}
+  .badge.track{background:linear-gradient(135deg,#f0fdf4,#dcfce7);color:#15803d;border:1px solid rgba(21,128,61,0.2)}
   
   /* Date Filter Styles */
-  .date-filter-container{background:#fff;border-radius:18px;padding:18px;margin-bottom:18px;box-shadow:0 10px 30px rgba(15,23,42,.08)}
-  .date-filter-pills{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
-  .date-pill{padding:8px 16px;border-radius:20px;border:2px solid #e2e8f0;background:#fff;color:#64748b;font-weight:600;text-decoration:none;transition:all 0.2s;font-size:0.9rem}
-  .date-pill:hover{border-color:#3b82f6;color:#3b82f6;background:#eff6ff}
-  .date-pill.active{border-color:#3b82f6;background:#3b82f6;color:#fff}
-  .date-input-group{display:flex;gap:8px;align-items:center}
-  .date-input-group input[type="date"]{padding:6px 12px;border:2px solid #e2e8f0;border-radius:12px;font-size:0.9rem;font-family:inherit}
-  .date-input-group button{padding:6px 12px;background:#3b82f6;color:#fff;border:none;border-radius:12px;font-weight:600;cursor:pointer;font-size:0.9rem}
-  .date-input-group button:hover{background:#2563eb}
+  .date-filter-container{background:#fff;border-radius:20px;padding:20px;margin-bottom:20px;box-shadow:0 4px 20px rgba(15,23,42,.08);border:1px solid rgba(226,232,240,0.5)}
+  .date-filter-pills{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+  .date-pill{padding:10px 18px;border-radius:24px;border:2px solid #e2e8f0;background:#fff;color:#64748b;font-weight:600;text-decoration:none;transition:all 0.3s cubic-bezier(0.4,0,0.2,1);font-size:0.9rem;position:relative;overflow:hidden}
+  .date-pill::before{content:'';position:absolute;top:0;left:-100%;width:100%;height:100%;background:linear-gradient(90deg,transparent,rgba(59,130,246,0.1),transparent);transition:left 0.5s}
+  .date-pill:hover::before{left:100%}
+  .date-pill:hover{border-color:#3b82f6;color:#3b82f6;background:#eff6ff;transform:translateY(-2px);box-shadow:0 4px 12px rgba(59,130,246,0.15)}
+  .date-pill.active{border-color:#3b82f6;background:linear-gradient(135deg,#3b82f6,#2563eb);color:#fff;box-shadow:0 4px 16px rgba(59,130,246,0.3);transform:translateY(-2px)}
+  .date-input-group{display:flex;gap:10px;align-items:center}
+  .date-input-group input[type="date"]{padding:8px 14px;border:2px solid #e2e8f0;border-radius:14px;font-size:0.9rem;font-family:inherit;transition:all 0.2s;background:#fff}
+  .date-input-group input[type="date"]:focus{outline:none;border-color:#3b82f6;box-shadow:0 0 0 3px rgba(59,130,246,0.1)}
+  .date-input-group button{padding:8px 16px;background:linear-gradient(135deg,#3b82f6,#2563eb);color:#fff;border:none;border-radius:14px;font-weight:600;cursor:pointer;font-size:0.9rem;transition:all 0.3s;box-shadow:0 2px 8px rgba(59,130,246,0.2)}
+  .date-input-group button:hover{background:linear-gradient(135deg,#2563eb,#1d4ed8);transform:translateY(-2px);box-shadow:0 4px 12px rgba(59,130,246,0.3)}
+  .date-input-group button:active{transform:translateY(0)}
+  
+  /* Enhanced chart container */
+  #sales-trend-chart-container{background:linear-gradient(135deg,#f8fafc,#ffffff);border-radius:16px;padding:16px;border:1px solid rgba(226,232,240,0.5)}
+  
+  /* Smooth animations */
+  @keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+  .metric-card{animation:fadeIn 0.4s ease-out}
+  .recent-block{animation:fadeIn 0.5s ease-out}
+  
+  /* Responsive improvements */
+  @media (max-width:768px){
+    .vertical-page{padding:12px;gap:16px}
+    .hero-actions{width:100%}
+    .hero-actions a{flex:1;text-align:center;min-width:120px}
+  }
 </style>
 
-<div class="vertical-page">
+<div class="vertical-page clothing-dashboard premium-dash">
   <header class="vertical-hero">
     <div>
       <p class="eyebrow">{{ business.name }} · {{ location_label }}</p>
@@ -64,65 +101,46 @@
       <a class="primary" href="{% url 'verticals:clothing_scan_in' %}">Scan IN</a>
       <a class="ghost" href="{% url 'verticals:clothing_hub' %}">Clothing Hub</a>
       <a class="ghost" href="{% url 'verticals:clothing_sell' %}">Sell</a>
+      {% include "partials/vertical_more_dropdown.html" %}
     </div>
   </header>
 
-  {% comment %}Date Filter Controls{% endcomment %}
-  <section class="date-filter-container">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-      <h3 style="margin:0;font-size:1rem;color:#64748b;text-transform:uppercase;letter-spacing:0.08em">📅 Date Range</h3>
+  {% comment %}Date Filter Controls - Unified (ALL OPTIONS RESTORED){% endcomment %}
+  <section class="recent-block" style="padding:16px 22px">
+    <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between">
+      <div style="display:flex;gap:12px;align-items:center">
+        {% include "partials/date_filter_unified.html" with filter_mode=filter_mode period=period month=month year=year custom_start=custom_start custom_end=custom_end range_label=range_label %}
+      </div>
+      <div style="font-size:.9rem;color:#64748b">
+        <strong>Showing:</strong> {{ range_label }}
+      </div>
     </div>
-    <div class="date-filter-pills">
-      <a href="?range=today" class="date-pill {% if active_range == 'today' %}active{% endif %}">
-        Today
-      </a>
-      <a href="?range=7d" class="date-pill {% if active_range == '7d' %}active{% endif %}">
-        Last 7 Days
-      </a>
-      <a href="?range=mtd" class="date-pill {% if active_range == 'mtd' %}active{% endif %}">
-        Month to Date
-      </a>
-      
-      <form method="get" class="date-input-group" style="margin-left:auto">
-        <input type="hidden" name="range" value="date">
-        <input 
-          type="date" 
-          name="date" 
-          value="{{ date_param|default:'' }}"
-          required
-        >
-        <button type="submit">Pick Date</button>
-      </form>
-    </div>
-    {% if active_range == 'date' and selected_date %}
-    <div style="margin-top:12px;padding:8px 12px;background:#eff6ff;border-radius:12px;font-size:0.85rem;color:#1e40af">
-      📆 Showing data for: <strong>{{ selected_date|date:"F j, Y" }}</strong>
-    </div>
-    {% endif %}
   </section>
 
-  <section class="metrics-grid">
-    <article class="metric-card" style="background:linear-gradient(135deg,#10b981,#059669);color:#fff">
-      <h3 style="color:rgba(255,255,255,.9)">Revenue{% if active_range == 'today' %} (Today){% elif active_range == '7d' %} (7D){% elif active_range == 'date' %} (Day){% else %} (MTD){% endif %}</h3>
-      <p style="color:#fff">K {{ revenue_mtd|floatformat:0|default:"0" }}</p>
+  <section class="cc-kpi-grid">
+    <article class="metric-card" style="background:linear-gradient(135deg,#3b82f6,#2563eb);color:#fff" data-cy="sales-revenue-card">
+      <h3 style="color:rgba(255,255,255,.9)">💰 Total Revenue{% if active_range == 'today' %} (Today){% elif active_range == '7d' %} (7D){% elif active_range == 'date' %} (Day){% else %} (MTD){% endif %}</h3>
+      <p style="color:#fff;font-size:2rem;font-weight:800">K <span data-countup="true" data-value="{{ revenue_mtd|floatformat:0|default:'0' }}">{{ revenue_mtd|floatformat:0|default:"0"|intcomma }}</span></p>
     </article>
-    <article class="metric-card" style="background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff">
-      <h3 style="color:rgba(255,255,255,.9)">Cost of Goods{% if active_range == 'today' %} (Today){% elif active_range == '7d' %} (7D){% elif active_range == 'date' %} (Day){% else %} (MTD){% endif %}</h3>
-      <p style="color:#fff">K {{ cost_mtd|floatformat:0|default:"0" }}</p>
+    <article class="metric-card" style="background:linear-gradient(135deg,#10b981,#059669);color:#fff">
+      <h3 style="color:rgba(255,255,255,.9)">📈 Total Profit{% if active_range == 'today' %} (Today){% elif active_range == '7d' %} (7D){% elif active_range == 'date' %} (Day){% else %} (MTD){% endif %}</h3>
+      <p style="color:#fff;font-size:2rem;font-weight:800">K <span data-countup="true" data-value="{{ profit_mtd|floatformat:0|default:'0' }}">{{ profit_mtd|floatformat:0|default:"0"|intcomma }}</span></p>
     </article>
     <article class="metric-card" style="background:linear-gradient(135deg,#ef4444,#dc2626);color:#fff">
-      <h3 style="color:rgba(255,255,255,.9)">Overhead{% if active_range == 'today' %} (Today){% elif active_range == '7d' %} (7D){% elif active_range == 'date' %} (Day){% else %} (MTD){% endif %}</h3>
-      <p style="color:#fff">K {{ overhead_costs|floatformat:0|default:"0" }}</p>
+      <h3 style="color:rgba(255,255,255,.9)">💸 Total Costs{% if active_range == 'today' %} (Today){% elif active_range == '7d' %} (7D){% elif active_range == 'date' %} (Day){% else %} (MTD){% endif %}</h3>
+      <p style="color:#fff;font-size:2rem;font-weight:800">K <span data-countup="true" data-value="{{ total_costs_mtd|floatformat:0|default:'0' }}">{{ total_costs_mtd|floatformat:0|default:"0"|intcomma }}</span></p>
+      <small style="color:rgba(255,255,255,.8);font-size:0.7rem;display:block;margin-top:6px">COGS + Overhead</small>
     </article>
-    <article class="metric-card" style="background:linear-gradient(135deg,#3b82f6,#2563eb);color:#fff">
-      <h3 style="color:rgba(255,255,255,.9)">Profit{% if active_range == 'today' %} (Today){% elif active_range == '7d' %} (7D){% elif active_range == 'date' %} (Day){% else %} (MTD){% endif %}</h3>
-      <p style="color:#fff">K {{ profit_mtd|floatformat:0|default:"0" }}</p>
-    </article>
-    <article class="metric-card">
-      <h3>Sales{% if active_range == 'today' %} (Today){% elif active_range == '7d' %} (7D){% elif active_range == 'date' %} (Day){% else %} (MTD){% endif %}</h3>
-      <p>{{ total_sales_mtd }}</p>
+    <article class="metric-card" style="background:linear-gradient(135deg,#eab308,#ca8a04);color:#fff">
+      <h3 style="color:rgba(255,255,255,.9)">📦 Stock Value{% if active_range == 'today' %} (Current){% endif %}</h3>
+      <p style="color:#fff;font-size:2rem;font-weight:800">K <span data-countup="true" data-value="{{ inventory_value|floatformat:0|default:'0' }}">{{ inventory_value|floatformat:0|default:"0"|intcomma }}</span></p>
+      <small style="color:rgba(255,255,255,.8);font-size:0.7rem;display:block;margin-top:6px">Current inventory</small>
     </article>
   </section>
+
+  {% if books_balance %}
+    {% include "dashboard/partials/books_balance_card.html" %}
+  {% endif %}
 
   {% comment %}Payment Mix Panel{% endcomment %}
   {% if payment_mix_data %}
@@ -168,45 +186,133 @@
     </section>
     {% endif %}
 
-    {% if sales_trend %}
     <section class="recent-block">
-      <h2 style="margin:0 0 12px;font-size:1.1rem">📈 Sales Trend (Last 7 Days)</h2>
-      <div style="display:flex;flex-direction:column;gap:8px">
-        {% for day in sales_trend %}
-        <div style="display:flex;justify-content:space-between;align-items:center">
-          <span style="font-size:.9rem;color:#64748b">{{ day.date_short }}</span>
-          <div style="flex:1;margin:0 12px;height:6px;background:#e2e8f0;border-radius:3px;overflow:hidden">
-            {% if sales_trend|length > 0 %}
-            {% with max_rev=sales_trend.0.revenue %}
-            <div style="height:100%;background:#3b82f6;width:{% if max_rev > 0 %}{{ day.revenue|floatformat:0|add:"0"|default:"1" }}{% else %}0{% endif %}%"></div>
-            {% endwith %}
-            {% endif %}
-          </div>
-          <span style="font-size:.9rem;font-weight:600">{{ day.count }}</span>
-        </div>
-        {% endfor %}
+      <h2 style="margin:0 0 16px;font-size:1.1rem">📊 Sales Trend{% if active_range == 'today' %} (Today){% elif active_range == '7d' %} (Last 7 Days){% elif active_range == 'date' %} (Selected Day){% else %} (This Month){% endif %}</h2>
+      <div class="chart-wrap cc-chart-container" style="height:300px" data-cy="sales-trend-chart-container">
+        <canvas id="sales-trend-chart" data-cy="sales-trend-chart"></canvas>
+      </div>
+      <div id="sales-trend-fallback" style="display:none;color:#64748b;text-align:center;padding:20px">
+        <p>No trend data available.</p>
       </div>
     </section>
-    {% endif %}
   </div>
 
-  <section class="metrics-grid">
+  {% comment %}Stock Summary Section - Visual overview of inventory by category{% endcomment %}
+  {% if stock_summary %}
+  <section class="recent-block">
+    <h2 style="margin:0 0 16px;font-size:1.1rem">📦 Stock Summary</h2>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px">
+      {% for category in stock_summary %}
+      <div class="stock-category-card">
+        <span class="category-icon">{{ category.icon }}</span>
+        <span class="category-name">{{ category.category }}</span>
+        <span class="category-quantity">{{ category.total_quantity|intcomma }}</span>
+        <span class="category-styles">{{ category.total_items }} style{{ category.total_items|pluralize }}</span>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+  {% else %}
+  <section class="recent-block">
+    <h2 style="margin:0 0 16px;font-size:1.1rem">📦 Stock Summary</h2>
+    <div class="empty-state">
+      <span class="empty-state-icon">📦</span>
+      <p class="empty-state-text">No stock categories yet. <a href="{% url 'verticals:clothing_scan_in' %}" class="empty-state-link">Add your first items</a></p>
+    </div>
+  </section>
+  {% endif %}
+
+  <section class="cc-kpi-grid">
     <article class="metric-card">
-      <h3>Products</h3>
+      <h3>🧾 Sales Count{% if active_range == 'today' %} (Today){% elif active_range == '7d' %} (7D){% elif active_range == 'date' %} (Day){% else %} (MTD){% endif %}</h3>
+      <p>{{ total_sales_count|default:"0" }}</p>
+      <small>Transaction count</small>
+    </article>
+    <article class="metric-card">
+      <h3>👗 Products</h3>
       <p>{{ product_count }}</p>
+      <small>{{ active_product_count }} active style{{ active_product_count|pluralize }}</small>
     </article>
     <article class="metric-card">
-      <h3>Active styles</h3>
-      <p>{{ active_product_count }}</p>
-    </article>
-    <article class="metric-card">
-      <h3>Scan required</h3>
-      <p>{{ scan_required_count }}</p>
-    </article>
-    <article class="metric-card">
-      <h3>Tracking inventory</h3>
+      <h3>📦 Tracking Inventory</h3>
       <p>{{ inventory_tracked_count }}</p>
+      <small>Units with scan tracking</small>
     </article>
+    {% if low_stock_products %}
+    <article class="metric-card" style="border-color:#fca5a5;background:linear-gradient(135deg,#fff1f2,#fee2e2);">
+      <h3 style="color:#dc2626;">⚠️ Low Stock Items</h3>
+      <p style="color:#dc2626;">{{ low_stock_products|length }}</p>
+      <small style="color:#991b1b;">Items running low — restock soon</small>
+    </article>
+    {% else %}
+    <article class="metric-card">
+      <h3>✅ Stock Health</h3>
+      <p style="color:#16a34a;font-size:1.5rem;">Good</p>
+      <small>No low-stock alerts</small>
+    </article>
+    {% endif %}
+  </section>
+
+  {# Low Stock Alert Panel #}
+  {% if low_stock_products %}
+  <section class="recent-block" style="border:1.5px solid #fca5a5;background:#fff5f5;">
+    <h2 style="margin:0 0 12px;font-size:1.05rem;color:#dc2626;">⚠️ Low Stock Alerts</h2>
+    <div style="display:flex;flex-direction:column;gap:8px;">
+      {% for p in low_stock_products %}
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:.6rem .9rem;background:#fff;border-radius:10px;border:1px solid #fecaca;">
+        <div>
+          <strong style="font-size:.9rem;color:#0f172a;">{{ p.name }}</strong>
+          <small style="display:block;color:#64748b;font-size:.78rem;">{{ p.category_display|default:p.kind }}</small>
+        </div>
+        <div style="text-align:right;">
+          <span style="font-weight:700;color:#dc2626;font-size:.95rem;">{{ p.quantity|default:0 }} left</span>
+          <small style="display:block;color:#64748b;font-size:.72rem;">Min: {{ p.low_stock_threshold|default:5 }}</small>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    <a href="{% url 'verticals:clothing_scan_in' %}" style="display:inline-flex;align-items:center;gap:.3rem;margin-top:.85rem;font-size:.82rem;font-weight:700;color:#dc2626;text-decoration:none;">
+      <i class="bi bi-plus-circle"></i> Restock now →
+    </a>
+  </section>
+  {% endif %}
+
+
+  {% comment %}Recent Sales Transactions List{% endcomment %}
+  <section class="recent-block">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <h2 style="margin:0;font-size:1.1rem">💰 Recent Sales</h2>
+    </div>
+    {% if recent_sales %}
+      <ul class="recent-list">
+        {% for sale in recent_sales %}
+          <li class="recent-item">
+            <div>
+              <strong>{{ sale.product.name }}</strong>
+              <small style="color:#64748b;display:block;margin-top:4px">
+                {{ sale.sold_at|date:"M d, Y H:i" }} · 
+                Qty: {{ sale.quantity }} · 
+                {{ sale.get_payment_method_display|default:sale.payment_method }} · 
+                {{ sale.sold_by.get_full_name|default:sale.sold_by.username }}
+              </small>
+            </div>
+            <div style="text-align:right">
+              <strong style="color:#10b981;font-size:1.1rem">K {{ sale.total_price|floatformat:0 }}</strong>
+              {% if sale.profit %}
+              <small style="display:block;margin-top:2px;color:#059669;font-weight:600">
+                +K {{ sale.profit|floatformat:0 }} profit
+              </small>
+              {% endif %}
+            </div>
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p style="margin:0;color:#64748b;text-align:center;padding:40px 20px">
+        No recent sales yet. 
+        <a href="{% url 'verticals:clothing_sell' %}" style="color:#10b981;font-weight:600">Make your first sale</a>
+      </p>
+    {% endif %}
   </section>
 
   <section class="recent-block">
@@ -220,9 +326,9 @@
           <li class="recent-item">
             <div>
               <strong>{{ item.name|default:item.sku|default:"Unnamed" }}</strong>
-              {% if item.sku %}<small style="color:#64748b">SKU · {{ item.sku }}</small>{% endif %}
+              {% if item.sku %}<small style="color:#64748b;display:block;margin-top:4px">SKU · {{ item.sku }}</small>{% endif %}
             </div>
-            <div style="display:flex;gap:8px">
+            <div style="display:flex;gap:8px;align-items:center">
               {% if item.scan_required %}
                 <span class="badge scan"><i class="bi bi-upc-scan"></i>Scan</span>
               {% endif %}
@@ -234,9 +340,395 @@
         {% endfor %}
       </ul>
     {% else %}
-      <p style="margin:0;color:#64748b">Add a few clothing items to see them here.</p>
+      <div class="empty-state">
+        <span class="empty-state-icon">👕</span>
+        <p class="empty-state-text">No drops yet — <a href="{{ clothing_add_url|default:'/inventory/clothing/products/new/v2/' }}" class="empty-state-link">add your first item</a></p>
+      </div>
     {% endif %}
   </section>
 </div>
-{% endblock %}
 
+{% comment %}Chart.js Sales Trend Line Chart{% endcomment %}
+<script src="{% static 'vendor/chartjs/chart.umd.min.js' %}"></script>
+<script>
+(function() {
+  let salesTrendChart = null;
+  let refreshInterval = null;
+  let isTabVisible = true;
+  
+  // Track tab visibility to pause refresh when hidden
+  document.addEventListener('visibilitychange', function() {
+    isTabVisible = !document.hidden;
+    if (isTabVisible && !refreshInterval) {
+      // Resume refresh if tab becomes visible and interval was cleared
+      startAutoRefresh();
+    } else if (!isTabVisible && refreshInterval) {
+      // Pause refresh when tab is hidden
+      clearInterval(refreshInterval);
+      refreshInterval = null;
+    }
+  });
+  
+  // Function to format currency in MWK
+  function formatCurrency(value) {
+    return 'K ' + Math.round(value).toLocaleString('en-US');
+  }
+  
+  // Function to start auto-refresh (with safeguards)
+  function startAutoRefresh() {
+    // Clear any existing interval to prevent duplicates
+    if (refreshInterval) {
+      clearInterval(refreshInterval);
+    }
+    // Only start if tab is visible
+    if (isTabVisible) {
+      refreshInterval = setInterval(updateSalesTrendChart, 60000); // 60 seconds
+    }
+  }
+  
+  // Function to fetch and render sales trend chart
+  function updateSalesTrendChart() {
+    // Skip if tab is hidden
+    if (!isTabVisible) {
+      return;
+    }
+    
+    // Get current filter params from URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const range = urlParams.get('range') || 'mtd';
+    const date = urlParams.get('date') || '';
+    
+    // Build API URL with cache busting
+    let apiUrl = '{% url "verticals:clothing_sales_trend_json" %}?ts=' + Date.now();
+    if (range) apiUrl += '&range=' + range;
+    if (date) apiUrl += '&date=' + date;
+    
+    // Fetch trend data with credentials to ensure authentication cookies are sent
+    fetch(apiUrl, { credentials: 'same-origin' })
+      .then(response => {
+        // Check if response is OK and is JSON (not HTML login page)
+        if (!response.ok || !response.headers.get('content-type')?.includes('application/json')) {
+          throw new Error('Invalid response');
+        }
+        return response.json();
+      })
+      .then(data => {
+        const canvas = document.getElementById('sales-trend-chart');
+        const fallback = document.getElementById('sales-trend-fallback');
+        
+        if (!canvas) return;
+        
+        // Check if we have data structure
+        if (!data || !data.labels || !data.revenue || !Array.isArray(data.revenue) || data.labels.length === 0) {
+          canvas.style.display = 'none';
+          if (fallback) fallback.style.display = 'block';
+          return;
+        }
+        
+        // Check if there's actual data (non-zero revenue or count)
+        // Only show "no data" if ALL points are zero AND has_data is false (if provided)
+        const hasNonZeroRevenue = data.revenue.some(r => r > 0);
+        const hasNonZeroCount = data.count && data.count.some(c => c > 0);
+        const hasData = data.has_data !== undefined ? data.has_data : (hasNonZeroRevenue || hasNonZeroCount);
+        
+        if (!hasData) {
+          canvas.style.display = 'none';
+          if (fallback) fallback.style.display = 'block';
+          return;
+        }
+        
+        canvas.style.display = 'block';
+        if (fallback) fallback.style.display = 'none';
+        
+        // Destroy existing chart if it exists
+        if (salesTrendChart) {
+          salesTrendChart.destroy();
+        }
+        
+        // Create new Chart.js BAR chart (mobile-friendly)
+        const ctx = canvas.getContext('2d');
+        salesTrendChart = new Chart(ctx, {
+          type: 'bar',
+          data: {
+            labels: data.labels,
+            datasets: [
+              {
+                label: 'Revenue (MWK)',
+                data: data.revenue,
+                backgroundColor: 'rgba(59, 130, 246, 0.85)',
+                borderColor: 'rgb(59, 130, 246)',
+                borderWidth: 1,
+                borderRadius: 4,
+                maxBarThickness: 60,
+              },
+              {
+                label: 'Sales Count',
+                data: data.count,
+                backgroundColor: 'rgba(16, 185, 129, 0.85)',
+                borderColor: 'rgb(16, 185, 129)',
+                borderWidth: 1,
+                borderRadius: 4,
+                maxBarThickness: 60,
+                yAxisID: 'y1',
+              }
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: {
+              mode: 'index',
+              intersect: false,
+            },
+            plugins: {
+              legend: {
+                display: true,
+                position: 'top',
+                labels: {
+                  usePointStyle: true,
+                  padding: 15,
+                  font: {
+                    size: 12,
+                    weight: '600'
+                  }
+                }
+              },
+              tooltip: {
+                backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                padding: 12,
+                titleFont: {
+                  size: 13,
+                  weight: '600'
+                },
+                bodyFont: {
+                  size: 12
+                },
+                callbacks: {
+                  label: function(context) {
+                    if (context.datasetIndex === 0) {
+                      // Revenue tooltip
+                      return 'Revenue: ' + formatCurrency(context.parsed.y);
+                    } else {
+                      // Count tooltip
+                      return 'Sales: ' + context.parsed.y + ' transaction' + (context.parsed.y !== 1 ? 's' : '');
+                    }
+                  }
+                },
+                displayColors: true,
+                borderColor: 'rgba(255, 255, 255, 0.1)',
+                borderWidth: 1
+              }
+            },
+            scales: {
+              x: {
+                grid: {
+                  display: false
+                },
+                ticks: {
+                  font: {
+                    size: 11
+                  },
+                  maxRotation: 45,
+                  minRotation: 0,
+                  autoSkip: true,
+                  autoSkipPadding: 10,
+                  color: '#64748b'
+                }
+              },
+              y: {
+                type: 'linear',
+                display: true,
+                position: 'left',
+                title: {
+                  display: true,
+                  text: 'Revenue (MWK)',
+                  font: {
+                    size: 11,
+                    weight: '600'
+                  },
+                  color: '#64748b'
+                },
+                ticks: {
+                  callback: function(value) {
+                    return formatCurrency(value);
+                  },
+                  font: {
+                    size: 10
+                  },
+                  color: '#64748b'
+                },
+                grid: {
+                  color: 'rgba(226, 232, 240, 0.5)'
+                }
+              },
+              y1: {
+                type: 'linear',
+                display: true,
+                position: 'right',
+                title: {
+                  display: true,
+                  text: 'Sales Count',
+                  font: {
+                    size: 11,
+                    weight: '600'
+                  },
+                  color: '#64748b'
+                },
+                ticks: {
+                  stepSize: 1,
+                  font: {
+                    size: 10
+                  },
+                  color: '#64748b'
+                },
+                grid: {
+                  drawOnChartArea: false,
+                }
+              }
+            }
+          }
+        });
+      })
+      .catch(error => {
+        console.error('Failed to fetch sales trend:', error);
+        const canvas = document.getElementById('sales-trend-chart');
+        const fallback = document.getElementById('sales-trend-fallback');
+        if (canvas) canvas.style.display = 'none';
+        if (fallback) fallback.style.display = 'block';
+      });
+  }
+  
+  // Initialize on page load
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function() {
+      updateSalesTrendChart();
+      startAutoRefresh();
+    });
+  } else {
+    updateSalesTrendChart();
+    startAutoRefresh();
+  }
+  
+  // Cleanup on page unload
+  window.addEventListener('beforeunload', function() {
+    if (refreshInterval) {
+      clearInterval(refreshInterval);
+      refreshInterval = null;
+    }
+  });
+})();
+</script>
+
+{% comment %}Premium Dashboard Enhancements - Count-up animations and polish{% endcomment %}
+<script>
+(function() {
+  'use strict';
+  
+  // Check if user prefers reduced motion
+  const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  
+  /**
+   * Count-up animation for numbers
+   * Smoothly animates from 0 to target value
+   */
+  function animateCountUp(element, finalValue, duration) {
+    if (prefersReducedMotion) {
+      // Skip animation if reduced motion is preferred
+      element.textContent = formatNumber(finalValue);
+      return;
+    }
+    
+    const startTime = performance.now();
+    const startValue = 0;
+    
+    function updateCount(currentTime) {
+      const elapsed = currentTime - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      
+      // Easing function (ease-out cubic)
+      const easedProgress = 1 - Math.pow(1 - progress, 3);
+      
+      const currentValue = Math.floor(startValue + (finalValue - startValue) * easedProgress);
+      element.textContent = formatNumber(currentValue);
+      
+      if (progress < 1) {
+        requestAnimationFrame(updateCount);
+      } else {
+        element.textContent = formatNumber(finalValue);
+      }
+    }
+    
+    requestAnimationFrame(updateCount);
+  }
+  
+  /**
+   * Format number with thousands separator
+   */
+  function formatNumber(num) {
+    return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  }
+  
+  /**
+   * Initialize count-up animations
+   */
+  function initCountUpAnimations() {
+    const elements = document.querySelectorAll('[data-countup="true"]');
+    
+    elements.forEach((element, index) => {
+      const value = parseFloat(element.getAttribute('data-value')) || 0;
+      const delay = index * 100; // Stagger animations by 100ms
+      const duration = 1000; // 1 second animation
+      
+      // Store original content in case we need it
+      element.setAttribute('data-original-content', element.textContent);
+      
+      // Start animation after delay
+      setTimeout(() => {
+        animateCountUp(element, value, duration);
+      }, delay);
+    });
+  }
+  
+  /**
+   * Initialize skeleton loading fade-in
+   * Show skeleton briefly, then fade in actual content
+   */
+  function initSkeletonLoading() {
+    const skeletonElements = document.querySelectorAll('[data-skeleton="true"]');
+    
+    if (skeletonElements.length === 0) {
+      // No skeleton elements, proceed immediately
+      initCountUpAnimations();
+      return;
+    }
+    
+    // Simulate loading time (300ms)
+    setTimeout(() => {
+      skeletonElements.forEach(element => {
+        element.removeAttribute('data-skeleton');
+        element.classList.add('fade-in');
+      });
+      
+      // Start count-up animations after fade-in begins
+      initCountUpAnimations();
+    }, 300);
+  }
+  
+  /**
+   * Initialize all premium dashboard features
+   */
+  function init() {
+    // Start immediately without skeleton (can be enabled by adding data-skeleton="true" to elements)
+    initCountUpAnimations();
+  }
+  
+  // Initialize when DOM is ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+})();
+</script>
+
+{% endblock %}

@@ -1,0 +1,19 @@
+{{ business.name }} — Daily Gym Summary
+{{ report_date|date:"l, N j, Y" }}
+================================================================================
+
+MEMBERSHIP OVERVIEW
+-------------------
+New Members Today        :  {{ new_members_today }}
+Active Members           :  {{ active_members }}
+Membership Revenue Today :  {{ currency }} {{ membership_revenue_today|floatformat:0 }}
+Check-ins Today          :  {{ checkins_today }}
+
+HIGHLIGHTS
+----------
+{% if top_plan %}Top Plan               :  {{ top_plan }}
+{% endif %}Renewals Due (7 days)  :  {{ renewals_due_7_days }}
+
+--------------------------------------------------------------------------------
+Automatically generated for {{ business.name }}.
+To disable, ask your manager to turn off Daily Summary in Settings.

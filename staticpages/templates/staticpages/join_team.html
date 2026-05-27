@@ -1,0 +1,397 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Join the Team - Emajinet</title>
+  <meta name="description" content="Join the Emajinet team - we're looking for talented builders in engineering, growth, sales, design, and customer success.">
+  
+  <!-- SEO: Canonical URL -->
+  <link rel="canonical" href="{{ request.scheme }}://{{ request.get_host }}{{ request.path }}">
+  
+  <meta name="theme-color" content="#0b1220">
+  <link rel="icon" href="{% static 'favicon.ico' %}">
+  
+  <style>
+    :root {
+      --primary: #4f46e5;
+      --primary-dark: #4338ca;
+      --secondary: #10b981;
+      --text-primary: #1f2937;
+      --text-secondary: #6b7280;
+      --bg-light: #f9fafb;
+      --white: #ffffff;
+      --shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+      --shadow-lg: 0 20px 50px rgba(0, 0, 0, 0.15);
+      --error: #ef4444;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, Roboto, Helvetica, Arial, sans-serif;
+      line-height: 1.6;
+      color: var(--text-primary);
+      background: linear-gradient(135deg, #f9fafb 0%, #e0e7ff 100%);
+      min-height: 100vh;
+      padding: 2rem 1rem;
+    }
+
+    .container {
+      max-width: 700px;
+      margin: 0 auto;
+    }
+
+    .card {
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(10px);
+      border-radius: 24px;
+      padding: 3rem 2.5rem;
+      box-shadow: var(--shadow-lg);
+      border: 1px solid rgba(79, 70, 229, 0.1);
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+
+    .logo {
+      height: 50px;
+      margin-bottom: 1rem;
+    }
+
+    h1 {
+      font-size: 2rem;
+      font-weight: 800;
+      color: var(--text-primary);
+      margin-bottom: 0.5rem;
+    }
+
+    .subtitle {
+      font-size: 1.125rem;
+      color: var(--text-secondary);
+      line-height: 1.6;
+    }
+
+    .form-group {
+      margin-bottom: 1.5rem;
+    }
+
+    label {
+      display: block;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 0.5rem;
+      font-size: 0.95rem;
+    }
+
+    input[type="text"],
+    input[type="email"],
+    input[type="url"],
+    select,
+    textarea {
+      width: 100%;
+      padding: 0.875rem 1rem;
+      border: 2px solid #e5e7eb;
+      border-radius: 12px;
+      font-size: 1rem;
+      font-family: inherit;
+      transition: all 0.3s ease;
+      background: var(--white);
+    }
+
+    input:focus,
+    select:focus,
+    textarea:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+    }
+
+    textarea {
+      min-height: 120px;
+      resize: vertical;
+    }
+
+    .required {
+      color: var(--error);
+      margin-left: 0.25rem;
+    }
+
+    .optional {
+      font-size: 0.85rem;
+      font-weight: 400;
+      color: var(--text-secondary);
+      margin-left: 0.5rem;
+    }
+
+    .btn {
+      padding: 0.875rem 2rem;
+      border-radius: 100px;
+      font-weight: 600;
+      font-size: 1rem;
+      text-decoration: none;
+      cursor: pointer;
+      border: none;
+      transition: all 0.3s ease;
+      display: inline-block;
+      text-align: center;
+      width: 100%;
+    }
+
+    .btn-primary {
+      background: var(--primary);
+      color: var(--white);
+      box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      background: var(--primary-dark);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(79, 70, 229, 0.4);
+    }
+
+    .btn-primary:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .btn-secondary {
+      background: transparent;
+      color: var(--primary);
+      border: 2px solid var(--primary);
+      margin-top: 1rem;
+    }
+
+    .btn-secondary:hover {
+      background: var(--primary);
+      color: var(--white);
+      transform: translateY(-2px);
+    }
+
+    .alert {
+      padding: 1rem 1.25rem;
+      border-radius: 12px;
+      margin-bottom: 1.5rem;
+      font-size: 0.95rem;
+    }
+
+    .alert-success {
+      background: rgba(16, 185, 129, 0.1);
+      color: #065f46;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+
+    .alert-error {
+      background: rgba(239, 68, 68, 0.1);
+      color: #991b1b;
+      border: 1px solid rgba(239, 68, 68, 0.3);
+    }
+
+    .back-link {
+      text-align: center;
+      margin-top: 1.5rem;
+    }
+
+    .back-link a {
+      color: var(--text-secondary);
+      text-decoration: none;
+      font-size: 0.95rem;
+      transition: color 0.3s ease;
+    }
+
+    .back-link a:hover {
+      color: var(--primary);
+    }
+
+    .errorlist {
+      list-style: none;
+      padding: 0;
+      margin: 0.5rem 0 0 0;
+    }
+
+    .errorlist li {
+      color: var(--error);
+      font-size: 0.875rem;
+    }
+
+    /* Mobile responsiveness */
+    @media (max-width: 768px) {
+      body {
+        padding: 1rem 0.5rem;
+      }
+
+      .card {
+        padding: 2rem 1.5rem;
+      }
+
+      h1 {
+        font-size: 1.75rem;
+      }
+
+      .subtitle {
+        font-size: 1rem;
+      }
+    }
+
+    @media (max-width: 430px) {
+      .card {
+        padding: 1.5rem 1rem;
+      }
+
+      h1 {
+        font-size: 1.5rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="card">
+      <div class="header">
+        <img src="{% static 'img/majn.png' %}" alt="Emajinet Logo" class="logo">
+        <h1>Join the Team</h1>
+        <p class="subtitle">
+          We're looking for talented builders in engineering, growth, sales, design, and customer success.
+        </p>
+      </div>
+
+      {% if messages %}
+        {% for message in messages %}
+          <div class="alert {% if message.tags %}alert-{{ message.tags }}{% endif %}">
+            {{ message }}
+          </div>
+        {% endfor %}
+      {% endif %}
+
+      {% if success %}
+        <div class="alert alert-success">
+          <strong>✓ Thank you!</strong> We received your message and we'll get back to you soon.
+        </div>
+        <div class="back-link">
+          <a href="{% url 'staticpages:home' %}">← Back to Home</a>
+        </div>
+      {% else %}
+        <form method="post" novalidate>
+          {% csrf_token %}
+          
+          <div class="form-group">
+            <label for="id_full_name">
+              Full Name<span class="required">*</span>
+            </label>
+            <input 
+              type="text" 
+              name="full_name" 
+              id="id_full_name" 
+              value="{{ form.full_name.value|default:'' }}"
+              required
+              maxlength="200"
+            >
+            {% if form.full_name.errors %}
+              <ul class="errorlist">
+                {% for error in form.full_name.errors %}
+                  <li>{{ error }}</li>
+                {% endfor %}
+              </ul>
+            {% endif %}
+          </div>
+
+          <div class="form-group">
+            <label for="id_email">
+              Email<span class="required">*</span>
+            </label>
+            <input 
+              type="email" 
+              name="email" 
+              id="id_email" 
+              value="{{ form.email.value|default:'' }}"
+              required
+            >
+            {% if form.email.errors %}
+              <ul class="errorlist">
+                {% for error in form.email.errors %}
+                  <li>{{ error }}</li>
+                {% endfor %}
+              </ul>
+            {% endif %}
+          </div>
+
+          <div class="form-group">
+            <label for="id_role">
+              Role Interested In<span class="required">*</span>
+            </label>
+            <select name="role" id="id_role" required>
+              <option value="">-- Select a role --</option>
+              <option value="engineering" {% if form.role.value == 'engineering' %}selected{% endif %}>Engineering</option>
+              <option value="operations" {% if form.role.value == 'operations' %}selected{% endif %}>Operations</option>
+              <option value="sales" {% if form.role.value == 'sales' %}selected{% endif %}>Sales</option>
+              <option value="design" {% if form.role.value == 'design' %}selected{% endif %}>Design</option>
+              <option value="support" {% if form.role.value == 'support' %}selected{% endif %}>Customer Support</option>
+              <option value="other" {% if form.role.value == 'other' %}selected{% endif %}>Other</option>
+            </select>
+            {% if form.role.errors %}
+              <ul class="errorlist">
+                {% for error in form.role.errors %}
+                  <li>{{ error }}</li>
+                {% endfor %}
+              </ul>
+            {% endif %}
+          </div>
+
+          <div class="form-group">
+            <label for="id_linkedin_portfolio">
+              LinkedIn/Portfolio URL<span class="optional">(optional)</span>
+            </label>
+            <input 
+              type="url" 
+              name="linkedin_portfolio" 
+              id="id_linkedin_portfolio" 
+              value="{{ form.linkedin_portfolio.value|default:'' }}"
+              placeholder="https://"
+            >
+            {% if form.linkedin_portfolio.errors %}
+              <ul class="errorlist">
+                {% for error in form.linkedin_portfolio.errors %}
+                  <li>{{ error }}</li>
+                {% endfor %}
+              </ul>
+            {% endif %}
+          </div>
+
+          <div class="form-group">
+            <label for="id_message">
+              Message<span class="required">*</span>
+            </label>
+            <textarea 
+              name="message" 
+              id="id_message" 
+              required
+              placeholder="Tell us about yourself, your experience, and why you want to join Emajinet..."
+            >{{ form.message.value|default:'' }}</textarea>
+            {% if form.message.errors %}
+              <ul class="errorlist">
+                {% for error in form.message.errors %}
+                  <li>{{ error }}</li>
+                {% endfor %}
+              </ul>
+            {% endif %}
+          </div>
+
+          <button type="submit" class="btn btn-primary">Submit Application</button>
+        </form>
+
+        <div class="back-link">
+          <a href="{% url 'staticpages:home' %}">← Back to Home</a>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</body>
+</html>
+

@@ -1,0 +1,535 @@
+{% extends "base.html" %}
+<!-- liquor-unit-conversion:v1 -->
+{% block title %}Liquor Stock · {{ business.name }}{% endblock %}
+
+{% block content %}
+<style>
+:root {
+  --lq-purple: #7c3aed;
+  --lq-pink: #db2777;
+  --lq-green: #059669;
+  --lq-amber: #d97706;
+  --lq-red: #dc2626;
+  /* Category palette */
+  --cat-beer-bg: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  --cat-beer-accent: #d97706;
+  --cat-beer-text: #92400e;
+  --cat-cider-bg: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);
+  --cat-cider-accent: #059669;
+  --cat-cider-text: #065f46;
+  --cat-wine-bg: linear-gradient(135deg, #fce7f3 0%, #fbcfe8 100%);
+  --cat-wine-accent: #be185d;
+  --cat-wine-text: #831843;
+  --cat-spirits-bg: linear-gradient(135deg, #ede9fe 0%, #ddd6fe 100%);
+  --cat-spirits-accent: #7c3aed;
+  --cat-spirits-text: #4c1d95;
+  --cat-whiskey-bg: linear-gradient(135deg, #fef3c7 0%, #fed7aa 100%);
+  --cat-whiskey-accent: #b45309;
+  --cat-whiskey-text: #78350f;
+  --cat-gin-bg: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%);
+  --cat-gin-accent: #0369a1;
+  --cat-gin-text: #0c4a6e;
+  --cat-vodka-bg: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+  --cat-vodka-accent: #0284c7;
+  --cat-vodka-text: #0c4a6e;
+  --cat-brandy-bg: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  --cat-brandy-accent: #c2410c;
+  --cat-brandy-text: #7c2d12;
+  --cat-cocktail-bg: linear-gradient(135deg, #fae8ff 0%, #f5d0fe 100%);
+  --cat-cocktail-accent: #a21caf;
+  --cat-cocktail-text: #701a75;
+  --cat-other-bg: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+  --cat-other-accent: #475569;
+  --cat-other-text: #1e293b;
+}
+
+.stock-page {
+  padding: clamp(12px, 3vw, 24px);
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+/* Hero Header */
+.stock-hero {
+  background: linear-gradient(120deg, var(--lq-purple), var(--lq-pink));
+  border-radius: 24px;
+  padding: clamp(20px, 4vw, 32px);
+  color: #fff;
+  margin-bottom: 28px;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.stock-hero::after {
+  content: '🍺';
+  position: absolute;
+  right: -20px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 120px;
+  opacity: 0.12;
+}
+
+.stock-hero h1 { margin: 0; font-size: clamp(1.5rem, 4vw, 2.25rem); font-weight: 800; }
+.stock-hero p { margin: 6px 0 0; opacity: .85; }
+
+.hero-btns { display: flex; gap: 10px; flex-wrap: wrap; }
+.hero-btn-primary {
+  background: #fff; color: var(--lq-purple); border-radius: 999px;
+  padding: 10px 22px; font-weight: 800; text-decoration: none;
+  display: inline-flex; align-items: center; gap: 6px; font-size: .95rem;
+  box-shadow: 0 4px 12px rgba(0,0,0,.15); transition: all .2s;
+}
+.hero-btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,0,0,.2); color: var(--lq-purple); }
+.hero-btn-ghost {
+  border: 2px solid rgba(255,255,255,.7); color: #fff; border-radius: 999px;
+  padding: 10px 22px; font-weight: 700; text-decoration: none;
+  display: inline-flex; align-items: center; gap: 6px;
+  transition: all .2s;
+}
+.hero-btn-ghost:hover { background: rgba(255,255,255,.15); color: #fff; }
+
+/* Stats bar */
+.stats-bar {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 14px;
+  margin-bottom: 24px;
+}
+
+.stat-chip {
+  background: #fff;
+  border-radius: 16px;
+  padding: 16px;
+  text-align: center;
+  box-shadow: 0 4px 16px rgba(15,23,42,.07);
+  border: 1px solid #e2e8f0;
+  transition: all .3s;
+}
+
+.stat-chip:hover { transform: translateY(-4px); box-shadow: 0 8px 24px rgba(15,23,42,.12); }
+.stat-chip .val { font-size: 1.6rem; font-weight: 800; color: #0f172a; line-height: 1.1; }
+.stat-chip .lbl { font-size: .75rem; text-transform: uppercase; letter-spacing: .07em; color: #64748b; font-weight: 600; margin-top: 4px; }
+
+/* Filters */
+.filter-card {
+  background: #fff;
+  border-radius: 16px;
+  padding: 18px;
+  box-shadow: 0 4px 16px rgba(15,23,42,.07);
+  border: 1px solid #e2e8f0;
+  margin-bottom: 24px;
+}
+
+.filter-row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+.filter-search { flex: 1 1 220px; position: relative; }
+.filter-search input {
+  width: 100%; padding: 10px 14px 10px 38px;
+  border: 2px solid #e2e8f0; border-radius: 12px; font-size: .95rem;
+  transition: border-color .2s;
+}
+.filter-search input:focus { border-color: var(--lq-purple); outline: none; }
+.filter-search i { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #94a3b8; }
+.cat-tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+.cat-tab {
+  padding: 8px 14px; border-radius: 999px; font-size: .85rem; font-weight: 600;
+  border: 2px solid #e2e8f0; background: #fff; color: #64748b; cursor: pointer;
+  text-decoration: none; transition: all .2s;
+}
+.cat-tab:hover, .cat-tab.active {
+  background: var(--lq-purple); border-color: var(--lq-purple); color: #fff;
+}
+
+/* Product Cards Grid */
+.products-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+}
+
+.product-card {
+  background: #fff;
+  border-radius: 20px;
+  padding: 20px;
+  box-shadow: 0 4px 16px rgba(15,23,42,.07);
+  border: 1px solid #e2e8f0;
+  transition: all .3s;
+  position: relative;
+  overflow: hidden;
+}
+
+.product-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 32px rgba(15,23,42,.14);
+}
+
+/* Category-specific card accent strip */
+.product-card::before {
+  content: '';
+  position: absolute; left: 0; top: 0; bottom: 0; width: 6px;
+  border-radius: 20px 0 0 20px;
+}
+.product-card.status-ok::before { background: var(--lq-green); }
+.product-card.status-low::before { background: var(--lq-amber); }
+.product-card.status-out::before { background: var(--lq-red); }
+
+/* Category header band */
+.cat-header-band {
+  margin: -20px -20px 14px -20px;
+  padding: 10px 20px 10px 26px;
+  border-radius: 20px 20px 0 0;
+  display: flex; align-items: center; gap: 8px;
+}
+.card-cat-beer .cat-header-band    { background: var(--cat-beer-bg); }
+.card-cat-cider .cat-header-band   { background: var(--cat-cider-bg); }
+.card-cat-wine .cat-header-band    { background: var(--cat-wine-bg); }
+.card-cat-spirits .cat-header-band { background: var(--cat-spirits-bg); }
+.card-cat-whiskey .cat-header-band { background: var(--cat-whiskey-bg); }
+.card-cat-gin .cat-header-band     { background: var(--cat-gin-bg); }
+.card-cat-vodka .cat-header-band   { background: var(--cat-vodka-bg); }
+.card-cat-brandy .cat-header-band  { background: var(--cat-brandy-bg); }
+.card-cat-cocktail .cat-header-band{ background: var(--cat-cocktail-bg); }
+.card-cat-other .cat-header-band   { background: var(--cat-other-bg); }
+
+.product-name { font-size: 1.05rem; font-weight: 700; color: #0f172a; margin-bottom: 4px; }
+.product-cat { font-size: .78rem; text-transform: uppercase; letter-spacing: .07em; font-weight: 700; }
+
+/* Category text colours */
+.cat-beer    { color: var(--cat-beer-text); }
+.cat-cider   { color: var(--cat-cider-text); }
+.cat-wine    { color: var(--cat-wine-text); }
+.cat-spirits { color: var(--cat-spirits-text); }
+.cat-whiskey { color: var(--cat-whiskey-text); }
+.cat-gin     { color: var(--cat-gin-text); }
+.cat-vodka   { color: var(--cat-vodka-text); }
+.cat-brandy  { color: var(--cat-brandy-text); }
+.cat-cocktail{ color: var(--cat-cocktail-text); }
+.cat-other   { color: var(--cat-other-text); }
+
+/* Stock progress */
+.stock-bar-wrap { margin: 12px 0; }
+.stock-bar-label { display: flex; justify-content: space-between; font-size: .8rem; font-weight: 600; margin-bottom: 5px; }
+.stock-bar { height: 10px; background: #f1f5f9; border-radius: 999px; overflow: hidden; }
+.stock-bar-fill { height: 100%; border-radius: 999px; transition: width .4s; }
+.fill-ok { background: linear-gradient(90deg, #10b981, #059669); }
+.fill-low { background: linear-gradient(90deg, #f59e0b, #d97706); }
+.fill-out { background: #dc2626; }
+
+/* Status chips - premium */
+.status-chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 5px 12px; border-radius: 999px; font-size: .78rem; font-weight: 700;
+  letter-spacing: .02em;
+}
+.chip-ok {
+  background: #dcfce7; color: #15803d;
+  box-shadow: 0 0 0 2px rgba(21,128,61,.15);
+}
+.chip-low {
+  background: #fef3c7; color: #92400e;
+  box-shadow: 0 0 0 2px rgba(146,64,14,.15);
+}
+.chip-out {
+  background: #fee2e2; color: #991b1b;
+  box-shadow: 0 0 0 2px rgba(153,27,27,.12);
+}
+.chip-open-bottle {
+  background: linear-gradient(135deg, #ede9fe, #ddd6fe); color: #5b21b6;
+  box-shadow: 0 0 0 2px rgba(91,33,182,.2);
+}
+
+/* Bottle breakdown badge */
+.bottle-breakdown {
+  background: linear-gradient(135deg, #f5f3ff, #ede9fe);
+  border: 1px solid #ddd6fe;
+  border-radius: 10px;
+  padding: 8px 12px;
+  margin-top: 8px;
+  font-size: .8rem;
+  color: #4c1d95;
+}
+.bottle-breakdown .bb-main {
+  font-weight: 700;
+  font-size: .88rem;
+  margin-bottom: 2px;
+}
+.bottle-breakdown .bb-sub {
+  color: #7c3aed;
+  font-weight: 500;
+}
+.glass-breakdown {
+  background: linear-gradient(135deg, #fdf2f8, #fce7f3);
+  border: 1px solid #fbcfe8;
+  border-radius: 10px;
+  padding: 8px 12px;
+  margin-top: 8px;
+  font-size: .8rem;
+  color: #831843;
+}
+.glass-breakdown .bb-main { font-weight: 700; font-size: .88rem; margin-bottom: 2px; }
+.glass-breakdown .bb-sub { color: #be185d; font-weight: 500; }
+
+/* Price row */
+.price-row { display: flex; gap: 12px; margin: 12px 0; flex-wrap: wrap; }
+.price-item { font-size: .85rem; }
+.price-label { color: #94a3b8; font-size: .75rem; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; }
+.price-val { font-weight: 700; color: #0f172a; font-size: .95rem; }
+
+/* Quick action buttons */
+.quick-actions { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+.qa-btn {
+  flex: 1 1 auto; padding: 8px 12px; border-radius: 10px; font-size: .82rem; font-weight: 700;
+  text-decoration: none; text-align: center; transition: all .2s; border: none; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+}
+.qa-restock { background: #ede9fe; color: var(--lq-purple); }
+.qa-restock:hover { background: var(--lq-purple); color: #fff; }
+.qa-sell { background: #d1fae5; color: var(--lq-green); }
+.qa-sell:hover { background: var(--lq-green); color: #fff; }
+
+/* Empty state */
+.empty-state { text-align: center; padding: 60px 24px; background: #fff; border-radius: 20px; border: 2px dashed #cbd5e1; }
+.empty-state i { font-size: 3rem; opacity: .35; }
+
+@media (max-width: 640px) {
+  .products-grid { grid-template-columns: 1fr; }
+  .stock-hero { flex-direction: column; }
+}
+</style>
+
+<div class="stock-page">
+
+  <!-- Hero Header -->
+  <header class="stock-hero">
+    <div>
+      <p style="margin:0;opacity:.7;font-size:.8rem;text-transform:uppercase;letter-spacing:.08em">{{ business.name }} · Stock View</p>
+      <h1>🍺 Liquor Inventory</h1>
+      <p>{{ total_products }} product{{ total_products|pluralize }} · {{ total_quantity }} bottles in stock</p>
+    </div>
+    <div class="hero-btns">
+      <a href="{% url 'liquor:scan_in' %}" class="hero-btn-primary">
+        <i class="bi bi-upc-scan"></i> Scan In
+      </a>
+      <a href="{% url 'liquor:sell' %}" class="hero-btn-ghost">
+        <i class="bi bi-cart-check-fill"></i> Sell
+      </a>
+    </div>
+  </header>
+
+  <!-- Stats Bar -->
+  <div class="stats-bar">
+    <div class="stat-chip">
+      <div class="val">{{ total_products }}</div>
+      <div class="lbl">Products</div>
+    </div>
+    <div class="stat-chip">
+      <div class="val">{{ total_quantity }}</div>
+      <div class="lbl">Bottles in Stock</div>
+    </div>
+    <div class="stat-chip">
+      <div class="val" style="color:var(--lq-green)">MK {{ total_retail_value|floatformat:0 }}</div>
+      <div class="lbl">Retail Value</div>
+    </div>
+    <div class="stat-chip">
+      <div class="val" style="color:#64748b">MK {{ total_cost_value|floatformat:0 }}</div>
+      <div class="lbl">Cost Value</div>
+    </div>
+    <div class="stat-chip">
+      <div class="val" style="color:{% if expected_profit > 0 %}var(--lq-green){% else %}var(--lq-red){% endif %}">MK {{ expected_profit|floatformat:0 }}</div>
+      <div class="lbl">Expected Profit</div>
+    </div>
+    <div class="stat-chip">
+      <div class="val" style="color:var(--lq-amber)">{{ low_stock_count }}</div>
+      <div class="lbl">Low Stock</div>
+    </div>
+    <div class="stat-chip">
+      <div class="val" style="color:var(--lq-red)">{{ out_of_stock_count }}</div>
+      <div class="lbl">Out of Stock</div>
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <div class="filter-card">
+    <form method="get" class="filter-row">
+      <div class="filter-search">
+        <i class="bi bi-search"></i>
+        <input type="text" name="q" placeholder="Search products…" value="{{ search_query|default:'' }}">
+      </div>
+      <div class="cat-tabs">
+        <a href="?{% if search_query %}q={{ search_query }}&{% endif %}"
+           class="cat-tab {% if not selected_category %}active{% endif %}">All</a>
+        {% for cat in categories %}
+        <a href="?category={{ cat.key }}{% if search_query %}&q={{ search_query }}{% endif %}"
+           class="cat-tab {% if selected_category == cat.key %}active{% endif %}">
+          {{ cat.display }}
+        </a>
+        {% endfor %}
+      </div>
+      <button type="submit" class="qa-btn qa-restock" style="flex:0 0 auto;padding:10px 16px">
+        <i class="bi bi-search"></i> Search
+      </button>
+    </form>
+  </div>
+
+  <!-- Products Grid -->
+  {% if products %}
+  <div class="products-grid">
+    {% for product in products %}
+    {% with qty=product.quantity_in_stock|default:0 cat=product.category|default:"other"|lower %}
+
+    <div class="product-card card-cat-{{ cat }} {% if qty == 0 %}status-out{% elif product.is_low_stock %}status-low{% else %}status-ok{% endif %}">
+
+      <!-- Category header band -->
+      <div class="cat-header-band">
+        <span style="font-size:1.3rem">
+          {% if cat == "beer" %}🍺{% elif cat == "cider" %}🥤{% elif cat == "wine" %}🍷{% elif cat == "spirits" or cat == "whiskey" %}🥃{% elif cat == "gin" %}🍸{% elif cat == "vodka" %}🧊{% elif cat == "brandy" %}🥂{% elif cat == "cocktail" %}🍹{% else %}🍶{% endif %}
+        </span>
+        <span class="product-cat cat-{{ cat }}">{{ product.category|default:"Other"|title }}</span>
+        <span class="ms-auto status-chip {% if qty == 0 %}chip-out{% elif product.is_low_stock %}chip-low{% elif product.bb_has_open_bottle %}chip-open-bottle{% else %}chip-ok{% endif %}">
+          {% if qty == 0 %}
+            ✕ Out of Stock
+          {% elif product.is_low_stock %}
+            ⚠ Low Stock
+          {% elif product.bb_has_open_bottle and product.has_shots %}
+            🔓 Open Bottle
+          {% elif product.bb_has_open_bottle and product.has_glasses %}
+            🍷 Open Bottle
+          {% else %}
+            ✓ In Stock
+          {% endif %}
+        </span>
+      </div>
+
+      <!-- Product name -->
+      <div class="product-name">{{ product.name }}</div>
+
+      <!-- Stock level display -->
+      <div class="stock-bar-wrap">
+        <div class="stock-bar-label">
+          <span style="color:#64748b;font-size:.78rem">Stock</span>
+          <span style="font-weight:800;font-size:1.1rem;color:{% if qty == 0 %}var(--lq-red){% elif product.is_low_stock %}var(--lq-amber){% else %}var(--lq-green){% endif %}">
+            {% if product.has_shots %}
+              {{ qty }} shot{{ qty|pluralize }}
+            {% elif product.has_glasses %}
+              {{ qty }} glass{{ qty|pluralize:"es" }}
+            {% else %}
+              {{ qty }} bottle{{ qty|pluralize }}
+            {% endif %}
+          </span>
+        </div>
+        <div class="stock-bar">
+          <div class="stock-bar-fill {% if qty == 0 %}fill-out{% elif product.is_low_stock %}fill-low{% else %}fill-ok{% endif %}"
+               style="width:{% if qty == 0 %}5{% elif product.is_low_stock %}35{% else %}85{% endif %}%"></div>
+        </div>
+
+        {# Bottle breakdown for spirits/whisky #}
+        {% if product.has_shots and product.shots_per_bottle and qty > 0 %}
+        <div class="bottle-breakdown">
+          <div class="bb-main">{{ product.bb_display_text }}</div>
+          <div class="bb-sub">{{ product.bb_total_label }} · {{ product.shots_per_bottle }} shots/bottle</div>
+        </div>
+        {% endif %}
+
+        {# Glass breakdown for wine #}
+        {% if product.has_glasses and product.glasses_per_bottle and qty > 0 %}
+        <div class="glass-breakdown">
+          <div class="bb-main">{{ product.bb_display_text }}</div>
+          <div class="bb-sub">{{ product.bb_total_label }} · {{ product.glasses_per_bottle }} glasses/bottle</div>
+        </div>
+        {% endif %}
+      </div>
+
+      <!-- SKU -->
+      {% if product.sku or product.internal_sku %}
+      <div style="font-size:.75rem;color:#94a3b8;margin-bottom:8px">SKU: {{ product.sku|default:product.internal_sku }}</div>
+      {% endif %}
+
+      <!-- Prices -->
+      <div class="price-row">
+        <div class="price-item">
+          <div class="price-label">Cost</div>
+          <div class="price-val">MK {{ product.cost_per_bottle|default:0|floatformat:0 }}</div>
+        </div>
+        <div class="price-item">
+          <div class="price-label">Sell Price</div>
+          <div class="price-val" style="color:var(--lq-green)">MK {{ product.price_per_bottle|default:0|floatformat:0 }}</div>
+        </div>
+        {% if product.has_shots and product.price_per_shot %}
+        <div class="price-item">
+          <div class="price-label">Per Shot</div>
+          <div class="price-val" style="color:var(--cat-spirits-text)">MK {{ product.price_per_shot|floatformat:0 }}</div>
+        </div>
+        {% endif %}
+        {% if product.has_glasses and product.price_per_glass %}
+        <div class="price-item">
+          <div class="price-label">Per Glass</div>
+          <div class="price-val" style="color:var(--cat-wine-text)">MK {{ product.price_per_glass|floatformat:0 }}</div>
+        </div>
+        {% endif %}
+      </div>
+
+      <!-- Profit margin badge -->
+      {% if product.price_per_bottle and product.cost_per_bottle and product.cost_per_bottle > 0 %}
+      {% with sell=product.price_per_bottle cost=product.cost_per_bottle %}
+      <div style="margin-bottom:10px">
+        {% if sell >= cost %}
+          {% widthratio sell cost 100 as gross_pct %}
+          {% if gross_pct >= 140 %}
+            <span style="display:inline-flex;align-items:center;gap:5px;background:linear-gradient(135deg,#d1fae5,#6ee7b7);color:#065f46;padding:4px 10px;border-radius:99px;font-size:.72rem;font-weight:800;border:1px solid #6ee7b7">
+              🔥 High Margin
+            </span>
+          {% elif gross_pct >= 120 %}
+            <span style="display:inline-flex;align-items:center;gap:5px;background:#f0fdf4;color:#15803d;padding:4px 10px;border-radius:99px;font-size:.72rem;font-weight:700;border:1px solid #bbf7d0">
+              ✓ Good Margin
+            </span>
+          {% else %}
+            <span style="display:inline-flex;align-items:center;gap:5px;background:#fff7ed;color:#c2410c;padding:4px 10px;border-radius:99px;font-size:.72rem;font-weight:700;border:1px solid #fed7aa">
+              ⚠ Low Margin
+            </span>
+          {% endif %}
+        {% else %}
+          <span style="display:inline-flex;align-items:center;gap:5px;background:#fef2f2;color:#dc2626;padding:4px 10px;border-radius:99px;font-size:.72rem;font-weight:700;border:1px solid #fecaca">
+            ⚠ Selling Below Cost
+          </span>
+        {% endif %}
+      </div>
+      {% endwith %}
+      {% endif %}
+
+      <!-- Quick Actions -->
+      <div class="quick-actions">
+        <a href="{% url 'liquor:scan_in' %}?product={{ product.id }}"
+           class="qa-btn qa-restock">
+          <i class="bi bi-arrow-up-circle"></i> Restock
+        </a>
+        <a href="{% url 'liquor:sell' %}?product={{ product.id }}"
+           class="qa-btn qa-sell">
+          <i class="bi bi-cart-check"></i> Sell
+        </a>
+      </div>
+    </div>
+
+    {% endwith %}
+    {% endfor %}
+  </div>
+
+  {% else %}
+  <div class="empty-state">
+    <i class="bi bi-inbox"></i>
+    <h3 style="margin:16px 0 8px">No Products Found</h3>
+    <p style="color:#64748b">
+      {% if search_query or selected_category %}Try adjusting your search or category filter.
+      {% else %}Add liquor products to start tracking inventory.{% endif %}
+    </p>
+    <a href="{% url 'liquor:scan_in' %}" class="hero-btn-primary" style="display:inline-flex;margin:16px auto 0">
+      <i class="bi bi-plus-circle"></i> Add First Product
+    </a>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

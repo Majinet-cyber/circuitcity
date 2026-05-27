@@ -1,0 +1,398 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Livestock Sales - {{ business.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+/* ===== Livestock Sales Premium Styles ===== */
+.livestock-sales {
+    --farm-green: #16a34a;
+    --farm-green-light: #dcfce7;
+    --farm-blue: #2563eb;
+    --farm-blue-light: #dbeafe;
+}
+
+/* Livestock Cards Grid */
+.livestock-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+}
+
+@media (min-width: 576px) {
+    .livestock-cards-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+@media (min-width: 768px) {
+    .livestock-cards-grid {
+        grid-template-columns: repeat(4, 1fr);
+    }
+}
+
+/* Livestock Card */
+.livestock-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 1.25rem 0.75rem;
+    background: var(--surface);
+    border: 2px solid var(--border);
+    border-radius: var(--radius);
+    text-decoration: none;
+    color: var(--ink);
+    font-weight: 600;
+    font-size: 0.875rem;
+    transition: all 0.2s ease;
+    box-shadow: var(--shadow-xs);
+    cursor: pointer;
+    text-align: center;
+}
+
+.livestock-card:hover {
+    background: var(--farm-blue-light);
+    border-color: var(--farm-blue);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+    text-decoration: none;
+    color: var(--ink);
+}
+
+.livestock-card:focus {
+    outline: 2px solid var(--farm-blue);
+    outline-offset: 2px;
+}
+
+.livestock-card .emoji {
+    font-size: 2.5rem;
+}
+
+.livestock-card .label {
+    font-weight: 700;
+}
+
+.livestock-card .count {
+    font-size: 0.6875rem;
+    color: var(--muted);
+    font-weight: 400;
+}
+
+/* Payment Method Cards */
+.payment-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+@media (min-width: 576px) {
+    .payment-cards-grid {
+        grid-template-columns: repeat(5, 1fr);
+    }
+}
+
+.payment-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+    padding: 0.75rem 0.5rem;
+    background: var(--surface);
+    border: 2px solid var(--border);
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-align: center;
+}
+
+.payment-card:hover {
+    border-color: var(--farm-green);
+    background: var(--farm-green-light);
+}
+
+.payment-card.selected {
+    border-color: var(--farm-green);
+    background: var(--farm-green-light);
+    box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.2);
+}
+
+.payment-card input[type="radio"] {
+    display: none;
+}
+
+.payment-card .icon {
+    font-size: 1.25rem;
+}
+
+.payment-card .label {
+    font-size: 0.6875rem;
+    font-weight: 600;
+}
+
+/* Sale Form */
+.sale-form-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-sm);
+    display: none;
+}
+
+.sale-form-card.visible {
+    display: block;
+}
+
+.sale-form-header {
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.sale-form-header .emoji {
+    font-size: 1.5rem;
+}
+
+.sale-form-header h3 {
+    font-size: 1rem;
+    font-weight: 700;
+    margin: 0;
+}
+
+.sale-form-body {
+    padding: 1.25rem;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="livestock-sales container-fluid py-3" data-vertical="farm" data-testid="farm-livestock-sales-page">
+    <div class="mb-4">
+        <a href="{% url 'verticals:farm_sales' %}" class="text-decoration-none mb-2 d-inline-block">&larr; Back to Sales</a>
+        <h1 class="h3 mb-1"><span class="me-2">🐄</span>Livestock Sales</h1>
+        <p class="text-muted mb-0">{{ hero_blurb }}</p>
+    </div>
+    
+    {% if has_livestock %}
+    <p class="text-muted mb-4"><i class="bi bi-lightning-fill text-primary me-1"></i> Select a recorded batch to sell from</p>
+    
+    <!-- Recorded Livestock Batches -->
+    <div class="livestock-cards-grid" data-testid="livestock-batch-cards">
+        {% for batch in batches %}
+        <a href="{% url 'verticals:farm_sales_record' %}?type=livestock&batch_id={{ batch.id }}" 
+           class="livestock-card" data-testid="livestock-batch-{{ batch.id }}">
+            <span class="emoji">
+                {% if batch.animal_type == 'chickens' %}🐔
+                {% elif batch.animal_type == 'pigs' %}🐖
+                {% elif batch.animal_type == 'goats' %}🐐
+                {% elif batch.animal_type == 'cattle' %}🐄
+                {% elif batch.animal_type == 'sheep' %}🐑
+                {% elif batch.animal_type == 'ducks' %}🦆
+                {% elif batch.animal_type == 'rabbits' %}🐰
+                {% elif batch.animal_type == 'fish' %}🐟
+                {% else %}🐾{% endif %}
+            </span>
+            <span class="label">{{ batch.name }}</span>
+            <span class="count text-success"><i class="bi bi-check-circle"></i> {{ batch.count_current }} head</span>
+        </a>
+        {% endfor %}
+    </div>
+    
+    {% else %}
+    <!-- Empty State: No livestock recorded -->
+    <div class="text-center py-5" style="background: linear-gradient(135deg, #dbeafe 0%, #f0f9ff 100%); border-radius: 12px; border: 2px dashed rgba(37,99,235,0.3);" data-testid="empty-livestock-cta">
+        <i class="bi bi-piggy-bank" style="font-size: 3rem; color: #2563eb; opacity: 0.6;"></i>
+        <h3 class="mt-3" style="font-size: 1.25rem; font-weight: 700;">No Livestock Recorded Yet</h3>
+        <p class="text-muted mb-4">Add your livestock batches first before making sales.</p>
+        <a href="{% url 'verticals:farm_livestock_add_batch' %}" class="btn btn-primary btn-lg">
+            <i class="bi bi-plus-circle me-1"></i> Add Livestock First
+        </a>
+    </div>
+    {% endif %}
+    
+    <!-- Sale Form (appears after selecting livestock type) -->
+    <div class="sale-form-card" id="saleFormCard" data-testid="livestock-sale-form">
+        <div class="sale-form-header">
+            <span class="emoji" id="selectedEmoji">🐄</span>
+            <h3>Record <span id="selectedLabel">Livestock</span> Sale</h3>
+        </div>
+        <div class="sale-form-body">
+            <form method="post" action="{% url 'verticals:farm_sales_record' %}" id="livestockSaleForm">
+                {% csrf_token %}
+                <input type="hidden" name="enterprise_type" id="enterpriseType" value="livestock">
+                
+                <div class="row">
+                    <div class="col-6 mb-3">
+                        <label for="quantity" class="form-label">Number of Animals *</label>
+                        <input type="number" class="form-control" id="quantity" name="quantity" 
+                               min="1" required placeholder="e.g., 5">
+                    </div>
+                    <div class="col-6 mb-3">
+                        <label for="unit_price" class="form-label">Price per Animal (MWK) *</label>
+                        <input type="number" class="form-control" id="unit_price" name="unit_price" 
+                               min="0" step="0.01" required placeholder="e.g., 25000">
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label for="amount" class="form-label">Total Amount (MWK) *</label>
+                    <input type="number" class="form-control form-control-lg" id="amount" name="amount" 
+                           min="0" step="0.01" required readonly>
+                    <small class="text-muted">Auto-calculated from quantity × price</small>
+                </div>
+
+                <div class="mb-3">
+                    <label for="date" class="form-label">Sale Date</label>
+                    <input type="date" class="form-control" id="date" name="date" value="{{ today }}">
+                </div>
+
+                <!-- Payment Method Cards -->
+                <div class="mb-3">
+                    <label class="form-label">Payment Method</label>
+                    <div class="payment-cards-grid" data-testid="payment-method-cards">
+                        <label class="payment-card selected" data-value="cash">
+                            <input type="radio" name="payment_method" value="cash" checked>
+                            <span class="icon">💵</span>
+                            <span class="label">Cash</span>
+                        </label>
+                        <label class="payment-card" data-value="mobile_money">
+                            <input type="radio" name="payment_method" value="mobile_money">
+                            <span class="icon">📱</span>
+                            <span class="label">Mobile Money</span>
+                        </label>
+                        <label class="payment-card" data-value="bank">
+                            <input type="radio" name="payment_method" value="bank">
+                            <span class="icon">🏦</span>
+                            <span class="label">Bank Transfer</span>
+                        </label>
+                        <label class="payment-card" data-value="credit">
+                            <input type="radio" name="payment_method" value="credit">
+                            <span class="icon">📝</span>
+                            <span class="label">Credit</span>
+                        </label>
+                        <label class="payment-card" data-value="barter">
+                            <input type="radio" name="payment_method" value="barter">
+                            <span class="icon">🤝</span>
+                            <span class="label">Barter</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label for="description" class="form-label">Description / Buyer</label>
+                    <input type="text" class="form-control" id="description" name="description" 
+                           placeholder="e.g., Sold to local market">
+                </div>
+
+                <div class="mb-3">
+                    <label for="notes" class="form-label">Notes</label>
+                    <textarea class="form-control" id="notes" name="notes" rows="2" 
+                              placeholder="Any additional notes"></textarea>
+                </div>
+
+                <input type="hidden" name="unit" value="head">
+
+                <div class="d-grid gap-2">
+                    <button type="submit" class="btn btn-success btn-lg">
+                        <i class="bi bi-check-circle me-1"></i> Record Sale
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary" id="cancelSale">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const formCard = document.getElementById('saleFormCard');
+    const selectedEmoji = document.getElementById('selectedEmoji');
+    const selectedLabel = document.getElementById('selectedLabel');
+    const enterpriseType = document.getElementById('enterpriseType');
+    const quantityInput = document.getElementById('quantity');
+    const unitPriceInput = document.getElementById('unit_price');
+    const amountInput = document.getElementById('amount');
+    
+    const emojiMap = {
+        'chickens': '🐔',
+        'pigs': '🐖',
+        'goats': '🐐',
+        'cattle': '🐄',
+        'sheep': '🐑',
+        'ducks': '🦆',
+        'rabbits': '🐰',
+        'fish': '🐟'
+    };
+    
+    const labelMap = {
+        'chickens': 'Chickens',
+        'pigs': 'Pigs',
+        'goats': 'Goats',
+        'cattle': 'Cattle',
+        'sheep': 'Sheep',
+        'ducks': 'Ducks',
+        'rabbits': 'Rabbits',
+        'fish': 'Fish'
+    };
+    
+    // Livestock card selection
+    document.querySelectorAll('.livestock-card').forEach(function(card) {
+        card.addEventListener('click', function() {
+            const type = this.dataset.type;
+            
+            // Remove selected from all
+            document.querySelectorAll('.livestock-card').forEach(c => c.classList.remove('selected'));
+            this.classList.add('selected');
+            
+            // Update form
+            selectedEmoji.textContent = emojiMap[type] || '🐄';
+            selectedLabel.textContent = labelMap[type] || 'Livestock';
+            enterpriseType.value = type;
+            
+            // Show form
+            formCard.classList.add('visible');
+            formCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            quantityInput.focus();
+        });
+    });
+    
+    // Payment card selection
+    document.querySelectorAll('.payment-card').forEach(function(card) {
+        card.addEventListener('click', function() {
+            document.querySelectorAll('.payment-card').forEach(c => c.classList.remove('selected'));
+            this.classList.add('selected');
+            this.querySelector('input[type="radio"]').checked = true;
+        });
+    });
+    
+    // Auto-calculate total
+    function calculateTotal() {
+        const qty = parseFloat(quantityInput.value) || 0;
+        const price = parseFloat(unitPriceInput.value) || 0;
+        amountInput.value = (qty * price).toFixed(2);
+    }
+    
+    quantityInput.addEventListener('input', calculateTotal);
+    unitPriceInput.addEventListener('input', calculateTotal);
+    
+    // Cancel button
+    document.getElementById('cancelSale').addEventListener('click', function() {
+        formCard.classList.remove('visible');
+        document.querySelectorAll('.livestock-card').forEach(c => c.classList.remove('selected'));
+    });
+    
+    // Set today's date
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('date').value = today;
+});
+</script>
+{% endblock %}

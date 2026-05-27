@@ -1,0 +1,258 @@
+{% extends "staticpages/base_public.html" %}
+{% load static marketplace_media %}
+
+{% block title %}{{ business.name }} – Emajinet Marketplace{% endblock %}
+{% block meta_description %}{{ business.name }} – Browse our products and services on Emajinet Marketplace{% endblock %}
+
+{% block styles %}
+<style>
+  :root {
+    --primary: #4f46e5;
+    --primary-dark: #4338ca;
+    --secondary: #10b981;
+    --text-primary: #1f2937;
+    --text-secondary: #6b7280;
+    --bg-light: #f9fafb;
+    --white: #ffffff;
+  }
+
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    background: var(--bg-light);
+    color: var(--text-primary);
+    line-height: 1.6;
+  }
+
+  .container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem 1rem;
+  }
+
+  .business-header {
+    background: var(--white);
+    padding: 2rem;
+    border-radius: 12px;
+    margin-bottom: 2rem;
+    text-align: center;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+  }
+
+  .business-logo {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    object-fit: cover;
+    margin-bottom: 1rem;
+  }
+
+  .business-name {
+    font-size: clamp(1.5rem, 4vw, 2rem);
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+  }
+
+  .listings-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+  }
+
+  .listing-card {
+    background: var(--white);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+  }
+
+  .listing-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  }
+
+  .listing-media {
+    width: 100%;
+    height: 200px;
+    object-fit: cover;
+    background: #e5e7eb;
+  }
+
+  .listing-content {
+    padding: 1rem;
+  }
+
+  .listing-title {
+    font-size: 1.125rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+  }
+
+  .listing-description {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.75rem;
+    line-height: 1.5;
+  }
+
+  .listing-price {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--primary);
+    margin-bottom: 0.75rem;
+  }
+
+  .btn {
+    display: inline-block;
+    padding: 0.625rem 1.25rem;
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+    color: var(--white);
+    text-decoration: none;
+    border-radius: 6px;
+    font-weight: 500;
+    text-align: center;
+    transition: all 0.3s ease;
+    border: none;
+    cursor: pointer;
+    font-size: 0.95rem;
+    width: 100%;
+  }
+
+  .btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+  }
+
+  .enquiry-form {
+    background: var(--white);
+    padding: 1.5rem;
+    border-radius: 8px;
+    margin-top: 1rem;
+    display: none;
+  }
+
+  .enquiry-form.active {
+    display: block;
+  }
+
+  .form-group {
+    margin-bottom: 1rem;
+  }
+
+  .form-group label {
+    display: block;
+    margin-bottom: 0.25rem;
+    font-weight: 500;
+  }
+
+  .form-group input,
+  .form-group textarea {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    font-size: 0.95rem;
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 4rem 1rem;
+    color: var(--text-secondary);
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+  <div class="business-header">
+    {% with logo_url=business.logo|safe_media_url %}
+    {% if logo_url %}
+      <img src="{{ logo_url }}" alt="{{ business.name }}" class="business-logo">
+    {% endif %}
+    {% endwith %}
+    <h1 class="business-name">{{ business.name }}</h1>
+    <p style="color: var(--text-secondary);">Browse our products and services</p>
+    <a href="{% url 'inventory:marketplace_public' %}" style="margin-top: 1rem; display: inline-block; color: var(--primary); text-decoration: none;">← Back to Marketplace</a>
+  </div>
+
+  {% if page_obj.object_list %}
+    <div class="listings-grid">
+      {% for listing in page_obj %}
+        <div class="listing-card">
+          {% with media=listing|listing_card_media %}
+          {% if media.kind == "image" %}
+            <img src="{{ media.url }}" alt="{{ listing.title }}" class="listing-media">
+          {% elif media.kind == "video" %}
+            <video src="{{ media.url }}" class="listing-media" controls></video>
+          {% else %}
+            <div class="listing-media" style="display: flex; align-items: center; justify-content: center; font-size: 3rem;">
+              📦
+            </div>
+          {% endif %}
+          {% endwith %}
+
+          <div class="listing-content">
+            <h3 class="listing-title">{{ listing.title }}</h3>
+            
+            {% if listing.description %}
+              <p class="listing-description">{{ listing.description|truncatewords:20 }}</p>
+            {% endif %}
+
+            {% if listing.price %}
+              <div class="listing-price">MWK {{ listing.price|floatformat:0 }}</div>
+            {% endif %}
+
+            <button class="btn" onclick="toggleEnquiryForm({{ listing.id }})">
+              Order / Enquire
+            </button>
+
+            <div id="enquiry-form-{{ listing.id }}" class="enquiry-form">
+              <h4 style="margin-bottom: 1rem;">Send Enquiry</h4>
+              <form method="post" action="{% url 'inventory:submit_enquiry' listing.id %}">
+                {% csrf_token %}
+                <div class="form-group">
+                  <label for="email-{{ listing.id }}">Email (required)</label>
+                  <input type="email" id="email-{{ listing.id }}" name="email" required>
+                </div>
+                <div class="form-group">
+                  <label for="name-{{ listing.id }}">Name (optional)</label>
+                  <input type="text" id="name-{{ listing.id }}" name="name">
+                </div>
+                <div class="form-group">
+                  <label for="phone-{{ listing.id }}">Phone (optional)</label>
+                  <input type="text" id="phone-{{ listing.id }}" name="phone">
+                </div>
+                <div class="form-group">
+                  <label for="message-{{ listing.id }}">Message (optional)</label>
+                  <textarea id="message-{{ listing.id }}" name="message" rows="3"></textarea>
+                </div>
+                <button type="submit" class="btn">Send Enquiry</button>
+              </form>
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="empty-state">
+      <h2>No listings yet</h2>
+      <p>This business hasn't added any listings yet. Check back soon!</p>
+    </div>
+  {% endif %}
+</div>
+
+<script>
+  function toggleEnquiryForm(listingId) {
+    const form = document.getElementById('enquiry-form-' + listingId);
+    form.classList.toggle('active');
+  }
+</script>
+{% endblock %}
+

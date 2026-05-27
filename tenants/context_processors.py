@@ -1,13 +1,15 @@
-﻿# tenants/context_processors.py
+# tenants/context_processors.py
 from __future__ import annotations
 
-from typing import Dict, Any
+from typing import Any, Dict
+
 from django.db import models
 
 # Defensive/lazy imports so templates never crash if utilities are missing
 try:
     from tenants.utils import get_active_business
 except Exception:  # pragma: no cover
+
     def get_active_business(_request):  # type: ignore
         return None
 
@@ -21,13 +23,11 @@ _VERTICAL_ALIASES = {
     "phones": "phones",
     "mobile": "phones",
     "mobiles": "phones",
-
     # Pharmacy
     "pharmacy": "pharmacy",
     "chemist": "pharmacy",
     "medicine": "pharmacy",
     "drugstore": "pharmacy",
-
     # Liquor
     "liquor": "liquor",
     "bar": "liquor",
@@ -35,27 +35,93 @@ _VERTICAL_ALIASES = {
     "pub": "liquor",
     "bottle-store": "liquor",
     "bottle store": "liquor",
-
     # Gym / Fitness
     "gym": "gym",
     "fitness": "gym",
     "fitness center": "gym",
     "health club": "gym",
     "sports club": "gym",
-
     # Clothing / Fashion
     "clothing": "clothing",
     "fashion": "clothing",
     "apparel": "clothing",
     "boutique": "clothing",
     "garments": "clothing",
-
     # Grocery / Supermarket / Retail
     "grocery": "grocery",
     "groceries": "grocery",
     "supermarket": "grocery",
     "supermarket & groceries": "grocery",
     "retail": "grocery",
+    # Hardware & General Dealers
+    "hardware": "hardware",
+    "hardware & general dealers": "hardware",
+    "general dealers": "hardware",
+    "building supplies": "hardware",
+    "home improvement": "hardware",
+    # Cement / Building Materials (legacy)
+    "cement": "cement",
+    "building materials": "cement",
+    # Farm Manager
+    "farm": "farm",
+    "agriculture": "farm",
+    "farming": "farm",
+    # Welding Workshop
+    "welding": "welding",
+    "welder": "welding",
+    "fabrication": "welding",
+    # Car Hire Service
+    "car_hire": "car_hire",
+    "car hire": "car_hire",
+    "car hire service": "car_hire",
+    "vehicle rental": "car_hire",
+    "car rental": "car_hire",
+    "fleet": "car_hire",
+    # Car Dealer
+    "car_dealer": "car_dealer",
+    "car dealer": "car_dealer",
+    "dealership": "car_dealer",
+    "car dealership": "car_dealer",
+    "vehicle dealer": "car_dealer",
+    "vehicle dealership": "car_dealer",
+    "auto dealer": "car_dealer",
+    "used cars": "car_dealer",
+    "second hand cars": "car_dealer",
+    # Renewable Energy
+    "energy": "energy",
+    "renewable energy": "energy",
+    "solar": "energy",
+    "solar energy": "energy",
+    "solar power": "energy",
+    "solar systems": "energy",
+    "battery systems": "energy",
+    "inverter": "energy",
+    "green energy": "energy",
+    "clean energy": "energy",
+    # Mobile Money Agent
+    "mobile_money": "mobile_money",
+    "mobile money": "mobile_money",
+    "mobile money agent": "mobile_money",
+    "momo agent": "mobile_money",
+    # Mixed Retail (multi-department shop)
+    "mixed_retail": "mixed_retail",
+    "mixed retail": "mixed_retail",
+    "multi retail": "mixed_retail",
+    "general shop": "mixed_retail",
+    "multi-department": "mixed_retail",
+    # Consultancy & Services
+    "consultancy": "consultancy",
+    "consulting": "consultancy",
+    "freelance": "consultancy",
+    "agency": "consultancy",
+    "services": "consultancy",
+    "advisory": "consultancy",
+    # Butchery
+    "butchery": "butchery",
+    "butcher": "butchery",
+    "meat shop": "butchery",
+    "butchery shop": "butchery",
+    "abattoir": "butchery",
 }
 
 PRODUCT_MODE_SESSION_KEY = "product_mode"
@@ -69,8 +135,18 @@ def _normalize_vertical(v: str | None) -> str:
 def _derive_mode_from_business(biz) -> str:
     if not biz:
         return "generic"
-    # Check a few common attributes (plus their display())
-    for attr in ("vertical", "category", "industry", "type", "kind", "sector", "business_kind", "business_type"):
+    # Keep field order aligned with inventory.helpers_core.product_mode_from_business (template_key first).
+    for attr in (
+        "template_key",
+        "vertical",
+        "category",
+        "industry",
+        "type",
+        "kind",
+        "sector",
+        "business_kind",
+        "business_type",
+    ):
         val = getattr(biz, attr, None)
         if isinstance(val, str) and val.strip():
             return _normalize_vertical(val)
@@ -118,9 +194,12 @@ def tenant_context(request) -> Dict[str, Any]:
     Adds to every template:
       - business / business_id (new keys)
       - active_business / active_business_id (legacy-friendly mirror)
+      - membership: Membership for (request.user, active_business) or None
+      - subscription: business.subscription or None (never raises)
       - PRODUCT_MODE ∈ {'phones','pharmacy','liquor','grocery','generic'}
       - BUSINESS_VERTICAL (alias for PRODUCT_MODE)
       - sidebar_items (vertical-aware navigation config)
+      - user_has_business (MULTI-TENANCY: True if user has any business membership)
 
     Priority for PRODUCT_MODE:
       1) request.product_mode (set by middleware)
@@ -128,22 +207,87 @@ def tenant_context(request) -> Dict[str, Any]:
       3) derived from active business
       4) session fallback
       5) 'generic'
+
+    This function is defensive and never raises exceptions, even on 404/500 pages.
     """
-    biz = _resolve_business(request)
-    bid = getattr(request, "business_id", None) or (getattr(biz, "pk", None) if biz else None)
+    try:
+        biz = _resolve_business(request)
+    except Exception:
+        biz = None
+
+    try:
+        bid = getattr(request, "business_id", None) or (getattr(biz, "pk", None) if biz else None)
+    except Exception:
+        bid = None
+
+    # Expose business status and workspace list to templates
+    user_has_business = False
+    membership = None
+    subscription = None
+    user_workspaces = []  # All workspaces the user belongs to (for switcher dropdown)
+
+    try:
+        if hasattr(request, "user") and getattr(request.user, "is_authenticated", False):
+            from .utils import user_has_any_business
+            from tenants.models import Membership as _Membership
+
+            user_has_business = user_has_any_business(request.user)
+
+            # All active workspaces for this user (used in navbar switcher)
+            try:
+                user_workspaces = list(
+                    _Membership.objects.filter(
+                        user=request.user,
+                        status="ACTIVE",
+                        business__status="ACTIVE",
+                    )
+                    .select_related("business")
+                    .order_by("business__name")
+                )
+            except Exception:
+                user_workspaces = []
+
+            # Current membership for (user, active business)
+            if biz:
+                try:
+                    membership = _Membership.objects.filter(
+                        user=request.user,
+                        business=biz,
+                    ).first()
+                except Exception:
+                    pass
+    except Exception:
+        pass
+    
+    # Safely get subscription (never raise ObjectDoesNotExist)
+    try:
+        if biz and hasattr(biz, "subscription"):
+            subscription = biz.subscription
+    except Exception:
+        # ObjectDoesNotExist, AttributeError, etc - all return None
+        subscription = None
 
     # 1) middleware (single source of truth if present)
-    mode = getattr(request, "product_mode", None)
+    try:
+        mode = getattr(request, "product_mode", None)
+    except Exception:
+        mode = None
 
     # 2) explicit override (useful in dev)
     if not mode:
-        override = request.GET.get("mode")
-        if override:
-            mode = _normalize_vertical(override)
+        try:
+            override = request.GET.get("mode")
+            if override:
+                mode = _normalize_vertical(override)
+        except Exception:
+            pass
 
     # 3) derive from business
     if not mode or mode == "generic":
-        mode = _derive_mode_from_business(biz)
+        try:
+            mode = _derive_mode_from_business(biz)
+        except Exception:
+            mode = "generic"
 
     # 4) session fallback
     if mode == "generic":
@@ -158,6 +302,21 @@ def tenant_context(request) -> Dict[str, Any]:
     if not mode:
         mode = "generic"
 
+    # 6) Active business beats stale middleware/session when switching workspaces (?mode= respected)
+    dev_mode_override = False
+    try:
+        if request.GET.get("mode"):
+            dev_mode_override = True
+    except Exception:
+        pass
+    if biz is not None and not dev_mode_override:
+        try:
+            bd = _derive_mode_from_business(biz)
+            if bd and bd != "generic":
+                mode = bd
+        except Exception:
+            pass
+
     # Persist for consistency with middleware (best effort)
     try:
         request.session[PRODUCT_MODE_SESSION_KEY] = mode
@@ -168,22 +327,47 @@ def tenant_context(request) -> Dict[str, Any]:
     sidebar_items = []
     try:
         from inventory.utils_verticals import get_vertical_sidebar_items
+
         sidebar_items = get_vertical_sidebar_items(mode)
-        # Ensure all items have require_manager key with safe default
+        # Ensure all items have required keys with safe defaults
         for item in sidebar_items:
             item.setdefault("require_manager", False)
+            item.setdefault("testid", "")  # Prevent VariableDoesNotExist spam
     except Exception:
         pass  # Fail gracefully if utils_verticals is not available
+
+    # Get vertical-aware mobile nav items
+    mobile_nav_items = []
+    try:
+        from inventory.mobile_nav import get_mobile_nav_items
+
+        mobile_nav_items = get_mobile_nav_items(request)
+    except Exception:
+        pass  # Fail gracefully if mobile_nav is not available
+
+    # Resolve currency from business or default to MWK
+    currency = "MWK"
+    try:
+        if biz and hasattr(biz, "currency") and getattr(biz, "currency", None):
+            currency = biz.currency
+    except Exception:
+        pass
 
     # Expose both new and legacy keys so no template breaks
     return {
         # New names
         "business": biz,
         "business_id": bid,
+        "membership": membership,        # Membership for (user, active business) or None
+        "subscription": subscription,    # business.subscription or None (safe)
         "PRODUCT_MODE": mode,
-        "BUSINESS_VERTICAL": mode,  # Alias for sidebar compatibility
+        "BUSINESS_VERTICAL": mode,       # Alias for sidebar compatibility
         "sidebar_items": sidebar_items,  # Vertical-aware navigation config
-
+        "MOBILE_NAV_ITEMS": mobile_nav_items,
+        "currency": currency,
+        "user_has_business": user_has_business,
+        # Multi-workspace: all workspaces the user is a member of
+        "user_workspaces": user_workspaces,
         # Legacy-friendly mirrors
         "active_business": biz,
         "active_business_id": bid,
@@ -201,23 +385,21 @@ def notifications_context(request) -> Dict[str, Any]:
             "unread_notifications_count": 0,
             "latest_notifications": [],
         }
-    
+
     try:
         from notifications.models import Notification
-        
+
         # Get user's notifications (including business-scoped ones if applicable)
         user_notifications = Notification.objects.filter(user=request.user)
-        
+
         # Optionally filter by active business if needed
         biz = _resolve_business(request)
         if biz:
-            user_notifications = user_notifications.filter(
-                models.Q(business=biz) | models.Q(business__isnull=True)
-            )
-        
+            user_notifications = user_notifications.filter(models.Q(business=biz) | models.Q(business__isnull=True))
+
         unread_count = user_notifications.filter(read_at__isnull=True).count()
-        latest = list(user_notifications.order_by('-created_at')[:10])
-        
+        latest = list(user_notifications.order_by("-created_at")[:10])
+
         return {
             "unread_notifications_count": unread_count,
             "latest_notifications": latest,

@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Economics & Savings – {{ business.name }}{% endblock %}
+{% block content %}
+<div class="container-fluid py-4">
+  <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
+    <div>
+      <h4 class="fw-bold mb-0">💰 Economics &amp; Savings</h4>
+      <div class="text-muted small">{{ business.name }} · Financial performance and decision guidance</div>
+    </div>
+    <a href="{% url 'verticals:energy_dashboard' %}" class="btn btn-outline-secondary btn-sm rounded-pill"><i class="bi bi-arrow-left me-1"></i>Dashboard</a>
+  </div>
+
+  {# Decision guidance pills #}
+  {% if economics_recs %}
+  <div class="mb-4">
+    {% for rec in economics_recs %}
+    <div style="padding:.5rem .75rem;border-radius:10px;font-size:.83rem;margin-bottom:.35rem;
+      {% if rec.type == 'warning' %}background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;
+      {% elif rec.type == 'risk' %}background:#fff1f2;border:1px solid #fca5a5;color:#991b1b;
+      {% else %}background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af;{% endif %}">
+      {% if rec.type == 'warning' %}⚠️{% elif rec.type == 'risk' %}🔴{% else %}💡{% endif %} {{ rec.text }}
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {% if is_demo_economics %}
+  {# ── DEMO / PLACEHOLDER state for new workspaces ── #}
+  <div class="mb-4 p-3 rounded-3 d-flex align-items-center gap-2" style="background:#fff7ed;border:1.5px solid #fed7aa;">
+    <span style="font-size:1.1rem;">📊</span>
+    <div style="font-size:.82rem;color:#92400e;">
+      <strong>Sample Preview</strong> — These are example economics from a 5.2 kW system.
+      <a href="{% url 'verticals:energy_sizing_create' %}" style="color:#059669;font-weight:600;">Run system sizing</a> to get your real numbers.
+    </div>
+  </div>
+
+  <div class="row g-3 mb-4">
+    {% for card in demo_econ_cards %}
+    <div class="col-6 col-md-3">
+      <div style="background:#fff;border-radius:14px;padding:1.2rem;border:1.5px solid #e2e8f0;text-align:center;position:relative;">
+        <div style="position:absolute;top:.4rem;right:.5rem;background:#fef3c7;color:#92400e;font-size:.6rem;font-weight:700;padding:.1rem .35rem;border-radius:8px;text-transform:uppercase;">DEMO</div>
+        <div style="font-size:1.3rem;font-weight:800;color:{{ card.color|default:'#0f172a' }};">{{ card.value }}</div>
+        <div style="font-size:.7rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.04em;margin-top:.25rem;">{{ card.label }}</div>
+        {% if card.note %}<div style="font-size:.65rem;color:#94a3b8;margin-top:.15rem;">{{ card.note }}</div>{% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  {# Key decision callout #}
+  <div class="mb-4 p-3 rounded-3" style="background:linear-gradient(135deg,#fef3c7,#fde68a);border:1.5px solid #f59e0b;">
+    <div style="font-size:.85rem;font-weight:700;color:#92400e;margin-bottom:.35rem;">🎯 Key Decision</div>
+    <div style="font-size:.83rem;color:#78350f;">Battery cost drives payback. Reduce night loads or increase solar daytime usage for faster payback. Payback improves if grid tariff or diesel costs rise.</div>
+    <div class="mt-2" style="font-size:.78rem;color:#92400e;">
+      <strong>Battery replacement reserve:</strong> Set aside MWK 50,000/month for battery replacement at year 10.<br>
+      <strong>Maintenance reserve:</strong> MWK 5,833/month (2% of CapEx/year).<br>
+      <strong>Financing note:</strong> If financed at 18% over 24 months, monthly repayment ≈ MWK 175,000 — still offset by savings.
+    </div>
+  </div>
+
+  {# Demo comparison table #}
+  <div style="background:#fff;border-radius:14px;padding:1.25rem;border:1.5px solid #e2e8f0;margin-bottom:1.5rem;">
+    <div style="font-size:.75rem;font-weight:700;text-transform:uppercase;color:#64748b;letter-spacing:.06em;margin-bottom:.75rem;">Diesel / Grid Comparison (Sample)</div>
+    <div class="table-responsive">
+      <table class="table table-sm" style="font-size:.85rem;">
+        <thead class="table-light"><tr><th>Source</th><th class="text-end">Monthly Cost</th><th class="text-end">Annual Cost</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td>🔋 Solar + Battery (this system)</td><td class="text-end text-success fw-bold">MWK 5,833</td><td class="text-end text-success fw-bold">MWK 70,000</td><td style="font-size:.75rem;">Maintenance reserve only after payback</td></tr>
+          <tr><td>⚡ ESCOM Grid (full dependency)</td><td class="text-end">MWK 185,000</td><td class="text-end">MWK 2,220,000</td><td style="font-size:.75rem;">At MWK 185/kWh, 1,000 kWh/month</td></tr>
+          <tr><td>⛽ Generator only (diesel)</td><td class="text-end text-danger fw-bold">MWK 262,500</td><td class="text-end text-danger fw-bold">MWK 3,150,000</td><td style="font-size:.75rem;">At MWK 3,500/litre, 2.5L/hr, 10hrs/day</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  {% else %}
+
+  {# ── REAL DATA ── #}
+  <div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+      <div style="background:#fff;border-radius:14px;padding:1.2rem;border:1.5px solid #e2e8f0;text-align:center;">
+        <div style="font-size:1.5rem;font-weight:800;color:#4f46e5;">{{ business.currency }} {{ totals.cumulative_savings|floatformat:0 }}</div>
+        <div style="font-size:.72rem;font-weight:700;color:#64748b;text-transform:uppercase;">Cumulative Savings</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div style="background:#fff;border-radius:14px;padding:1.2rem;border:1.5px solid #e2e8f0;text-align:center;">
+        <div style="font-size:1.5rem;font-weight:800;color:#0f172a;">{{ business.currency }} {{ totals.installation_cost|floatformat:0 }}</div>
+        <div style="font-size:.72rem;font-weight:700;color:#64748b;text-transform:uppercase;">Total Investment</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div style="background:#fff;border-radius:14px;padding:1.2rem;border:1.5px solid #e2e8f0;text-align:center;">
+        <div style="font-size:1.5rem;font-weight:800;color:#15803d;">{{ business.currency }} {{ totals.monthly_savings|floatformat:0 }}</div>
+        <div style="font-size:.72rem;font-weight:700;color:#64748b;text-transform:uppercase;">This Month's Savings</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div style="background:#fff;border-radius:14px;padding:1.2rem;border:1.5px solid #e2e8f0;text-align:center;">
+        <div style="font-size:1.5rem;font-weight:800;color:{% if totals.roi_pct %}#4f46e5{% else %}#94a3b8{% endif %};">{% if totals.roi_pct %}{{ totals.roi_pct }}%{% else %}–{% endif %}</div>
+        <div style="font-size:.72rem;font-weight:700;color:#64748b;text-transform:uppercase;">Portfolio ROI</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="mb-3 p-3 rounded-3" style="background:#eff6ff;border:1.5px solid #bfdbfe;font-size:.82rem;color:#1e40af;">
+    💡 <strong>Decision note:</strong> Payback improves if grid tariff or diesel costs rise. Track monthly savings to confirm the system is performing as projected.
+    {% if totals.payback_months %} Estimated payback: <strong>~{{ totals.payback_months }} months</strong>.{% endif %}
+  </div>
+
+  {% if sites_data %}
+  <div class="table-responsive">
+    <table class="table align-middle" style="font-size:.87rem;">
+      <thead class="table-light">
+        <tr><th>Site</th><th>Investment</th><th>Cumulative Savings</th><th>This Month</th><th>ROI</th><th>Payback</th></tr>
+      </thead>
+      <tbody>
+        {% for row in sites_data %}
+        <tr>
+          <td><a href="{% url 'verticals:energy_site_detail' row.site.id %}" class="text-decoration-none fw-semibold">{{ row.site.name }}</a></td>
+          <td>{{ business.currency }} {{ row.installation_cost|floatformat:0 }}</td>
+          <td style="color:#15803d;font-weight:600;">{{ business.currency }} {{ row.cumulative_savings|floatformat:0 }}</td>
+          <td>{{ business.currency }} {{ row.monthly_savings|floatformat:0 }}</td>
+          <td>{% if row.roi_pct %}<span style="color:#4f46e5;font-weight:700;">{{ row.roi_pct }}%</span>{% else %}<span class="text-muted">–</span>{% endif %}</td>
+          <td>{% if row.payback_months %}<strong>~{{ row.payback_months }} months</strong>{% else %}<span class="text-muted">–</span>{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="text-center py-4">
+    <div style="font-size:3rem;opacity:.2">💰</div>
+    <h5 class="mt-3 text-muted">No economic data yet</h5>
+    <p class="text-muted small">Add sites with installation costs and log savings records to see real economics.</p>
+    <a href="{% url 'verticals:energy_site_create' %}" class="btn btn-success rounded-pill mt-1 btn-sm">Add First Site</a>
+  </div>
+  {% endif %}
+  {% endif %}
+</div>
+{% endblock %}

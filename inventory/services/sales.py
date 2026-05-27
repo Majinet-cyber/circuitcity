@@ -33,16 +33,10 @@ def _apply_unsold_filters(qs):
     """
     Conservative 'unsold' filters using only fields that exist on InventoryItem.
     """
-    return (
-        qs.filter(is_active=True)
-        .filter(sold_at__isnull=True)
-        .exclude(status__iexact="SOLD")
-    )
+    return qs.filter(is_active=True).filter(sold_at__isnull=True).exclude(status__iexact="SOLD")
 
 
-def _find_item_for_sale(
-    *, business, code: str
-) -> Optional[InventoryItem]:
+def _find_item_for_sale(*, business, code: str) -> Optional[InventoryItem]:
     """
     Locate a single in-stock item in the same business using 'code' as an IMEI.
     Rules:
@@ -55,8 +49,7 @@ def _find_item_for_sale(
     d15 = digits[-15:] if len(digits) >= 15 else digits
 
     base = _apply_unsold_filters(
-        InventoryItem.objects.select_related("product", "current_location")
-        .filter(business=business)
+        InventoryItem.objects.select_related("product", "current_location").filter(business=business)
     )
 
     hit: Optional[InventoryItem] = None
@@ -79,6 +72,7 @@ def _find_item_for_sale(
 # --------------------------------------------------------------------------------------
 # Public API
 # --------------------------------------------------------------------------------------
+
 
 @transaction.atomic
 def mark_item_sold(
@@ -128,23 +122,19 @@ def mark_item_sold(
         raise ValidationError("No matching in-stock item was found for this code/IMEI.")
 
     # Lock the row to prevent race conditions during sale
-    item = (
-        InventoryItem.objects.select_for_update()
-        .select_related("product", "current_location")
-        .get(pk=item.pk)
-    )
+    item = InventoryItem.objects.select_for_update().select_related("product", "current_location").get(pk=item.pk)
 
     # Idempotency / state checks
     if item.sold_at is not None or str(item.status).upper() == "SOLD":
         raise ValidationError("Item is already sold.")
 
-    # Build the Sale payload (only using fields that we know exist)
+    # Build the Sale payload (only using fields that actually exist on Sale model)
+    # Sale model fields: item, agent, location, sold_at, price, commission_pct, payment_method
+    # Note: Sale does NOT have: business, product, seller (use 'agent' instead of 'seller')
     sale_kwargs = {
-        "business": business,
         "item": item,
-        "product": item.product,
+        "agent": user if getattr(user, "is_authenticated", False) else None,
         "location": location,
-        "seller": user if getattr(user, "is_authenticated", False) else None,
         "price": price,
         "commission_pct": commission_pct or 0,
         "sold_at": sold_at or timezone.now(),
@@ -155,18 +145,14 @@ def mark_item_sold(
     # Flip inventory state using only existing fields
     item.status = "SOLD"
     item.sold_at = sale.sold_at
-    # Persist relation if your model has it (your InventoryItem DOES have `sale`)
-    item.sale = sale
-    # Note: there is no 'sold_price' or 'sold_location' field on InventoryItem in your DB
-    item.save(update_fields=["status", "sold_at", "sale"])
+    # NOTE: The Sale has a OneToOneField to InventoryItem (Sale.item), not the reverse.
+    # The reverse accessor is `item.sale` (from related_name='sale'), but it's not a concrete
+    # field - it's a reverse relation. So we don't include 'sale' in update_fields.
+    item.save(update_fields=["status", "sold_at"])
 
     # Fresh aggregates for UI
-    qs_instock = _apply_unsold_filters(
-        InventoryItem.objects.filter(business=business)
-    )
-    qs_sold = InventoryItem.objects.filter(
-        business=business, status__iexact="SOLD"
-    )
+    qs_instock = _apply_unsold_filters(InventoryItem.objects.filter(business=business))
+    qs_sold = InventoryItem.objects.filter(business=business, status__iexact="SOLD")
 
     sum_order = qs_instock.aggregate(total=Sum("order_price"))["total"] or Decimal(0)
     sum_selling = qs_instock.aggregate(total=Sum("selling_price"))["total"] or Decimal(0)

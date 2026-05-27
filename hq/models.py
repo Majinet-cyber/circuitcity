@@ -1,84 +1,224 @@
-﻿"""
-HQ app models for tracking gamification metrics and merchant contracts.
-"""
-from django.conf import settings
+﻿# hq/models.py
+import uuid
 from django.db import models
-from django.contrib.auth import get_user_model
-from tenants.models import Business
+from django.conf import settings
+from django.utils import timezone
+from decimal import Decimal
 
-User = get_user_model()
+# Bug Monitor and Admin Audit Log models
+from .models_bugmonitor import (  # noqa: F401
+    SystemIssue,
+    SystemIssueOccurrence,
+    AdminAuditLog,
+    IssueStatus,
+    IssueSeverity,
+)
+
+
+class HQPaymentMark(models.Model):
+    """
+    Track manual payment confirmations from HQ for subscription periods.
+    Idempotent: one mark per business per period.
+    """
+
+    business = models.ForeignKey("tenants.Business", on_delete=models.CASCADE, related_name="payment_marks")
+    period_start = models.DateField(help_text="Start of billing period")
+    period_end = models.DateField(help_text="End of billing period")
+    plan_code = models.CharField(max_length=50, blank=True, default="", help_text="Plan code at time of marking")
+    amount = models.DecimalField(
+        max_digits=12, decimal_places=2, default=Decimal("0.00"), help_text="Amount marked paid"
+    )
+
+    marked_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name="+")
+    marked_at = models.DateTimeField(default=timezone.now)
+    notes = models.TextField(blank=True, default="")
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-period_start"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["business", "period_start", "period_end"], name="unique_payment_mark_per_period"
+            )
+        ]
+        indexes = [
+            models.Index(fields=["business", "period_start"]),
+            models.Index(fields=["marked_at"]),
+        ]
+
+    def __str__(self):
+        return f"{self.business.name} - {self.period_start} to {self.period_end} - Marked Paid"
 
 
 class AgentMilestone(models.Model):
     """
-    Track agent milestones for gamification.
+    Track agent performance milestones and achievements for gamification.
     """
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='milestones')
-    business = models.ForeignKey(Business, on_delete=models.CASCADE, related_name='agent_milestones')
-    
-    milestone_type = models.CharField(max_length=50)  # e.g., "sales_10", "sales_25", etc.
-    milestone_name = models.CharField(max_length=100)  # e.g., "Rising Star"
-    milestone_emoji = models.CharField(max_length=10, default="⭐")
-    
-    sales_count = models.IntegerField(default=0)  # The sales count when milestone was achieved
-    achieved_at = models.DateTimeField(auto_now_add=True)
-    
-    # Period tracking (optional - to track per month)
-    year = models.IntegerField(null=True, blank=True)
-    month = models.IntegerField(null=True, blank=True)
-    
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="agent_milestones")
+    business = models.ForeignKey("tenants.Business", on_delete=models.CASCADE, null=True, blank=True)
+    milestone_type = models.CharField(
+        max_length=50, help_text="Type of milestone (e.g., first_sale, 100_sales, top_seller)"
+    )
+    achieved_at = models.DateTimeField(default=timezone.now)
+    metadata = models.JSONField(default=dict, blank=True, help_text="Additional milestone data")
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
     class Meta:
-        unique_together = ('user', 'business', 'milestone_type', 'year', 'month')
-        ordering = ['-achieved_at']
+        ordering = ["-achieved_at"]
         indexes = [
-            models.Index(fields=['user', 'business']),
-            models.Index(fields=['business', 'year', 'month']),
+            models.Index(fields=["user", "milestone_type"]),
+            models.Index(fields=["business", "achieved_at"]),
         ]
-    
+
     def __str__(self):
-        return f"{self.user.username} - {self.milestone_name} ({self.sales_count} sales)"
+        return f"{self.user.username} - {self.milestone_type}"
 
 
+# Support models (already exist based on imports, defining schema for completeness)
+class SupportTicket(models.Model):
+    """Support ticket tracking."""
+
+    STATUS_CHOICES = [
+        ("open", "Open"),
+        ("in_progress", "In Progress"),
+        ("resolved", "Resolved"),
+        ("closed", "Closed"),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    business = models.ForeignKey("tenants.Business", on_delete=models.CASCADE, related_name="support_tickets")
+    title = models.CharField(max_length=255)
+    description = models.TextField()
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="open")
+    priority = models.CharField(max_length=20, default="medium")
+
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name="+")
+    assigned_to = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    resolved_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["business", "status"]),
+            models.Index(fields=["status", "created_at"]),
+        ]
+
+    def __str__(self):
+        return f"Ticket #{self.id}: {self.title}"
+
+
+class SupportActionLog(models.Model):
+    """Log of support actions taken by HQ staff."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    ticket = models.ForeignKey(
+        SupportTicket, on_delete=models.CASCADE, null=True, blank=True, related_name="action_logs"
+    )
+    business = models.ForeignKey("tenants.Business", on_delete=models.CASCADE, null=True, blank=True)
+
+    action_type = models.CharField(max_length=50)
+    description = models.TextField(default="", blank=True)
+    performed_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name="+")
+    metadata = models.JSONField(default=dict, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["business", "created_at"]),
+            models.Index(fields=["ticket", "created_at"]),
+        ]
+
+    def __str__(self):
+        return f"{self.action_type} - {self.created_at.strftime('%Y-%m-%d %H:%M')}"
+
+
+# Contract models (for HQ contract management)
 class MerchantContract(models.Model):
-    """
-    Stores signed merchant contracts for businesses (HQ-managed).
-    """
-    business = models.OneToOneField(
-        Business,
-        on_delete=models.CASCADE,
-        related_name="merchant_contract",
-        help_text="The business this contract is for"
+    """Business contract storage and management with e-signature support."""
+
+    CONTRACT_STATUS_DRAFT = "draft"
+    CONTRACT_STATUS_SENT = "sent"
+    CONTRACT_STATUS_VIEWED = "viewed"
+    CONTRACT_STATUS_SIGNED = "signed"
+    CONTRACT_STATUS_VOID = "void"
+
+    CONTRACT_STATUS_CHOICES = [
+        (CONTRACT_STATUS_DRAFT, "Draft"),
+        (CONTRACT_STATUS_SENT, "Sent to Merchant"),
+        (CONTRACT_STATUS_VIEWED, "Viewed by Merchant"),
+        (CONTRACT_STATUS_SIGNED, "Signed"),
+        (CONTRACT_STATUS_VOID, "Void"),
+    ]
+
+    business = models.ForeignKey("tenants.Business", on_delete=models.CASCADE, related_name="contracts")
+    title = models.CharField(max_length=255, default="Merchant Services Agreement")
+    file = models.FileField(upload_to="contracts/", null=True, blank=True)
+    contract_type = models.CharField(max_length=50, default="standard")
+    notes = models.TextField(blank=True, default="")
+
+    # Status & lifecycle
+    status = models.CharField(
+        max_length=20,
+        choices=CONTRACT_STATUS_CHOICES,
+        default=CONTRACT_STATUS_DRAFT,
+        db_index=True,
     )
-    file = models.FileField(
-        upload_to="contracts/",
-        help_text="Signed contract PDF file"
+
+    signed_at = models.DateTimeField(null=True, blank=True)
+    expires_at = models.DateTimeField(null=True, blank=True)
+
+    # E-signature fields
+    signature_name = models.CharField(
+        max_length=255, blank=True, default="",
+        help_text="Full name typed by the merchant when signing",
     )
-    uploaded_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        null=True,
-        blank=True,
-        on_delete=models.SET_NULL,
-        related_name="uploaded_contracts",
-        help_text="HQ staff member who uploaded this contract"
-    )
+    signed_ip = models.GenericIPAddressField(null=True, blank=True)
+    signed_user_agent = models.TextField(blank=True, default="")
+
+    # Signing token (used for secure merchant portal link)
+    sign_token = models.UUIDField(default=uuid.uuid4, unique=True, db_index=True)
+
+    # Template expects these field names
+    uploaded_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name="+")
     uploaded_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    notes = models.TextField(
-        blank=True,
-        help_text="Internal notes about this contract"
-    )
-    
-    class Meta:
-        ordering = ['-uploaded_at']
-        indexes = [
-            models.Index(fields=['business']),
-            models.Index(fields=['uploaded_at']),
-        ]
-    
-    def __str__(self):
-        return f"Contract for {self.business.name}"
-    
+
+    # Aliases for backwards compatibility
+    @property
+    def created_by(self):
+        return self.uploaded_by
+
+    @property
+    def created_at(self):
+        return self.uploaded_at
+
     @property
     def is_signed(self):
-        """Returns True if a contract file exists"""
-        return bool(self.file)
+        return self.status == self.CONTRACT_STATUS_SIGNED
+
+    def get_sign_url(self):
+        """Return the merchant-facing e-signature URL."""
+        from django.urls import reverse
+        return reverse("hq:contract_sign_portal", kwargs={"token": self.sign_token})
+
+    class Meta:
+        ordering = ["-uploaded_at"]
+        indexes = [
+            models.Index(fields=["business", "contract_type"]),
+            models.Index(fields=["status"]),
+            models.Index(fields=["sign_token"]),
+        ]
+
+    def __str__(self):
+        return f"{self.business.name} - {self.title}"

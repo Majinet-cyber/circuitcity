@@ -1,0 +1,1412 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Farm Dashboard - {{ business.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+/* ===== Farm Dashboard Premium Styles ===== */
+/* PREMIUM BLUE THEME (Jan 2026) - matches Clothing/Cement premium feel */
+.farm-dashboard {
+    /* Primary accent: Premium blue (not green) */
+    --farm-primary: #2563eb;
+    --farm-primary-light: #dbeafe;
+    --farm-primary-rgb: 37, 99, 235;
+    
+    /* Secondary colors */
+    --farm-green: #16a34a;
+    --farm-green-light: #dcfce7;
+    --farm-amber: #d97706;
+    --farm-amber-light: #fef3c7;
+    --farm-red: #dc2626;
+    --farm-red-light: #fee2e2;
+    --farm-blue: #2563eb;
+    --farm-blue-light: #dbeafe;
+}
+
+/* Premium Header Styling - Blue accent like Clothing/Cement */
+.farm-dashboard .farm-header-text h1 {
+    background: linear-gradient(135deg, var(--farm-primary) 0%, #3b82f6 50%, #60a5fa 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+/* Business chip / vertical badge - premium blue */
+.farm-dashboard .farm-period-pill {
+    background: var(--farm-primary-light);
+    border-color: rgba(var(--farm-primary-rgb), 0.3);
+}
+
+.farm-dashboard .farm-period-pill i {
+    color: var(--farm-primary);
+}
+
+/* Page Header */
+.farm-header {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.farm-header-text h1 {
+    font-size: clamp(1.5rem, 4vw, 1.875rem);
+    font-weight: 800;
+    color: var(--ink);
+    margin: 0 0 0.25rem 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.farm-header-text p {
+    color: var(--muted);
+    margin: 0;
+    font-size: 0.875rem;
+}
+
+.farm-period-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--ink-500);
+    box-shadow: var(--shadow-xs);
+}
+
+.farm-period-pill i {
+    color: var(--farm-green);
+}
+
+/* KPI Cards Grid */
+.kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+}
+
+@media (min-width: 768px) {
+    .kpi-grid {
+        grid-template-columns: repeat(4, 1fr);
+        gap: 1rem;
+    }
+}
+
+/* Premium KPI Card */
+.kpi-card {
+    background: var(--surface);
+    border-radius: var(--radius);
+    padding: 1rem 1.25rem;
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-sm);
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.kpi-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+}
+
+.kpi-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 0.75rem;
+}
+
+.kpi-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--muted);
+}
+
+.kpi-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.125rem;
+}
+
+.kpi-icon.profit { background: var(--farm-green-light); color: var(--farm-green); }
+.kpi-icon.income { background: var(--farm-blue-light); color: var(--farm-blue); }
+.kpi-icon.expense { background: var(--farm-red-light); color: var(--farm-red); }
+.kpi-icon.cost { background: var(--farm-amber-light); color: var(--farm-amber); }
+
+.kpi-value {
+    font-size: clamp(1.25rem, 3.5vw, 1.75rem);
+    font-weight: 800;
+    color: var(--ink);
+    line-height: 1.2;
+    margin-bottom: 0.25rem;
+}
+
+.kpi-value.positive { color: var(--farm-green); }
+.kpi-value.negative { color: var(--farm-red); }
+
+.kpi-change {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.125rem 0.5rem;
+    border-radius: 999px;
+}
+
+.kpi-change.up { background: var(--farm-green-light); color: var(--farm-green); }
+.kpi-change.down { background: var(--farm-red-light); color: var(--farm-red); }
+.kpi-change.flat { background: #f1f5f9; color: var(--muted); }
+
+.kpi-subtitle {
+    font-size: 0.6875rem;
+    color: var(--muted);
+    margin-top: 0.25rem;
+}
+
+/* Charts Section */
+.charts-row {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+@media (min-width: 768px) {
+    .charts-row {
+        grid-template-columns: 1.5fr 1fr;
+    }
+}
+
+.chart-card {
+    background: var(--surface);
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+}
+
+.chart-card-header {
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.chart-card-header h3 {
+    font-size: 0.9375rem;
+    font-weight: 700;
+    margin: 0;
+    color: var(--ink);
+}
+
+.chart-card-body {
+    padding: 1rem;
+    height: 220px;
+    position: relative;
+}
+
+/* Alerts Section */
+.alerts-section {
+    margin-bottom: 1.5rem;
+}
+
+.alert-card {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 0.875rem 1rem;
+    background: var(--surface);
+    border-radius: var(--radius-sm);
+    border-left: 4px solid;
+    margin-bottom: 0.5rem;
+    box-shadow: var(--shadow-xs);
+}
+
+.alert-card.critical { border-left-color: var(--farm-red); background: var(--farm-red-light); }
+.alert-card.warning { border-left-color: var(--farm-amber); background: var(--farm-amber-light); }
+.alert-card.info { border-left-color: var(--farm-blue); background: var(--farm-blue-light); }
+
+.alert-icon {
+    flex-shrink: 0;
+    font-size: 1.25rem;
+}
+
+.alert-card.critical .alert-icon { color: var(--farm-red); }
+.alert-card.warning .alert-icon { color: var(--farm-amber); }
+.alert-card.info .alert-icon { color: var(--farm-blue); }
+
+.alert-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.alert-title {
+    font-weight: 700;
+    font-size: 0.875rem;
+    color: var(--ink);
+    margin: 0 0 0.125rem 0;
+}
+
+.alert-message {
+    font-size: 0.8125rem;
+    color: var(--ink-500);
+    margin: 0;
+}
+
+/* Summary Panels */
+.summary-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+@media (min-width: 768px) {
+    .summary-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+.summary-panel {
+    background: var(--surface);
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-sm);
+}
+
+.summary-panel-header {
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.summary-panel-header h3 {
+    font-size: 0.9375rem;
+    font-weight: 700;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.summary-panel-body {
+    padding: 1rem 1.25rem;
+}
+
+.summary-stat {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0;
+    border-bottom: 1px dashed var(--border);
+}
+
+.summary-stat:last-child {
+    border-bottom: none;
+}
+
+.summary-stat-label {
+    font-size: 0.8125rem;
+    color: var(--muted);
+}
+
+.summary-stat-value {
+    font-size: 0.9375rem;
+    font-weight: 700;
+    color: var(--ink);
+}
+
+.summary-stat-value.positive { color: var(--farm-green); }
+.summary-stat-value.negative { color: var(--farm-red); }
+
+/* Recent Activity */
+.activity-card {
+    background: var(--surface);
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-sm);
+    margin-bottom: 1.5rem;
+}
+
+.activity-header {
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.activity-header h3 {
+    font-size: 0.9375rem;
+    font-weight: 700;
+    margin: 0;
+}
+
+.activity-list {
+    max-height: 320px;
+    overflow-y: auto;
+}
+
+.activity-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1.25rem;
+    border-bottom: 1px solid var(--border);
+    transition: background 0.15s ease;
+}
+
+.activity-item:last-child {
+    border-bottom: none;
+}
+
+.activity-item:hover {
+    background: var(--surface-2);
+}
+
+.activity-type {
+    flex-shrink: 0;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.875rem;
+}
+
+.activity-type.expense { background: var(--farm-red-light); color: var(--farm-red); }
+.activity-type.sale { background: var(--farm-green-light); color: var(--farm-green); }
+
+.activity-details {
+    flex: 1;
+    min-width: 0;
+}
+
+.activity-desc {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--ink);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.activity-meta {
+    font-size: 0.75rem;
+    color: var(--muted);
+}
+
+.activity-amount {
+    font-size: 0.9375rem;
+    font-weight: 700;
+    text-align: right;
+}
+
+.activity-amount.expense { color: var(--farm-red); }
+.activity-amount.sale { color: var(--farm-green); }
+
+/* Empty State */
+.empty-state {
+    text-align: center;
+    padding: 2.5rem 1rem;
+    color: var(--muted);
+}
+
+.empty-state i {
+    font-size: 2.5rem;
+    opacity: 0.5;
+    margin-bottom: 0.75rem;
+}
+
+.empty-state p {
+    margin: 0 0 1rem 0;
+    font-size: 0.875rem;
+}
+
+/* Expense Bar Chart (CSS Fallback) */
+.expense-bar {
+    margin-bottom: 0.75rem;
+}
+
+.expense-bar-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.75rem;
+    margin-bottom: 0.25rem;
+}
+
+.expense-bar-label .name {
+    color: var(--ink-500);
+    text-transform: capitalize;
+}
+
+.expense-bar-label .amount {
+    font-weight: 600;
+    color: var(--ink);
+}
+
+.expense-bar-track {
+    height: 8px;
+    background: var(--surface-2);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.expense-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--farm-red), #f87171);
+    border-radius: 4px;
+    transition: width 0.5s ease;
+}
+
+/* Mobile optimizations */
+@media (max-width: 480px) {
+    .kpi-card {
+        padding: 0.875rem 1rem;
+    }
+    
+    .kpi-icon {
+        width: 32px;
+        height: 32px;
+        font-size: 1rem;
+    }
+    
+    .kpi-value {
+        font-size: 1.25rem;
+    }
+    
+    .chart-card-body {
+        height: 180px;
+    }
+    
+    .quick-action-btn {
+        padding: 1rem 0.5rem;
+    }
+    
+    .quick-action-btn .icon {
+        width: 40px;
+        height: 40px;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="farm-dashboard container-fluid py-3" data-vertical="farm" data-testid="farm-dashboard-container">
+    
+    <!-- ═══ COMMAND CENTER HERO ═══ -->
+    <header class="vertical-hero" data-testid="farm-hero-card"
+      style="background:linear-gradient(135deg,#0f2027 0%,#0ea5e9 50%,#16a34a 100%);padding:24px 28px;border-radius:24px;color:#fff;box-shadow:0 20px 60px rgba(14,165,233,0.25);position:relative;overflow:hidden;margin-bottom:1.5rem;">
+      <!-- Background pattern -->
+      <div style="position:absolute;inset:0;opacity:0.06;background-image:radial-gradient(circle at 20% 20%,#fff 1px,transparent 1px),radial-gradient(circle at 80% 80%,#fff 1px,transparent 1px);background-size:40px 40px;"></div>
+
+      <div style="position:relative;z-index:1;display:flex;flex-wrap:wrap;gap:20px;align-items:flex-start;justify-content:space-between;">
+
+        <!-- Left: Farm Identity -->
+        <div style="flex:1;min-width:200px;">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+            <span style="opacity:0.9;text-transform:uppercase;font-size:0.72rem;letter-spacing:0.18em;font-weight:700;">{{ business.name }}</span>
+            {% if is_demo %}<span style="background:rgba(255,255,255,0.2);font-size:0.65rem;font-weight:700;padding:2px 10px;border-radius:999px;letter-spacing:.06em;">DEMO</span>{% endif %}
+          </div>
+          <h1 style="margin:0 0 6px;font-size:clamp(24px,4vw,34px);font-weight:900;color:#fff;text-shadow:0 2px 12px rgba(0,0,0,0.2);">🌾 Farm Command Center</h1>
+          <p style="margin:0 0 14px;opacity:0.9;font-size:0.95rem;">Intelligence · Livestock · Crops · Market</p>
+
+          <!-- Status Pills -->
+          <div style="display:flex;flex-wrap:wrap;gap:8px;">
+            {% if farm_score %}
+            <span style="background:rgba(255,255,255,0.18);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,0.3);border-radius:999px;padding:4px 14px;font-size:0.75rem;font-weight:700;">
+              🎯 Score: {{ farm_score.score }}/100 · {{ farm_score.rank }}
+            </span>
+            {% endif %}
+            {% if snapshot.net_profit_mwk >= 0 %}
+            <span style="background:rgba(34,197,94,0.25);border:1px solid rgba(34,197,94,0.4);border-radius:999px;padding:4px 14px;font-size:0.75rem;font-weight:700;color:#bbf7d0;">
+              💚 Profit Positive
+            </span>
+            {% else %}
+            <span style="background:rgba(239,68,68,0.25);border:1px solid rgba(239,68,68,0.4);border-radius:999px;padding:4px 14px;font-size:0.75rem;font-weight:700;color:#fecaca;">
+              🔴 Profit Negative
+            </span>
+            {% endif %}
+            {% if categorized_alerts.critical %}
+            <span style="background:rgba(239,68,68,0.25);border:1px solid rgba(239,68,68,0.4);border-radius:999px;padding:4px 14px;font-size:0.75rem;font-weight:700;color:#fca5a5;">
+              ⚠ {{ categorized_alerts.critical|length }} Critical Alert{{ categorized_alerts.critical|length|pluralize }}
+            </span>
+            {% endif %}
+          </div>
+        </div>
+
+        <!-- Right: Mode tabs + nav -->
+        <div style="display:flex;flex-direction:column;gap:10px;align-items:flex-end;">
+          <!-- Farm Mode Tabs -->
+          <div style="display:flex;background:rgba(0,0,0,0.2);border-radius:12px;padding:4px;gap:2px;">
+            <a href="{% url 'verticals:farm_crops_list' %}" style="text-decoration:none;padding:6px 14px;border-radius:8px;font-size:0.78rem;font-weight:700;color:rgba(255,255,255,0.8);transition:all .2s;">🌾 Crops</a>
+            <a href="{% url 'verticals:farm_livestock_list' %}" style="text-decoration:none;padding:6px 14px;border-radius:8px;font-size:0.78rem;font-weight:700;color:rgba(255,255,255,0.8);transition:all .2s;">🐄 Livestock</a>
+            <a href="{% url 'verticals:farm_ledger_list' %}" style="text-decoration:none;padding:6px 14px;border-radius:8px;background:rgba(255,255,255,0.2);font-size:0.78rem;font-weight:700;color:#fff;transition:all .2s;">📒 Ledger</a>
+          </div>
+          <!-- Quick action buttons -->
+          <div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;">
+            <a href="{% url 'verticals:farm_livestock_create' %}" style="background:#fff;color:#0f172a;border-radius:20px;padding:8px 16px;font-size:0.78rem;font-weight:700;text-decoration:none;box-shadow:0 2px 8px rgba(0,0,0,0.2);">+ Livestock</a>
+            <a href="{% url 'verticals:farm_crop_create' %}" style="background:rgba(255,255,255,0.15);color:#fff;border:1px solid rgba(255,255,255,0.5);border-radius:20px;padding:8px 16px;font-size:0.78rem;font-weight:700;text-decoration:none;">+ Crop</a>
+            <a href="{% url 'verticals:farm_add_expense' %}" style="background:rgba(255,255,255,0.15);color:#fff;border:1px solid rgba(255,255,255,0.5);border-radius:20px;padding:8px 16px;font-size:0.78rem;font-weight:700;text-decoration:none;">+ Expense</a>
+            <a href="{% url 'verticals:farm_add_sale' %}" style="background:rgba(34,197,94,0.3);color:#bbf7d0;border:1px solid rgba(34,197,94,0.4);border-radius:20px;padding:8px 16px;font-size:0.78rem;font-weight:700;text-decoration:none;">💰 Record Sale</a>
+          </div>
+        </div>
+
+      </div>
+    </header>
+
+    <!-- ═══ QUICK ACTIONS ROW ═══ -->
+    <div data-testid="farm-quick-actions" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:1.5rem;">
+      <a href="{% url 'verticals:farm_crop_create' %}" class="quick-action-btn" style="background:#f0fdf4;border:1.5px solid #bbf7d0;border-radius:16px;padding:14px 12px;text-align:center;text-decoration:none;transition:all .2s;display:block;">
+        <div style="font-size:1.6rem;margin-bottom:4px;">🌱</div>
+        <div style="font-size:0.78rem;font-weight:700;color:#166534;">Add Crop</div>
+      </a>
+      <a href="{% url 'verticals:farm_livestock_create' %}" class="quick-action-btn" style="background:#eff6ff;border:1.5px solid #bfdbfe;border-radius:16px;padding:14px 12px;text-align:center;text-decoration:none;transition:all .2s;display:block;">
+        <div style="font-size:1.6rem;margin-bottom:4px;">🐄</div>
+        <div style="font-size:0.78rem;font-weight:700;color:#1d4ed8;">Add Livestock</div>
+      </a>
+      <a href="{% url 'verticals:farm_add_expense' %}" class="quick-action-btn" style="background:#fef2f2;border:1.5px solid #fecaca;border-radius:16px;padding:14px 12px;text-align:center;text-decoration:none;transition:all .2s;display:block;">
+        <div style="font-size:1.6rem;margin-bottom:4px;">📋</div>
+        <div style="font-size:0.78rem;font-weight:700;color:#991b1b;">Record Expense</div>
+      </a>
+      <a href="{% url 'verticals:farm_add_sale' %}" class="quick-action-btn" style="background:#f0fdf4;border:1.5px solid #86efac;border-radius:16px;padding:14px 12px;text-align:center;text-decoration:none;transition:all .2s;display:block;">
+        <div style="font-size:1.6rem;margin-bottom:4px;">💰</div>
+        <div style="font-size:0.78rem;font-weight:700;color:#15803d;">Record Sale</div>
+      </a>
+      <a href="{% url 'verticals:farm_livestock_add_event' %}" class="quick-action-btn" style="background:#fefce8;border:1.5px solid #fde68a;border-radius:16px;padding:14px 12px;text-align:center;text-decoration:none;transition:all .2s;display:block;">
+        <div style="font-size:1.6rem;margin-bottom:4px;">📝</div>
+        <div style="font-size:0.78rem;font-weight:700;color:#92400e;">Livestock Event</div>
+      </a>
+      <a href="{% url 'verticals:farm_egg_tracking' %}" class="quick-action-btn" style="background:#fff7ed;border:1.5px solid #fed7aa;border-radius:16px;padding:14px 12px;text-align:center;text-decoration:none;transition:all .2s;display:block;">
+        <div style="font-size:1.6rem;margin-bottom:4px;">🥚</div>
+        <div style="font-size:0.78rem;font-weight:700;color:#c2410c;">Egg Tracking</div>
+      </a>
+      <a href="{% url 'verticals:farm_business_health' %}" class="quick-action-btn" style="background:#f0f9ff;border:1.5px solid #bae6fd;border-radius:16px;padding:14px 12px;text-align:center;text-decoration:none;transition:all .2s;display:block;">
+        <div style="font-size:1.6rem;margin-bottom:4px;">🏥</div>
+        <div style="font-size:0.78rem;font-weight:700;color:#0369a1;">Farm Health</div>
+      </a>
+      <a href="{% url 'verticals:farm_reports' %}" class="quick-action-btn" style="background:#faf5ff;border:1.5px solid #e9d5ff;border-radius:16px;padding:14px 12px;text-align:center;text-decoration:none;transition:all .2s;display:block;">
+        <div style="font-size:1.6rem;margin-bottom:4px;">📊</div>
+        <div style="font-size:0.78rem;font-weight:700;color:#7c3aed;">Reports</div>
+      </a>
+    </div>
+
+    <!-- Page Header with Filter Integration -->
+    <div class="farm-header" data-testid="farm-dashboard">
+        <div class="farm-header-text">
+            <h1><span></span> Dashboard Overview</h1>
+            <p>Your farm at a glance · {% now "N j, Y" %}</p>
+        </div>
+        <div class="farm-header-actions">
+            {% include "partials/farm_filter_panel.html" with filter_state=filter_state filter_options=filter_options %}
+        </div>
+    </div>
+
+    <!-- Demo Preview Banner (shown when no real data exists) -->
+    {% if is_demo %}
+    <div style="background:linear-gradient(135deg,#fefce8,#fef9c3);border:2px dashed #ca8a04;border-radius:16px;padding:14px 20px;margin-bottom:1.25rem;display:flex;align-items:center;gap:12px;" data-testid="demo-preview-banner">
+      <span style="font-size:1.5rem;">🌱</span>
+      <div>
+        <strong style="color:#92400e;">Demo Preview</strong>
+        <span style="color:#78350f;font-size:0.875rem;margin-left:8px;">These are sample estimates to show what your dashboard will look like once you start recording data.</span>
+        <span style="color:#78350f;font-size:0.875rem;margin-left:4px;">
+          <a href="{% url 'verticals:farm_expenses' %}" style="color:#d97706;font-weight:700;">Add your first record →</a>
+        </span>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Alert summary strip (counts only; detail shown in categorized alerts section below) -->
+    {% if critical_alerts_count or categorized_alerts.total_count %}
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:1rem;" data-testid="farm-alerts-strip">
+      {% if categorized_alerts.critical %}
+      <div style="display:inline-flex;align-items:center;gap:6px;background:#fef2f2;border:1px solid #fecaca;border-radius:999px;padding:5px 14px;font-size:0.78rem;font-weight:700;color:#dc2626;">
+        <i class="bi bi-exclamation-triangle-fill"></i>
+        {{ categorized_alerts.critical|length }} Critical
+      </div>
+      {% endif %}
+      {% if categorized_alerts.warnings %}
+      <div style="display:inline-flex;align-items:center;gap:6px;background:#fffbeb;border:1px solid #fde68a;border-radius:999px;padding:5px 14px;font-size:0.78rem;font-weight:700;color:#d97706;">
+        <i class="bi bi-exclamation-circle-fill"></i>
+        {{ categorized_alerts.warnings|length }} Warning{{ categorized_alerts.warnings|length|pluralize }}
+      </div>
+      {% endif %}
+      {% if categorized_alerts.opportunities %}
+      <div style="display:inline-flex;align-items:center;gap:6px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:999px;padding:5px 14px;font-size:0.78rem;font-weight:700;color:#16a34a;">
+        <i class="bi bi-stars"></i>
+        {{ categorized_alerts.opportunities|length }} Opportunit{{ categorized_alerts.opportunities|length|pluralize:"y,ies" }}
+      </div>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    <!-- KPI Cards -->
+    <div class="kpi-grid" data-testid="farm-kpis">
+        <!-- Net Profit -->
+        <div class="kpi-card">
+            <div class="kpi-card-header">
+                <span class="kpi-label">Net Profit</span>
+                <div class="kpi-icon profit">
+                    <i class="bi bi-graph-up-arrow"></i>
+                </div>
+            </div>
+            <div class="kpi-value {% if snapshot.net_profit_mwk >= 0 %}positive{% else %}negative{% endif %}">
+                MWK {{ snapshot.net_profit_mwk|floatformat:0|intcomma }}
+            </div>
+            {% if snapshot.profit_change_pct is not None %}
+            <span class="kpi-change {{ snapshot.profit_trend }}">
+                {% if snapshot.profit_trend == 'up' %}<i class="bi bi-arrow-up"></i>{% elif snapshot.profit_trend == 'down' %}<i class="bi bi-arrow-down"></i>{% else %}<i class="bi bi-dash"></i>{% endif %}
+                {{ snapshot.profit_change_pct|floatformat:1|default:"0" }}%
+            </span>
+            {% endif %}
+            <div class="kpi-subtitle">vs last month</div>
+        </div>
+
+        <!-- Sales/Income -->
+        <div class="kpi-card">
+            <div class="kpi-card-header">
+                <span class="kpi-label">Sales</span>
+                <div class="kpi-icon income">
+                    <i class="bi bi-cart-check"></i>
+                </div>
+            </div>
+            <div class="kpi-value">
+                MWK {{ snapshot.total_income_mwk|floatformat:0|intcomma }}
+            </div>
+            {% if snapshot.income_change_pct is not None %}
+            <span class="kpi-change {% if snapshot.income_change_pct >= 0 %}up{% else %}down{% endif %}">
+                {% if snapshot.income_change_pct >= 0 %}<i class="bi bi-arrow-up"></i>{% else %}<i class="bi bi-arrow-down"></i>{% endif %}
+                {{ snapshot.income_change_pct|floatformat:1|default:"0" }}%
+            </span>
+            {% endif %}
+            <div class="kpi-subtitle">{{ snapshot.sales_count }} transaction{% if snapshot.sales_count != 1 %}s{% endif %}</div>
+        </div>
+
+        <!-- Expenses -->
+        <div class="kpi-card">
+            <div class="kpi-card-header">
+                <span class="kpi-label">Expenses</span>
+                <div class="kpi-icon expense">
+                    <i class="bi bi-cash-stack"></i>
+                </div>
+            </div>
+            <div class="kpi-value">
+                MWK {{ snapshot.total_expenses_mwk|floatformat:0|intcomma }}
+            </div>
+            {% if snapshot.expense_change_pct is not None %}
+            <span class="kpi-change {% if snapshot.expense_change_pct <= 0 %}up{% else %}down{% endif %}">
+                {% if snapshot.expense_change_pct > 0 %}<i class="bi bi-arrow-up"></i>{% else %}<i class="bi bi-arrow-down"></i>{% endif %}
+                {{ snapshot.expense_change_pct|floatformat:1|default:"0" }}%
+            </span>
+            {% endif %}
+            <div class="kpi-subtitle">{{ snapshot.expense_count }} expense{% if snapshot.expense_count != 1 %}s{% endif %}</div>
+        </div>
+
+        <!-- Top Cost Driver -->
+        <div class="kpi-card">
+            <div class="kpi-card-header">
+                <span class="kpi-label">Top Cost</span>
+                <div class="kpi-icon cost">
+                    <i class="bi bi-pie-chart"></i>
+                </div>
+            </div>
+            <div class="kpi-value" style="font-size: 1.125rem; text-transform: capitalize;">
+                {{ snapshot.top_cost_driver_name|default:"None" }}
+            </div>
+            {% if snapshot.top_cost_driver_amount > 0 %}
+            <div class="kpi-subtitle">
+                MWK {{ snapshot.top_cost_driver_amount|floatformat:0|intcomma }} ({{ snapshot.top_cost_driver_pct|floatformat:0 }}%)
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Marketplace -->
+        <div class="kpi-card">
+            <div class="kpi-card-header">
+                <span class="kpi-label">Marketplace (farm)</span>
+                <div class="kpi-icon income">
+                    <i class="bi bi-shop-window"></i>
+                </div>
+            </div>
+            <div class="kpi-value">{{ marketplace_farm_live_count|default:0 }}</div>
+            <div class="kpi-subtitle">Live farm-tagged listings</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-card-header">
+                <span class="kpi-label">Inquiries (unread)</span>
+                <div class="kpi-icon cost">
+                    <i class="bi bi-envelope-exclamation"></i>
+                </div>
+            </div>
+            <div class="kpi-value">{{ marketplace_enquiry_unread_count|default:0 }}</div>
+            <div class="kpi-subtitle">All live listings: {{ marketplace_live_total_count|default:0 }}</div>
+        </div>
+    </div>
+
+    {% if farm_operational_prompts %}
+    <div class="alerts-section" data-testid="farm-operational-prompts" style="margin-top:0.5rem;">
+        {% for p in farm_operational_prompts|slice:":4" %}
+        <div class="alert-card {{ p.severity|default:'info' }}">
+            <div class="alert-icon"><i class="bi bi-lightbulb"></i></div>
+            <div class="alert-content">
+                <p class="alert-title">{{ p.title }}</p>
+                <p class="alert-message">{{ p.message }}</p>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- ===== FARM SCORE + ACHIEVEMENTS + RECOMMENDATIONS ===== -->
+    {% if farm_score %}
+    <div data-testid="farm-score-section" style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.5rem;" class="farm-score-grid">
+
+      <!-- Farm Score Ring -->
+      <div style="background:#fff;border:1px solid #e2e8f0;border-radius:20px;padding:1.5rem;box-shadow:0 2px 8px rgba(0,0,0,0.05);display:flex;align-items:center;gap:1.25rem;">
+        <!-- SVG Ring -->
+        <div style="flex-shrink:0;position:relative;width:88px;height:88px;">
+          <svg width="88" height="88" viewBox="0 0 88 88" style="transform:rotate(-90deg);">
+            <circle cx="44" cy="44" r="36" fill="none" stroke="#e2e8f0" stroke-width="8"/>
+            <circle cx="44" cy="44" r="36" fill="none"
+              stroke="{% if farm_score.score >= 85 %}#16a34a{% elif farm_score.score >= 70 %}#2563eb{% elif farm_score.score >= 50 %}#d97706{% elif farm_score.score >= 30 %}#ea580c{% else %}#dc2626{% endif %}"
+              stroke-width="8"
+              stroke-dasharray="226.2"
+              stroke-dashoffset="{{ 226|add:'-'|add:farm_score.score|floatformat:0 }}"
+              stroke-linecap="round"
+              style="transition:stroke-dashoffset 1s ease;stroke-dashoffset:calc(226.2 - (226.2 * {{ farm_score.score }} / 100))"/>
+          </svg>
+          <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;">
+            <div style="font-size:1.375rem;font-weight:900;color:#0f172a;line-height:1;">{{ farm_score.score }}</div>
+            <div style="font-size:0.6rem;font-weight:600;color:#64748b;text-transform:uppercase;">/ 100</div>
+          </div>
+        </div>
+        <!-- Score details -->
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:4px;">Farm Score</div>
+          <div style="font-size:1.1rem;font-weight:800;color:#0f172a;margin-bottom:4px;">{{ farm_score.rank }}</div>
+          <div style="font-size:0.78rem;color:#64748b;margin-bottom:8px;">{{ farm_score.xp_points }} XP</div>
+          {% if farm_score.next_action %}
+          <div style="font-size:0.75rem;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:6px 10px;color:#1d4ed8;">
+            <i class="bi bi-arrow-right-circle" style="margin-right:4px;"></i>{{ farm_score.next_action }}
+          </div>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Achievements & Weaknesses -->
+      <div style="background:#fff;border:1px solid #e2e8f0;border-radius:20px;padding:1.5rem;box-shadow:0 2px 8px rgba(0,0,0,0.05);">
+        <div style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:0.75rem;">Achievements</div>
+        {% if farm_score.badges %}
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:0.75rem;">
+          {% for badge in farm_score.badges %}
+          <span style="background:#dcfce7;color:#15803d;font-size:0.7rem;font-weight:700;padding:3px 10px;border-radius:999px;border:1px solid #bbf7d0;">✓ {{ badge }}</span>
+          {% endfor %}
+        </div>
+        {% endif %}
+        {% if farm_score.weaknesses %}
+        <div style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:0.5rem;">Needs Attention</div>
+        <div style="display:flex;flex-direction:column;gap:4px;">
+          {% for w in farm_score.weaknesses|slice:":3" %}
+          <div style="font-size:0.75rem;color:#b45309;background:#fef3c7;border-radius:6px;padding:4px 8px;">⚠ {{ w }}</div>
+          {% endfor %}
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- What Should I Do Next + Categorized Alerts row -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.5rem;" class="farm-intel-row">
+
+      <!-- Recommendations Panel -->
+      {% if recommendations %}
+      <div style="background:#fff;border:1px solid #e2e8f0;border-radius:20px;padding:1.25rem;box-shadow:0 2px 8px rgba(0,0,0,0.05);" data-testid="farm-recommendations">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:0.875rem;">
+          <div style="background:#eff6ff;border-radius:8px;width:32px;height:32px;display:flex;align-items:center;justify-content:center;"><i class="bi bi-compass" style="color:#2563eb;"></i></div>
+          <div style="font-size:0.8rem;font-weight:700;color:#0f172a;">What should I do next?</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          {% for rec in recommendations %}
+          <div style="display:flex;align-items:flex-start;gap:8px;padding:8px 10px;background:#f8fafc;border-radius:10px;border-left:3px solid #2563eb;">
+            <i class="bi bi-arrow-right-circle-fill" style="color:#2563eb;flex-shrink:0;margin-top:2px;font-size:0.85rem;"></i>
+            <span style="font-size:0.8rem;color:#334155;line-height:1.4;">{{ rec }}</span>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- Categorized Alerts -->
+      <div data-testid="farm-categorized-alerts">
+        {% if categorized_alerts.critical %}
+        <div style="margin-bottom:0.75rem;">
+          {% for alert in categorized_alerts.critical|slice:":2" %}
+          <div style="display:flex;align-items:flex-start;gap:10px;background:#fef2f2;border:1px solid #fecaca;border-radius:12px;padding:10px 12px;margin-bottom:6px;">
+            <i class="bi bi-exclamation-triangle-fill" style="color:#dc2626;flex-shrink:0;margin-top:2px;"></i>
+            <div>
+              <div style="font-size:0.78rem;font-weight:700;color:#991b1b;">{{ alert.title }}</div>
+              <div style="font-size:0.73rem;color:#b91c1c;margin-top:2px;">{{ alert.message }}</div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+        {% if categorized_alerts.warnings %}
+        <div style="margin-bottom:0.75rem;">
+          {% for alert in categorized_alerts.warnings|slice:":2" %}
+          <div style="display:flex;align-items:flex-start;gap:10px;background:#fffbeb;border:1px solid #fde68a;border-radius:12px;padding:10px 12px;margin-bottom:6px;">
+            <i class="bi bi-exclamation-circle-fill" style="color:#d97706;flex-shrink:0;margin-top:2px;"></i>
+            <div>
+              <div style="font-size:0.78rem;font-weight:700;color:#92400e;">{{ alert.title }}</div>
+              <div style="font-size:0.73rem;color:#b45309;margin-top:2px;">{{ alert.message }}</div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+        {% if categorized_alerts.opportunities %}
+        {% for opp in categorized_alerts.opportunities|slice:":2" %}
+        <div style="display:flex;align-items:flex-start;gap:10px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:10px 12px;margin-bottom:6px;">
+          <i class="bi bi-stars" style="color:#16a34a;flex-shrink:0;margin-top:2px;"></i>
+          <div>
+            <div style="font-size:0.78rem;font-weight:700;color:#14532d;">{{ opp.title }}</div>
+            <div style="font-size:0.73rem;color:#166534;margin-top:2px;">{{ opp.message }}</div>
+          </div>
+        </div>
+        {% endfor %}
+        {% endif %}
+        {% if not categorized_alerts.critical and not categorized_alerts.warnings and not categorized_alerts.opportunities %}
+        <div style="text-align:center;padding:2rem;color:#64748b;font-size:0.85rem;">
+          <i class="bi bi-check-circle" style="font-size:2rem;color:#16a34a;display:block;margin-bottom:8px;"></i>
+          No alerts. Farm is looking healthy.
+        </div>
+        {% endif %}
+      </div>
+
+    </div>
+    {% endif %}
+
+    <!-- Responsive style for score grid on mobile -->
+    <style>
+    @media (max-width: 640px) {
+      .farm-score-grid, .farm-intel-row { grid-template-columns: 1fr !important; }
+    }
+    </style>
+
+    <!-- ===== FARM HEALTH PULSE + HARVEST FORECAST ===== -->
+    <div data-testid="farm-health-pulse" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:1rem;margin-bottom:1.5rem;">
+
+      <!-- Livestock Health Card -->
+      <div style="background:#fff;border:1px solid #e2e8f0;border-radius:20px;padding:1.25rem;box-shadow:0 2px 8px rgba(0,0,0,0.05);" data-testid="livestock-health-card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;">
+          <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;">Livestock Health</div>
+          <span style="background:#dcfce7;color:#16a34a;font-size:.7rem;font-weight:700;padding:3px 10px;border-radius:999px;">
+            {% if is_demo %}87%{% elif total_livestock_count > 0 %}Good{% else %}—{% endif %}
+          </span>
+        </div>
+        <div style="font-size:2rem;font-weight:900;color:#0f172a;margin-bottom:0.5rem;">
+          {% if is_demo %}87%{% elif total_livestock_count > 0 %}{{ total_livestock_count }}{% else %}—{% endif %}
+        </div>
+        <div style="height:8px;background:#f1f5f9;border-radius:999px;overflow:hidden;margin-bottom:0.5rem;">
+          <div style="height:100%;width:{% if is_demo %}87{% elif total_livestock_count > 0 %}75{% else %}0{% endif %}%;background:linear-gradient(90deg,#16a34a,#4ade80);border-radius:999px;"></div>
+        </div>
+        <div style="font-size:.78rem;color:#64748b;">
+          {% if is_demo %}25 pigs · 20 chickens · all vaccinated{% else %}{{ total_livestock_count }} animals across batches{% endif %}
+        </div>
+      </div>
+
+      <!-- Harvest Forecast Card -->
+      <div style="background:linear-gradient(135deg,#f0fdf4,#dcfce7);border:1px solid #bbf7d0;border-radius:20px;padding:1.25rem;" data-testid="harvest-forecast-card">
+        <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#16a34a;margin-bottom:0.75rem;">🌾 Harvest Forecast</div>
+        <div style="font-size:1.6rem;font-weight:900;color:#14532d;margin-bottom:0.25rem;">
+          {% if is_demo %}MWK 420,000{% elif snapshot.projected_crop_income %}MWK {{ snapshot.projected_crop_income|floatformat:0|intcomma }}{% else %}Add crops →{% endif %}
+        </div>
+        <div style="font-size:.82rem;color:#166534;margin-bottom:0.75rem;">
+          {% if is_demo %}Estimated harvest value · 3 active fields{% else %}Projected income from active seasons{% endif %}
+        </div>
+        {% if is_demo %}
+        <div style="display:flex;flex-direction:column;gap:6px;">
+          <div style="display:flex;justify-content:space-between;font-size:.78rem;">
+            <span style="color:#166534;">🌽 Maize (2ha)</span><span style="font-weight:700;color:#14532d;">~MWK 240,000</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:.78rem;">
+            <span style="color:#166534;">🥜 Groundnuts (1.5ha)</span><span style="font-weight:700;color:#14532d;">~MWK 120,000</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:.78rem;">
+            <span style="color:#166534;">🫘 Soya (1ha)</span><span style="font-weight:700;color:#14532d;">~MWK 60,000</span>
+          </div>
+        </div>
+        {% endif %}
+      </div>
+
+      <!-- Feed Planning Alert Card -->
+      <div style="background:#fff;border:1px solid #e2e8f0;border-radius:20px;padding:1.25rem;box-shadow:0 2px 8px rgba(0,0,0,0.05);" data-testid="feed-planning-card">
+        <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:0.75rem;">🌾 Feed Planning</div>
+        {% if is_demo %}
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;background:#fef9c3;border-radius:10px;padding:8px 10px;">
+            <span style="font-size:.8rem;color:#92400e;font-weight:600;">Pig feed stock</span>
+            <span style="background:#ca8a04;color:#fff;font-size:.68rem;font-weight:700;padding:2px 8px;border-radius:999px;">7 days left</span>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;background:#dcfce7;border-radius:10px;padding:8px 10px;">
+            <span style="font-size:.8rem;color:#166534;font-weight:600;">Poultry feed</span>
+            <span style="background:#16a34a;color:#fff;font-size:.68rem;font-weight:700;padding:2px 8px;border-radius:999px;">21 days</span>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;background:#fee2e2;border-radius:10px;padding:8px 10px;">
+            <span style="font-size:.8rem;color:#991b1b;font-weight:600;">Fertilizer (basal)</span>
+            <span style="background:#dc2626;color:#fff;font-size:.68rem;font-weight:700;padding:2px 8px;border-radius:999px;">Order now</span>
+          </div>
+        </div>
+        {% else %}
+        <div style="text-align:center;padding:1rem;color:#94a3b8;">
+          <div style="font-size:1.5rem;margin-bottom:6px;">📋</div>
+          <div style="font-size:.8rem;">Track feed expenses to see planning alerts</div>
+          <a href="{% url 'verticals:farm_expenses' %}" style="display:inline-block;margin-top:8px;font-size:.78rem;color:#2563eb;font-weight:700;text-decoration:none;">Add Feed Expense →</a>
+        </div>
+        {% endif %}
+      </div>
+
+    </div>
+
+    <!-- ===== UPCOMING FARM TASKS ===== -->
+    {% if is_demo %}
+    <div style="background:#fff;border:1px solid #e2e8f0;border-radius:20px;padding:1.25rem;margin-bottom:1.5rem;box-shadow:0 2px 8px rgba(0,0,0,0.05);" data-testid="upcoming-farm-tasks">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+        <h3 style="margin:0;font-size:1rem;font-weight:800;color:#0f172a;">📅 Upcoming Farm Tasks</h3>
+        <span style="font-size:.72rem;color:#64748b;">Demo preview</span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <div style="display:flex;align-items:center;gap:12px;padding:10px;background:#fef2f2;border-radius:12px;border-left:3px solid #dc2626;">
+          <span style="font-size:1.25rem;">💧</span>
+          <div style="flex:1;">
+            <div style="font-weight:700;font-size:.85rem;color:#0f172a;">Irrigation — Maize Field A</div>
+            <div style="font-size:.75rem;color:#64748b;">Due in 2 days · 2 hectares</div>
+          </div>
+          <span style="background:#fecaca;color:#dc2626;font-size:.68rem;font-weight:700;padding:2px 8px;border-radius:999px;">Urgent</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;padding:10px;background:#fef9c3;border-radius:12px;border-left:3px solid #ca8a04;">
+          <span style="font-size:1.25rem;">💉</span>
+          <div style="flex:1;">
+            <div style="font-weight:700;font-size:.85rem;color:#0f172a;">Vaccination — Pig Batch 1</div>
+            <div style="font-size:.75rem;color:#64748b;">Due in 5 days · 25 pigs</div>
+          </div>
+          <span style="background:#fde68a;color:#92400e;font-size:.68rem;font-weight:700;padding:2px 8px;border-radius:999px;">Soon</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;padding:10px;background:#f0fdf4;border-radius:12px;border-left:3px solid #16a34a;">
+          <span style="font-size:1.25rem;">🌿</span>
+          <div style="flex:1;">
+            <div style="font-weight:700;font-size:.85rem;color:#0f172a;">Top-dress fertilizer — Groundnuts B</div>
+            <div style="font-size:.75rem;color:#64748b;">Week 6 · 1.5 hectares</div>
+          </div>
+          <span style="background:#dcfce7;color:#16a34a;font-size:.68rem;font-weight:700;padding:2px 8px;border-radius:999px;">Planned</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;padding:10px;background:#f8fafc;border-radius:12px;border-left:3px solid #94a3b8;">
+          <span style="font-size:1.25rem;">🛒</span>
+          <div style="flex:1;">
+            <div style="font-weight:700;font-size:.85rem;color:#0f172a;">Market day — sell 8 pigs</div>
+            <div style="font-size:.75rem;color:#64748b;">Next Saturday · estimated MWK 72,000</div>
+          </div>
+          <span style="background:#e2e8f0;color:#475569;font-size:.68rem;font-weight:700;padding:2px 8px;border-radius:999px;">Upcoming</span>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Charts Row -->
+    <div class="charts-row">
+        <!-- Profit Trend Chart -->
+        <div class="chart-card">
+            <div class="chart-card-header">
+                <h3><i class="bi bi-graph-up me-2"></i>Profit Trend</h3>
+                <span class="text-muted" style="font-size: 0.75rem;">Last 6 months</span>
+            </div>
+            <div class="chart-card-body">
+                <canvas id="profitTrendChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Expense Breakdown -->
+        <div class="chart-card">
+            <div class="chart-card-header">
+                <h3><i class="bi bi-pie-chart me-2"></i>Expense Breakdown</h3>
+            </div>
+            <div class="chart-card-body" style="padding: 1rem 1.25rem;">
+                {% if snapshot.expense_breakdown %}
+                    {% for cat in snapshot.expense_breakdown %}
+                    <div class="expense-bar">
+                        <div class="expense-bar-label">
+                            <span class="name">{{ cat.label }}</span>
+                            <span class="amount">MWK {{ cat.amount|floatformat:0|intcomma }}</span>
+                        </div>
+                        <div class="expense-bar-track">
+                            <div class="expense-bar-fill" style="width: {{ cat.percentage }}%;"></div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="empty-state" style="padding: 1.5rem;">
+                        <i class="bi bi-bar-chart"></i>
+                        <p>No expenses this month</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== FARM SNAPSHOT SECTION ==================== -->
+    <div class="farm-snapshot-section" data-testid="farm-snapshot-section" style="margin-bottom: 1.5rem;">
+        <h2 style="font-size: 1.25rem; font-weight: 800; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
+            <i class="bi bi-grid-3x3-gap-fill" style="color: var(--farm-primary);"></i> Farm Snapshot
+        </h2>
+        
+        <div class="summary-grid" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));">
+            
+            <!-- Crops Breakdown Card -->
+            <div class="summary-panel" data-testid="crops-breakdown-card">
+                <div class="summary-panel-header">
+                    <h3><span>🌱</span> Crops Breakdown</h3>
+                    <a href="{% url 'verticals:farm_crops_list' %}" class="btn btn-sm btn-outline-primary">View All</a>
+                </div>
+                <div class="summary-panel-body">
+                    {% if crops_breakdown %}
+                        {% for crop in crops_breakdown %}
+                        <div class="crop-row" style="display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 0; border-bottom: 1px dashed var(--border);">
+                            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                <span style="font-size: 1.25rem;">{{ crop.emoji }}</span>
+                                <div>
+                                    <div style="font-weight: 600; font-size: 0.875rem; color: var(--ink);" data-testid="crop-name">{{ crop.crop_type }}</div>
+                                    <div style="font-size: 0.75rem; color: var(--muted);">{{ crop.area }} {{ crop.area_unit }} — Season: {{ crop.year }}</div>
+                                </div>
+                            </div>
+                            <div style="text-align: right;">
+                                <span class="badge" style="background: var(--farm-primary-light); color: var(--farm-primary); font-size: 0.7rem; padding: 0.25rem 0.5rem; border-radius: 999px;">{{ crop.stage }}</span>
+                            </div>
+                        </div>
+                        {% endfor %}
+                        {% if snapshot.active_seasons_count > 0 %}
+                        <div class="summary-stat" style="border-bottom: none; margin-top: 0.5rem;">
+                            <span class="summary-stat-label">Total Area</span>
+                            <span class="summary-stat-value">{{ snapshot.total_crop_area|floatformat:1 }} acres</span>
+                        </div>
+                        {% endif %}
+                    {% else %}
+                        <div class="empty-state" style="padding: 1.5rem;">
+                            <i class="bi bi-flower1"></i>
+                            <p>No active crop seasons</p>
+                            <a href="{% url 'verticals:farm_add_season' %}" class="btn btn-sm btn-primary">Add Season</a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Livestock Breakdown Card -->
+            <div class="summary-panel" data-testid="livestock-breakdown-card">
+                <div class="summary-panel-header">
+                    <h3><span>🐖</span> Livestock Breakdown</h3>
+                    <a href="{% url 'verticals:farm_livestock_list' %}" class="btn btn-sm btn-outline-primary">View All</a>
+                </div>
+                <div class="summary-panel-body">
+                    {% if livestock_by_type %}
+                        {% for animal_type, data in livestock_by_type.items %}
+                        <div class="summary-stat" data-testid="livestock-type-count">
+                            <span class="summary-stat-label" style="display: flex; align-items: center; gap: 0.5rem;">
+                                <span style="font-size: 1.125rem;">{{ data.icon }}</span> {{ animal_type }}
+                            </span>
+                            <span class="summary-stat-value">{{ data.count|intcomma }}</span>
+                        </div>
+                        {% endfor %}
+                        <div class="summary-stat" style="border-bottom: none; margin-top: 0.25rem; background: var(--surface-2); padding: 0.5rem; border-radius: 8px;">
+                            <span class="summary-stat-label"><strong>Total Animals</strong></span>
+                            <span class="summary-stat-value"><strong>{{ snapshot.total_livestock_count|intcomma }}</strong></span>
+                        </div>
+                        {% if snapshot.livestock_births_this_month > 0 or snapshot.livestock_deaths_this_month > 0 %}
+                        <div style="display: flex; gap: 1rem; margin-top: 0.5rem; font-size: 0.75rem;">
+                            <span style="color: var(--farm-green);"><i class="bi bi-plus-circle-fill"></i> {{ snapshot.livestock_births_this_month }} births</span>
+                            <span style="color: var(--farm-red);"><i class="bi bi-dash-circle-fill"></i> {{ snapshot.livestock_deaths_this_month }} deaths</span>
+                        </div>
+                        {% endif %}
+                    {% else %}
+                        <div class="empty-state" style="padding: 1.5rem;">
+                            <i class="bi bi-piggy-bank"></i>
+                            <p>No livestock batches yet</p>
+                            <a href="{% url 'verticals:farm_livestock_add_batch' %}" class="btn btn-sm btn-primary">Add First Batch</a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Assets Preview Card -->
+            <div class="summary-panel" data-testid="assets-preview-card">
+                <div class="summary-panel-header">
+                    <h3><span>🚜</span> Assets Preview</h3>
+                    <a href="{% url 'verticals:farm_assets' %}" class="btn btn-sm btn-outline-primary">View All</a>
+                </div>
+                <div class="summary-panel-body">
+                    {% if assets_preview %}
+                        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.5rem; margin-bottom: 0.75rem;">
+                            {% for asset in assets_preview|slice:":6" %}
+                            <div class="asset-tile" style="background: var(--surface-2); padding: 0.5rem; border-radius: 8px; text-align: center;">
+                                <div style="font-size: 1.5rem;">
+                                    {% if asset.asset_type == 'tractor' %}🚜{% elif asset.asset_type == 'pump' %}💧{% elif asset.asset_type == 'plough' %}🔧{% elif asset.asset_type == 'truck' %}🚛{% elif asset.asset_type == 'storage' %}🏠{% else %}📦{% endif %}
+                                </div>
+                                <div style="font-size: 0.75rem; font-weight: 600; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ asset.name|truncatechars:15 }}</div>
+                                {% if asset.value_mwk %}
+                                <div style="font-size: 0.65rem; color: var(--muted);">MWK {{ asset.value_mwk|floatformat:0|intcomma }}</div>
+                                {% endif %}
+                                <div style="font-size: 0.6rem; text-transform: uppercase; color: {% if asset.condition == 'good' or asset.condition == 'new' %}var(--farm-green){% elif asset.condition == 'fair' %}var(--farm-amber){% else %}var(--farm-red){% endif %};">{{ asset.condition }}</div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        <div class="summary-stat" style="border-bottom: none; background: linear-gradient(135deg, var(--farm-primary-light), rgba(37, 99, 235, 0.05)); padding: 0.5rem; border-radius: 8px;">
+                            <span class="summary-stat-label"><strong>Total Value</strong> ({{ assets_count }} assets)</span>
+                            <span class="summary-stat-value" style="color: var(--farm-primary);">MWK {{ total_assets_value|floatformat:0|intcomma }}</span>
+                        </div>
+                    {% else %}
+                        <div class="empty-state" style="padding: 1.5rem;">
+                            <i class="bi bi-tools"></i>
+                            <p>No assets recorded</p>
+                            <a href="{% url 'verticals:farm_assets' %}" class="btn btn-sm btn-primary">Add Asset</a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== AI INSIGHTS SECTION ==================== -->
+    {% if ai_insights %}
+    <div class="ai-insights-section" data-testid="ai-insights-section" style="margin-bottom: 1.5rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h2 style="font-size: 1.25rem; font-weight: 800; margin: 0; display: flex; align-items: center; gap: 0.5rem;">
+                <i class="bi bi-lightbulb-fill" style="color: var(--farm-amber);"></i> AI Insights <span style="background: var(--farm-amber-light); color: var(--farm-amber); font-size: 0.65rem; padding: 0.2rem 0.5rem; border-radius: 999px; font-weight: 700; text-transform: uppercase; margin-left: 0.5rem;">Beta</span>
+            </h2>
+            <span style="font-size: 0.75rem; color: var(--muted);">{{ ai_insights|length }} recommendations</span>
+        </div>
+        
+        <div class="insights-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 0.75rem;">
+            {% for insight in ai_insights %}
+            <div class="insight-card" data-testid="insight-card" style="
+                background: var(--surface);
+                border-radius: var(--radius);
+                border: 1px solid var(--border);
+                border-left: 4px solid {% if insight.priority == 'critical' %}var(--farm-red){% elif insight.priority == 'high' %}var(--farm-amber){% elif insight.priority == 'medium' %}var(--farm-blue){% else %}var(--muted){% endif %};
+                padding: 1rem;
+                box-shadow: var(--shadow-xs);
+            ">
+                <div style="display: flex; align-items: flex-start; gap: 0.75rem;">
+                    <div style="
+                        width: 36px; height: 36px;
+                        border-radius: 10px;
+                        display: flex; align-items: center; justify-content: center;
+                        font-size: 1.125rem;
+                        background: {% if insight.color == 'green' %}var(--farm-green-light){% elif insight.color == 'amber' %}var(--farm-amber-light){% elif insight.color == 'red' %}var(--farm-red-light){% else %}var(--farm-blue-light){% endif %};
+                        color: {% if insight.color == 'green' %}var(--farm-green){% elif insight.color == 'amber' %}var(--farm-amber){% elif insight.color == 'red' %}var(--farm-red){% else %}var(--farm-blue){% endif %};
+                    ">
+                        <i class="bi {{ insight.icon }}"></i>
+                    </div>
+                    <div style="flex: 1; min-width: 0;">
+                        <h4 style="font-size: 0.9375rem; font-weight: 700; margin: 0 0 0.25rem; color: var(--ink);">{{ insight.title }}</h4>
+                        <p style="font-size: 0.8125rem; color: var(--ink-500); margin: 0 0 0.5rem; line-height: 1.4;">{{ insight.reason }}</p>
+                        
+                        {% if insight.suggested_quantities %}
+                        <div style="background: var(--surface-2); padding: 0.5rem; border-radius: 6px; font-size: 0.8125rem; margin-bottom: 0.5rem;">
+                            <strong style="color: var(--ink);">📊 Estimate:</strong> {{ insight.suggested_quantities }}
+                        </div>
+                        {% endif %}
+                        
+                        <div style="font-size: 0.6875rem; color: var(--muted); font-style: italic;">
+                            <i class="bi bi-info-circle"></i> {{ insight.confidence_note }}
+                        </div>
+                    </div>
+                </div>
+                
+                {% if insight.season_id or insight.batch_id %}
+                <div style="margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px dashed var(--border);">
+                    {% if insight.season_id %}
+                    <a href="{% url 'verticals:farm_crop_detail' insight.season_id %}?prefill={{ insight.entry_prefill.type|default:'other' }}" class="btn btn-sm" style="background: var(--farm-primary); color: white; font-size: 0.75rem;">
+                        <i class="bi bi-plus-lg"></i> Add Entry
+                    </a>
+                    {% elif insight.batch_id %}
+                    <a href="{% url 'verticals:farm_livestock_add_event' %}?batch_id={{ insight.batch_id }}&type={{ insight.entry_prefill.type|default:'other' }}" class="btn btn-sm" style="background: var(--farm-primary); color: white; font-size: 0.75rem;">
+                        <i class="bi bi-plus-lg"></i> Add Entry
+                    </a>
+                    {% endif %}
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% else %}
+    <!-- AI Insights Empty State -->
+    <div class="alert alert-info d-flex align-items-center gap-2" style="border-radius: var(--radius); margin-bottom: 1.5rem;" data-testid="ai-insights-empty">
+        <i class="bi bi-lightbulb-fill fs-5"></i>
+        <div>
+            <strong>AI Insights (beta)</strong>
+            <p class="mb-0 small text-muted">Add crop seasons or livestock batches to receive smart recommendations.</p>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Recent Activity -->
+    <div class="activity-card" data-testid="farm-recent-activity">
+        <div class="activity-header">
+            <h3><i class="bi bi-clock-history me-2"></i>Recent Activity</h3>
+            <a href="{% url 'verticals:farm_ledger_list' %}" class="btn btn-sm btn-outline-primary">View All</a>
+        </div>
+        <div class="activity-list">
+            {% if recent_entries %}
+                {% for entry in recent_entries %}
+                <div class="activity-item">
+                    <div class="activity-type {% if entry.entry_type == 'expense' %}expense{% else %}sale{% endif %}">
+                        {% if entry.entry_type == 'expense' %}
+                        <i class="bi bi-dash"></i>
+                        {% else %}
+                        <i class="bi bi-plus"></i>
+                        {% endif %}
+                    </div>
+                    <div class="activity-details">
+                        <div class="activity-desc">{{ entry.description|default:entry.get_category_display }}</div>
+                        <div class="activity-meta">{{ entry.date|date:"M d" }} · {{ entry.get_enterprise_type_display }}</div>
+                    </div>
+                    <div class="activity-amount {% if entry.entry_type == 'expense' %}expense{% else %}sale{% endif %}">
+                        {% if entry.entry_type == 'expense' %}-{% else %}+{% endif %}MWK {{ entry.amount_mwk|floatformat:0|intcomma }}
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="empty-state">
+                    <i class="bi bi-journal-text"></i>
+                    <p>No entries yet. Start by adding an expense or sale!</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Profit Trend Chart
+    const profitTrendData = {{ profit_trend_json|safe }};
+    
+    if (profitTrendData && profitTrendData.length > 0) {
+        const ctx = document.getElementById('profitTrendChart');
+        if (ctx) {
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: profitTrendData.map(d => d.label),
+                    datasets: [
+                        {
+                            label: 'Net Profit',
+                            data: profitTrendData.map(d => d.net_profit),
+                            borderColor: '#16a34a',
+                            backgroundColor: 'rgba(22, 163, 74, 0.1)',
+                            fill: true,
+                            tension: 0.4,
+                            pointRadius: 4,
+                            pointHoverRadius: 6,
+                            pointBackgroundColor: '#16a34a',
+                            borderWidth: 2.5,
+                        },
+                        {
+                            label: 'Income',
+                            data: profitTrendData.map(d => d.income),
+                            borderColor: '#2563eb',
+                            backgroundColor: 'transparent',
+                            borderDash: [5, 5],
+                            tension: 0.4,
+                            pointRadius: 0,
+                            borderWidth: 1.5,
+                        },
+                        {
+                            label: 'Expenses',
+                            data: profitTrendData.map(d => d.expenses),
+                            borderColor: '#dc2626',
+                            backgroundColor: 'transparent',
+                            borderDash: [5, 5],
+                            tension: 0.4,
+                            pointRadius: 0,
+                            borderWidth: 1.5,
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false,
+                    },
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'bottom',
+                            labels: {
+                                usePointStyle: true,
+                                boxWidth: 8,
+                                padding: 16,
+                                font: { size: 11 }
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                            titleFont: { weight: 'bold' },
+                            bodyFont: { size: 12 },
+                            padding: 12,
+                            cornerRadius: 8,
+                            callbacks: {
+                                label: function(context) {
+                                    return context.dataset.label + ': MWK ' + context.parsed.y.toLocaleString();
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { display: false },
+                            ticks: { font: { size: 11 } }
+                        },
+                        y: {
+                            grid: { color: 'rgba(0,0,0,0.05)' },
+                            ticks: {
+                                font: { size: 11 },
+                                callback: function(value) {
+                                    if (value >= 1000000) return (value / 1000000).toFixed(1) + 'M';
+                                    if (value >= 1000) return (value / 1000).toFixed(0) + 'K';
+                                    return value;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+    }
+});
+</script>
+{% endblock %}

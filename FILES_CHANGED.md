@@ -1,185 +1,150 @@
-# Files Changed Summary
+# Files Changed - Analytics Feature Implementation
 
-## New Files Created (10 files)
+## New Files Created
 
-1. **inventory/services/agent_ranking.py**
-   - Agent ranking service with `compute_agent_ranking()` and `format_rank()`
-   - Computes sales-based leaderboard per business
+1. **inventory/views_router.py**
+   - Business-aware router views that redirect to correct vertical-specific URLs
+   - Functions: `app_home`, `app_scan`, `app_sell`, `app_stock`, `app_wallet`, `app_sim`, `app_analytics`
 
-2. **inventory/models_approval.py**
-   - PhoneStockEditRequest model for manager approval workflow
-   - Methods: approve(), reject(), get_changes_display()
+2. **inventory/urls_router.py**
+   - URL patterns for router endpoints (`/app/home/`, `/app/scan/`, etc.)
 
-3. **inventory/services/warranty.py**
-   - Carlcare warranty check integration
-   - Functions: check_carlcare_warranty(), update_stock_warranty(), check_warranty_async()
+3. **inventory/decorators_vertical.py**
+   - Vertical guard decorators to prevent leakage
+   - `@vertical_guard()` - Restrict views to specific verticals
+   - `@prevent_vertical_leakage` - Redirect old URLs to router endpoints
 
-4. **tenants/views_location_detail.py**
-   - Location detail view showing stock and agent performance
-   - Route: /tenants/locations/<pk>/
+4. **inventory/views_analytics.py**
+   - Analytics dashboard view for all businesses
+   - Vertical-specific analytics adapters (phones, clothing, liquor, pharmacy, gym)
+   - Filters: date range, location, payment mode, selectable metrics
+   - Excel-style dashboard with KPIs, charts, and composition panels
 
-5. **tenants/views_agent_detail.py**
-   - Agent detail view with earnings panel and date filters
-   - Route: /tenants/agents/<agent_id>/
+5. **templates/inventory/analytics/dashboard.html**
+   - Excel-style analytics dashboard template
+   - Filter pills (Today, Last 7 Days, Month to Date, Custom)
+   - KPI cards grid (responsive)
+   - Charts: Sales trend (daily) with Amount/Count toggle, Cash mix (donut)
+   - Composition panels: Top products/models, Category mix with progress bars
+   - Mobile-first responsive design
 
-6. **templates/tenants/location_detail.html**
-   - Template for location detail page
-   - Shows stock summary, agents, and stock list
+6. **core/templatetags/money.py**
+   - Template filters for consistent money formatting
+   - `format_mwk` - Format as "MWK 1,234,567"
+   - `format_money` - Custom currency formatting
 
-7. **templates/tenants/agent_detail.html**
-   - Template for agent detail page with earnings
-   - Filters: Today, Last 7 days, Last 30 days, Custom range
+7. **static/css/ui-polish.css**
+   - Safe-area support for iPhone
+   - Mobile header fixes (prevent overlap)
+   - Button consistency (casing, sizing, styling)
 
-8. **inventory/migrations/0002_warranty_and_approval.py**
-   - Migration for warranty fields and PhoneStockEditRequest model
+8. **tests/test_router_endpoints.py**
+   - Django tests for router endpoints
+   - Tests vertical guard functionality
+   - Tests analytics accessibility
+   - Tests phones inventory_dashboard redirect to analytics
+   - Tests bottom nav doesn't leak phones URLs to other verticals
 
-9. **tests/test_phones_features.py**
-   - Comprehensive test suite (5 test classes, 9 test methods)
+9. **IMPLEMENTATION_SUMMARY.md**
+   - Complete implementation documentation
 
-10. **PHONES_FEATURES_IMPLEMENTATION.md**
-    - Detailed implementation documentation
+10. **FILES_CHANGED.md**
+    - This file
 
-## Modified Files (6 files)
+## Modified Files
 
-1. **inventory/models.py**
-   - Updated warranty field names and choices
-   - Added backward compatibility properties
-   - Re-exported PhoneStockEditRequest model
+1. **inventory/utils_verticals.py**
+   - Added Analytics as second item in sidebar_items for all verticals (gym, clothing, liquor, pharmacy, phones)
+   - Uses `app_router:analytics` endpoint (business-aware routing)
 
-2. **inventory/views_dashboard.py**
-   - Added agent ranking computation for agents
-   - Integrated agent_ranking service
-   - Added is_agent check and ranking data to context
+2. **inventory/views_dispatch.py**
+   - Modified `vertical_dispatcher` to redirect phones to analytics instead of phones dashboard
+   - Phones businesses now route to analytics when accessing inventory_dashboard
 
-3. **templates/inventory/dashboard.html**
-   - Added agent ranking widget section (150+ lines)
-   - Shows rank, total sales, leaderboard, motivation cards
+3. **inventory/views_dashboard.py**
+   - Modified `inventory_dashboard` to redirect phones businesses to analytics
+   - Maintains backward compatibility (URL still works, content is analytics)
 
-4. **tenants/views.py**
-   - Added stock summary computation to manager_locations view
-   - Queries sold, in_stock, total per location
+4. **inventory/views_analytics.py**
+   - Enhanced vertical-specific analytics implementations:
+     - Gym: Members, new members, payments, active memberships, churn metrics
+     - Liquor: Sales, profit, costs, cash mix, top products, sales trend
+     - Pharmacy: Sales, profit, costs, cash mix, top products, expiry-aware metrics
+     - Clothing: Stock value, retail value, expected margin, sales trend, cash mix
+     - Phones: Revenue, profit, units sold, stock on hand, cash mix, top models
 
-5. **templates/tenants/manager_locations.html**
-   - Added stock summary table below locations table
-   - Shows Sold, In Stock, Total columns with badges
+5. **templates/partials/bottomnav.html**
+   - Added Analytics link to bottom navigation
+   - Uses `app_router:analytics` endpoint
+   - Maintains existing router endpoint usage
 
-6. **tenants/urls.py**
-   - Added location_detail route
-   - Added agent_detail route
-   - Imported new view modules
+6. **urls.py** (root)
+   - Added: `path("app/", include("inventory.urls_router"))`
 
-## Quick Reference: Feature → Files
+7. **templates/base.html**
+   - Added: `<link rel="stylesheet" href="{% static 'css/ui-polish.css' %}?v={{ ASSET_V }}">`
 
-### 1. Agent Ranking
-- **Service**: inventory/services/agent_ranking.py
-- **View**: inventory/views_dashboard.py (modified)
-- **Template**: templates/inventory/dashboard.html (modified)
+## Summary
 
-### 2. Location Stock Summary
-- **View**: tenants/views.py (modified)
-- **Detail View**: tenants/views_location_detail.py (new)
-- **Templates**: 
-  - templates/tenants/manager_locations.html (modified)
-  - templates/tenants/location_detail.html (new)
-- **URLs**: tenants/urls.py (modified)
+- **Total New Files**: 10 (existing from previous implementation)
+- **Total Modified Files**: 7
+- **Lines Added**: ~1500+
+- **Lines Modified**: ~300+
 
-### 3. Agent Detail with Earnings
-- **View**: tenants/views_agent_detail.py (new)
-- **Template**: templates/tenants/agent_detail.html (new)
-- **URLs**: tenants/urls.py (modified)
+## Key Features Implemented
 
-### 4. Manager Approval Workflow
-- **Model**: inventory/models_approval.py (new)
-- **Exports**: inventory/models.py (modified)
-- **Migration**: inventory/migrations/0002_warranty_and_approval.py (new)
+### 1. Analytics Sidebar Placement ✅
+- Analytics added as SECOND button in sidebar for all verticals
+- Positioned right after Dashboard/Home
+- Uses business-aware router endpoint (`app_router:analytics`)
 
-### 5. Warranty Integration
-- **Service**: inventory/services/warranty.py (new)
-- **Model Fields**: inventory/models.py (modified)
-- **Migration**: inventory/migrations/0002_warranty_and_approval.py (new)
+### 2. Phones Dashboard Replacement ✅
+- Phones `inventory_dashboard` now redirects to analytics
+- Old URL still works (backward compatible)
+- No data loss - all KPIs and charts available in analytics
 
-### 6. Unit Tests
-- **Tests**: tests/test_phones_features.py (new)
+### 3. Excel-Style Analytics Layout ✅
+- Filter pills for date range (Today, Last 7 Days, Month to Date, Custom)
+- Location filter dropdown
+- Metric view selector (Amount/Count toggle)
+- KPI cards grid (responsive, 3-6 cards depending on vertical)
+- Sales trend chart (daily) with Amount/Count toggle
+- Cash mix donut chart
+- Top products/models table
+- Category mix with progress bars (where applicable)
+- Mobile-first responsive design
+- Safe-area support for iPhone
 
-## Commands to Run
+### 4. Vertical-Specific Analytics ✅
+- **Clothing**: Stock value, retail value, expected margin, sales trend, cash mix, top categories/models
+- **Liquor**: Sales, profit, costs, cash mix, top products/categories, sales trend
+- **Pharmacy**: Sales, profit, costs, cash mix, top products, expiry-aware metrics
+- **Gym**: NO stock language - members, new members, payments, active memberships, churn metrics
+- **Phones**: Revenue, profit, units sold, stock on hand, cash mix, top models
 
-### 1. Create and Run Migrations
-```bash
-python manage.py makemigrations inventory
-python manage.py migrate inventory
-```
+### 5. Zero Vertical Leakage ✅
+- All navigation uses business-aware router endpoints
+- Bottom nav uses router URLs (never hardcoded phones routes)
+- Sidebar Analytics uses `/app/analytics/` router endpoint
+- Guard against wrong-vertical URLs (handled by router system)
 
-### 2. Run Tests
-```bash
-# All phones features tests
-pytest tests/test_phones_features.py -v
+### 6. Testing ✅
+- Django tests for router endpoints
+- Tests analytics accessibility for all verticals
+- Tests phones inventory_dashboard redirect to analytics
+- Tests bottom nav doesn't leak phones URLs to clothing business
+- Guard tests for vertical leakage prevention
 
-# Specific test class
-pytest tests/test_phones_features.py::TestAgentRanking -v
+## Testing
 
-# All tests
-pytest tests/ -v
-```
-
-### 3. Check for Linting Issues
-```bash
-# Check new Python files
-flake8 inventory/services/agent_ranking.py
-flake8 inventory/models_approval.py
-flake8 inventory/services/warranty.py
-flake8 tenants/views_location_detail.py
-flake8 tenants/views_agent_detail.py
-flake8 tests/test_phones_features.py
-```
-
-## Installation Requirements
-
-No new dependencies required! All features use existing packages:
-- Django (core)
-- requests (already in requirements.txt for HTTP calls)
-- pytest-django (for tests)
+- Django tests: `python manage.py test tests.test_router_endpoints`
+- Run specific test: `python manage.py test tests.test_router_endpoints.RouterEndpointsTestCase.test_phones_inventory_dashboard_redirects_to_analytics`
+- Cypress tests: Recommended to add for E2E testing (login as clothing business, tap each bottom icon, assert no phones content)
 
 ## Next Steps
 
-1. **Run migrations**:
-   ```bash
-   python manage.py migrate
-   ```
-
-2. **Run tests**:
-   ```bash
-   pytest tests/test_phones_features.py -v
-   ```
-
-3. **Test in browser**:
-   - Visit phones dashboard as agent → see ranking widget
-   - Visit `/tenants/manager/locations/` → see stock summary
-   - Click location → see detail with agents
-   - Click agent → see earnings panel
-
-4. **Optional enhancements** (see PHONES_FEATURES_IMPLEMENTATION.md):
-   - Add manager approval UI for stock edit requests
-   - Add warranty badges to stock list templates
-   - Integrate warranty checking on stock creation
-
-## Breaking Changes
-
-**None!** All changes are additive and backward compatible:
-- New models don't affect existing functionality
-- Warranty fields are renamed but have backward compatibility properties
-- New views are on new URLs
-- Dashboard widget only shows for agents (not managers)
-
-## Rollback Plan
-
-If needed, rollback by:
-1. Revert migrations: `python manage.py migrate inventory 0001`
-2. Delete new files listed above
-3. Revert modifications to the 6 modified files
-
----
-
-**Total Files**: 16 files (10 new, 6 modified)  
-**Lines of Code Added**: ~2000+  
-**Test Coverage**: 9 test methods covering all major features
-
+1. Run Django tests: `python manage.py test tests.test_router_endpoints`
+2. Add Cypress tests for vertical leakage prevention (E2E)
+3. Test on staging with real businesses across all verticals
+4. Verify analytics loads correctly with real data
+5. Check mobile responsiveness on actual devices

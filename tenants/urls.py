@@ -1,4 +1,4 @@
-﻿# tenants/urls.py
+# tenants/urls.py
 from __future__ import annotations
 
 from django.shortcuts import redirect
@@ -35,6 +35,7 @@ except Exception:
 suspend_agent_view = getattr(_vm, "suspend_agent", None) if _vm else None
 restore_agent_view = getattr(_vm, "restore_agent", None) if _vm else None
 edit_agent_location_view = getattr(_vm, "edit_agent_location", None) if _vm else None
+manager_agents_earnings_view = getattr(_vm, "manager_agents_earnings", None) if _vm else None
 
 # Prefer dedicated invite-accept views module if present
 _vinv = None
@@ -184,6 +185,8 @@ urlpatterns = [
 
     # --- Manager: review agent join requests (per active business)
     path("manager/agents/", manager_review_agents, name="manager_review_agents"),
+    # Manager: agent earnings view
+    path("manager/agents/earnings/", manager_agents_earnings_view or _fallback_redirect("tenants:manager_review_agents"), name="manager_agents_earnings"),
     # Agent detail view
     path("agents/<int:agent_id>/", _get_or_fallback("agent_detail_view", "tenants:manager_review_agents"), name="agent_detail"),
 
@@ -214,6 +217,11 @@ urlpatterns = [
     # Accept invite (used in links shared with agents)
     # NOTE: <str:token> safely carries TimestampSigner tokens (no slashes).
     path("invites/accept/<str:token>/", invite_accept, name="invite_accept"),
+
+    # ── JSON API: workspace management ──────────────────────────────────────────
+    path("api/workspaces/",         views.api_workspaces_list,       name="api_workspaces"),
+    path("api/workspaces/active/",  views.api_workspaces_set_active, name="api_workspaces_active"),
+    path("api/workspaces/members/", views.api_workspaces_members,    name="api_workspaces_members"),
     
     # Location tracking endpoints (for agents)
     path(

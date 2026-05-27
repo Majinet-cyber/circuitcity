@@ -1,0 +1,64 @@
+{% comment %}
+Premium Product Grid Partial
+Renders a grid of products using the product_card partial
+
+Usage:
+  {% include "partials/products/product_grid.html" with products=products vertical="liquor" %}
+
+Required context:
+  - products: QuerySet or list of product objects
+  - vertical: String identifier (liquor/pharmacy/clothing/phones/gym)
+
+Optional context:
+  - show_prices: Boolean (default True)
+  - show_stock: Boolean (default False)
+  - show_expiry: Boolean (default False)
+  - show_health_score: Boolean (default False)
+  - show_actions: Boolean (default True)
+  - edit_url_name: URL pattern name for edit (e.g., 'inventory:phone_product_edit')
+  - delete_url_name: URL pattern name for delete
+  - view_url_name: URL pattern name for view
+  - use_in_sale_url_name: URL pattern name for use in sale
+  - empty_message: Custom empty state message
+  - empty_icon: Custom empty state icon (default: bi-inbox)
+  - add_product_url: URL to add new product (shown in empty state)
+{% endcomment %}
+
+{% load humanize %}
+
+{% with show_prices=show_prices|default:True %}
+{% with show_stock=show_stock|default:False %}
+{% with show_expiry=show_expiry|default:False %}
+{% with show_health_score=show_health_score|default:False %}
+{% with show_actions=show_actions|default:True %}
+
+{% if products %}
+  <div class="premium-product-grid" role="list" aria-label="Product grid">
+    {% for product in products %}
+      {% include "partials/products/product_card.html" with product=product vertical=vertical show_prices=show_prices show_stock=show_stock show_expiry=show_expiry show_health_score=show_health_score show_actions=show_actions edit_url=edit_url_name|add:product.id|default:product.pk view_url=view_url_name|add:product.id|default:product.pk delete_url=delete_url_name|add:product.id|default:product.pk use_in_sale_url=use_in_sale_url_name|add:product.id|default:product.pk %}
+    {% endfor %}
+  </div>
+{% else %}
+  {# Empty state #}
+  <div class="premium-empty-state" role="status" aria-live="polite">
+    <div class="premium-empty-icon">
+      <i class="bi {{ empty_icon|default:'bi-inbox' }}"></i>
+    </div>
+    <h3 class="premium-empty-title">{{ empty_title|default:"No products yet" }}</h3>
+    <p class="premium-empty-text">
+      {{ empty_message|default:"Add your first product to get started" }}
+    </p>
+    {% if add_product_url %}
+    <a href="{{ add_product_url }}" class="premium-btn premium-btn-primary">
+      <i class="bi bi-plus-circle"></i> Add Product
+    </a>
+    {% endif %}
+  </div>
+{% endif %}
+
+{% endwith %}
+{% endwith %}
+{% endwith %}
+{% endwith %}
+{% endwith %}
+

@@ -1,0 +1,322 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Revenue - Car Hire{% endblock %}
+
+{% block extra_css %}
+<style>
+:root {
+  --hire-primary: #0ea5e9;
+  --hire-accent: #0284c7;
+  --hire-dark: #0f172a;
+  --hire-surface: #1e293b;
+  --hire-card: #334155;
+  --hire-border: #475569;
+  --hire-text: #f8fafc;
+  --hire-muted: #94a3b8;
+  --hire-success: #22c55e;
+}
+
+.car-hire-page {
+  background: linear-gradient(135deg, var(--hire-dark) 0%, #1e293b 100%);
+  min-height: 100vh;
+  color: var(--hire-text);
+}
+
+.car-hire-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 1.5rem;
+}
+
+.page-header {
+  background: linear-gradient(135deg, var(--hire-surface) 0%, var(--hire-card) 100%);
+  border: 1px solid var(--hire-border);
+  border-radius: 20px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+}
+
+.page-title {
+  font-size: 1.75rem;
+  font-weight: 800;
+  margin-bottom: 0.5rem;
+  background: linear-gradient(135deg, var(--hire-primary), #38bdf8);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: center;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--hire-border);
+}
+
+.filter-btn {
+  padding: 0.625rem 1.25rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  background: var(--hire-dark);
+  border: 1px solid var(--hire-border);
+  border-radius: 10px;
+  color: var(--hire-text);
+  text-decoration: none;
+  transition: all 0.2s;
+}
+
+.filter-btn:hover, .filter-btn.active {
+  background: var(--hire-primary);
+  border-color: var(--hire-primary);
+  color: white;
+}
+
+.kpi-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.kpi-card {
+  background: var(--hire-card);
+  border: 1px solid var(--hire-border);
+  border-radius: 16px;
+  padding: 1.25rem;
+}
+
+.kpi-label {
+  font-size: 0.875rem;
+  color: var(--hire-muted);
+  margin-bottom: 0.5rem;
+}
+
+.kpi-value {
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: var(--hire-success);
+}
+
+.kpi-count {
+  font-size: 0.875rem;
+  color: var(--hire-muted);
+  margin-top: 0.5rem;
+}
+
+.action-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.875rem 1.5rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+  background: linear-gradient(135deg, var(--hire-primary), var(--hire-accent));
+  border: none;
+  border-radius: 12px;
+  color: white;
+  text-decoration: none;
+  transition: all 0.2s;
+  box-shadow: 0 4px 12px rgba(14, 165, 233, 0.3);
+  margin-bottom: 1.5rem;
+}
+
+.action-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(14, 165, 233, 0.4);
+  color: white;
+}
+
+.action-btn i {
+  margin-right: 0.5rem;
+}
+
+.revenue-list {
+  display: grid;
+  gap: 1rem;
+}
+
+.revenue-item {
+  background: var(--hire-card);
+  border: 1px solid var(--hire-border);
+  border-radius: 12px;
+  padding: 1.25rem;
+  transition: all 0.2s;
+}
+
+.revenue-item:hover {
+  border-color: var(--hire-primary);
+  box-shadow: 0 4px 16px rgba(14, 165, 233, 0.15);
+}
+
+.revenue-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 0.75rem;
+}
+
+.revenue-description {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--hire-text);
+}
+
+.revenue-amount {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: var(--hire-success);
+}
+
+.revenue-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  font-size: 0.85rem;
+  color: var(--hire-muted);
+}
+
+.category-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.25rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: rgba(14, 165, 233, 0.2);
+  color: #38bdf8;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 4rem 2rem;
+  background: var(--hire-card);
+  border: 1px solid var(--hire-border);
+  border-radius: 20px;
+}
+
+.empty-icon {
+  font-size: 4rem;
+  margin-bottom: 1rem;
+}
+
+.empty-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+}
+
+.empty-text {
+  color: var(--hire-muted);
+}
+
+@media (max-width: 768px) {
+  .car-hire-container {
+    padding: 1rem;
+  }
+  
+  .filter-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .revenue-header {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="car-hire-page" data-testid="car-hire-revenue-page">
+  <div class="car-hire-container">
+    <!-- Page Header -->
+    <div class="page-header">
+      <h1 class="page-title">💰 Revenue</h1>
+      <p style="color: var(--hire-muted); margin: 0;">Track all revenue entries for your car hire business</p>
+      
+      <!-- Filter Bar -->
+      <div class="filter-bar">
+        <span style="color: var(--hire-muted); font-size: 0.875rem;">Period:</span>
+        <a href="?range=mtd" class="filter-btn {% if active_range == 'mtd' %}active{% endif %}">
+          Month to Date
+        </a>
+        <a href="?range=last7" class="filter-btn {% if active_range == 'last7' %}active{% endif %}">
+          Last 7 Days
+        </a>
+        <a href="?period=all" class="filter-btn {% if active_range == 'all' %}active{% endif %}">
+          All Time
+        </a>
+        
+        {% if all_vehicles %}
+        <select name="vehicle_id" onchange="window.location.href='?{% if active_range != 'mtd' %}range={{ active_range }}&{% endif %}vehicle_id='+this.value" style="margin-left: auto; padding: 0.5rem 1rem; border-radius: 8px; background: var(--hire-dark); border: 1px solid var(--hire-border); color: var(--hire-text);">
+          <option value="">All Vehicles</option>
+          {% for vehicle in all_vehicles %}
+          <option value="{{ vehicle.id }}" {% if selected_vehicle.id == vehicle.id %}selected{% endif %}>
+            {{ vehicle.name }}
+          </option>
+          {% endfor %}
+        </select>
+        {% endif %}
+      </div>
+    </div>
+    
+    <!-- KPI Row -->
+    <div class="kpi-row">
+      <div class="kpi-card" data-testid="revenue-kpi-total">
+        <div class="kpi-label">Total Revenue ({{ range_label }})</div>
+        <div class="kpi-value">MWK {{ total_revenue|floatformat:0|intcomma }}</div>
+        <div class="kpi-count">{{ revenue_count }} {{ revenue_count|pluralize:"entry,entries" }}</div>
+      </div>
+    </div>
+    
+    <!-- Add Revenue Button -->
+    <a href="{% url 'verticals:car_hire_revenue_add' %}" class="action-btn" data-testid="btn-add-revenue">
+      <i class="bi bi-plus-circle"></i> Add Revenue Entry
+    </a>
+    
+    <!-- Revenue List -->
+    <div class="revenue-list">
+      {% for revenue in revenues %}
+      <div class="revenue-item" data-testid="revenue-item">
+        <div class="revenue-header">
+          <div>
+            <div class="revenue-description">{{ revenue.description }}</div>
+            <span class="category-badge">
+              <i class="bi bi-tag"></i> {{ revenue.get_category_display }}
+            </span>
+          </div>
+          <div class="revenue-amount">MWK {{ revenue.amount|floatformat:0|intcomma }}</div>
+        </div>
+        <div class="revenue-meta">
+          <span><i class="bi bi-calendar"></i> {{ revenue.received_on|date:"M d, Y" }}</span>
+          {% if revenue.vehicle %}
+          <span><i class="bi bi-truck"></i> {{ revenue.vehicle.name }}</span>
+          {% endif %}
+          {% if revenue.notes %}
+          <span><i class="bi bi-sticky"></i> {{ revenue.notes|truncatewords:10 }}</span>
+          {% endif %}
+        </div>
+      </div>
+      {% empty %}
+      <div class="empty-state" data-testid="empty-revenue">
+        <div class="empty-icon">💰</div>
+        <div class="empty-title">No revenue entries yet</div>
+        <div class="empty-text">
+          Add your first revenue entry to start tracking income.
+        </div>
+        <a href="{% url 'verticals:car_hire_revenue_add' %}" class="action-btn" style="margin-top: 1.5rem;">
+          <i class="bi bi-plus-circle"></i> Add Revenue Entry
+        </a>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endblock %}
+

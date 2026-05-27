@@ -1,0 +1,19 @@
+{% load money %}
+{% comment %}
+Currency switcher dropdown component.
+Include this in your topbar or settings page.
+{% endcomment %}
+{% if user.is_authenticated %}
+  {% with current_currency=user.profile.display_currency|default:"MWK" %}
+  <div class="currency-switcher">
+    <form method="post" action="{% url 'accounts:settings_currency' %}" class="d-inline">
+      {% csrf_token %}
+      <select name="currency" class="form-select form-select-sm" onchange="this.form.submit()" style="width: auto; display: inline-block;">
+        <option value="MWK" {% if current_currency == "MWK" %}selected{% endif %}>MWK</option>
+        <option value="USD" {% if current_currency == "USD" %}selected{% endif %}>USD</option>
+      </select>
+    </form>
+  </div>
+  {% endwith %}
+{% endif %}
+

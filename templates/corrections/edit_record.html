@@ -1,0 +1,617 @@
+{% extends "base.html" %}
+{% load static %}
+{% load corrections_tags %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Premium Edit Record Styling */
+    .corrections-page {
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+        padding: 18px;
+    }
+    
+    .corrections-hero {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 24px;
+        border-radius: 20px;
+        color: #fff;
+        box-shadow: 0 8px 24px rgba(102, 126, 234, 0.25);
+    }
+    
+    .corrections-hero h1 {
+        margin: 0;
+        font-size: clamp(24px, 3vw, 32px);
+        font-weight: 700;
+    }
+    
+    .corrections-hero .breadcrumb {
+        background: rgba(255, 255, 255, 0.15);
+        padding: 8px 16px;
+        border-radius: 8px;
+        margin-bottom: 12px;
+    }
+    
+    .corrections-hero .breadcrumb-item + .breadcrumb-item::before {
+        color: rgba(255, 255, 255, 0.7);
+    }
+    
+    .corrections-hero .breadcrumb-item a {
+        color: #fff;
+        text-decoration: none;
+        font-weight: 600;
+    }
+    
+    .corrections-hero .breadcrumb-item.active {
+        color: rgba(255, 255, 255, 0.9);
+    }
+    
+    /* Premium Card */
+    .premium-card {
+        background: white;
+        border-radius: 20px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+        overflow: hidden;
+        border: 1px solid #e2e8f0;
+    }
+    
+    .premium-card-header {
+        background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+        border-bottom: 2px solid #f59e0b;
+        padding: 16px 24px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+    
+    .premium-card-header i {
+        font-size: 1.5rem;
+        color: #d97706;
+    }
+    
+    .premium-card-header strong {
+        color: #92400e;
+        font-size: 1rem;
+    }
+    
+    .premium-card-body {
+        padding: 24px;
+    }
+    
+    /* Form Styling */
+    .form-label {
+        font-weight: 600;
+        color: #475569;
+        margin-bottom: 8px;
+    }
+    
+    .form-control, .form-select {
+        border-radius: 10px;
+        border: 2px solid #e2e8f0;
+        padding: 12px 16px;
+        font-size: 1rem;
+        transition: all 0.2s ease;
+    }
+    
+    .form-control:focus, .form-select:focus {
+        border-color: #667eea;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+    
+    textarea.form-control {
+        min-height: 100px;
+    }
+    
+    .form-text {
+        color: #64748b;
+        font-size: 0.875rem;
+        margin-top: 4px;
+    }
+    
+    /* Field Groups */
+    .field-group {
+        background: #f8fafc;
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 16px;
+        border: 1px solid #e2e8f0;
+    }
+    
+    .field-group-title {
+        font-size: 1.1rem;
+        font-weight: 700;
+        color: #334155;
+        margin-bottom: 16px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    
+    /* Buttons */
+    .btn-premium-primary {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 12px 32px;
+        border-radius: 12px;
+        font-weight: 700;
+        font-size: 1rem;
+        border: none;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+    }
+    
+    .btn-premium-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 16px rgba(102, 126, 234, 0.4);
+        color: white;
+    }
+    
+    .btn-premium-secondary {
+        background: white;
+        color: #64748b;
+        padding: 12px 32px;
+        border-radius: 12px;
+        font-weight: 700;
+        font-size: 1rem;
+        border: 2px solid #e2e8f0;
+        transition: all 0.3s ease;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+    }
+    
+    .btn-premium-secondary:hover {
+        border-color: #667eea;
+        color: #667eea;
+        background: #f8fafc;
+    }
+    
+    .btn-premium-danger {
+        background: white;
+        color: #dc2626;
+        padding: 12px 32px;
+        border-radius: 12px;
+        font-weight: 700;
+        font-size: 1rem;
+        border: 2px solid #fecaca;
+        transition: all 0.3s ease;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+    }
+    
+    .btn-premium-danger:hover {
+        border-color: #dc2626;
+        background: #fef2f2;
+        color: #dc2626;
+    }
+    
+    /* Delete Modal */
+    .delete-modal .modal-content {
+        border-radius: 20px;
+        border: none;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    }
+    
+    .delete-modal .modal-header {
+        background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+        border-bottom: 2px solid #dc2626;
+        border-radius: 20px 20px 0 0;
+        padding: 20px 24px;
+    }
+    
+    .delete-modal .modal-title {
+        color: #991b1b;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    
+    .delete-modal .modal-body {
+        padding: 24px;
+    }
+    
+    .delete-modal .alert-danger {
+        background: #fef2f2;
+        border: 2px solid #fecaca;
+        border-radius: 12px;
+        color: #991b1b;
+    }
+    
+    /* History Card */
+    .history-card {
+        background: white;
+        border-radius: 20px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+        border: 1px solid #e2e8f0;
+        overflow: hidden;
+    }
+    
+    .history-card-header {
+        background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+        padding: 16px 20px;
+        border-bottom: 1px solid #e2e8f0;
+    }
+    
+    .history-card-header h6 {
+        margin: 0;
+        font-weight: 700;
+        color: #334155;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    
+    .history-card-body {
+        padding: 20px;
+        max-height: 500px;
+        overflow-y: auto;
+    }
+    
+    .history-item {
+        padding-bottom: 16px;
+        margin-bottom: 16px;
+        border-bottom: 1px solid #e2e8f0;
+    }
+    
+    .history-item:last-child {
+        border-bottom: none;
+        margin-bottom: 0;
+        padding-bottom: 0;
+    }
+    
+    .history-item-date {
+        color: #94a3b8;
+        font-size: 0.875rem;
+        display: block;
+        margin-bottom: 4px;
+    }
+    
+    .history-item-field {
+        font-weight: 700;
+        color: #334155;
+        margin-bottom: 4px;
+    }
+    
+    .history-item-change {
+        background: #f1f5f9;
+        padding: 8px 12px;
+        border-radius: 8px;
+        font-size: 0.875rem;
+        color: #475569;
+        margin-top: 6px;
+        font-family: 'Courier New', monospace;
+    }
+    
+    .history-item-user {
+        color: #64748b;
+        font-size: 0.875rem;
+        margin-top: 6px;
+    }
+    
+    /* Before/After Preview */
+    .diff-preview {
+        background: #f8fafc;
+        border-radius: 12px;
+        padding: 16px;
+        margin-top: 12px;
+        border: 1px solid #e2e8f0;
+    }
+    
+    .diff-preview-title {
+        font-weight: 600;
+        color: #475569;
+        margin-bottom: 8px;
+        font-size: 0.875rem;
+    }
+    
+    .diff-row {
+        display: flex;
+        gap: 12px;
+        margin-bottom: 8px;
+    }
+    
+    .diff-before, .diff-after {
+        flex: 1;
+        padding: 8px 12px;
+        border-radius: 8px;
+        font-size: 0.875rem;
+    }
+    
+    .diff-before {
+        background: #fee2e2;
+        color: #991b1b;
+        text-decoration: line-through;
+    }
+    
+    .diff-after {
+        background: #dcfce7;
+        color: #166534;
+        font-weight: 600;
+    }
+    
+    @media (max-width: 992px) {
+        .corrections-page {
+            padding: 12px;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="corrections-page">
+    <!-- Hero Header -->
+    <header class="corrections-hero">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb mb-0">
+                <li class="breadcrumb-item"><a href="{% url 'corrections:dashboard' vertical=vertical %}">Data Corrections</a></li>
+                <li class="breadcrumb-item"><a href="{% url 'corrections:browse_entity' vertical=vertical entity_label=entity_label %}">{{ entity_config.label }}</a></li>
+                <li class="breadcrumb-item active">Edit #{{ obj.pk }}</li>
+            </ol>
+        </nav>
+        <h1>{{ hero_title }}</h1>
+    </header>
+    
+    <div class="row">
+        <div class="col-lg-8">
+            <!-- Edit Form -->
+            <div class="premium-card mb-4">
+                <div class="premium-card-header">
+                    <i class="bi bi-exclamation-triangle"></i>
+                    <div>
+                        <strong>Warning:</strong> Changes will be applied immediately and logged for audit.
+                    </div>
+                </div>
+                <div class="premium-card-body">
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        <!-- Reason (Required) -->
+                        <div class="mb-4">
+                            <label for="reason" class="form-label">
+                                <i class="bi bi-chat-left-text"></i> Reason for Correction 
+                                <span class="text-danger">*</span>
+                            </label>
+                            <textarea name="reason" id="reason" class="form-control" rows="3" required 
+                                      placeholder="Explain why this correction is needed (e.g., 'Member reported incorrect phone number')..."></textarea>
+                            <div class="form-text">
+                                <i class="bi bi-info-circle"></i> This will be logged in the audit trail for accountability.
+                            </div>
+                        </div>
+                        
+                        <hr class="my-4">
+                        
+                        <!-- Editable Fields -->
+                        <div class="field-group">
+                            <div class="field-group-title">
+                                <i class="bi bi-pencil-square"></i>
+                                Editable Fields
+                            </div>
+                            
+                            {% for field_name, field_config in entity_config.fields.items %}
+                            {% with value=obj|lookup:field_name %}
+                            <div class="mb-3">
+                                <label for="{{ field_name }}" class="form-label">
+                                    {{ field_config.label }}
+                                    {% if field_config.required %}<span class="text-danger">*</span>{% endif %}
+                                </label>
+                                
+                                {% if field_config.field_type == 'string' %}
+                                <input type="text" name="{{ field_name }}" id="{{ field_name }}" 
+                                       class="form-control" value="{{ value }}" 
+                                       {% if field_config.required %}required{% endif %}>
+                                
+                                {% elif field_config.field_type == 'integer' %}
+                                <input type="number" name="{{ field_name }}" id="{{ field_name }}" 
+                                       class="form-control" value="{{ value }}" step="1" 
+                                       {% if field_config.required %}required{% endif %}>
+                                
+                                {% elif field_config.field_type == 'decimal' %}
+                                <input type="number" name="{{ field_name }}" id="{{ field_name }}" 
+                                       class="form-control" value="{{ value }}" step="0.01" 
+                                       {% if field_config.required %}required{% endif %}>
+                                
+                                {% elif field_config.field_type == 'date' %}
+                                <input type="date" name="{{ field_name }}" id="{{ field_name }}" 
+                                       class="form-control" value="{{ value|date:'Y-m-d' }}" 
+                                       {% if field_config.required %}required{% endif %}>
+                                
+                                {% elif field_config.field_type == 'datetime' %}
+                                <input type="datetime-local" name="{{ field_name }}" id="{{ field_name }}" 
+                                       class="form-control" value="{{ value|date:'Y-m-d\TH:i' }}" 
+                                       {% if field_config.required %}required{% endif %}>
+                                
+                                {% elif field_config.field_type == 'boolean' %}
+                                <select name="{{ field_name }}" id="{{ field_name }}" 
+                                        class="form-select" {% if field_config.required %}required{% endif %}>
+                                    <option value="True" {% if value %}selected{% endif %}>Yes</option>
+                                    <option value="False" {% if not value %}selected{% endif %}>No</option>
+                                </select>
+                                
+                                {% else %}
+                                <input type="text" name="{{ field_name }}" id="{{ field_name }}" 
+                                       class="form-control" value="{{ value }}" 
+                                       {% if field_config.required %}required{% endif %}>
+                                {% endif %}
+                                
+                                {% if field_config.help_text %}
+                                <div class="form-text">{{ field_config.help_text }}</div>
+                                {% endif %}
+                            </div>
+                            {% endwith %}
+                            {% endfor %}
+                        </div>
+                        
+                        <div class="d-flex gap-3 mt-4 flex-wrap">
+                            <button type="submit" class="btn-premium-primary">
+                                <i class="bi bi-check-lg"></i> Apply Correction
+                            </button>
+                            <a href="{% url 'corrections:browse_entity' vertical=vertical entity_label=entity_label %}" 
+                               class="btn-premium-secondary">
+                                <i class="bi bi-x-lg"></i> Cancel
+                            </a>
+                            
+                            {% if entity_label == 'gym_payment' or entity_label == 'pharmacy_sale' %}
+                            <!-- Delete button -->
+                            <button type="button" class="btn-premium-danger ms-auto" 
+                                    id="delete-section"
+                                    data-bs-toggle="modal" data-bs-target="#deleteModal">
+                                <i class="bi bi-trash"></i> Delete Record
+                            </button>
+                            {% endif %}
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-4">
+            <!-- Correction History -->
+            <div class="history-card">
+                <div class="history-card-header">
+                    <h6><i class="bi bi-clock-history"></i> Correction History</h6>
+                </div>
+                <div class="history-card-body">
+                    {% if history %}
+                        {% for item in history %}
+                        <div class="history-item">
+                            <small class="history-item-date">
+                                <i class="bi bi-calendar3"></i> {{ item.batch.created_at|date:"M d, Y H:i" }}
+                            </small>
+                            <div class="history-item-field">{{ item.field_name }}</div>
+                            <div class="history-item-change">
+                                <span style="color: #dc2626;">{{ item.old_value|default:"(empty)" }}</span>
+                                <i class="bi bi-arrow-right" style="margin: 0 8px;"></i>
+                                <span style="color: #16a34a;">{{ item.new_value|default:"(empty)" }}</span>
+                            </div>
+                            <small class="history-item-user">
+                                <i class="bi bi-person"></i> By {{ item.batch.created_by.get_full_name|default:item.batch.created_by.username }}
+                            </small>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div style="text-align: center; padding: 2rem 1rem; color: #94a3b8;">
+                            <i class="bi bi-inbox" style="font-size: 2rem; display: block; margin-bottom: 8px; opacity: 0.5;"></i>
+                            <p style="margin: 0; font-size: 0.9rem;">No previous corrections for this record.</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+{% if entity_label == 'gym_payment' or entity_label == 'pharmacy_sale' %}
+<div class="modal fade delete-modal" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="deleteModalLabel">
+                    <i class="bi bi-exclamation-triangle-fill"></i>
+                    {% if entity_label == 'pharmacy_sale' %}Delete Sale Record{% else %}Delete Payment Record{% endif %}
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                {% if entity_label == 'pharmacy_sale' %}
+                <div class="alert alert-warning" role="alert">
+                    <strong><i class="bi bi-shield-exclamation"></i> Note:</strong>
+                    This will <strong>soft-delete</strong> the sale record. Stock will be restored to the batch and the action will be logged.
+                </div>
+                {% else %}
+                <div class="alert alert-danger" role="alert">
+                    <strong><i class="bi bi-shield-exclamation"></i> Warning:</strong> This will permanently remove the payment and revert any linked wallet/ledger effects.
+                </div>
+                {% endif %}
+                
+                <form method="post" action="{% url 'corrections:delete_record' vertical=vertical entity_label=entity_label object_id=obj.pk %}" id="deleteForm">
+                    {% csrf_token %}
+                    
+                    <div class="mb-3">
+                        <label for="delete_reason" class="form-label fw-bold">
+                            Reason for Deletion <span class="text-danger">*</span>
+                        </label>
+                        {% if entity_label == 'pharmacy_sale' %}
+                        <select name="reason" id="delete_reason" class="form-select" required>
+                            <option value="">-- Select reason --</option>
+                            <option value="data_entry_error">Data Entry Error</option>
+                            <option value="wrong_product">Wrong Product / Batch</option>
+                            <option value="wrong_quantity">Wrong Quantity</option>
+                            <option value="wrong_price">Wrong Price</option>
+                            <option value="duplicate">Duplicate Sale</option>
+                            <option value="customer_return">Customer Return / Cancelled</option>
+                            <option value="other">Other (specify in notes)</option>
+                        </select>
+                        {% else %}
+                        <select name="reason" id="delete_reason" class="form-select" required>
+                            <option value="">-- Select reason --</option>
+                            <option value="duplicate">Duplicate Payment</option>
+                            <option value="wrong_member">Wrong Member</option>
+                            <option value="wrong_amount">Wrong Amount</option>
+                            <option value="data_entry_error">Data Entry Error</option>
+                            <option value="other">Other (specify in notes)</option>
+                        </select>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="delete_notes" class="form-label fw-bold">
+                            Additional Notes
+                        </label>
+                        <textarea name="notes" id="delete_notes" class="form-control" rows="3" 
+                                  placeholder="Provide additional details..."></textarea>
+                        <div class="form-text">
+                            <i class="bi bi-info-circle"></i> This will be logged in the audit trail.
+                        </div>
+                    </div>
+                    
+                    {% if entity_label == 'pharmacy_sale' %}
+                    <div class="alert alert-info" role="alert">
+                        <strong><i class="bi bi-info-circle"></i> What will happen:</strong>
+                        <ul class="mb-0 mt-2">
+                            <li>Sale #{{ obj.pk }} will be marked as deleted (soft delete)</li>
+                            <li>Batch stock will be restored by {{ obj.quantity }} unit{{ obj.quantity|pluralize }}</li>
+                            <li>Sale will no longer appear in revenue/profit totals</li>
+                            <li>Action will be logged with full audit trail</li>
+                        </ul>
+                    </div>
+                    {% else %}
+                    <div class="alert alert-warning" role="alert">
+                        <strong><i class="bi bi-info-circle"></i> What will happen:</strong>
+                        <ul class="mb-0 mt-2">
+                            <li>Payment record will be PERMANENTLY deleted from database</li>
+                            <li>Related wallet entries will be removed</li>
+                            <li>Action will be logged with full audit trail</li>
+                            <li>This action CANNOT be undone</li>
+                        </ul>
+                    </div>
+                    {% endif %}
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="bi bi-x-lg"></i> Cancel
+                </button>
+                <button type="submit" form="deleteForm" class="btn btn-danger">
+                    <i class="bi bi-trash"></i> Confirm Delete
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% block extra_js %}
+<!-- Corrections Modal Handler - Ensures delete modal works in production -->
+<script src="{% static 'js/corrections-modal.js' %}?v={{ BUILD_ID|default:STATIC_VERSION|default:'1' }}" defer></script>
+{% endblock %}
+{% endblock %}

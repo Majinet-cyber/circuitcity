@@ -47,8 +47,9 @@
   </form>
 
   {% if page_obj %}
-  <table>
-    <thead><tr><th>No.</th><th>Business</th><th>Amount</th><th>Status</th><th>Date</th></tr></thead>
+  <div class="table-wrap table-responsive">
+    <table class="table">
+      <thead><tr><th>No.</th><th>Business</th><th>Amount</th><th>Status</th><th>Date</th></tr></thead>
     <tbody>
       {% for inv in page_obj %}
       <tr>
@@ -60,7 +61,8 @@
       </tr>
       {% endfor %}
     </tbody>
-  </table>
+    </table>
+  </div><!-- /.table-responsive -->
   {% endif %}
 </div>
 <script>function setRange(r){document.getElementById('range').value=r;document.forms[0].submit();}</script>

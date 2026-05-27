@@ -116,12 +116,12 @@ class TestInventoryDashboardRedirectLoops:
             or "/accounts/settings" in location
         ), f"Expected redirect to business selection, got {location}"
 
-    def test_authenticated_user_with_phones_business_gets_200_dashboard(
+    def test_authenticated_user_with_phones_business_redirects_to_analytics(
         self, client_logged_in, phones_business, phones_membership
     ):
         """
-        Authenticated user WITH active PHONES business should get a 200 OK dashboard.
-        No redirect should occur.
+        Authenticated user WITH active PHONES business should redirect to analytics.
+        Phones businesses now use Analytics instead of the inventory dashboard.
         """
         # Set active business in session
         session = client_logged_in.session
@@ -130,16 +130,17 @@ class TestInventoryDashboardRedirectLoops:
         
         response = client_logged_in.get("/inventory/dashboard/", follow=False)
         
-        # Should render successfully (200 OK)
-        assert response.status_code == 200, (
-            f"User with PHONES business should get 200 OK, got {response.status_code}. "
+        # Should redirect (302) to analytics
+        assert response.status_code == 302, (
+            f"User with PHONES business should redirect to analytics (302), "
+            f"got {response.status_code}. "
             f"Location: {response.get('Location', 'N/A')}"
         )
         
-        # Should NOT redirect
-        assert "Location" not in response, (
-            f"User with active business should NOT be redirected, "
-            f"but got Location: {response.get('Location')}"
+        # Should redirect to analytics
+        location = response.get("Location", "")
+        assert "/app/analytics" in location or "analytics" in location, (
+            f"PHONES business should redirect to analytics, got {location}"
         )
 
     def test_hard_guard_against_self_redirect(self, client_logged_in):
@@ -198,14 +199,14 @@ class TestInventoryDashboardRedirectLoops:
             f"Should NOT end up back on /inventory/dashboard/, final path: {final_path}"
         )
 
-    def test_vertical_dispatcher_does_not_redirect_phones_to_itself(
+    def test_vertical_dispatcher_redirects_phones_to_analytics(
         self, client_logged_in, phones_business, phones_membership
     ):
         """
-        CRITICAL: vertical_dispatcher should NOT redirect PHONES businesses back to
-        inventory:inventory_dashboard (which is the same URL).
+        CRITICAL: vertical_dispatcher should redirect PHONES businesses to analytics,
+        NOT back to inventory:inventory_dashboard (which would cause a loop).
         
-        This is the core fix for the ERR_TOO_MANY_REDIRECTS issue.
+        This ensures phones use Analytics instead of the inventory dashboard.
         """
         # Set active business in session
         session = client_logged_in.session
@@ -215,17 +216,20 @@ class TestInventoryDashboardRedirectLoops:
         # Access the dashboard
         response = client_logged_in.get("/inventory/dashboard/", follow=False)
         
-        # For PHONES vertical, should render (200) NOT redirect (302)
-        assert response.status_code == 200, (
-            f"PHONES business should render dashboard directly (200), "
-            f"got {response.status_code}. "
-            f"If 302, this indicates the old self-redirect bug is back!"
+        # For PHONES vertical, should redirect (302) to analytics
+        assert response.status_code == 302, (
+            f"PHONES business should redirect to analytics (302), "
+            f"got {response.status_code}."
         )
         
-        # Absolutely NO redirect should occur
-        assert "Location" not in response, (
-            f"CRITICAL: PHONES business redirected to {response.get('Location')}. "
-            f"This is the self-redirect loop bug!"
+        # Should redirect to analytics, NOT back to /inventory/dashboard/
+        location = response.get("Location", "")
+        assert "/app/analytics" in location or "analytics" in location, (
+            f"PHONES business should redirect to analytics, got {location}"
+        )
+        assert "/inventory/dashboard" not in location, (
+            f"CRITICAL: PHONES business redirected back to /inventory/dashboard/ "
+            f"which would cause a loop! Got {location}"
         )
 
 
@@ -280,5 +284,34 @@ class TestOtherVerticalsRedirect:
         # Should NOT redirect back to /inventory/dashboard/
         assert "/inventory/dashboard" not in location, (
             f"Liquor business should NOT redirect to /inventory/dashboard/, got {location}"
+        )
+
+    def test_phones_business_redirects_to_analytics_not_500(
+        self, client_logged_in, phones_business, phones_membership
+    ):
+        """
+        Phones business accessing /inventory/dashboard/ should redirect to analytics
+        and NEVER return 500 error.
+        """
+        # Set active business in session
+        session = client_logged_in.session
+        session["active_business_id"] = phones_business.id
+        session.save()
+        
+        response = client_logged_in.get("/inventory/dashboard/", follow=False)
+        
+        # Should NOT be 500
+        assert response.status_code != 500, (
+            f"Phones business should NOT get 500 error, got {response.status_code}"
+        )
+        
+        # Should redirect to analytics
+        assert response.status_code == 302, (
+            f"Phones business should redirect (302) to analytics, got {response.status_code}"
+        )
+        
+        location = response.get("Location", "")
+        assert "/app/analytics" in location or "analytics" in location, (
+            f"Phones business should redirect to analytics, got {location}"
         )
 

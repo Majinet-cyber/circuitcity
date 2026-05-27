@@ -25,7 +25,7 @@ from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_http_methods
 
 # Tenant/business scoping
-from tenants.utils import get_active_business
+from tenants.utils import get_active_business, require_business, require_role
 from tenants.scope import resolve_location_for_user
 
 # Models
@@ -38,23 +38,15 @@ from inventory.business_kinds import BusinessKind
 
 # Decorators
 from core.decorators import manager_required
-from tenants.utils import require_business
 
 # Role helpers
 from core.roles import is_manager, is_agent
 
 
 # =============================================================================
-# BRAND CONFIG (with logos and taglines)
+# BRAND CONFIG (with logos and taglines) - 5 BRANDS
 # =============================================================================
 PHONE_BRANDS = [
-    {
-        "key": "itel",
-        "name": "ITEL",
-        "logo": "img/brands/itel.svg",
-        "tagline": "Budget workhorse",
-        "color": "#f59e0b",  # amber
-    },
     {
         "key": "tecno",
         "name": "TECNO",
@@ -63,11 +55,39 @@ PHONE_BRANDS = [
         "color": "#3b82f6",  # blue
     },
     {
+        "key": "itel",
+        "name": "ITEL",
+        "logo": "img/brands/itel.svg",
+        "tagline": "Budget workhorse",
+        "color": "#ef4444",  # red
+    },
+    {
         "key": "samsung",
         "name": "SAMSUNG",
         "logo": "img/brands/samsung.svg",
         "tagline": "Premium experience",
-        "color": "#1d4ed8",  # blue-700
+        "color": "#f97316",  # orange
+    },
+    {
+        "key": "google_pixel",
+        "name": "GOOGLE PIXEL",
+        "logo": "img/brands/google-pixel.svg",
+        "tagline": "Pure Android",
+        "color": "#10b981",  # green
+    },
+    {
+        "key": "redmi",
+        "name": "REDMI",
+        "logo": "img/brands/redmi.svg",
+        "tagline": "Value leader",
+        "color": "#8b5cf6",  # purple
+    },
+    {
+        "key": "iphone",
+        "name": "IPHONE",
+        "logo": "img/brands/iphone.svg",
+        "tagline": "Premium Apple experience",
+        "color": "#111827",  # dark gray/black
     },
 ]
 
@@ -82,7 +102,7 @@ def get_phone_models_for_brand(business, brand_key: str) -> List[Dict[str, Any]]
     """
     if not business:
         return []
-    
+
     try:
         models = get_models_for_brand(business, brand_key.upper())
         return models
@@ -99,12 +119,12 @@ def get_phone_models_for_brand(business, brand_key: str) -> List[Dict[str, Any]]
 def phone_available_imeis(request: HttpRequest, product_id: int) -> JsonResponse:
     """
     Return available IMEIs for a given product, scoped by business + location + role.
-    
+
     Definition of "available":
     - IMEIs that currently exist in stock for this business
     - Status = IN_STOCK (not sold)
     - is_active = True
-    
+
     Scoping rules:
     - Managers: see all IMEIs across all locations in their business
     - Agents: see only IMEIs in their current location
@@ -112,16 +132,17 @@ def phone_available_imeis(request: HttpRequest, product_id: int) -> JsonResponse
     business = get_active_business(request)
     if not business:
         return JsonResponse({"ok": False, "error": "No active business"}, status=400)
-    
+
     location_id = resolve_location_for_user(request)
     location = None
     if location_id:
         try:
             from inventory.models import Location
+
             location = Location.objects.get(pk=location_id, business=business)
         except Location.DoesNotExist:
             pass
-    
+
     # Base queryset: in-stock items for this business and product
     qs = InventoryItem.objects.filter(
         business=business,
@@ -129,8 +150,10 @@ def phone_available_imeis(request: HttpRequest, product_id: int) -> JsonResponse
         status="IN_STOCK",
         is_active=True,
         imei__isnull=False,  # Only show items with IMEIs
-    ).exclude(imei="")  # Exclude empty strings
-    
+    ).exclude(
+        imei=""
+    )  # Exclude empty strings
+
     # Role-based scoping
     user = request.user
     if is_manager(user):
@@ -143,15 +166,17 @@ def phone_available_imeis(request: HttpRequest, product_id: int) -> JsonResponse
         else:
             # If no location, return empty (agents must have a location)
             return JsonResponse({"ok": True, "imeis": []})
-    
+
     # Get IMEIs, ordered for consistency
     imeis = list(qs.values_list("imei", flat=True).order_by("imei"))
-    
-    return JsonResponse({
-        "ok": True,
-        "imeis": imeis,
-        "count": len(imeis),
-    })
+
+    return JsonResponse(
+        {
+            "ok": True,
+            "imeis": imeis,
+            "count": len(imeis),
+        }
+    )
 
 
 # =============================================================================
@@ -160,45 +185,94 @@ def phone_available_imeis(request: HttpRequest, product_id: int) -> JsonResponse
 @never_cache
 @login_required
 @require_business
+@require_role(["Manager", "Admin", "Agent"])
 @require_http_methods(["GET", "POST"])
 @transaction.atomic
 def phone_scan_in(request: HttpRequest) -> HttpResponse:
     """
     Gamified scan-in page for PHONES vertical.
-    
+
     Shows brand cards (ITEL, TECNO, SAMSUNG) → model dropdown → IMEI → submit.
     Displays daily scan target progress bar at top.
+    
+    For non-PHONES businesses (e.g., hardware), renders the generic scan_in template
+    directly to avoid redirect loops.
     """
     business = get_active_business(request)
     if not business:
         messages.error(request, "No active business selected.")
         return redirect("inventory:inventory_dashboard")
-    
-    # Only for PHONES businesses
+
+    # Non-PHONES businesses: render generic scan-in directly (no redirect to avoid loops)
     if getattr(business, "business_kind", None) != BusinessKind.PHONES:
-        # Redirect to generic scan-in
-        return redirect("inventory:scan_in")
-    
+        # Use ScanInView's get_context_data to build context, then render template
+        from inventory.views_scan import (
+            _query_products, _query_locations, 
+            _pick_default_location
+        )
+        from inventory.models import Location
+        from django.urls import reverse_lazy
+        
+        # Resolve location for user (same as in phone_scan_in flow)
+        location_id = resolve_location_for_user(request)
+        location = None
+        if location_id:
+            try:
+                location = Location.objects.get(pk=location_id, business=business)
+            except Location.DoesNotExist:
+                pass
+        
+        # If no location found, ensure a default location exists
+        if not location:
+            location = Location.ensure_default_for_business(business)
+        
+        # Build context manually (same as ScanInView.get_context_data)
+        products = _query_products(request)
+        locations = _query_locations(request)
+        default_loc_id, default_loc_name = _pick_default_location(request, locations)
+        
+        # Always provide a dict with id/name keys to avoid template lookup errors
+        default_location_dict = {
+            "id": default_loc_id or (location.id if location else ""),
+            "name": default_loc_name or (location.name if location else ""),
+        }
+        
+        context = {
+            "post_url": reverse_lazy("inventory:api_scan_in"),
+            "products": products,
+            "locations": locations,
+            "default_location": default_location_dict,
+            "default_location_id": default_location_dict["id"],
+            "default_location_name": default_location_dict["name"],
+            "active_business_name": getattr(business, "name", None),
+            "business": business,
+            "location": location,
+            "lock_location": True,
+            "received_date_default": date.today(),
+            "phone_brands": [],
+            "rules": {
+                "imei_length": 15,
+                "require_product": True,
+                "order_price_autofill": True,
+            },
+        }
+        return render(request, "inventory/scan_in.html", context)
+
     location_id = resolve_location_for_user(request)
-    
+
     # Get the actual Location object (required for creating InventoryItem)
+    from inventory.models import Location
     location = None
     if location_id:
         try:
-            from inventory.models import Location
             location = Location.objects.get(pk=location_id, business=business)
         except Location.DoesNotExist:
             pass
-    
-    # If no location found, use business default
+
+    # If no location found, ensure a default location exists (creates one if needed)
     if not location:
-        from inventory.models import Location
-        location = Location.default_for(business)
-    
-    if not location:
-        messages.error(request, "No location available for this business.")
-        return redirect("inventory:inventory_dashboard")
-    
+        location = Location.ensure_default_for_business(business)
+
     # --- Gamification stats: today's scans (role-based) ---
     today = date.today()
     base_qs = InventoryItem.objects.filter(
@@ -206,7 +280,7 @@ def phone_scan_in(request: HttpRequest) -> HttpResponse:
         received_at=today,
         is_active=True,
     )
-    
+
     # Role-based scoping for stats
     if is_manager(request.user):
         # Managers see all scans for the business (across all locations)
@@ -216,49 +290,93 @@ def phone_scan_in(request: HttpRequest) -> HttpResponse:
         scanned_today = base_qs.filter(
             assigned_agent=request.user,
         ).count()
-        
+
         # Further restrict to location if available
         if location:
             scanned_today = base_qs.filter(
                 assigned_agent=request.user,
                 current_location=location,
             ).count()
-    
+
     # Daily target (could be made configurable per business later)
     daily_target = 50
     progress_pct = min(100, int(scanned_today * 100 / daily_target)) if daily_target else 0
-    
+
     # --- GET: Render UI ---
     if request.method == "GET":
-        # Get brands available in this business's catalog
-        available_brands = get_brands_for_business(business)
-        
+        # Get brands available in this business's catalog (safe: returns [] if empty)
+        try:
+            available_brands = get_brands_for_business(business)
+        except Exception:
+            available_brands = []
+
         # Filter PHONE_BRANDS to only those available
         brands_with_data = [
-            b for b in PHONE_BRANDS
-            if b["name"] in available_brands or b["key"].upper() in available_brands
+            b for b in PHONE_BRANDS if b["name"] in available_brands or b["key"].upper() in available_brands
         ]
-        
+
+        # DEFENSIVE: If no brands seeded, show empty state (fallback to all brand cards for UI)
+        # Template must handle empty catalog gracefully with "No models/products yet" message
         context = {
-            "brands": brands_with_data or PHONE_BRANDS,  # fallback to all if none seeded
+            "brands": brands_with_data or PHONE_BRANDS,  # fallback to all brand cards for UI
+            "has_catalog": len(available_brands) > 0,  # Flag for template to show empty state
             "scanned_today": scanned_today,
             "daily_target": daily_target,
             "progress_pct": progress_pct,
             "business": business,
             "location": location,
+            "active_tab": "scan_in",  # For base.html bottom nav highlighting
         }
+        # Category selector when accessed from unified scan-in (Phones/Laptops/Desktops)
+        if getattr(request, "_show_electronics_category_selector", False):
+            context["show_category_selector"] = True
+            context["scan_in_url"] = getattr(request, "_electronics_scan_in_url", reverse("inventory:scan_in"))
         return render(request, "inventory/phones_scan_in.html", context)
-    
+
     # --- POST: Process scan-in ---
     brand_key = request.POST.get("brand", "").strip()
     catalog_id = request.POST.get("catalog_product_id", "").strip()
     imei = request.POST.get("imei", "").strip()
-    
+
+    # NEW: Barcode workflow
+    has_barcode = request.POST.get("has_barcode", "no").strip()
+    barcode_value = request.POST.get("barcode", "").strip()
+
     # Basic validation
     if not (brand_key and catalog_id and imei):
         messages.error(request, "Please select a brand, model, and enter IMEI.")
         return redirect("inventory:phone_scan_in")
-    
+
+    # NEW: Barcode validation (conditional)
+    if has_barcode == "yes":
+        if not barcode_value:
+            messages.error(request, "Barcode is required when 'Has Barcode' is Yes.")
+            return redirect("inventory:phone_scan_in")
+
+        from inventory.utils_barcodes import validate_barcode, normalize_barcode, find_by_barcode
+
+        is_valid, error_msg = validate_barcode(barcode_value)
+        if not is_valid:
+            messages.error(request, f"Invalid barcode: {error_msg}")
+            return redirect("inventory:phone_scan_in")
+
+        barcode_value = normalize_barcode(barcode_value)
+
+        # Check for duplicate barcode in this business (prevent two different products sharing same barcode)
+        existing_products = find_by_barcode(barcode_value, business=business)
+        if existing_products.exists():
+            # Check if it's a different product (not the one we're about to create)
+            # For phones, we check by brand+model+variant
+            for existing_prod in existing_products:
+                # If barcode already used by a different product, reject
+                # (We'll allow same product to have same barcode, but not different products)
+                messages.error(
+                    request,
+                    f"Barcode {barcode_value} is already used by another product in your business. "
+                    "Each barcode must be unique.",
+                )
+                return redirect("inventory:phone_scan_in")
+
     # Security: Ensure the catalog product belongs to THIS business (prevent cross-business attacks)
     try:
         catalog_product_check = PhoneProductCatalog.objects.get(
@@ -269,46 +387,54 @@ def phone_scan_in(request: HttpRequest) -> HttpResponse:
     except (ValueError, PhoneProductCatalog.DoesNotExist):
         messages.error(request, "Invalid phone model selected or product not found in your business.")
         return redirect("inventory:phone_scan_in")
-    
+
     # Normalize IMEI: digits only, last 15 chars
     imei_clean = "".join(ch for ch in imei if ch.isdigit())
     if len(imei_clean) >= 15:
         imei_clean = imei_clean[-15:]
-    
+
     if len(imei_clean) != 15:
         messages.error(request, f"IMEI must be exactly 15 digits. Got {len(imei_clean)} digits.")
         return redirect("inventory:phone_scan_in")
-    
+
     # Check duplicate IMEI in this business
     existing = InventoryItem.objects.filter(business=business, imei=imei_clean).first()
     if existing:
         messages.error(
-            request,
-            f"IMEI {imei_clean} already exists in your inventory. "
-            "We never stock the same device twice."
+            request, f"IMEI {imei_clean} already exists in your inventory. " "We never stock the same device twice."
         )
         return redirect("inventory:phone_scan_in")
-    
+
     # Resolve catalog product (already validated above for security)
     catalog_product = catalog_product_check
-    
+
     # Use default cost price from catalog (or 0)
     order_price = catalog_product.default_cost_price or Decimal("0.00")
-    
+
     # Get or create a Product entry for this catalog item (required by InventoryItem)
     from inventory.models import Product
+
     product, _ = Product.objects.get_or_create(
         brand=catalog_product.brand,
         model=catalog_product.model_name,
         variant=catalog_product.variant_label,
         defaults={
-            "code": f"{catalog_product.brand}-{catalog_product.model_name}-{catalog_product.variant_label}".replace(" ", "-"),
+            "code": f"{catalog_product.brand}-{catalog_product.model_name}-{catalog_product.variant_label}".replace(
+                " ", "-"
+            ),
             "name": catalog_product.display_name,
             "cost_price": catalog_product.default_cost_price or Decimal("0.00"),
             "sale_price": catalog_product.default_selling_price or Decimal("0.00"),
-        }
+        },
     )
-    
+
+    # NEW: Store barcode on product if provided
+    if has_barcode == "yes" and barcode_value:
+        from inventory.utils_barcodes import set_barcode
+
+        set_barcode(product, barcode_value)
+        product.save()
+
     # Create inventory item
     try:
         item = InventoryItem.objects.create(
@@ -323,16 +449,16 @@ def phone_scan_in(request: HttpRequest) -> HttpResponse:
             sold_at=None,
             assigned_agent=request.user if not request.user.is_staff else None,
         )
-        
+
         # Success message with gamification
         messages.success(
             request,
             f"✅ {catalog_product.display_name} (IMEI: {imei_clean}) added to stock! "
-            f"Scanned {scanned_today + 1} today. Keep going!"
+            f"Scanned {scanned_today + 1} today. Keep going!",
         )
-        
+
         return redirect("inventory:phone_scan_in")
-        
+
     except Exception as e:
         messages.error(request, f"Failed to add phone to inventory: {str(e)}")
         return redirect("inventory:phone_scan_in")
@@ -344,12 +470,13 @@ def phone_scan_in(request: HttpRequest) -> HttpResponse:
 @never_cache
 @login_required
 @require_business
+@require_role(["Manager", "Admin", "Agent"])
 @require_http_methods(["GET", "POST"])
 @transaction.atomic
 def phone_scan_sell(request: HttpRequest) -> HttpResponse:
     """
     Gamified scan-sell page for PHONES vertical.
-    
+
     Shows brand cards → in-stock models dropdown → IMEI → selling price → submit.
     Displays daily sales target progress bar and premium success screen with profit.
     """
@@ -357,43 +484,38 @@ def phone_scan_sell(request: HttpRequest) -> HttpResponse:
     if not business:
         messages.error(request, "No active business selected.")
         return redirect("inventory:inventory_dashboard")
-    
+
     # Only for PHONES businesses
     if getattr(business, "business_kind", None) != BusinessKind.PHONES:
         # Redirect to generic scan-sold
         return redirect("inventory:scan_sold")
-    
+
     location_id = resolve_location_for_user(request)
-    
+
     # Get the actual Location object (required for querying InventoryItem)
+    from inventory.models import Location
     location = None
     if location_id:
         try:
-            from inventory.models import Location
             location = Location.objects.get(pk=location_id, business=business)
         except Location.DoesNotExist:
             pass
-    
-    # If no location found, use business default
+
+    # If no location found, ensure a default location exists (creates one if needed)
     if not location:
-        from inventory.models import Location
-        location = Location.default_for(business)
-    
-    if not location:
-        messages.error(request, "No location available for this business.")
-        return redirect("inventory:inventory_dashboard")
-    
+        location = Location.ensure_default_for_business(business)
+
     # --- Gamification stats: today's sales ---
     today = date.today()
     today_start = timezone.make_aware(timezone.datetime.combine(today, timezone.datetime.min.time()))
     today_end = timezone.make_aware(timezone.datetime.combine(today, timezone.datetime.max.time()))
-    
+
     sold_today = InventoryItem.objects.filter(
         business=business,
         status="SOLD",
         sold_at__range=(today_start, today_end),
     ).count()
-    
+
     # Filter by location if available
     if location:
         sold_today = InventoryItem.objects.filter(
@@ -402,22 +524,21 @@ def phone_scan_sell(request: HttpRequest) -> HttpResponse:
             status="SOLD",
             sold_at__range=(today_start, today_end),
         ).count()
-    
+
     # Daily sales target
     daily_sales_target = 30
     sales_progress_pct = min(100, int(sold_today * 100 / daily_sales_target)) if daily_sales_target else 0
-    
+
     # --- GET: Render UI ---
     if request.method == "GET":
         # Get brands available in this business's catalog
         available_brands = get_brands_for_business(business)
-        
+
         # Filter PHONE_BRANDS to only those available
         brands_with_data = [
-            b for b in PHONE_BRANDS
-            if b["name"] in available_brands or b["key"].upper() in available_brands
+            b for b in PHONE_BRANDS if b["name"] in available_brands or b["key"].upper() in available_brands
         ]
-        
+
         context = {
             "brands": brands_with_data or PHONE_BRANDS,
             "sold_today": sold_today,
@@ -425,85 +546,113 @@ def phone_scan_sell(request: HttpRequest) -> HttpResponse:
             "sales_progress_pct": sales_progress_pct,
             "business": business,
             "location": location,
+            "active_tab": "sell",  # For base.html bottom nav highlighting
         }
+        # Category selector when accessed from unified scan-sell
+        if getattr(request, "_show_electronics_category_selector", False):
+            context["show_category_selector"] = True
+            context["scan_sell_url"] = getattr(request, "_electronics_scan_sell_url", reverse("inventory:scan_sell"))
+        # Apply SSOT defaults to prevent KeyError failures
+        from reports.services.context_defaults import apply_default_report_context
+        context = apply_default_report_context(context)
         return render(request, "inventory/phones_scan_sell.html", context)
-    
+
     # --- POST: Process sale ---
     brand_key = request.POST.get("brand", "").strip()
     imei = request.POST.get("imei", "").strip()
     selling_price_raw = request.POST.get("selling_price", "").strip()
     payment_method = request.POST.get("payment_method", "CASH").strip()
-    
+
     # Basic validation
     if not (brand_key and imei and selling_price_raw):
         messages.error(request, "Please select a brand, enter IMEI, and selling price.")
         return redirect("inventory:phone_scan_sell")
-    
+
     # Normalize IMEI
     imei_clean = "".join(ch for ch in imei if ch.isdigit())
     if len(imei_clean) >= 15:
         imei_clean = imei_clean[-15:]
-    
+
     if len(imei_clean) != 15:
         messages.error(request, f"IMEI must be exactly 15 digits. Got {len(imei_clean)} digits.")
         return redirect("inventory:phone_scan_sell")
-    
-    # Find in-stock item
+
+    # Find in-stock item (AGENTS CAN SELL ANY UNSOLD PHONE IN BUSINESS)
+    # No longer filter by assigned_agent - allow agents to sell any business stock
     item_qs = InventoryItem.objects.filter(
         business=business,
         imei=imei_clean,
         status="IN_STOCK",
         is_active=True,
     )
-    
+
     if location:
         item_qs = item_qs.filter(current_location=location)
-    
-    item = item_qs.first()
-    
+
+    # Use select_for_update to prevent race conditions (double-sell)
+    item = item_qs.select_for_update().first()
+
     if not item:
         messages.error(
-            request,
-            f"IMEI {imei_clean} not found in stock. "
-            "Please scan in the phone first or check the IMEI."
+            request, f"IMEI {imei_clean} not found in stock. " "Please scan in the phone first or check the IMEI."
         )
         return redirect("inventory:phone_scan_sell")
-    
+
     # Parse selling price
+    from inventory.utils_pricing import parse_currency_input, validate_selling_price, validate_phone_selling_price
+
     try:
-        selling_price = Decimal(selling_price_raw)
+        selling_price = parse_currency_input(selling_price_raw)
         if selling_price <= 0:
             raise ValueError("Selling price must be positive")
     except (ValueError, Decimal.InvalidOperation):
         messages.error(request, f"Invalid selling price: {selling_price_raw}")
         return redirect("inventory:phone_scan_sell")
-    
-    # Calculate profit
+
+    # PHONE PRICE VALIDATION: Block suspiciously low prices
+    is_valid, error_msg, suggested_price = validate_phone_selling_price(selling_price, is_blocking=True)
+    if not is_valid:
+        messages.error(request, error_msg)
+        if suggested_price:
+            # Store suggestion in session for potential UI enhancement
+            request.session["price_suggestion"] = float(suggested_price)
+        return redirect("inventory:phone_scan_sell")
+
+    # Calculate profit and validate pricing intelligence
     cost = item.order_price or Decimal("0.00")
     profit = selling_price - cost
-    
-    # Mark as sold
+
+    # PRICING INTELLIGENCE: Validate and warn
+    validation = validate_selling_price(
+        selling_price=selling_price, cost_price=cost, product_name=item.product.name if item.product else "Phone"
+    )
+
+    # Log warnings but don't block (assistive, not policing)
+    if validation["warnings"]:
+        for warning in validation["warnings"]:
+            messages.warning(request, warning)
+
+    # Mark as sold and track who sold it (for commission attribution)
     try:
         item.status = "SOLD"
         item.selling_price = selling_price
         item.sold_at = timezone.now()
         item.payment_method = payment_method
-        item.save(update_fields=["status", "selling_price", "sold_at", "payment_method", "updated_at"])
-        
+        item.sold_by = request.user  # Track selling agent for commission
+        item.save(update_fields=["status", "selling_price", "sold_at", "payment_method", "sold_by", "updated_at"])
+
         # Premium success message with profit
         sales_left = max(0, daily_sales_target - (sold_today + 1))
         profit_msg = f"💰 Profit: MK {profit:,.0f}" if profit > 0 else ""
         target_msg = f"🎯 {sales_left} sales away from today's target!" if sales_left > 0 else "🎉 Target reached!"
-        
+
         messages.success(
-            request,
-            f"✅ Sold! {item.product or 'Phone'} (IMEI: {imei_clean}) · "
-            f"{profit_msg} · {target_msg}"
+            request, f"✅ Sold! {item.product or 'Phone'} (IMEI: {imei_clean}) · " f"{profit_msg} · {target_msg}"
         )
-        
-        return redirect("inventory:phone_scan_sell")
-        
+
+        # FIXED: Redirect to phones dashboard (not scan-sell page)
+        return redirect("inventory_verticals:phones_dashboard")
+
     except Exception as e:
         messages.error(request, f"Failed to record sale: {str(e)}")
         return redirect("inventory:phone_scan_sell")
-

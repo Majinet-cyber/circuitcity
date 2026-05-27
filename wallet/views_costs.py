@@ -22,6 +22,7 @@ from .services_costs import (
     add_business_cost,
     get_cost_breakdown_by_category
 )
+from .utils_costs import ensure_monthly_recurring_costs
 
 try:
     from tenants.utils import get_active_business
@@ -90,29 +91,78 @@ def admin_cost_list(request: HttpRequest) -> HttpResponse:
         messages.error(request, "Manager access required")
         return redirect("wallet:admin_home")
     
+    # Ensure recurring costs are created for current month (idempotent)
+    try:
+        from datetime import date
+        today = timezone.now().date()
+        month_start = date(today.year, today.month, 1)
+        ensure_monthly_recurring_costs(business, month_start)
+    except Exception as e:
+        # Don't break the page if auto-creation fails, just log it
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.warning(f"Failed to auto-create recurring costs: {e}")
+    
     # Get period from query params (default to current month)
     period = request.GET.get('period', 'month')
     
     # Get cost summary for the period
     cost_summary = get_business_costs_for_period(business, period=period)
     
-    # Get detailed breakdown
+    # Get detailed breakdown with defensive handling
     breakdown = get_cost_breakdown_by_category(
         business,
         cost_summary['period_start'],
         cost_summary['period_end']
     )
+    # Defensive: ensure breakdown has expected keys
+    breakdown = breakdown or {}
+    
+    # Get all costs as WalletTransaction objects for templates that expect direct model access
+    # Defensive: use .none() if no business (though we already checked above)
+    if business:
+        all_costs_qs = WalletTransaction.objects.filter(
+            business=business,
+            ledger=Ledger.COMPANY,
+            type__in=[TxnType.COST_ONCE_OFF, TxnType.COST_RECURRING]
+        ).order_by('-created_at')
+    else:
+        all_costs_qs = WalletTransaction.objects.none()
+    
+    # Get subscription safely (may not exist)
+    subscription = None
+    try:
+        subscription = business.subscription
+    except Exception:
+        subscription = None
+    
+    # Get membership safely (may not exist)
+    membership = None
+    try:
+        from tenants.models import Membership
+        membership = Membership.objects.filter(
+            user=request.user,
+            business=business,
+            status='ACTIVE'
+        ).first()
+    except Exception:
+        membership = None
     
     context = {
         'business': business,
         'period': period,
         'cost_summary': cost_summary,
-        'fixed_costs': breakdown['fixed'],
-        'variable_costs': breakdown['variable'],
-        'fixed_total': breakdown['fixed_total'],
-        'variable_total': breakdown['variable_total'],
+        'fixed_costs': breakdown.get('fixed') or [],
+        'variable_costs': breakdown.get('variable') or [],
+        'fixed_total': breakdown.get('fixed_total') or Decimal('0'),
+        'variable_total': breakdown.get('variable_total') or Decimal('0'),
+        'costs': all_costs_qs,  # For templates that expect a 'costs' variable
+        'show_search': False,  # Don't show global search bar on this page
+        'subscription': subscription,  # Safe default for base template
+        'membership': membership,  # Safe default for base template
     }
     
+    # Explicitly render the app-specific template to avoid ambiguity
     return render(request, 'wallet/admin_costs.html', context)
 
 

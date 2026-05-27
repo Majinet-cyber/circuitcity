@@ -15,9 +15,7 @@ def normalize_code(raw: str) -> str:
     return "".join(ch for ch in (raw or "").strip() if ch.isdigit())[:15]
 
 
-def find_unsold_unit(
-    *, business_id: int, code: str
-) -> Tuple[Optional[InventoryItem], Optional[int]]:
+def find_unsold_unit(*, business_id: int, code: str) -> Tuple[Optional[InventoryItem], Optional[int]]:
     """
     Find an UNSOLD unit for this business, regardless of location.
     Returns (item, location_id_if_found)
@@ -26,10 +24,7 @@ def find_unsold_unit(
     if not code:
         return None, None
 
-    qs = (InventoryItem.objects
-          .select_related("location")
-          .filter(business_id=business_id, code=code)
-          .order_by("id"))
+    qs = InventoryItem.objects.select_related("location").filter(business_id=business_id, code=code).order_by("id")
 
     # Prefer truly unsold rows
     item = qs.filter(sold_at__isnull=True).first()
@@ -73,15 +68,17 @@ def mark_as_sold_anywhere(
     if hasattr(item, "status"):
         item.status = "SOLD"
     item.sold_at = sold_at
-    item.save(update_fields=[
-        *(["original_location_id"] if hasattr(item, "original_location_id") else []),
-        *(["sold_location_id"] if hasattr(item, "sold_location_id") else []),
-        *(["sold_by_id"] if hasattr(item, "sold_by_id") else []),
-        *(["selling_price"] if hasattr(item, "selling_price") else []),
-        *(["status"] if hasattr(item, "status") else []),
-        "sold_at",
-        # always update updated_at if you have it via auto_now; no need to list
-    ])
+    item.save(
+        update_fields=[
+            *(["original_location_id"] if hasattr(item, "original_location_id") else []),
+            *(["sold_location_id"] if hasattr(item, "sold_location_id") else []),
+            *(["sold_by_id"] if hasattr(item, "sold_by_id") else []),
+            *(["selling_price"] if hasattr(item, "selling_price") else []),
+            *(["status"] if hasattr(item, "status") else []),
+            "sold_at",
+            # always update updated_at if you have it via auto_now; no need to list
+        ]
+    )
 
     return {
         "ok": True,
@@ -91,9 +88,3 @@ def mark_as_sold_anywhere(
         "sold_location_id": sold_location_id,
         "sold_at": sold_at.isoformat(),
     }
-
-
-
-
-
-

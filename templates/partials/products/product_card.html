@@ -1,0 +1,207 @@
+{% comment %}
+Premium Product Card Partial
+Usage:
+  {% include "partials/products/product_card.html" with product=product vertical="liquor" %}
+
+Required context:
+  - product: Product object with fields like name, category, etc.
+  - vertical: String identifier (liquor/pharmacy/clothing/phones/gym)
+
+Optional context:
+  - show_prices: Boolean (default True)
+  - show_stock: Boolean (default False)
+  - show_expiry: Boolean (default False) - for pharmacy
+  - show_health_score: Boolean (default False) - for pharmacy gamification
+  - show_actions: Boolean (default True)
+  - edit_url: URL for edit action
+  - delete_url: URL for delete action
+  - view_url: URL for view action
+{% endcomment %}
+
+{% load humanize math_extras %}
+
+{% with show_prices=show_prices|default:True %}
+{% with show_stock=show_stock|default:False %}
+{% with show_expiry=show_expiry|default:False %}
+{% with show_health_score=show_health_score|default:False %}
+{% with show_actions=show_actions|default:True %}
+
+<article class="premium-product-card" data-vertical="{{ vertical|default:'generic' }}">
+  <div class="premium-card-header">
+    <div style="min-width: 0; flex: 1;">
+      <h3 class="premium-card-title" title="{{ product.name|default:product.liquor_name|default:product.product_name|default:'Unnamed Product' }}">
+        {{ product.name|default:product.liquor_name|default:product.product_name|default:"Unnamed Product" }}
+      </h3>
+      
+      {% if product.variant_label or product.model_number or product.sku %}
+      <p class="premium-card-subtitle" title="{{ product.variant_label|default:product.model_number|default:product.sku }}">
+        {{ product.variant_label|default:product.model_number|default:product.sku }}
+      </p>
+      {% endif %}
+    </div>
+    
+    {% if product.category %}
+    <span class="premium-badge premium-badge-{{ product.category|lower|default:'category' }}" title="{{ product.get_category_display|default:product.category }}">
+      {{ product.get_category_display|default:product.category }}
+    </span>
+    {% endif %}
+  </div>
+
+  {% comment %}Price section{% endcomment %}
+  {% if show_prices %}
+  <div class="premium-price-row">
+    {% if product.cost_price or product.cost_per_bottle or product.order_price or product.default_cost_price %}
+    <div class="premium-price-item">
+      <span class="premium-price-label">Cost</span>
+      <span class="premium-price-value cost" title="MK {{ product.cost_price|default:product.cost_per_bottle|default:product.order_price|default:product.default_cost_price|floatformat:0|intcomma }}">
+        MK {{ product.cost_price|default:product.cost_per_bottle|default:product.order_price|default:product.default_cost_price|floatformat:0|intcomma }}
+      </span>
+    </div>
+    {% endif %}
+    
+    {% if product.selling_price or product.price_per_bottle or product.price_bottle or product.default_selling_price %}
+    <div class="premium-price-item">
+      <span class="premium-price-label">Selling</span>
+      <span class="premium-price-value selling" title="MK {{ product.selling_price|default:product.price_per_bottle|default:product.price_bottle|default:product.default_selling_price|floatformat:0|intcomma }}">
+        MK {{ product.selling_price|default:product.price_per_bottle|default:product.price_bottle|default:product.default_selling_price|floatformat:0|intcomma }}
+      </span>
+    </div>
+    {% endif %}
+    
+    {% if product.price_per_shot or product.price_shot %}
+    {% if product.has_shots %}
+    <div class="premium-price-item">
+      <span class="premium-price-label">Per Shot</span>
+      <span class="premium-price-value" title="MK {{ product.price_per_shot|default:product.price_shot|floatformat:0|intcomma }}">
+        MK {{ product.price_per_shot|default:product.price_shot|floatformat:0|intcomma }}
+      </span>
+    </div>
+    {% endif %}
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% comment %}Stock level bar (gamified){% endcomment %}
+  {% if show_stock and product.quantity is not None %}
+  {% with reorder=product.reorder_level|default:10 %}
+  {% with pct=product.quantity|add:0|floatformat:0|add:0|mul:100|div:reorder|default:100 %}
+  <div class="premium-stock-bar" title="Stock: {{ product.quantity }} / Target: {{ reorder }}">
+    <div class="premium-stock-fill {% if pct < 30 %}critical{% elif pct < 60 %}low{% elif pct >= 90 %}excellent{% endif %}" 
+         style="width: {% if pct > 100 %}100{% else %}{{ pct }}{% endif %}%;">
+      {{ product.quantity }} units
+    </div>
+  </div>
+  {% endwith %}
+  {% endwith %}
+  {% endif %}
+
+  {% comment %}Expiry countdown (pharmacy){% endcomment %}
+  {% if show_expiry and product.expiry_date %}
+  {% with days=product.days_to_expiry|default:999 %}
+  <div class="premium-expiry-chip {% if days < 0 %}danger{% elif days <= 30 %}warning{% else %}healthy{% endif %}" title="Expires: {{ product.expiry_date|date:'Y-m-d' }}">
+    {% if days < 0 %}
+      ⚠️ Expired
+    {% elif days == 0 %}
+      ⚠️ Expires today
+    {% elif days <= 30 %}
+      ⏳ Expires in {{ days }} day{{ days|pluralize }}
+    {% else %}
+      ✅ Expires: {{ product.expiry_date|date:"M d, Y" }}
+    {% endif %}
+  </div>
+  {% endwith %}
+  {% elif show_expiry %}
+  <div class="premium-expiry-chip none">
+    No expiry date
+  </div>
+  {% endif %}
+
+  {% comment %}Health Score (gamified for pharmacy){% endcomment %}
+  {% if show_health_score %}
+  {% with stock_score=product.quantity|default:0|mul:50|div:product.reorder_level|default:10 %}
+  {% with expiry_score=product.days_to_expiry|default:365|mul:50|div:365 %}
+  {% with health=stock_score|add:expiry_score|floatformat:0 %}
+  <div class="premium-health-score" title="Based on stock level and expiry status">
+    <span class="premium-health-icon">{% if health >= 80 %}💚{% elif health >= 60 %}💛{% else %}🔴{% endif %}</span>
+    <span class="premium-health-label">Health Score</span>
+    <span class="premium-health-value">{{ health|default:50 }}</span>
+  </div>
+  {% endwith %}
+  {% endwith %}
+  {% endwith %}
+  {% endif %}
+
+  {% comment %}Status indicators{% endcomment %}
+  {% if product.is_low_stock or product.is_expired or product.is_near_expiry %}
+  <div class="premium-status-row">
+    {% if product.is_low_stock %}
+    <span class="premium-status-icon warning" title="Low stock">⚠️</span>
+    {% endif %}
+    {% if product.is_near_expiry %}
+    <span class="premium-status-icon warning" title="Near expiry">⏳</span>
+    {% endif %}
+    {% if product.is_expired %}
+    <span class="premium-status-icon danger" title="Expired">❌</span>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% comment %}Additional metadata{% endcomment %}
+  {% if product.supplier or product.batch_number or product.shots_per_bottle %}
+  <div style="margin-top: 12px; font-size: 0.8125rem; color: #64748b;">
+    {% if product.supplier %}
+      <div>Supplier: <strong>{{ product.supplier }}</strong></div>
+    {% endif %}
+    {% if product.batch_number %}
+      <div>Batch: <code style="background: #f1f5f9; padding: 2px 6px; border-radius: 4px;">{{ product.batch_number }}</code></div>
+    {% endif %}
+    {% if product.has_shots and product.shots_per_bottle %}
+      <div style="margin-top: 6px;">
+        <span class="premium-badge" style="background: #dcfce7; color: #166534; border-color: #bbf7d0;">
+          🥃 {{ product.sellable_shots_per_bottle|default:product.shots_per_bottle }} shots/bottle
+        </span>
+      </div>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% comment %}Card actions{% endcomment %}
+  {% if show_actions %}
+  <div class="premium-card-actions">
+    {% if view_url %}
+    <a href="{{ view_url }}" class="premium-btn premium-btn-primary" aria-label="View {{ product.name }}">
+      <i class="bi bi-eye"></i> View
+    </a>
+    {% endif %}
+    
+    {% if edit_url %}
+    <a href="{{ edit_url }}" class="premium-btn premium-btn-secondary" aria-label="Edit {{ product.name }}">
+      <i class="bi bi-pencil"></i> Edit
+    </a>
+    {% endif %}
+    
+    {% if use_in_sale_url %}
+    <a href="{{ use_in_sale_url }}" class="premium-btn premium-btn-success" aria-label="Use in sale">
+      <i class="bi bi-cart-plus"></i> Use in Sale
+    </a>
+    {% endif %}
+    
+    {% if delete_url %}
+    <form method="post" action="{{ delete_url }}" style="display: inline;" 
+          onsubmit="return confirm('Archive this product? You can restore it later.')">
+      {% csrf_token %}
+      <button type="submit" class="premium-btn premium-btn-danger" aria-label="Archive {{ product.name }}">
+        <i class="bi bi-archive"></i> Archive
+      </button>
+    </form>
+    {% endif %}
+  </div>
+  {% endif %}
+</article>
+
+{% endwith %}
+{% endwith %}
+{% endwith %}
+{% endwith %}
+{% endwith %}
+

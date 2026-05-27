@@ -1,0 +1,332 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Butchery Reports · {{ business.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+.rpt-wrap { max-width: 1100px; margin: 0 auto; padding: 16px 14px; }
+
+/* Period bar */
+.period-bar {
+  background: #fff; border: 1px solid #e2e8f0; border-radius: 12px;
+  padding: 10px 14px; display: flex; align-items: center; gap: 8px;
+  flex-wrap: wrap; margin-bottom: 18px; box-shadow: 0 1px 3px rgba(15,23,42,.04);
+}
+.period-btn {
+  padding: 6px 14px; border-radius: 8px; font-size: .78rem; font-weight: 700;
+  text-decoration: none; border: 1px solid #e2e8f0; color: #475569; background: #f8fafc;
+  transition: all .12s ease;
+}
+.period-btn:hover { background: #f0fdf4; border-color: #86efac; color: #15803d; }
+.period-btn.active { background: #10b981; border-color: #10b981; color: #fff; }
+.period-label-pill {
+  margin-left: auto; font-size: .75rem; color: #64748b; font-weight: 600;
+  background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 4px 12px;
+}
+
+/* Custom range */
+.custom-range { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+.custom-range input[type=date] {
+  padding: 7px 10px; border: 1px solid #d1d5db; border-radius: 8px;
+  font-size: .85rem; color: #0f172a; background: #fafafa;
+}
+.range-btn {
+  padding: 7px 16px; background: #10b981; border: none; color: #fff;
+  border-radius: 8px; font-size: .85rem; font-weight: 700; cursor: pointer;
+}
+
+/* KPI row */
+.kpi-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px,1fr)); gap: 12px; margin-bottom: 22px; }
+.kpi-card {
+  background: #fff; border: 1px solid #e2e8f0; border-radius: 14px;
+  padding: 14px 16px; box-shadow: 0 1px 4px rgba(15,23,42,.05);
+}
+.kpi-card.green { border-left: 3px solid #22c55e; }
+.kpi-card.teal  { border-left: 3px solid #14b8a6; }
+.kpi-card.blue  { border-left: 3px solid #3b82f6; }
+.kpi-card.amber { border-left: 3px solid #f59e0b; }
+.kpi-card.red   { border-left: 3px solid #ef4444; }
+.kpi-label { font-size: .68rem; text-transform: uppercase; letter-spacing: .07em; color: #64748b; font-weight: 700; margin-bottom: 4px; }
+.kpi-value { font-size: 1.3rem; font-weight: 900; color: #0f172a; }
+.kpi-sub { font-size: .7rem; color: #94a3b8; margin-top: 2px; }
+
+/* Export buttons */
+.export-bar {
+  display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 22px; align-items: center;
+}
+.export-bar .exp-label { font-size: .78rem; font-weight: 700; color: #374151; }
+.btn-csv {
+  padding: 9px 20px; background: #fff; border: 1.5px solid #10b981; color: #10b981;
+  border-radius: 9px; font-size: .85rem; font-weight: 700; text-decoration: none;
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.btn-csv:hover { background: #f0fdf4; }
+.btn-pdf {
+  padding: 9px 20px; background: #f97316; border: none; color: #fff;
+  border-radius: 9px; font-size: .85rem; font-weight: 700; text-decoration: none;
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.btn-pdf:hover { background: #ea580c; }
+
+/* Section head */
+.section-head { font-size: .78rem; text-transform: uppercase; letter-spacing: .07em; font-weight: 800; color: #475569; margin: 22px 0 10px; display: flex; align-items: center; gap: 8px; }
+.section-head::before { content: ''; display: block; width: 3px; height: 13px; background: #10b981; border-radius: 2px; }
+
+/* Tables */
+.rpt-table { width: 100%; border-collapse: collapse; font-size: .83rem; }
+.rpt-table th { text-align: left; padding: 8px 10px; font-size: .7rem; text-transform: uppercase; letter-spacing: .05em; color: #64748b; border-bottom: 2px solid #e2e8f0; font-weight: 700; }
+.rpt-table td { padding: 9px 10px; border-bottom: 1px solid #f1f5f9; }
+.rpt-table tr:last-child td { border-bottom: none; }
+.rpt-table tr:hover td { background: #f8fafc; }
+
+/* Category breakdown bars */
+.cat-bar-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid #f1f5f9; }
+.cat-bar-row:last-child { border-bottom: none; }
+.cat-bar-name { font-size: .83rem; font-weight: 600; color: #0f172a; min-width: 120px; }
+.cat-bar-bg { flex: 1; background: #f1f5f9; border-radius: 99px; height: 6px; }
+.cat-bar-fill { height: 6px; background: linear-gradient(90deg, #10b981, #059669); border-radius: 99px; }
+.cat-bar-val { font-size: .78rem; font-weight: 700; color: #059669; min-width: 100px; text-align: right; }
+
+/* Daily summary table */
+.daily-tbl-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+/* Ledger status */
+.ledger-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.ledger-dot.locked { background: #22c55e; }
+.ledger-dot.draft { background: #fbbf24; }
+
+@media (max-width: 640px) {
+  .kpi-row { grid-template-columns: 1fr 1fr; }
+  .export-bar { flex-direction: column; align-items: stretch; }
+  .btn-csv, .btn-pdf { justify-content: center; }
+  .cat-bar-name { min-width: 90px; }
+  .period-label-pill { display: none; }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="rpt-wrap">
+
+  <!-- Page title -->
+  <div style="margin-bottom:18px;">
+    <h1 style="font-size:1.2rem;font-weight:900;color:#0f172a;margin:0 0 4px;">Butchery Reports</h1>
+    <p style="font-size:.83rem;color:#64748b;margin:0;">{{ period_label }}</p>
+  </div>
+
+  <!-- Period Filter -->
+  <div class="period-bar">
+    <span style="font-size:.78rem;font-weight:700;color:#475569;flex-shrink:0;">Period:</span>
+    <a href="?period=month" class="period-btn {% if period_key == 'month' %}active{% endif %}">Month</a>
+    <a href="?period=w1" class="period-btn {% if period_key == 'w1' %}active{% endif %}">Week 1</a>
+    <a href="?period=w2" class="period-btn {% if period_key == 'w2' %}active{% endif %}">Week 2</a>
+    <a href="?period=w3" class="period-btn {% if period_key == 'w3' %}active{% endif %}">Week 3</a>
+    <a href="?period=w4" class="period-btn {% if period_key == 'w4' %}active{% endif %}">Week 4</a>
+    <a href="?period=w5" class="period-btn {% if period_key == 'w5' %}active{% endif %}">Week 5</a>
+    <form method="get" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-left:8px;">
+      <span style="font-size:.76rem;font-weight:700;color:#475569;">Custom:</span>
+      <input type="date" name="from" value="{{ date_from|date:'Y-m-d' }}" style="padding:6px 8px;border:1px solid #d1d5db;border-radius:7px;font-size:.82rem;">
+      <span style="font-size:.78rem;color:#94a3b8;">to</span>
+      <input type="date" name="to" value="{{ date_to|date:'Y-m-d' }}" style="padding:6px 8px;border:1px solid #d1d5db;border-radius:7px;font-size:.82rem;">
+      <button type="submit" class="range-btn">Apply</button>
+    </form>
+    <span class="period-label-pill">{{ period_label }}</span>
+  </div>
+
+  <!-- KPI Summary -->
+  <div class="kpi-row">
+    <div class="kpi-card green">
+      <div class="kpi-label">Total Revenue</div>
+      <div class="kpi-value">MWK {{ range_revenue|floatformat:0|intcomma }}</div>
+      <div class="kpi-sub">{{ total_count }} transactions</div>
+    </div>
+    <div class="kpi-card teal">
+      <div class="kpi-label">Gross Profit</div>
+      <div class="kpi-value">MWK {{ range_profit|floatformat:0|intcomma }}</div>
+      <div class="kpi-sub">{{ margin_pct|floatformat:1 }}% margin</div>
+    </div>
+    <div class="kpi-card blue">
+      <div class="kpi-label">KG Sold</div>
+      <div class="kpi-value">{{ range_kg|floatformat:2 }} kg</div>
+      <div class="kpi-sub">By weight</div>
+    </div>
+    <div class="kpi-card amber">
+      <div class="kpi-label">Expenses</div>
+      <div class="kpi-value">MWK {{ total_expenses|floatformat:0|intcomma }}</div>
+      <div class="kpi-sub">Operating costs</div>
+    </div>
+    <div class="kpi-card {% if net_profit >= 0 %}green{% else %}red{% endif %}">
+      <div class="kpi-label">Net Profit</div>
+      <div class="kpi-value">MWK {{ net_profit|floatformat:0|intcomma }}</div>
+      <div class="kpi-sub">After expenses</div>
+    </div>
+    <div class="kpi-card teal">
+      <div class="kpi-label">Intake (kg)</div>
+      <div class="kpi-value">{{ total_intake_kg|floatformat:1 }} kg</div>
+      <div class="kpi-sub">MWK {{ total_intake_cost|floatformat:0|intcomma }} cost</div>
+    </div>
+    <div class="kpi-card blue">
+      <div class="kpi-label">Month Revenue</div>
+      <div class="kpi-value">MWK {{ month_revenue|floatformat:0|intcomma }}</div>
+      <div class="kpi-sub">MWK {{ month_profit|floatformat:0|intcomma }} profit</div>
+    </div>
+  </div>
+
+  <!-- Export Buttons -->
+  <div class="export-bar">
+    <span class="exp-label">Export:</span>
+    <a href="{% url 'butchery:reports_export_csv' %}?period={{ period_key }}&from={{ date_from|date:'Y-m-d' }}&to={{ date_to|date:'Y-m-d' }}" class="btn-csv">
+      <i class="bi bi-file-earmark-spreadsheet"></i> Download CSV
+    </a>
+    <a href="{% url 'butchery:reports_export_pdf' %}?period={{ period_key }}&from={{ date_from|date:'Y-m-d' }}&to={{ date_to|date:'Y-m-d' }}" class="btn-pdf">
+      <i class="bi bi-file-earmark-pdf"></i> Download PDF
+    </a>
+  </div>
+
+  <!-- Two-column content -->
+  <div style="display:grid;grid-template-columns:1.2fr 1fr;gap:16px;margin-bottom:22px;" class="rpt-two-col">
+
+    <!-- Top Cuts -->
+    <div style="background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:18px;box-shadow:0 1px 4px rgba(15,23,42,.05);">
+      <div class="section-head" style="margin-top:0;">Top Cuts / Products</div>
+      {% if top_cuts %}
+      <div class="daily-tbl-wrap">
+        <table class="rpt-table">
+          <thead>
+            <tr>
+              <th>Product</th>
+              <th style="text-align:right;">Revenue</th>
+              <th style="text-align:right;">Quantity</th>
+              <th style="text-align:right;">Profit</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for c in top_cuts %}
+            <tr>
+              <td>
+                <div style="font-weight:700;color:#0f172a;">{{ c.product__name }}</div>
+                <div style="font-size:.7rem;color:#94a3b8;">{{ category_map|default_if_none:""|default:"" }}
+                  {% with cat=c.product__category %}{{ category_map|default:cat }}{% endwith %}
+                </div>
+              </td>
+              <td style="text-align:right;font-weight:700;color:#059669;">MWK {{ c.revenue|floatformat:0|intcomma }}</td>
+              <td style="text-align:right;color:#64748b;">{{ c.qty|floatformat:3 }}</td>
+              <td style="text-align:right;font-weight:600;color:#475569;">MWK {{ c.profit|floatformat:0|intcomma }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div style="text-align:center;padding:32px 0;color:#94a3b8;font-size:.85rem;">
+        No sales data for this period.
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Sales by Category -->
+    <div style="background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:18px;box-shadow:0 1px 4px rgba(15,23,42,.05);">
+      <div class="section-head" style="margin-top:0;">Revenue by Category</div>
+      {% if by_category %}
+        {% for cat in by_category %}
+        {% if range_revenue > 0 %}
+        <div class="cat-bar-row">
+          <div class="cat-bar-name">{{ category_map|default:cat.product__category }}</div>
+          <div class="cat-bar-bg">
+            <div class="cat-bar-fill" style="width:{% widthratio cat.revenue range_revenue 100 %}%;"></div>
+          </div>
+          <div class="cat-bar-val">MWK {{ cat.revenue|floatformat:0|intcomma }}</div>
+        </div>
+        {% endif %}
+        {% endfor %}
+      {% else %}
+      <div style="text-align:center;padding:32px 0;color:#94a3b8;font-size:.85rem;">
+        No category data for this period.
+      </div>
+      {% endif %}
+    </div>
+
+  </div>
+
+  <!-- Daily Summary Table -->
+  {% if daily_summary %}
+  <div class="section-head">Daily Summary</div>
+  <div style="background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:18px;box-shadow:0 1px 4px rgba(15,23,42,.05);margin-bottom:22px;">
+    <div class="daily-tbl-wrap">
+      <table class="rpt-table">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th style="text-align:right;">Revenue (MWK)</th>
+            <th style="text-align:right;">Profit (MWK)</th>
+            <th style="text-align:right;">Transactions</th>
+            <th>Ledger</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in daily_summary %}
+          <tr>
+            <td style="font-weight:700;color:#0f172a;">{{ row.d|date:"D, d M Y" }}</td>
+            <td style="text-align:right;font-weight:700;color:#059669;">{{ row.revenue|floatformat:0|intcomma }}</td>
+            <td style="text-align:right;color:#475569;">{{ row.profit|floatformat:0|intcomma }}</td>
+            <td style="text-align:right;color:#64748b;">{{ row.count }}</td>
+            <td>
+              {% for lv in ledgers %}{% if lv.date == row.d %}
+              {% if lv.is_locked %}
+              <span class="ledger-dot locked"></span> Locked
+              {% else %}
+              <span class="ledger-dot draft"></span> Draft
+              {% endif %}
+              {% endif %}{% endfor %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- By Meat Type -->
+  {% if by_meat_type %}
+  <div class="section-head">Sales by Meat Type</div>
+  <div style="background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:18px;box-shadow:0 1px 4px rgba(15,23,42,.05);margin-bottom:22px;">
+    <div class="daily-tbl-wrap">
+      <table class="rpt-table">
+        <thead>
+          <tr>
+            <th>Meat Type</th>
+            <th style="text-align:right;">Revenue</th>
+            <th style="text-align:right;">Profit</th>
+            <th style="text-align:right;">Transactions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in by_meat_type %}
+          <tr>
+            <td style="font-weight:700;">{{ meat_type_map|default:row.product__meat_type }}</td>
+            <td style="text-align:right;font-weight:700;color:#059669;">MWK {{ row.revenue|floatformat:0|intcomma }}</td>
+            <td style="text-align:right;color:#475569;">MWK {{ row.profit|floatformat:0|intcomma }}</td>
+            <td style="text-align:right;color:#64748b;">{{ row.count }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Fix category display in top cuts table
+(function(){
+  var catMap = {{ category_map|safe }};
+  var mt = {{ meat_type_map|safe }};
+  // category labels are inline via Django template, no JS needed
+})();
+</script>
+{% endblock %}

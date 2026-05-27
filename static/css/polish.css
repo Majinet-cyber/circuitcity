@@ -362,3 +362,94 @@ html, body{ max-width:100%; overflow-x:hidden; }
   border-color: var(--p-border) !important;
   box-shadow: var(--p-shadow);
 }
+
+/* =====================================================
+   MOBILE-FIRST: Number overflow fixes (Android + iPhone)
+   Critical for dashboards, analytics, KPIs, reports
+   ===================================================== */
+
+/* iOS Safari consistency - prevent text size adjustments */
+html { -webkit-text-size-adjust: 100%; }
+
+/* Critical for flex/grid truncation - allows children to shrink below content size */
+.shrink-0 { min-width: 0 !important; }
+
+/* For amounts and long inline text - truncate with ellipsis */
+.truncate-1 {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* For long names when wrapping is better than truncation */
+.wrap-anywhere {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+/* Charts must fit on mobile - never overflow */
+.chart-wrap {
+  max-width: 100%;
+  overflow: hidden;
+  position: relative;
+}
+.chart-wrap canvas,
+.chart-wrap svg {
+  max-width: 100% !important;
+  height: auto !important;
+}
+
+/* Ensure KPI cards with flex rows don't overflow */
+.kpi-row,
+.metric-row,
+.stats-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  min-width: 0; /* critical for flex */
+}
+.kpi-row > *,
+.metric-row > *,
+.stats-row > * {
+  min-width: 0; /* allow shrinking */
+}
+
+/* Right-aligned values in cards (amounts, totals) */
+.value-right {
+  text-align: right;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Mobile-specific: ensure cards don't overflow viewport */
+@media (max-width: 768px) {
+  .card, .kpi, .metric-card, .recent-block {
+    min-width: 0;
+    overflow: hidden;
+  }
+  
+  /* Tighter padding on mobile */
+  .card-body, .kpi, .metric-card {
+    padding: 12px;
+  }
+  
+  /* Font size reduction for very long numbers on small screens */
+  .value-responsive {
+    font-size: clamp(1rem, 3vw, 1.5rem);
+  }
+  
+  /* Stack rows on very small screens if needed */
+  @media (max-width: 360px) {
+    .kpi-row, .metric-row {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+    .value-right {
+      text-align: left;
+    }
+  }
+}

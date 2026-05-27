@@ -1,7 +1,7 @@
 {# templates/dashboard/admin_agent_detail.html #}
 {% extends "base.html" %}
 {% load humanize %}
-{% block title %}Agent · {{ agent.get_username }} · Emajinet{% endblock %}
+{% block title %}{% if BUSINESS_VERTICAL == "gym" %}Trainer{% else %}Agent{% endif %} · {{ agent.get_username }} · Emajinet{% endblock %}
 
 {% block body %}
 <style>
@@ -40,7 +40,7 @@
 <div class="bg" style="min-height:100dvh; padding:2rem">
   <div class="card" style="max-width:1100px; margin:auto; padding:1.5rem">
     <div class="row" style="justify-content:space-between; margin-bottom:1rem">
-      <h2 class="brand" style="margin:0">Agent: {{ agent.get_username }}</h2>
+      <h2 class="brand" style="margin:0">{% if BUSINESS_VERTICAL == "gym" %}Trainer{% else %}Agent{% endif %}: {{ agent.get_username }}</h2>
       <div class="row">
         <a class="btn ghost" href="{% url 'admin_dashboard' %}">← Back to Admin</a>
       </div>

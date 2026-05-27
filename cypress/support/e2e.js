@@ -1,28 +1,43 @@
-// ***********************************************************
-// This support file is processed and loaded automatically before your test files.
-// You can read more here: https://on.cypress.io/configuration
-// ***********************************************************
+/**
+ * CircuitCity / Emajinet - Cypress E2E Support
+ * Clean Suite Reboot (Jan 2026)
+ *
+ * This file is loaded before every E2E test.
+ * Import custom commands and configure global behavior.
+ */
 
-// Import commands.js using ES2015 syntax:
+// Import custom commands
 import './commands';
 
-// Alternatively you can use CommonJS syntax:
-// require('./commands')
+// ============================================================================
+// GLOBAL CONFIGURATION
+// ============================================================================
 
-// Hide fetch/XHR logs to reduce noise
-const app = window.top;
-if (!app.document.head.querySelector('[data-hide-command-log-request]')) {
-  const style = app.document.createElement('style');
-  style.innerHTML = '.command-name-request, .command-name-xhr { display: none }';
-  style.setAttribute('data-hide-command-log-request', '');
-  app.document.head.appendChild(style);
-}
-
-// Suppress uncaught exceptions that may occur during navigation
+// Disable uncaught exception handling (prevents test failures from app errors)
 Cypress.on('uncaught:exception', (err, runnable) => {
-  // Returning false here prevents Cypress from failing the test
-  // Only use this for known, non-critical errors
+  // Log the error but don't fail the test
   console.warn('Uncaught exception:', err.message);
+
+  // Return false to prevent Cypress from failing the test
+  // We use assertNoServerError() explicitly in tests instead
   return false;
 });
 
+// ============================================================================
+// BEFORE EACH TEST
+// ============================================================================
+beforeEach(() => {
+  // NOTE: We do NOT clear cookies/localStorage here because cy.session() manages that.
+  // Clearing here would break cy.session() caching and slow down tests significantly.
+  
+  // Log the test name for debugging
+  cy.log(`🧪 Starting: ${Cypress.currentTest.title}`);
+});
+
+// ============================================================================
+// AFTER EACH TEST
+// ============================================================================
+afterEach(() => {
+  // Log test completion
+  cy.log(`✅ Completed: ${Cypress.currentTest.title}`);
+});

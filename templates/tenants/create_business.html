@@ -1,34 +1,222 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block title %}Create Business{% endblock %}
-{% block header_title %}Create Business (Manager Request){% endblock %}
-
-{% block extra_css %}
-<link rel="stylesheet" href="{% static 'tenants/tenants.css' %}">
-{% endblock %}
+{% block title %}Create Workspace{% endblock %}
+{% block header_title %}Create a New Workspace{% endblock %}
 
 {% block content %}
-<section class="tenants-wrap tenants-narrow">
-  <form method="post" class="gcard" data-anim>
-    {% csrf_token %}
-    <div class="gtitle">Business details</div>
-    <div class="gsub">This name will appear in UI and dashboards. Staff will approve before activation.</div>
+<style>
+  .cb-wrap { max-width: 580px; margin: 2rem auto; padding: 0 1rem; }
+  .cb-card {
+    background: #fff; border-radius: 20px; padding: 2rem 2rem 1.75rem;
+    box-shadow: 0 4px 32px rgba(0,0,0,.08); border: 1px solid #e2e8f0;
+  }
+  .cb-title { font-size: 1.25rem; font-weight: 800; color: #0f172a; margin-bottom: .25rem; }
+  .cb-sub { color: #64748b; font-size: .875rem; margin-bottom: 1.5rem; line-height: 1.5; }
+  .cb-label {
+    font-size: .75rem; font-weight: 700; color: #374151;
+    text-transform: uppercase; letter-spacing: .06em; margin-bottom: .5rem;
+  }
+  .cb-field { margin-bottom: 1.25rem; }
+  .cb-err { color: #ef4444; font-size: .8rem; margin-top: .3rem; }
+  .cb-actions { display: flex; gap: .75rem; margin-top: 1.75rem; }
+  .cb-btn {
+    flex: 1; padding: .7rem 1.2rem; border-radius: 12px; font-weight: 700;
+    font-size: .9rem; border: none; cursor: pointer; transition: all .15s;
+    display: flex; align-items: center; justify-content: center; gap: .4rem;
+  }
+  .cb-btn-primary { background: #10b981; color: #fff; }
+  .cb-btn-primary:hover { background: #059669; box-shadow: 0 4px 12px rgba(16,185,129,.3); }
+  .cb-btn-cancel {
+    background: #f1f5f9; color: #334155; text-decoration: none;
+    flex: 0 0 auto; padding: .7rem 1.25rem;
+  }
+  .cb-btn-cancel:hover { background: #e2e8f0; color: #0f172a; }
 
-    <div class="gfield" style="margin-top:14px" data-anim>
-      <div class="label">Business name</div>
-      {{ form.name|add_class:"ginput" }}
-      {% if form.name.errors %}<div class="badge badge-warn" style="margin-top:8px">{{ form.name.errors.0 }}</div>{% endif %}
+  /* Workspace type grid */
+  .vertical-grid {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: .5rem;
+    margin-bottom: 1.25rem;
+  }
+  .vk-item {
+    border: 1.5px solid #e2e8f0; border-radius: 12px; padding: .65rem .35rem .5rem;
+    text-align: center; cursor: pointer; transition: all .15s;
+    background: #f8fafc; position: relative; outline: none;
+  }
+  .vk-item:hover { border-color: #10b981; background: #f0fdf4; transform: translateY(-1px); }
+  .vk-item.selected {
+    border-color: #10b981; background: #f0fdf4;
+    box-shadow: 0 0 0 3px rgba(16,185,129,.15);
+  }
+  .vk-item.selected::after {
+    content: '✓'; position: absolute; top: 4px; right: 6px;
+    font-size: .6rem; font-weight: 800; color: #10b981;
+  }
+  .vk-item input[type=radio] { display: none; }
+
+  /* Icon container */
+  .vk-icon-wrap {
+    width: 36px; height: 36px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto .3rem; font-size: 1.1rem;
+    transition: transform .15s;
+  }
+  .vk-item:hover .vk-icon-wrap { transform: scale(1.05); }
+  .vk-name { font-size: .63rem; font-weight: 700; color: #374151; line-height: 1.25; }
+
+  /* Icon color themes */
+  .ic-phones     { background: #dbeafe; color: #2563eb; }
+  .ic-clothing   { background: #fef9c3; color: #ca8a04; }
+  .ic-grocery    { background: #dcfce7; color: #16a34a; }
+  .ic-liquor     { background: #fce7f3; color: #db2777; }
+  .ic-pharmacy   { background: #ede9fe; color: #7c3aed; }
+  .ic-gym        { background: #fee2e2; color: #dc2626; }
+  .ic-hardware   { background: #e0f2fe; color: #0284c7; }
+  .ic-cement     { background: #f1f5f9; color: #475569; }
+  .ic-farm       { background: #d1fae5; color: #059669; }
+  .ic-welding    { background: #fef3c7; color: #b45309; }
+  .ic-car_hire   { background: #e0e7ff; color: #4f46e5; }
+  .ic-car_dealer { background: #fdf4ff; color: #9d174d; }
+  .ic-energy     { background: #fef9c3; color: #d97706; }
+  .ic-mobile_money { background: #ecfdf5; color: #047857; }
+  .ic-mixed_retail { background: #e0f2fe; color: #0369a1; }
+  .ic-consultancy  { background: #eff6ff; color: #1d4ed8; }
+  .ic-generic    { background: #f1f5f9; color: #64748b; }
+
+  @media(max-width: 500px) {
+    .vertical-grid { grid-template-columns: repeat(3, 1fr); }
+  }
+  @media(max-width: 360px) {
+    .vertical-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>
+
+<div class="cb-wrap">
+  <form method="post" class="cb-card">
+    {% csrf_token %}
+    <div class="cb-title">
+      <i class="bi bi-plus-circle-fill me-2" style="color:#10b981"></i>New Workspace
+    </div>
+    <div class="cb-sub">
+      Your workspace is ready instantly — no approval needed.
+      Switch between workspaces anytime.
     </div>
 
-    <div class="gactions">
-      <a href="{% url 'tenants:choose_business' %}" class="gbtn">Cancel</a>
-      <button class="gbtn primary" data-anim="pop">Submit for Approval</button>
+    {% if form.non_field_errors %}
+      <div class="alert alert-danger rounded-3 mb-3">{{ form.non_field_errors }}</div>
+    {% endif %}
+
+    {# Business Name #}
+    <div class="cb-field">
+      <div class="cb-label">Business name</div>
+      <input type="text" name="name" class="form-control {% if form.name.errors %}is-invalid{% endif %}"
+             value="{{ form.name.value|default:'' }}"
+             placeholder="e.g., Sunrise Electronics Area 25" autofocus>
+      {% if form.name.errors %}
+        <div class="cb-err">{{ form.name.errors.0 }}</div>
+      {% endif %}
+    </div>
+
+    {# Business Type — icon cards #}
+    <div class="cb-field">
+      <div class="cb-label">Business type</div>
+      <input type="hidden" name="business_kind" id="business_kind_input" value="{{ form.business_kind.value|default:'' }}">
+      <div class="vertical-grid" id="verticalGrid">
+        {% for val, label in form.business_kind.field.choices %}
+          {% if val %}
+            <label class="vk-item {% if form.business_kind.value == val %}selected{% endif %}"
+                   data-kind="{{ val }}" tabindex="0" role="button" aria-label="{{ label }}">
+              <input type="radio" value="{{ val }}" {% if form.business_kind.value == val %}checked{% endif %}>
+              <div class="vk-icon-wrap
+                {% if val == 'phones' %}ic-phones
+                {% elif val == 'clothing' %}ic-clothing
+                {% elif val == 'grocery' %}ic-grocery
+                {% elif val == 'liquor' %}ic-liquor
+                {% elif val == 'pharmacy' %}ic-pharmacy
+                {% elif val == 'gym' %}ic-gym
+                {% elif val == 'hardware' %}ic-hardware
+                {% elif val == 'cement' %}ic-cement
+                {% elif val == 'farm' %}ic-farm
+                {% elif val == 'welding' %}ic-welding
+                {% elif val == 'car_hire' %}ic-car_hire
+                {% elif val == 'car_dealer' %}ic-car_dealer
+                {% elif val == 'energy' %}ic-energy
+                {% elif val == 'mobile_money' %}ic-mobile_money
+                {% elif val == 'mixed_retail' %}ic-mixed_retail
+                {% elif val == 'consultancy' %}ic-consultancy
+                {% else %}ic-generic{% endif %}">
+                <i class="bi
+                  {% if val == 'phones' %}bi-phone-fill
+                  {% elif val == 'clothing' %}bi-bag-heart-fill
+                  {% elif val == 'grocery' %}bi-basket2-fill
+                  {% elif val == 'liquor' %}bi-cup-straw
+                  {% elif val == 'pharmacy' %}bi-capsule-pill
+                  {% elif val == 'gym' %}bi-lightning-fill
+                  {% elif val == 'hardware' %}bi-hammer
+                  {% elif val == 'cement' %}bi-bricks
+                  {% elif val == 'farm' %}bi-tree-fill
+                  {% elif val == 'welding' %}bi-tools
+                  {% elif val == 'car_hire' %}bi-car-front-fill
+                  {% elif val == 'car_dealer' %}bi-car-front
+                  {% elif val == 'energy' %}bi-sun-fill
+                  {% elif val == 'mobile_money' %}bi-phone-vibrate-fill
+                  {% elif val == 'mixed_retail' %}bi-shop-window
+                  {% elif val == 'consultancy' %}bi-briefcase-fill
+                  {% else %}bi-building{% endif %}">
+                </i>
+              </div>
+              <div class="vk-name">{{ label }}</div>
+            </label>
+          {% endif %}
+        {% endfor %}
+      </div>
+      {% if form.business_kind.errors %}
+        <div class="cb-err">{{ form.business_kind.errors.0 }}</div>
+      {% endif %}
+    </div>
+
+    {# Currency #}
+    <div class="cb-field">
+      <div class="cb-label">Currency</div>
+      <select name="currency" class="form-select">
+        {% for val, label in form.currency.field.choices %}
+          <option value="{{ val }}" {% if form.currency.value == val or val == "MWK" and not form.currency.value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="cb-actions">
+      <a href="{% url 'tenants:choose_business' %}" class="cb-btn cb-btn-cancel">
+        <i class="bi bi-arrow-left"></i> Cancel
+      </a>
+      <button type="submit" class="cb-btn cb-btn-primary">
+        <i class="bi bi-plus-lg"></i> Create Workspace
+      </button>
     </div>
   </form>
-</section>
-{% endblock %}
+</div>
 
-{% block extra_js %}
-<script src="{% static 'tenants/tenants.js' %}"></script>
+<script>
+(function() {
+  var grid = document.getElementById('verticalGrid');
+  var hidden = document.getElementById('business_kind_input');
+  if (!grid || !hidden) return;
+
+  function selectItem(item) {
+    grid.querySelectorAll('.vk-item').forEach(function(i) { i.classList.remove('selected'); });
+    item.classList.add('selected');
+    hidden.value = item.dataset.kind || '';
+  }
+
+  grid.querySelectorAll('.vk-item').forEach(function(item) {
+    item.addEventListener('click', function() { selectItem(item); });
+    item.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        selectItem(item);
+      }
+    });
+  });
+})();
+</script>
 {% endblock %}

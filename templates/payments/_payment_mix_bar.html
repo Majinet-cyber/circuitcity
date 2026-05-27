@@ -1,0 +1,538 @@
+{% load static %}
+
+{# ========================================
+   PAYMENT MIX BAR - Reusable Component
+   ======================================== #}
+{% comment %}
+  Usage:
+    {%  include "payments/_payment_mix_bar.html" with total_amount=product_price  %}
+  
+  Features:
+  - Single method auto-fill OR multi-method split
+  - Mobile-first, premium UI
+  - Real-time validation (client-side)
+  - Server-side validation required on submit
+{% endcomment %}
+
+<div class="payment-mix-bar" id="paymentMixBar">
+  <h3 class="payment-mix-title">
+    <i class="bi bi-credit-card"></i>
+    Payment Method
+  </h3>
+  
+  <div class="payment-method-selector">
+    <button type="button" class="payment-method-btn active" data-method="single" id="btnSingleMethod">
+      <i class="bi bi-cash-stack"></i>
+      Single Method
+    </button>
+    <button type="button" class="payment-method-btn" data-method="multi" id="btnMultiMethod">
+      <i class="bi bi-layers"></i>
+      Payment Mix
+    </button>
+  </div>
+  
+  <!-- Single Method Selection -->
+  <div class="payment-single-panel" id="singleMethodPanel">
+    <label class="payment-label">Choose Payment Method:</label>
+    <div class="payment-options-grid">
+      <label class="payment-option">
+        <input type="radio" name="payment_method_single" value="CASH" checked>
+        <span class="payment-option-card">
+          <i class="bi bi-cash"></i>
+          <strong>Cash</strong>
+        </span>
+      </label>
+      
+      <label class="payment-option">
+        <input type="radio" name="payment_method_single" value="BANK">
+        <span class="payment-option-card">
+          <i class="bi bi-bank"></i>
+          <strong>Bank</strong>
+        </span>
+      </label>
+      
+      <label class="payment-option">
+        <input type="radio" name="payment_method_single" value="MOBILE_MONEY">
+        <span class="payment-option-card">
+          <i class="bi bi-phone"></i>
+          <strong>Mobile Money</strong>
+        </span>
+      </label>
+    </div>
+  </div>
+  
+  <!-- Multi-Method Split Panel -->
+  <div class="payment-multi-panel" id="multiMethodPanel" style="display:none;">
+    <label class="payment-label">Split payment across methods:</label>
+    
+    <div class="payment-split-inputs">
+      <div class="payment-input-group">
+        <label for="cashAmount">
+          <i class="bi bi-cash"></i> Cash (MWK)
+        </label>
+        <input type="number" 
+               id="cashAmount" 
+               name="cash_amount" 
+               class="form-control payment-amount-input" 
+               placeholder="0" 
+               min="0" 
+               step="0.01"
+               data-payment-type="cash">
+      </div>
+      
+      <div class="payment-input-group">
+        <label for="bankAmount">
+          <i class="bi bi-bank"></i> Bank (MWK)
+        </label>
+        <input type="number" 
+               id="bankAmount" 
+               name="bank_amount" 
+               class="form-control payment-amount-input" 
+               placeholder="0" 
+               min="0" 
+               step="0.01"
+               data-payment-type="bank">
+      </div>
+      
+      <div class="payment-input-group">
+        <label for="mobileMoneyAmount">
+          <i class="bi bi-phone"></i> Mobile Money (MWK)
+        </label>
+        <input type="number" 
+               id="mobileMoneyAmount" 
+               name="mobile_money_amount" 
+               class="form-control payment-amount-input" 
+               placeholder="0" 
+               min="0" 
+               step="0.01"
+               data-payment-type="mobile">
+      </div>
+    </div>
+    
+    <!-- Payment Summary -->
+    <div class="payment-summary">
+      <div class="summary-row">
+        <span>Total Required:</span>
+        <strong id="totalRequired" class="text-primary">MWK {{ total_amount|default:"0.00" }}</strong>
+      </div>
+      <div class="summary-row">
+        <span>Amount Entered:</span>
+        <strong id="totalEntered" class="text-info">MWK 0.00</strong>
+      </div>
+      <div class="summary-row" id="balanceRow">
+        <span>Balance:</span>
+        <strong id="balance" class="text-muted">MWK {{ total_amount|default:"0.00" }}</strong>
+      </div>
+    </div>
+    
+    <!-- Validation Message -->
+    <div class="payment-validation-msg" id="paymentValidationMsg" style="display:none;"></div>
+  </div>
+  
+  <!-- Hidden inputs for form submission -->
+  <input type="hidden" name="payment_mode" id="paymentMode" value="single">
+  <input type="hidden" name="payment_method" id="paymentMethod" value="CASH">
+  <input type="hidden" name="total_amount" id="totalAmount" value="{{ total_amount|default:'0' }}">
+</div>
+
+<style>
+/* Payment Mix Bar Styles */
+.payment-mix-bar {
+  background: #ffffff;
+  border: 2px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 20px;
+  margin: 20px 0;
+}
+
+.payment-mix-title {
+  margin: 0 0 16px 0;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #1e293b;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.payment-method-selector {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.payment-method-btn {
+  flex: 1;
+  min-width: 140px;
+  padding: 12px 20px;
+  border: 2px solid #e2e8f0;
+  border-radius: 12px;
+  background: white;
+  color: #64748b;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.payment-method-btn:hover {
+  border-color: #8b5cf6;
+  color: #8b5cf6;
+  transform: translateY(-2px);
+}
+
+.payment-method-btn.active {
+  background: linear-gradient(135deg, #8b5cf6, #6366f1);
+  border-color: #8b5cf6;
+  color: white;
+}
+
+.payment-label {
+  display: block;
+  margin-bottom: 12px;
+  font-weight: 600;
+  color: #334155;
+  font-size: 0.95rem;
+}
+
+/* Single Method Options */
+.payment-options-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 12px;
+}
+
+.payment-option {
+  margin: 0;
+  cursor: pointer;
+}
+
+.payment-option input[type="radio"] {
+  display: none;
+}
+
+.payment-option-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 16px 12px;
+  border: 2px solid #e2e8f0;
+  border-radius: 12px;
+  background: white;
+  transition: all 0.2s ease;
+  min-height: 80px;
+  gap: 8px;
+}
+
+.payment-option-card i {
+  font-size: 1.8rem;
+  color: #64748b;
+  transition: color 0.2s ease;
+}
+
+.payment-option-card strong {
+  color: #334155;
+  font-size: 0.9rem;
+}
+
+.payment-option:hover .payment-option-card {
+  border-color: #8b5cf6;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.15);
+}
+
+.payment-option input:checked + .payment-option-card {
+  border-color: #8b5cf6;
+  background: linear-gradient(135deg, #f5f3ff, #ede9fe);
+  box-shadow: 0 4px 16px rgba(139, 92, 246, 0.2);
+}
+
+.payment-option input:checked + .payment-option-card i {
+  color: #8b5cf6;
+}
+
+/* Multi-Method Split */
+.payment-split-inputs {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.payment-input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.payment-input-group label {
+  font-weight: 600;
+  color: #475569;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.payment-amount-input {
+  padding: 12px 16px;
+  border: 2px solid #e2e8f0;
+  border-radius: 10px;
+  font-size: 1rem;
+  font-weight: 600;
+  transition: border-color 0.2s ease;
+}
+
+.payment-amount-input:focus {
+  outline: none;
+  border-color: #8b5cf6;
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1);
+}
+
+.payment-amount-input.valid {
+  border-color: #10b981;
+}
+
+.payment-amount-input.invalid {
+  border-color: #ef4444;
+}
+
+/* Payment Summary */
+.payment-summary {
+  background: #f8fafc;
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.summary-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.95rem;
+}
+
+.summary-row strong {
+  font-size: 1.05rem;
+}
+
+#balanceRow.positive #balance {
+  color: #10b981 !important;
+}
+
+#balanceRow.negative #balance {
+  color: #ef4444 !important;
+}
+
+#balanceRow.zero #balance {
+  color: #10b981 !important;
+}
+
+/* Validation Message */
+.payment-validation-msg {
+  margin-top: 12px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.payment-validation-msg.success {
+  background: #d1fae5;
+  color: #065f46;
+  border-left: 4px solid #10b981;
+}
+
+.payment-validation-msg.error {
+  background: #fee2e2;
+  color: #991b1b;
+  border-left: 4px solid #ef4444;
+}
+
+/* Mobile Optimizations */
+@media (max-width: 576px) {
+  .payment-mix-bar {
+    padding: 16px;
+  }
+  
+  .payment-mix-title {
+    font-size: 1.1rem;
+  }
+  
+  .payment-method-btn {
+    min-width: 120px;
+    padding: 10px 16px;
+    font-size: 0.9rem;
+  }
+  
+  .payment-options-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .payment-option-card {
+    flex-direction: row;
+    justify-content: flex-start;
+    padding: 12px 16px;
+    min-height: auto;
+  }
+  
+  .payment-option-card i {
+    font-size: 1.5rem;
+  }
+  
+  .payment-amount-input {
+    font-size: 0.95rem;
+  }
+}
+</style>
+
+<script>
+(function() {
+  const paymentMixBar = document.getElementById('paymentMixBar');
+  if (!paymentMixBar) return;
+  
+  const btnSingleMethod = document.getElementById('btnSingleMethod');
+  const btnMultiMethod = document.getElementById('btnMultiMethod');
+  const singleMethodPanel = document.getElementById('singleMethodPanel');
+  const multiMethodPanel = document.getElementById('multiMethodPanel');
+  const paymentModeInput = document.getElementById('paymentMode');
+  const paymentMethodInput = document.getElementById('paymentMethod');
+  const totalAmountInput = document.getElementById('totalAmount');
+  
+  const cashInput = document.getElementById('cashAmount');
+  const bankInput = document.getElementById('bankAmount');
+  const mobileInput = document.getElementById('mobileMoneyAmount');
+  
+  const totalEnteredSpan = document.getElementById('totalEntered');
+  const balanceSpan = document.getElementById('balance');
+  const balanceRow = document.getElementById('balanceRow');
+  const validationMsg = document.getElementById('paymentValidationMsg');
+  
+  let currentMode = 'single';
+  let totalRequired = parseFloat(totalAmountInput?.value || 0);
+  
+  // Update total required dynamically (for fast sell when price changes)
+  window.updatePaymentTotal = function(newTotal) {
+    totalRequired = parseFloat(newTotal || 0);
+    document.getElementById('totalRequired').textContent = `MWK ${totalRequired.toFixed(2)}`;
+    if (totalAmountInput) totalAmountInput.value = totalRequired;
+    if (currentMode === 'multi') validateMultiMethod();
+  };
+  
+  // Switch to single method
+  btnSingleMethod?.addEventListener('click', function() {
+    currentMode = 'single';
+    btnSingleMethod.classList.add('active');
+    btnMultiMethod.classList.remove('active');
+    singleMethodPanel.style.display = 'block';
+    multiMethodPanel.style.display = 'none';
+    paymentModeInput.value = 'single';
+    
+    // Update hidden payment method from selected radio
+    const selectedRadio = document.querySelector('input[name="payment_method_single"]:checked');
+    if (selectedRadio) paymentMethodInput.value = selectedRadio.value;
+  });
+  
+  // Switch to multi method
+  btnMultiMethod?.addEventListener('click', function() {
+    currentMode = 'multi';
+    btnMultiMethod.classList.add('active');
+    btnSingleMethod.classList.remove('active');
+    multiMethodPanel.style.display = 'block';
+    singleMethodPanel.style.display = 'none';
+    paymentModeInput.value = 'multi';
+    paymentMethodInput.value = 'MIXED';
+    validateMultiMethod();
+  });
+  
+  // Update payment method on radio change
+  document.querySelectorAll('input[name="payment_method_single"]').forEach(radio => {
+    radio.addEventListener('change', function() {
+      if (currentMode === 'single') {
+        paymentMethodInput.value = this.value;
+      }
+    });
+  });
+  
+  // Validate multi-method payment
+  function validateMultiMethod() {
+    const cash = parseFloat(cashInput?.value || 0);
+    const bank = parseFloat(bankInput?.value || 0);
+    const mobile = parseFloat(mobileInput?.value || 0);
+    
+    const totalEntered = cash + bank + mobile;
+    const balance = totalRequired - totalEntered;
+    
+    // Update UI
+    if (totalEnteredSpan) totalEnteredSpan.textContent = `MWK ${totalEntered.toFixed(2)}`;
+    if (balanceSpan) balanceSpan.textContent = `MWK ${Math.abs(balance).toFixed(2)}`;
+    
+    // Update balance row class
+    if (balanceRow) {
+      balanceRow.classList.remove('positive', 'negative', 'zero');
+      if (balance === 0) {
+        balanceRow.classList.add('zero');
+      } else if (balance > 0) {
+        balanceRow.classList.add('negative');
+      } else {
+        balanceRow.classList.add('positive');
+      }
+    }
+    
+    // Show validation message
+    if (validationMsg) {
+      if (balance === 0 && totalEntered > 0) {
+        validationMsg.className = 'payment-validation-msg success';
+        validationMsg.innerHTML = '<i class="bi bi-check-circle"></i> Payment valid!';
+        validationMsg.style.display = 'flex';
+      } else if (balance > 0) {
+        validationMsg.className = 'payment-validation-msg error';
+        validationMsg.innerHTML = `<i class="bi bi-exclamation-circle"></i> Short by MWK ${balance.toFixed(2)}`;
+        validationMsg.style.display = 'flex';
+      } else if (balance < 0) {
+        validationMsg.className = 'payment-validation-msg error';
+        validationMsg.innerHTML = `<i class="bi bi-exclamation-circle"></i> Overpaid by MWK ${Math.abs(balance).toFixed(2)}`;
+        validationMsg.style.display = 'flex';
+      } else {
+        validationMsg.style.display = 'none';
+      }
+    }
+    
+    return balance === 0 && totalEntered > 0;
+  }
+  
+  // Real-time validation on input
+  [cashInput, bankInput, mobileInput].forEach(input => {
+    input?.addEventListener('input', validateMultiMethod);
+  });
+  
+  // Validate payment on form submit
+  window.validatePaymentMix = function() {
+    if (currentMode === 'single') {
+      // Always valid for single method
+      return true;
+    } else {
+      // Validate multi-method
+      const isValid = validateMultiMethod();
+      if (!isValid) {
+        alert('Payment amounts do not match the total. Please adjust.');
+      }
+      return isValid;
+    }
+  };
+  
+  // Initialize
+  validateMultiMethod();
+})();
+</script>
+

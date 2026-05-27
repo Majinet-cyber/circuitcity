@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Energy Assets – {{ business.name }}{% endblock %}
+{% block content %}
+<style>
+  .asset-card{background:#fff;border-radius:12px;border:1.5px solid #e2e8f0;padding:.9rem 1rem;}
+  .health-bar{height:6px;border-radius:3px;background:#e2e8f0;overflow:hidden;margin-top:.2rem;}
+  .health-fill{height:100%;border-radius:3px;}
+</style>
+<div class="container-fluid py-4">
+  <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
+    <div>
+      <h4 class="fw-bold mb-0">🔋 Asset Registry</h4>
+      <div class="text-muted small">{{ business.name }}</div>
+    </div>
+    <a href="{% url 'verticals:energy_asset_create' %}" class="btn btn-primary btn-sm rounded-pill">
+      <i class="bi bi-plus-lg me-1"></i>Register Asset
+    </a>
+  </div>
+
+  {# Filters #}
+  <form method="get" class="d-flex gap-2 flex-wrap mb-4">
+    <select name="type" class="form-select form-select-sm rounded-pill" style="width:auto;">
+      <option value="">All Types</option>
+      {% for val, label in asset_types %}
+        <option value="{{ val }}" {% if type_filter == val %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+    <select name="status" class="form-select form-select-sm rounded-pill" style="width:auto;">
+      <option value="">All Statuses</option>
+      {% for val, label in asset_statuses %}
+        <option value="{{ val }}" {% if status_filter == val %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+    <button type="submit" class="btn btn-sm btn-outline-secondary rounded-pill">Filter</button>
+    {% if type_filter or status_filter %}
+      <a href="{% url 'verticals:energy_assets' %}" class="btn btn-sm btn-outline-danger rounded-pill">Clear</a>
+    {% endif %}
+  </form>
+
+  {% if messages %}{% for m in messages %}<div class="alert alert-{{ m.tags|default:'info' }} rounded-3 mb-3">{{ m }}</div>{% endfor %}{% endif %}
+
+  {% if assets %}
+  <div class="row g-3">
+    {% for asset in assets %}
+    <div class="col-12 col-md-6 col-lg-4">
+      <div class="asset-card">
+        <div class="d-flex align-items-center gap-2 mb-1">
+          <span style="font-size:1.3rem;">
+            {% if asset.asset_type == "solar_panel" %}☀️{% elif asset.asset_type == "battery" %}🔋{% elif asset.asset_type == "inverter" %}⚡{% elif asset.asset_type == "generator" %}🏭{% else %}🔩{% endif %}
+          </span>
+          <div>
+            <div class="fw-bold" style="font-size:.9rem;">{{ asset.get_asset_type_display }}</div>
+            {% if asset.brand %}<div class="text-muted" style="font-size:.75rem;">{{ asset.brand }}{% if asset.model_name %} {{ asset.model_name }}{% endif %}</div>{% endif %}
+          </div>
+          <div class="ms-auto">
+            <span class="badge rounded-pill" style="font-size:.65rem;background:{% if asset.status == 'operational' %}#dcfce7;color:#15803d{% elif asset.status == 'degraded' %}#fef3c7;color:#d97706{% elif asset.status == 'faulty' %}#fee2e2;color:#dc2626{% else %}#f1f5f9;color:#64748b{% endif %};">{{ asset.get_status_display }}</span>
+          </div>
+        </div>
+        <div class="text-muted small mb-1"><i class="bi bi-geo-alt me-1"></i>{{ asset.site.name }}</div>
+        <div class="d-flex align-items-center gap-2" style="font-size:.78rem;">
+          <span style="color:#64748b;">Health</span>
+          <div style="flex:1;"><div class="health-bar"><div class="health-fill" style="width:{{ asset.health_score }}%;background:{% if asset.health_score >= 70 %}#10b981{% elif asset.health_score >= 40 %}#f59e0b{% else %}#ef4444{% endif %};"></div></div></div>
+          <span class="fw-bold">{{ asset.health_score }}%</span>
+        </div>
+        {% if asset.is_maintenance_overdue %}
+        <div class="mt-1"><span class="badge bg-danger rounded-pill" style="font-size:.65rem;">⚠️ Maintenance Overdue</span></div>
+        {% endif %}
+        {% if asset.capacity %}<div class="text-muted mt-1" style="font-size:.75rem;">{{ asset.capacity }} {{ asset.capacity_unit }}</div>{% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div style="max-width:520px;margin:3rem auto;text-align:center;">
+    <div style="font-size:4rem;margin-bottom:1rem;">🔋</div>
+    <h5 class="fw-bold mb-2" style="color:#0f172a;">No assets registered yet</h5>
+    <p class="text-muted mb-3" style="font-size:.9rem;">Register every piece of equipment at your customer sites — solar panels, batteries, inverters, charge controllers, and more. Track health, maintenance, and alerts automatically.</p>
+    <a href="{% url 'verticals:energy_asset_create' %}" class="btn btn-primary rounded-pill px-4 me-2">
+      <i class="bi bi-plus-lg me-1"></i>Register First Asset
+    </a>
+    <div style="margin-top:1.5rem;display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:.5rem;">
+      {% url 'verticals:energy_asset_create' as create_url %}
+      <a href="{{ create_url }}?prefill_type=solar_panel" style="background:#fef3c7;border:1.5px solid #fde68a;border-radius:12px;padding:.75rem;text-decoration:none;font-size:.8rem;color:#92400e;font-weight:600;">☀️<br>Solar Panels</a>
+      <a href="{{ create_url }}?prefill_type=battery" style="background:#eef2ff;border:1.5px solid #c7d2fe;border-radius:12px;padding:.75rem;text-decoration:none;font-size:.8rem;color:#3730a3;font-weight:600;">🔋<br>Battery Banks</a>
+      <a href="{{ create_url }}?prefill_type=inverter" style="background:#fff1f2;border:1.5px solid #fecdd3;border-radius:12px;padding:.75rem;text-decoration:none;font-size:.8rem;color:#9f1239;font-weight:600;">⚡<br>Inverters</a>
+      <a href="{{ create_url }}?prefill_type=charge_controller" style="background:#f0fdf4;border:1.5px solid #bbf7d0;border-radius:12px;padding:.75rem;text-decoration:none;font-size:.8rem;color:#065f46;font-weight:600;">🔌<br>Charge Controllers</a>
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

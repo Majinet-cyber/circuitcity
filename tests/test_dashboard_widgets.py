@@ -34,13 +34,11 @@ class TestDashboardWidgets(TestCase):
             password="password123",
             is_staff=True
         )
-        # Create agent profile for user (needed for leaderboard logic sometimes)
-        # Assuming AgentProfile might be needed or at least harmless
-        AgentProfile.objects.create(
-            user=self.user,
-            location=self.location,
-            sales_goal=1000
-        )
+        # Create/update agent profile for user (idempotent, may exist from signal)
+        agent_profile, _ = AgentProfile.objects.get_or_create(user=self.user)
+        if agent_profile.location != self.location:
+            agent_profile.location = self.location
+            agent_profile.save(update_fields=["location"])
         
         # Create phone product
         self.phone_product = Product.objects.create(

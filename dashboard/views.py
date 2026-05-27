@@ -1,4 +1,4 @@
-﻿# dashboard/views.py
+# dashboard/views.py
 from __future__ import annotations
 
 from datetime import datetime, timedelta, time, date
@@ -16,7 +16,7 @@ from django.http import JsonResponse, HttpResponseRedirect
 from django.shortcuts import render, get_object_or_404, redirect
 from django.urls import reverse, NoReverseMatch
 from django.utils import timezone
-from django.views.decorators.http import require_GET
+from django.views.decorators.http import require_GET, require_http_methods
 from django.views.decorators.cache import never_cache
 
 from tenants.utils import require_business  # ✅ tenant guard
@@ -344,10 +344,8 @@ def _products_count(biz) -> int:
 
 
 # ---------------------------
-# Manager/tenant “home” (fresh dashboard UX)
+# Manager/tenant "home" (fresh dashboard UX)
 # ---------------------------
-@login_required
-@require_business
 @login_required
 @require_business
 def home(request):
@@ -355,9 +353,9 @@ def home(request):
     Default dashboard for managers/agents within an active business.
     Shows a 'first-run' checklist when there's no data yet; otherwise normal KPIs.
     Staff users are redirected to the staff dashboard (per-tenant view if business is set).
-    
+
     Routes to vertical-specific dashboards for gym, clothing, liquor, and pharmacy.
-    
+
     NOTE: @require_business ensures request.business is set; if no active business,
     user is redirected to choose-business page, preventing redirect loops.
     """
@@ -365,13 +363,13 @@ def home(request):
         return redirect("dashboard:admin_dashboard")
 
     biz = request.business
-    
+
     # ==============================================================================
     # VERTICAL ROUTING: Redirect to vertical-specific dashboards
     # ==============================================================================
     vertical_kind = get_vertical_kind(biz)
     vertical_dashboard_url = get_vertical_dashboard_url(vertical_kind)
-    
+
     if vertical_dashboard_url:
         # Redirect to vertical-specific dashboard (gym, pharmacy, clothing, liquor)
         try:
@@ -388,7 +386,7 @@ def home(request):
     filter_end_date = None
     selected_date = None
     date_param = None
-    
+
     if DATE_FILTER_AVAILABLE:
         try:
             date_range_ctx = parse_date_range_from_request(request)
@@ -400,7 +398,7 @@ def home(request):
         except Exception:
             # Fallback to MTD if parsing fails
             pass
-    
+
     # Canonical KPI source (tenant-wide for the dashboard tiles)
     inv_kpis = business_metrics(request, include_agent_scope=False)
 
@@ -418,7 +416,7 @@ def home(request):
     # Simple per-tenant KPIs (safe)
     tz = timezone.get_current_timezone()
     today = timezone.localdate()
-    
+
     # Use filter dates if available, otherwise use MTD
     if filter_start_date and filter_end_date:
         # Use the filtered date range
@@ -428,7 +426,7 @@ def home(request):
         # Default to MTD
         period_start = _start_of_day(today.replace(day=1), tz)
         period_end = _start_of_day(_first_of_next_month(today), tz)
-    
+
     # Keep original month bounds for backwards compatibility
     month_start = _start_of_day(today.replace(day=1), tz)
     month_end = _start_of_day(_first_of_next_month(today), tz)
@@ -456,13 +454,13 @@ def home(request):
         .filter(SOLD_Q(), sold_at__gte=period_start, sold_at__lt=period_end)
         .count()
     )
-    
+
     # Keep MTD count for backwards compatibility (some parts may still use it)
     sold_mtd_count = sold_period_count
 
     # Onboarding steps tailored to business vertical
     onboarding_steps = get_onboarding_steps(vertical_kind, request)
-    
+
     # ===== NEW: Personalized dashboard enhancements =====
     # Import helpers
     try:
@@ -470,28 +468,28 @@ def home(request):
         from dashboard.helpers_yesterday import get_yesterday_summary, should_show_yesterday_summary, mark_yesterday_summary_shown
         from dashboard.helpers_payments import get_payment_mix_for_dashboard
         from dashboard.helpers_quotes import get_todays_quotes
-        
+
         # Personalized greeting
         greeting_ctx = get_personalized_greeting(request.user, biz)
-        
+
         # Brand header context
         brand_logo_url = None
         if hasattr(biz, 'logo') and biz.logo:
             brand_logo_url = biz.logo.url
-        
+
         # Yesterday summary (show once per day)
         yesterday_summary = None
         if should_show_yesterday_summary(request):
             yesterday_summary = get_yesterday_summary(request.user, biz)
             if yesterday_summary:
                 mark_yesterday_summary_shown(request)
-        
+
         # Payment mix (last 30 days)
         payment_mix = get_payment_mix_for_dashboard(biz, period_days=30, user=None)
-        
+
         # Daily quotes
         daily_quotes = get_todays_quotes(request.user, count=10)
-        
+
         # Add to context
         ctx_enhancements = {
             "DASHBOARD_GREETING": greeting_ctx.get("greeting"),
@@ -508,23 +506,28 @@ def home(request):
     except Exception:
         # Gracefully degrade if helpers not available
         ctx_enhancements = {}
-    
+
     # ===== Enhanced Dashboard Data =====
     # Determine if user is manager or agent
-    is_manager = (
-        request.user.is_staff 
-        or request.user.is_superuser 
-        or getattr(request.user, 'is_manager', False)
-        or getattr(getattr(request.user, 'profile', None), 'is_manager', False)
-    )
-    
+    # CRITICAL: Use authoritative flag from middleware (set by tenants.utils_roles)
+    if hasattr(request, "cc_is_manager"):
+        is_manager = getattr(request, "cc_is_manager", False)
+    else:
+        # Fallback: if middleware hasn't set flag (shouldn't happen in normal flow)
+        is_manager = (
+            request.user.is_staff
+            or request.user.is_superuser
+            or getattr(request.user, 'is_manager', False)
+            or getattr(getattr(request.user, 'profile', None), 'is_manager', False)
+        )
+
     # Sales for the filtered period (respects date range selector)
     period_sold = _scope_queryset(InventoryItem.objects.all(), biz).filter(
         SOLD_Q(), sold_at__gte=period_start, sold_at__lt=period_end
     )
     period_sales_count = period_sold.count()
     period_sales_amount = _inv_revenue_sum(period_sold)
-    
+
     # For display purposes, map to "today" or "month" variables based on active range
     # This maintains backwards compatibility with templates
     if active_range == 'today':
@@ -538,14 +541,14 @@ def home(request):
         today_sales_amount = period_sales_amount
         month_sales_count = period_sales_count
         month_sales_amount = period_sales_amount
-    
+
     # Locations and agents count
     try:
         from inventory.models import Location
         locations_count = Location.objects.filter(business=biz).count()
     except Exception:
         locations_count = 0
-    
+
     User = get_user_model()
     try:
         # Count users who have agent_profile for this business
@@ -553,11 +556,11 @@ def home(request):
         agents_count = AgentProfile.objects.filter(location__business=biz).count()
     except Exception:
         agents_count = 0
-    
+
     # Location performance (manager only)
     location_performance = []
     agent_leaderboard = []
-    
+
     if is_manager:
         try:
             from inventory.models import Location
@@ -572,7 +575,7 @@ def home(request):
                     sold_at__gte=period_start, sold_at__lt=period_end
                 )
                 loc_amount = _inv_revenue_sum(loc_sales)
-                
+
                 location_performance.append({
                     'name': loc.name,
                     'stock_count': loc_stock,
@@ -581,7 +584,7 @@ def home(request):
                 })
         except Exception:
             pass
-        
+
         # Agent leaderboard (using new service with filtered period)
         try:
             from tenants.services.leaderboard import get_agent_leaderboard
@@ -597,7 +600,7 @@ def home(request):
                 agent['units'] = agent['devices_sold']
         except Exception as e:
             pass
-    
+
     # Agent-specific data
     agent_today_amount = 0
     agent_today_count = 0
@@ -606,7 +609,7 @@ def home(request):
     agent_rank = None
     agent_gap = None
     agent_commission = 0
-    
+
     if not is_manager:
         try:
             # Agent's own sales for the filtered period
@@ -617,13 +620,13 @@ def home(request):
             )
             agent_period_count = agent_period_sales.count()
             agent_period_amount = _inv_revenue_sum(agent_period_sales)
-            
+
             # Map to display variables
             agent_today_count = agent_period_count
             agent_today_amount = agent_period_amount
             agent_month_count = agent_period_count
             agent_month_amount = agent_period_amount
-            
+
             # Calculate rank using new service with filtered period
             from tenants.services.leaderboard import get_current_agent_rank
             rank_data = get_current_agent_rank(
@@ -634,15 +637,15 @@ def home(request):
             )
             agent_rank = rank_data.get('rank')
             agent_gap = rank_data.get('gap_formatted')
-            
+
             # Commission (simplified - assuming 5% of sales)
             agent_commission = agent_month_amount * Decimal('0.05')
         except Exception:
             pass
-    
+
     # Check for optional namespaces
     has_reports_namespace = _namespace_exists("reports")
-    
+
     # Check for payslip reminder banner (show if there's an unread payslip notification in last 10 days)
     show_payslip_banner = False
     try:
@@ -656,28 +659,161 @@ def home(request):
         ).exists()
     except Exception:
         pass
+
+    # ===== DYNAMIC STATS: Active Businesses & Agents (PREMIUM FEATURE) =====
+    active_businesses_today = 0
+    active_agents_today = 0
+    new_agents_this_week = 0
     
+    try:
+        from tenants.models import Business, Membership
+        from datetime import datetime, date
+        
+        # Count businesses with sales today (across all verticals)
+        today_start = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        today_end = timezone.now()
+        
+        # Try to count businesses with sales in multiple verticals
+        businesses_with_activity = set()
+        
+        # Check ClothingSale
+        try:
+            from inventory.models_verticals import ClothingSale
+            clothing_businesses = ClothingSale.objects.filter(
+                sold_at__gte=today_start,
+                sold_at__lte=today_end
+            ).values_list('business_id', flat=True).distinct()
+            businesses_with_activity.update(clothing_businesses)
+        except Exception:
+            pass
+        
+        # Check LiquorSale
+        try:
+            from inventory.models_verticals import LiquorSale
+            liquor_businesses = LiquorSale.objects.filter(
+                sold_at__gte=today_start,
+                sold_at__lte=today_end
+            ).values_list('business_id', flat=True).distinct()
+            businesses_with_activity.update(liquor_businesses)
+        except Exception:
+            pass
+        
+        # Check PharmacySale
+        try:
+            from inventory.models_pharmacy import PharmacySale
+            pharmacy_businesses = PharmacySale.objects.filter(
+                sold_at__gte=today_start,
+                sold_at__lte=today_end
+            ).values_list('business_id', flat=True).distinct()
+            businesses_with_activity.update(pharmacy_businesses)
+        except Exception:
+            pass
+        
+        # Check general Sale model (uses module-level import - do NOT re-import inside function)
+        try:
+            general_businesses = Sale.objects.filter(
+                sold_at__gte=today_start,
+                sold_at__lte=today_end
+            ).values_list('business_id', flat=True).distinct()
+            businesses_with_activity.update(general_businesses)
+        except Exception:
+            pass
+        
+        active_businesses_today = len(businesses_with_activity)
+        
+        # Count active agents today (agents who made sales today across all businesses)
+        agents_with_activity = set()
+        
+        # Check ClothingSale for agents
+        try:
+            from inventory.models_verticals import ClothingSale
+            clothing_agents = ClothingSale.objects.filter(
+                sold_at__gte=today_start,
+                sold_at__lte=today_end,
+                sold_by__isnull=False
+            ).values_list('sold_by_id', flat=True).distinct()
+            agents_with_activity.update(clothing_agents)
+        except Exception:
+            pass
+        
+        # Check LiquorSale for agents
+        try:
+            from inventory.models_verticals import LiquorSale
+            liquor_agents = LiquorSale.objects.filter(
+                sold_at__gte=today_start,
+                sold_at__lte=today_end,
+                sold_by__isnull=False
+            ).values_list('sold_by_id', flat=True).distinct()
+            agents_with_activity.update(liquor_agents)
+        except Exception:
+            pass
+        
+        # Check PharmacySale for agents
+        try:
+            from inventory.models_pharmacy import PharmacySale
+            pharmacy_agents = PharmacySale.objects.filter(
+                sold_at__gte=today_start,
+                sold_at__lte=today_end,
+                sold_by__isnull=False
+            ).values_list('sold_by_id', flat=True).distinct()
+            agents_with_activity.update(pharmacy_agents)
+        except Exception:
+            pass
+        
+        # Check general Sale model for agents (uses module-level import - do NOT re-import inside function)
+        try:
+            general_agents = Sale.objects.filter(
+                sold_at__gte=today_start,
+                sold_at__lte=today_end,
+                sold_by__isnull=False
+            ).values_list('sold_by_id', flat=True).distinct()
+            agents_with_activity.update(general_agents)
+        except Exception:
+            pass
+        
+        active_agents_today = len(agents_with_activity)
+        
+        # Count new agents who joined this week (last 7 days)
+        week_ago = today_start - timedelta(days=7)
+        try:
+            new_agents_this_week = Membership.objects.filter(
+                joined_at__gte=week_ago,
+                role__iexact='AGENT'
+            ).values('user_id').distinct().count()
+        except Exception:
+            # Fallback: try AgentProfile model
+            try:
+                from inventory.models import AgentProfile
+                new_agents_this_week = AgentProfile.objects.filter(
+                    joined_on__gte=week_ago.date()
+                ).count()
+            except Exception:
+                pass
+    except Exception:
+        # Silently fail - these are bonus stats
+        pass
+
     # ===== COMPUTE COSTS & PROFIT (Manager view) =====
     total_costs_period = Decimal("0.00")
     net_profit = period_sales_amount  # Default: profit = revenue (no costs)
     profit_margin = Decimal("100.00") if period_sales_amount > 0 else Decimal("0.00")
     costs_breakdown = {}
-    
+
     if is_manager:
         try:
             from wallet.utils import compute_revenue_costs_profit
-            
+
             # Compute costs and profit for the selected period
             period_start_date = period_start.date() if hasattr(period_start, 'date') else period_start
             period_end_date = period_end.date() if hasattr(period_end, 'date') else period_end
-            
+
             metrics = compute_revenue_costs_profit(
                 biz,
                 period_sales_amount,
                 period_start_date,
                 period_end_date
             )
-            
+
             total_costs_period = metrics.get('costs', Decimal("0.00"))
             net_profit = metrics.get('profit', period_sales_amount)
             profit_margin = metrics.get('profit_margin', Decimal("100.00"))
@@ -685,7 +821,7 @@ def home(request):
         except Exception:
             # Gracefully degrade if wallet app not available
             pass
-    
+
     ctx = {
         "first_run": first_run,
         "products_count": products_count,
@@ -728,9 +864,13 @@ def home(request):
         "net_profit": net_profit,
         "profit_margin": profit_margin,
         "costs_breakdown": costs_breakdown,
+        # Dynamic Stats (PREMIUM FEATURE)
+        "active_businesses_today": active_businesses_today,
+        "active_agents_today": active_agents_today,
+        "new_agents_this_week": new_agents_this_week,
         **ctx_enhancements,  # Merge enhancements
     }
-    
+
     # ===== MANAGER ONLY: Costs & Commissions Panel =====
     if is_manager:
         try:
@@ -738,9 +878,29 @@ def home(request):
             costs_commissions_panel = get_month_to_date_costs_commissions(biz)
             ctx['costs_commissions_panel'] = costs_commissions_panel
         except Exception:
-            # Gracefully degrade if helper not available
             pass
+
+    # ===== BUSINESS HEALTH SCORE (manager view, lightweight card) =====
+    if is_manager:
+        try:
+            from dashboard.services_health import calculate_business_health_score
+            health_score = calculate_business_health_score(biz)
+            ctx['health_score'] = health_score
+        except Exception:
+            ctx['health_score'] = None
+
+        try:
+            from dashboard.services_books_balance import run_daily_books_balance
+            ctx["books_balance"] = run_daily_books_balance(biz)
+        except Exception:
+            ctx["books_balance"] = None
+
+    ctx.setdefault("latest_notifications", [])
     
+    # Inject dashboard enhancements and normalize context
+    from core.dashboard_context import normalize_dashboard_context
+    ctx = normalize_dashboard_context(request, ctx)
+
     return render(request, "dashboard/home.html", ctx)
 
 
@@ -870,21 +1030,21 @@ def admin_dashboard(request):
         from dashboard.helpers_greetings import get_personalized_greeting
         from dashboard.helpers_payments import get_payment_mix_for_dashboard
         from dashboard.helpers_quotes import get_todays_quotes
-        
+
         # Personalized greeting
         greeting_ctx = get_personalized_greeting(request.user, biz)
-        
+
         # Brand header context
         brand_logo_url = None
         if biz and hasattr(biz, 'logo') and biz.logo:
             brand_logo_url = biz.logo.url
-        
+
         # Payment mix (business-wide, last 30 days)
         payment_mix = get_payment_mix_for_dashboard(biz, period_days=30, user=None)
-        
+
         # Daily quotes
         daily_quotes = get_todays_quotes(request.user, count=10)
-        
+
         ctx_enhancements = {
             "DASHBOARD_GREETING": greeting_ctx.get("greeting"),
             "DASHBOARD_USER_NAME": greeting_ctx.get("user_name"),
@@ -898,7 +1058,7 @@ def admin_dashboard(request):
         }
     except Exception:
         ctx_enhancements = {}
-    
+
     ctx = {
         "kpis": kpis,
         "in_stock_total": in_stock_total,
@@ -962,19 +1122,19 @@ def agent_dashboard(request):
     next_milestone = None
     try:
         from hq.utils_gamification import (
-            get_agent_rank_for_user, 
+            get_agent_rank_for_user,
             get_gamification_message,
             get_current_milestone,
             get_next_milestone
         )
         from hq.utils_dates import get_month_range
         from django.utils import timezone
-        
+
         if biz:
             # Get MTD date range
             today = timezone.now().date()
             month_start, month_end = get_month_range(today.year, today.month)
-            
+
             # Get agent's ranking
             rank = get_agent_rank_for_user(
                 user_id=request.user.id,
@@ -983,15 +1143,15 @@ def agent_dashboard(request):
                 start_date=month_start,
                 end_date=month_end
             )
-            
+
             if rank:
                 agent_ranking = rank
                 gamification_message = get_gamification_message(rank)
-                
+
                 # Get milestones
                 current_milestone = get_current_milestone(rank.sales_count)
                 next_milestone = get_next_milestone(rank.sales_count)
-                
+
                 # Build agent ranking dict
                 agent_ranking = {
                     "rank": rank.rank,
@@ -1000,7 +1160,7 @@ def agent_dashboard(request):
                     "behind_count": rank.behind_count,
                     "gamification_message": gamification_message,
                 }
-                
+
                 # Format milestones
                 if current_milestone:
                     threshold, name, emoji = current_milestone
@@ -1009,7 +1169,7 @@ def agent_dashboard(request):
                         "emoji": emoji,
                         "threshold": threshold,
                     }
-                
+
                 if next_milestone:
                     threshold, name, emoji, sales_needed = next_milestone
                     agent_ranking["next_milestone"] = {
@@ -1029,28 +1189,28 @@ def agent_dashboard(request):
         from dashboard.helpers_yesterday import get_yesterday_summary, should_show_yesterday_summary, mark_yesterday_summary_shown
         from dashboard.helpers_payments import get_payment_mix_for_dashboard
         from dashboard.helpers_quotes import get_todays_quotes
-        
+
         # Personalized greeting
         greeting_ctx = get_personalized_greeting(request.user, biz)
-        
+
         # Brand header context
         brand_logo_url = None
         if biz and hasattr(biz, 'logo') and biz.logo:
             brand_logo_url = biz.logo.url
-        
+
         # Yesterday summary (agent-scoped would be future enhancement)
         yesterday_summary = None
         if should_show_yesterday_summary(request):
             yesterday_summary = get_yesterday_summary(request.user, biz)
             if yesterday_summary:
                 mark_yesterday_summary_shown(request)
-        
+
         # Payment mix (agent-scoped, last 30 days)
         payment_mix = get_payment_mix_for_dashboard(biz, period_days=30, user=request.user)
-        
+
         # Daily quotes
         daily_quotes = get_todays_quotes(request.user, count=10)
-        
+
         ctx_enhancements = {
             "DASHBOARD_GREETING": greeting_ctx.get("greeting"),
             "DASHBOARD_USER_NAME": greeting_ctx.get("user_name"),
@@ -1065,7 +1225,7 @@ def agent_dashboard(request):
         }
     except Exception:
         ctx_enhancements = {}
-    
+
     ctx = {
         "kpis": kpis,
         "agent_battery": {"count": my_in_stock, "max": battery_max, "pct": pct, "label": label, "color": color},
@@ -1304,7 +1464,7 @@ def v2_sales_trend_data_proxy(request):
         business = getattr(request, "business", None)
         if not business:
             return JsonResponse({"labels": [], "values": []})
-        
+
         # Parse period parameter (default 30d for "month")
         period_param = request.GET.get("period", "30d").lower()
         if period_param in ("month", "30d"):
@@ -1315,19 +1475,19 @@ def v2_sales_trend_data_proxy(request):
             days = 1
         else:
             days = 30
-        
+
         # Calculate date range
         tz = timezone.get_current_timezone()
         today = timezone.localdate()
         end_date = _start_of_day(today + timedelta(days=1), tz)
         start_date = _start_of_day(today - timedelta(days=days - 1), tz)
-        
+
         # Query sold items using InventoryItem (same as KPIs)
         sold_items = (
             _scope_queryset(InventoryItem.objects.all(), business)
             .filter(SOLD_Q(), sold_at__gte=start_date, sold_at__lt=end_date)
         )
-        
+
         # Group by date
         from django.db.models.functions import TruncDate
         daily_sales = (
@@ -1340,24 +1500,24 @@ def v2_sales_trend_data_proxy(request):
             )
             .order_by('sale_date')
         )
-        
+
         # Build dict for quick lookup
         sales_by_date = {
             item['sale_date'].isoformat(): item
             for item in daily_sales
         }
-        
+
         # Fill all dates in range (including zeros)
         labels = []
         values = []
         current = today - timedelta(days=days - 1)
-        
+
         metric = request.GET.get("metric", "amount")
-        
+
         for i in range(days):
             date_str = current.isoformat()
             labels.append(date_str)
-            
+
             if date_str in sales_by_date:
                 row = sales_by_date[date_str]
                 if metric in ("count", "qty"):
@@ -1366,11 +1526,11 @@ def v2_sales_trend_data_proxy(request):
                     values.append(float(row['amount'] or 0))
             else:
                 values.append(0)
-            
+
             current += timedelta(days=1)
-        
+
         return JsonResponse({"labels": labels, "values": values})
-        
+
     except Exception as e:
         import logging
         logging.exception("Error in v2_sales_trend_data_proxy")
@@ -1391,7 +1551,7 @@ def v2_top_models_data_proxy(request):
         business = getattr(request, "business", None)
         if not business:
             return JsonResponse({"labels": [], "values": []})
-        
+
         # Parse period parameter
         period_param = request.GET.get("period", "month").lower()
         if period_param == "today":
@@ -1400,19 +1560,19 @@ def v2_top_models_data_proxy(request):
             days = 7
         else:  # month/30d
             days = 30
-        
+
         # Calculate date range
         tz = timezone.get_current_timezone()
         today = timezone.localdate()
         end_date = _start_of_day(today + timedelta(days=1), tz)
         start_date = _start_of_day(today - timedelta(days=days - 1), tz)
-        
+
         # Query sold items by product/model
         sold_items = (
             _scope_queryset(InventoryItem.objects.select_related('product'), business)
             .filter(SOLD_Q(), sold_at__gte=start_date, sold_at__lt=end_date)
         )
-        
+
         # Group by product name
         from django.db.models.functions import Coalesce
         top_models = (
@@ -1432,16 +1592,16 @@ def v2_top_models_data_proxy(request):
             )
             .order_by('-qty')[:5]  # Top 5
         )
-        
+
         labels = []
         values = []
-        
+
         for item in top_models:
             labels.append(str(item['model_name'] or 'Unknown'))
             values.append(int(item['qty'] or 0))
-        
+
         return JsonResponse({"labels": labels, "values": values})
-        
+
     except Exception as e:
         import logging
         logging.exception("Error in v2_top_models_data_proxy")
@@ -1601,3 +1761,386 @@ def api_recommendations(request):
 @require_GET
 def dashboard_healthz_proxy(request):
     return JsonResponse({"ok": True, "time": timezone.now().isoformat()})
+
+
+# ---------------------------------------------------------------------------
+# Business Health Score — dashboard card view + full breakdown + API
+# ---------------------------------------------------------------------------
+
+@login_required
+@require_business
+@never_cache
+def business_health_view(request):
+    """
+    Full Business Health Score breakdown page.
+    URL: /dashboard/business-health/
+    Scoped to request.business — no cross-tenant leakage.
+    """
+    from dashboard.services_health import calculate_business_health_score, get_health_badges
+
+    business = request.business
+    health = calculate_business_health_score(business)
+    badges = get_health_badges(health)
+
+    return render(request, "dashboard/business_health.html", {
+        "business": business,
+        "health": health,
+        "badges": badges,
+        "active_tab": "business_health",
+        "show_search": False,
+    })
+
+
+@login_required
+@require_business
+@require_GET
+def business_health_api(request):
+    """
+    JSON endpoint for Business Health Score.
+    GET /dashboard/api/business-health/
+    Returns the same structure as calculate_business_health_score, serialised.
+    Scoped to request.business.
+    """
+    from dashboard.services_health import calculate_business_health_score
+    from datetime import date as _date
+
+    business = request.business
+    health = calculate_business_health_score(business)
+
+    # Serialise dates for JSON
+    period = health.get("period", {})
+    health_json = {
+        **health,
+        "period": {
+            "start": period["start"].isoformat() if isinstance(period.get("start"), _date) else None,
+            "end": period["end"].isoformat() if isinstance(period.get("end"), _date) else None,
+        },
+    }
+
+    return JsonResponse(health_json)
+
+
+# ---------------------------------------------------------------------------
+# Daily Books Balance / Business Health Check
+# ---------------------------------------------------------------------------
+
+@login_required
+@require_business
+@never_cache
+@require_http_methods(["GET", "POST"])
+def books_balance_view(request):
+    from dashboard.services_books_balance import books_balance_history, run_daily_books_balance
+
+    business = request.business
+    if request.method == "POST":
+        check = run_daily_books_balance(business, force=True)
+        if request.headers.get("x-requested-with") == "XMLHttpRequest":
+            return JsonResponse(
+                {
+                    "ok": True,
+                    "status": check.status,
+                    "score": check.score,
+                    "variance": str(check.variance),
+                    "recommendation": check.recommendation,
+                }
+            )
+        return redirect("dashboard:books_balance")
+
+    check = run_daily_books_balance(business)
+    history = books_balance_history(business)
+    return render(
+        request,
+        "dashboard/books_balance.html",
+        {
+            "business": business,
+            "books_balance": check,
+            "history": history,
+            "active_tab": "books_balance",
+            "show_search": False,
+        },
+    )
+
+
+@login_required
+@require_business
+@never_cache
+@require_http_methods(["POST"])
+def books_balance_recalculate(request):
+    from dashboard.services_books_balance import run_daily_books_balance
+
+    check = run_daily_books_balance(request.business, force=True)
+    return JsonResponse(
+        {
+            "ok": True,
+            "status": check.status,
+            "status_label": check.status_label,
+            "score": check.score,
+            "expected_value": str(check.expected_value),
+            "actual_value": str(check.actual_value),
+            "variance": str(check.variance),
+            "recommendation": check.recommendation,
+        }
+    )
+
+
+# ---------------------------------------------------------------------------
+# Credit Score Views
+# ---------------------------------------------------------------------------
+
+@login_required
+@require_business
+def credit_scores_list(request):
+    """
+    Shows the active business's creditworthiness score.
+    GET /dashboard/credit-scores/
+    """
+    from dashboard.services_credit import calculate_business_credit_score
+
+    business = request.business
+    credit = calculate_business_credit_score(business)
+    return render(request, "dashboard/credit_scores.html", {
+        "business": business,
+        "credit": credit,
+        "active_tab": "credit_scores",
+        "show_search": False,
+    })
+
+
+@login_required
+@require_business
+def credit_score_detail(request, customer_phone: str):
+    """
+    Backward-compatible legacy route. Credit scoring is now business-level,
+    so render the same business credit profile for the active business.
+    GET /dashboard/credit-score/<customer_phone>/
+    """
+    from dashboard.services_credit import calculate_business_credit_score
+
+    business = request.business
+    credit = calculate_business_credit_score(business)
+    return render(request, "dashboard/credit_scores.html", {
+        "business": business,
+        "credit": credit,
+        "active_tab": "credit_scores",
+        "show_search": False,
+        "legacy_customer_phone": customer_phone,
+    })
+
+
+@login_required
+@require_business
+@require_GET
+def credit_score_api(request, customer_phone: str):
+    """
+    Backward-compatible JSON endpoint. Returns business creditworthiness.
+    GET /dashboard/api/credit-score/<customer_phone>/
+    """
+    from dashboard.services_credit import calculate_business_credit_score
+
+    business = request.business
+    credit = calculate_business_credit_score(business)
+    credit["legacy_customer_phone"] = customer_phone
+    return JsonResponse(credit)
+
+
+@login_required
+@require_business
+@require_GET
+def business_credit_score_api(request):
+    from dashboard.services_credit import calculate_business_credit_score
+
+    return JsonResponse(calculate_business_credit_score(request.business))
+
+
+# ---------------------------------------------------------------------------
+# Business OS Dashboard — Cross-Vertical Intelligence Layer (Phase 2)
+# ---------------------------------------------------------------------------
+
+@login_required
+@require_business
+def business_os_dashboard(request):
+    """
+    Unified Business OS dashboard showing cross-vertical analytics.
+    Aggregates metrics from all active verticals for executive overview.
+    """
+    business = request.business
+
+    try:
+        from inventory.services.business_os import get_business_os_metrics
+        metrics = get_business_os_metrics(business)
+    except Exception:
+        metrics = {"business": business, "verticals_active": [], "insights": [], "vertical_metrics": {}}
+
+    ctx = {
+        "business": business,
+        **metrics,
+    }
+    return render(request, "dashboard/business_os.html", ctx)
+
+
+# ---------------------------------------------------------------------------
+# Recurring Costs — cross-vertical cost management
+# ---------------------------------------------------------------------------
+
+@login_required
+@require_business
+def recurring_costs_list(request):
+    """Show and manage recurring costs for the active business."""
+    from inventory.models import RecurringCost, RecurringCostCategory, RecurringCostFrequency
+    from django.db.models import Sum
+
+    business = request.business
+    costs = RecurringCost.objects.filter(business=business)
+    active = costs.filter(is_active=True)
+    monthly_total = 0.0
+
+    for c in active:
+        amt = float(c.amount)
+        if c.frequency == "monthly":
+            monthly_total += amt
+        elif c.frequency == "weekly":
+            monthly_total += amt * 4.33
+        elif c.frequency == "quarterly":
+            monthly_total += amt / 3
+        elif c.frequency == "annually":
+            monthly_total += amt / 12
+
+    by_category = {}
+    for c in active:
+        by_category[c.category] = by_category.get(c.category, 0) + float(c.amount)
+
+    return render(request, "dashboard/recurring_costs.html", {
+        "business": business,
+        "costs": costs,
+        "active_count": active.count(),
+        "monthly_total": monthly_total,
+        "by_category": by_category,
+        "categories": RecurringCostCategory.choices,
+        "frequencies": RecurringCostFrequency.choices,
+    })
+
+
+@login_required
+@require_business
+def recurring_cost_add(request):
+    """Add a new recurring cost."""
+    from inventory.models import RecurringCost, RecurringCostCategory, RecurringCostFrequency
+    from django.utils import timezone as _tz
+    import calendar
+
+    business = request.business
+    if request.method == "POST":
+        name = request.POST.get("name", "").strip()
+        category = request.POST.get("category", "other")
+        amount = request.POST.get("amount", "0")
+        frequency = request.POST.get("frequency", "monthly")
+        notes = request.POST.get("notes", "").strip()
+
+        try:
+            from decimal import Decimal
+            amt = Decimal(amount)
+            if not name or amt <= 0:
+                raise ValueError("Name and amount required")
+
+            today = _tz.localdate()
+            year, month = today.year, today.month
+            if month == 12:
+                year, month = year + 1, 1
+            else:
+                month += 1
+            next_run = today.replace(day=1) if today.day > 1 else today
+            next_run = next_run.replace(year=year, month=month, day=1)
+
+            RecurringCost.objects.create(
+                business=business,
+                name=name,
+                category=category,
+                amount=amt,
+                frequency=frequency,
+                notes=notes,
+                is_active=True,
+                next_run_date=next_run,
+                created_by=request.user,
+            )
+            from django.contrib import messages
+            messages.success(request, f"'{name}' added as a recurring cost.")
+            return redirect("dashboard:recurring_costs")
+        except Exception as exc:
+            from django.contrib import messages
+            messages.error(request, f"Could not add cost: {exc}")
+
+    return render(request, "dashboard/recurring_cost_form.html", {
+        "business": business,
+        "categories": RecurringCostCategory.choices,
+        "frequencies": RecurringCostFrequency.choices,
+        "editing": False,
+    })
+
+
+@login_required
+@require_business
+def recurring_cost_edit(request, pk: int):
+    """Edit an existing recurring cost."""
+    from inventory.models import RecurringCost, RecurringCostCategory, RecurringCostFrequency
+    from django.shortcuts import get_object_or_404
+
+    business = request.business
+    cost = get_object_or_404(RecurringCost, pk=pk, business=business)
+
+    if request.method == "POST":
+        try:
+            from decimal import Decimal
+            cost.name = request.POST.get("name", cost.name).strip()
+            cost.category = request.POST.get("category", cost.category)
+            cost.amount = Decimal(request.POST.get("amount", str(cost.amount)))
+            cost.frequency = request.POST.get("frequency", cost.frequency)
+            cost.notes = request.POST.get("notes", cost.notes).strip()
+            cost.save()
+            from django.contrib import messages
+            messages.success(request, f"'{cost.name}' updated.")
+            return redirect("dashboard:recurring_costs")
+        except Exception as exc:
+            from django.contrib import messages
+            messages.error(request, f"Could not update cost: {exc}")
+
+    return render(request, "dashboard/recurring_cost_form.html", {
+        "business": business,
+        "cost": cost,
+        "categories": RecurringCostCategory.choices,
+        "frequencies": RecurringCostFrequency.choices,
+        "editing": True,
+    })
+
+
+@login_required
+@require_business
+def recurring_cost_toggle(request, pk: int):
+    """Toggle active/paused state of a recurring cost."""
+    from inventory.models import RecurringCost
+    from django.shortcuts import get_object_or_404
+    from django.views.decorators.http import require_POST as _require_POST
+    from django.contrib import messages
+
+    business = request.business
+    cost = get_object_or_404(RecurringCost, pk=pk, business=business)
+    cost.is_active = not cost.is_active
+    cost.save(update_fields=["is_active"])
+    state = "resumed" if cost.is_active else "paused"
+    messages.success(request, f"'{cost.name}' {state}.")
+    return redirect("dashboard:recurring_costs")
+
+
+@login_required
+@require_business
+def recurring_cost_delete(request, pk: int):
+    """Delete a recurring cost."""
+    from inventory.models import RecurringCost
+    from django.shortcuts import get_object_or_404
+    from django.contrib import messages
+
+    business = request.business
+    cost = get_object_or_404(RecurringCost, pk=pk, business=business)
+    name = cost.name
+    cost.delete()
+    messages.success(request, f"'{name}' deleted.")
+    return redirect("dashboard:recurring_costs")

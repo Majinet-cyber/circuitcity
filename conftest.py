@@ -1,7 +1,17 @@
 # conftest.py — pytest config to make tests stable & fast
 
 import os
+import warnings
 import pytest
+from uuid import uuid4
+from django.utils.text import slugify
+
+# Suppress ResourceWarning for unclosed file descriptors opened by WhiteNoise.
+# WhiteNoise opens static files during middleware initialisation and does not
+# always close the low-level FileIO objects before Python's GC finalises them.
+# This is a known upstream behaviour and is not caused by application code.
+# See: https://github.com/evansd/whitenoise/issues (file-handle leak on init)
+warnings.filterwarnings("ignore", category=ResourceWarning, message="unclosed file")
 
 # Ensure Django settings are discoverable for pytest
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "cc.settings")
@@ -42,3 +52,17 @@ def _relaxed_test_settings(settings):
         pass
     # Speed up password hashing in tests
     settings.PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
+    # Ensure TESTING is True for notification/on_commit handling
+    settings.TESTING = True
+
+
+# --- Test helpers for creating unique test data ----------------------------
+def unique_slug(name="test-biz"):
+    """
+    Generate a unique slug for test Business objects.
+
+    Usage:
+        Business.objects.create(name="Test Biz", slug=unique_slug("Test Biz"), ...)
+    """
+    base = slugify(name) or "test-biz"
+    return f"{base}-{uuid4().hex[:8]}"

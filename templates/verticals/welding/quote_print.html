@@ -1,0 +1,154 @@
+{% load humanize %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Quotation {{ quote.quote_number }}</title>
+  <style>
+    @page { size: A4; margin: 14mm; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #f3f4f6; color: #111827; font-family: Arial, Helvetica, sans-serif; }
+    .sheet { width: 210mm; min-height: 297mm; margin: 0 auto; background: #fff; padding: 18mm; box-shadow: 0 12px 40px rgba(15,23,42,.15); }
+    .top { display: grid; grid-template-columns: 1fr auto; gap: 24px; align-items: start; border-bottom: 2px solid #f97316; padding-bottom: 18px; }
+    .brand { display: flex; gap: 14px; align-items: flex-start; }
+    .brand-logo { width: 86px; height: 64px; object-fit: contain; }
+    .brand-fallback { min-width: 86px; height: 64px; display: grid; place-items: center; border: 1px solid #e5e7eb; color: #f97316; font-weight: 800; font-size: 22px; }
+    .brand h1 { font-size: 22px; margin: 0 0 5px; }
+    .muted { color: #6b7280; }
+    .doc-title { text-align: right; }
+    .doc-title h2 { margin: 0; font-size: 30px; text-transform: uppercase; letter-spacing: 1px; }
+    .doc-title p { margin: 6px 0 0; }
+    .panel-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin: 22px 0; }
+    .panel { border: 1px solid #e5e7eb; padding: 14px; min-height: 118px; }
+    .panel h3 { margin: 0 0 10px; font-size: 13px; color: #f97316; text-transform: uppercase; }
+    table { width: 100%; border-collapse: collapse; }
+    th { text-align: left; background: #111827; color: #fff; padding: 10px; font-size: 12px; }
+    td { padding: 10px; border-bottom: 1px solid #e5e7eb; vertical-align: top; }
+    .num { text-align: right; white-space: nowrap; }
+    .totals { margin-left: auto; width: 320px; margin-top: 18px; }
+    .totals td { border-bottom: none; padding: 7px 10px; }
+    .grand td { background: #fff7ed; border-top: 2px solid #f97316; font-size: 18px; font-weight: 800; }
+    .bottom { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 28px; }
+    .signature { margin-top: 34px; border-top: 1px solid #111827; padding-top: 8px; min-height: 56px; }
+    .signature img { max-height: 54px; max-width: 180px; object-fit: contain; display: block; margin-bottom: 8px; }
+    .footer { margin-top: 24px; text-align: center; color: #9ca3af; font-size: 11px; }
+    .actions { max-width: 210mm; margin: 16px auto; text-align: right; }
+    .actions button { background: #f97316; color: #fff; border: 0; padding: 10px 16px; font-weight: 700; cursor: pointer; }
+    @media print {
+      body { background: #fff; }
+      .sheet { width: auto; min-height: auto; padding: 0; box-shadow: none; }
+      .actions { display: none; }
+    }
+    @media (max-width: 760px) {
+      .sheet { width: 100%; padding: 18px; }
+      .top, .panel-grid, .bottom { grid-template-columns: 1fr; }
+      .doc-title { text-align: left; }
+      .table-wrap { overflow-x: auto; }
+      table.items { min-width: 680px; }
+      .totals { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <div class="actions"><button type="button" onclick="window.print()">Print / Save PDF</button></div>
+  <main class="sheet">
+    <section class="top">
+      <div class="brand">
+        {% if branding_profile.logo %}
+        <img class="brand-logo" src="{{ branding_profile.logo.url }}" alt="{{ branding_profile.company_name }} logo">
+        {% else %}
+        <div class="brand-fallback">{{ branding_profile.company_name|slice:":2"|upper }}</div>
+        {% endif %}
+        <div>
+          <h1>{{ branding_profile.company_name }}</h1>
+          <div class="muted">
+            {% if branding_profile.phone %}{{ branding_profile.phone }}<br>{% endif %}
+            {% if branding_profile.email %}{{ branding_profile.email }}<br>{% endif %}
+            {% if branding_profile.address %}{{ branding_profile.address|linebreaksbr }}{% endif %}
+            {% if branding_profile.city %}<br>{{ branding_profile.city }}{% endif %}
+          </div>
+        </div>
+      </div>
+      <div class="doc-title">
+        <h2>Quotation</h2>
+        <p><strong>{{ quote.quote_number }}</strong></p>
+        <p class="muted">{{ quote.created_at|date:"d M Y" }}</p>
+      </div>
+    </section>
+
+    <section class="panel-grid">
+      <div class="panel">
+        <h3>Customer Details</h3>
+        <strong>{{ quote.customer_name }}</strong><br>
+        {% if quote.customer_contact_person %}Contact: {{ quote.customer_contact_person }}<br>{% endif %}
+        {% if quote.customer_phone %}Phone: {{ quote.customer_phone }}<br>{% endif %}
+        {% if quote.customer_email %}Email: {{ quote.customer_email }}<br>{% endif %}
+        {% if quote.customer_address %}<span class="muted">{{ quote.customer_address|linebreaksbr }}</span>{% endif %}
+      </div>
+      <div class="panel">
+        <h3>Quote Details</h3>
+        Quote No: <strong>{{ quote.quote_number }}</strong><br>
+        Date: {{ quote.created_at|date:"d M Y" }}<br>
+        Status: {{ quote.get_status_display }}<br>
+        {% if quote.valid_until %}Valid Until: {{ quote.valid_until|date:"d M Y" }}{% else %}Valid for 30 days from issue{% endif %}
+      </div>
+    </section>
+
+    <div class="table-wrap">
+      <table class="items">
+        <thead>
+          <tr><th>#</th><th>Description</th><th class="num">Quantity</th><th class="num">Unit Price</th><th class="num">Total</th></tr>
+        </thead>
+        <tbody>
+          {% for item in line_items %}
+          <tr>
+            <td>{{ forloop.counter }}</td>
+            <td>{{ item.material_name }}{% if item.notes %}<br><span class="muted">{{ item.notes }}</span>{% endif %}</td>
+            <td class="num">{{ item.quantity }} {{ item.material_unit }}</td>
+            <td class="num">{% if item.unit_price %}MWK {{ item.unit_price|floatformat:0|intcomma }}{% else %}TBD{% endif %}</td>
+            <td class="num">MWK {{ item.line_total|floatformat:0|intcomma }}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="5">No line items added.</td></tr>
+          {% endfor %}
+          {% for cost in costs %}
+          <tr>
+            <td>{{ line_items|length|add:forloop.counter }}</td>
+            <td>{% if cost.description %}{{ cost.description }}{% else %}{{ cost.get_cost_type_display }}{% endif %}</td>
+            <td class="num">1</td>
+            <td class="num">MWK {{ cost.amount|floatformat:0|intcomma }}</td>
+            <td class="num">MWK {{ cost.amount|floatformat:0|intcomma }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <table class="totals">
+      <tr><td>Materials</td><td class="num">MWK {{ totals.materials_total|floatformat:0|intcomma }}</td></tr>
+      <tr><td>Labour</td><td class="num">MWK {{ totals.labour_total|floatformat:0|intcomma }}</td></tr>
+      <tr><td>Transport</td><td class="num">MWK {{ totals.transport_total|floatformat:0|intcomma }}</td></tr>
+      <tr><td>Other</td><td class="num">MWK {{ totals.other_total|floatformat:0|intcomma }}</td></tr>
+      <tr><td>Profit</td><td class="num">MWK {{ totals.profit_total|floatformat:0|intcomma }}</td></tr>
+      <tr class="grand"><td>Grand Total</td><td class="num">MWK {{ totals.grand_total|floatformat:0|intcomma }}</td></tr>
+    </table>
+
+    <section class="bottom">
+      <div>
+        <h3>Terms and Conditions</h3>
+        <p class="muted">{{ quote.terms|default:branding_profile.terms|linebreaksbr }}</p>
+      </div>
+      <div>
+        <h3>Payment Instructions</h3>
+        <p class="muted">{{ branding_profile.payment_instructions|default:"Payment details will be confirmed with the customer."|linebreaksbr }}</p>
+        <div class="signature">
+          {% if branding_profile.signature_image %}<img src="{{ branding_profile.signature_image.url }}" alt="Signature">{% endif %}
+          Authorized by{% if branding_profile.signature_name %}: <strong>{{ branding_profile.signature_name }}</strong>{% endif %}
+        </div>
+      </div>
+    </section>
+    <div class="footer">Generated by Emajinet</div>
+  </main>
+</body>
+</html>

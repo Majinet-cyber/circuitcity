@@ -58,6 +58,16 @@
                     </div>
 
                     <div class="mb-3">
+                        <label for="{{ form.trainer.id_for_label }}" class="form-label">
+                            {{ form.trainer.label }}
+                        </label>
+                        {{ form.trainer }}
+                        {% if form.trainer.errors %}
+                            <div class="text-danger small mt-1">{{ form.trainer.errors }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="mb-3">
                         <label for="{{ form.notes.id_for_label }}" class="form-label">
                             Notes
                         </label>

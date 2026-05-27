@@ -3,7 +3,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Sign in · Imajinet</title>
+  <title>Sign in · Emajinet</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0">
   <meta http-equiv="Pragma" content="no-cache">
@@ -193,7 +193,7 @@
     </div>
     
     <!-- Keep your logo -->
-    <img class="card-logo" src="{% static 'img/majn.png' %}" alt="Imajinet">
+    <img class="card-logo" src="{% static 'img/majn.png' %}" alt="Emajinet">
 
     <p id="loginDesc" class="sub">Sign in to continue.</p>
 
@@ -266,5 +266,11 @@
       addEventListener('pageshow', e => { if (e.persisted) location.reload(); });
     } catch(e){}
   </script>
+
+  <!-- Copyright Footer -->
+  <div style="position: fixed; bottom: 0; left: 0; right: 0; padding: 16px 20px; display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem; color: #64748b; pointer-events: none;">
+    <span>&copy; Emajinet</span>
+    <span>{% now "Y" %}</span>
+  </div>
 </body>
 </html>

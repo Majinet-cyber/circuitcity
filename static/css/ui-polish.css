@@ -1,0 +1,165 @@
+/* UI Polish: Safe-area support, button consistency, header fixes */
+
+/* ========= Safe-Area Support for iPhone ========= */
+:root {
+  --safe-area-top: env(safe-area-inset-top, 0px);
+  --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-area-left: env(safe-area-inset-left, 0px);
+  --safe-area-right: env(safe-area-inset-right, 0px);
+}
+
+/* Header safe-area padding */
+.cc-header,
+.topbar,
+.navbar,
+.app-navbar,
+.page-header {
+  padding-top: calc(12px + var(--safe-area-top));
+  padding-left: calc(12px + var(--safe-area-left));
+  padding-right: calc(12px + var(--safe-area-right));
+}
+
+/* Bottom nav safe-area padding */
+.cc-bottomnav {
+  padding-bottom: var(--safe-area-bottom);
+}
+
+/* Content padding to account for safe areas */
+body.has-bottomnav main,
+body.has-bottomnav .cc-page,
+body.has-bottomnav .page {
+  padding-bottom: calc(var(--dock-h, 64px) + var(--safe-area-bottom) + 16px);
+}
+
+/* ========= Mobile Header Fix: Prevent Overlap ========= */
+@media (max-width: 991.98px) {
+  .cc-header {
+    position: sticky;
+    top: 0;
+    z-index: 1600;
+    background: var(--card, #ffffff);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    min-height: 52px;
+    display: flex;
+    align-items: center;
+  }
+  
+  /* Ensure hamburger/menu button is inside header, not floating */
+  .cc-header .mobile-toggle,
+  .cc-header .menu-toggle,
+  .cc-header .hamburger {
+    position: relative;
+    margin-right: 12px;
+    z-index: 1601;
+  }
+  
+  /* Prevent header content from overlapping */
+  .cc-header .topbar h1,
+  .cc-header .topbar .topbar-title {
+    margin: 0;
+    padding-left: 0;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+/* ========= Button Consistency ========= */
+/* Standardize button casing: Title Case for actions */
+.btn {
+  text-transform: none; /* Override any global uppercase */
+  font-weight: 500;
+  border-radius: 8px;
+  padding: 10px 16px;
+  font-size: 14px;
+  line-height: 1.5;
+  transition: all 0.2s ease;
+}
+
+/* Primary buttons */
+.btn-primary {
+  background-color: var(--cc-accent, #2563eb);
+  border-color: var(--cc-accent, #2563eb);
+  color: #ffffff;
+}
+
+.btn-primary:hover {
+  background-color: #1d4ed8;
+  border-color: #1d4ed8;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+}
+
+/* Secondary buttons */
+.btn-secondary {
+  background-color: #f1f5f9;
+  border-color: #e2e8f0;
+  color: #475569;
+}
+
+.btn-secondary:hover {
+  background-color: #e2e8f0;
+  border-color: #cbd5e1;
+}
+
+/* Button text: Title Case for action buttons */
+.btn[class*="scan"],
+.btn[class*="sell"],
+.btn[class*="stock"],
+.btn[class*="add"] {
+  text-transform: none;
+}
+
+/* Specific button text fixes */
+.btn:contains("Scan IN"),
+.btn:contains("Scan In") {
+  /* Use "Scan In" (Title Case) */
+}
+
+/* ========= Consistent Button Sizing ========= */
+.btn-sm {
+  padding: 6px 12px;
+  font-size: 13px;
+  border-radius: 6px;
+}
+
+.btn-lg {
+  padding: 14px 24px;
+  font-size: 16px;
+  border-radius: 10px;
+}
+
+/* ========= Money Formatting Helper Class ========= */
+.money,
+.amount,
+.currency {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+/* ========= Mobile-Specific Polish ========= */
+@media (max-width: 576px) {
+  /* Ensure buttons are tappable */
+  .btn {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  /* Better spacing for mobile cards */
+  .glass-card,
+  .card {
+    margin-bottom: 16px;
+  }
+  
+  /* Consistent padding */
+  .cc-page,
+  .content,
+  main {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+}
+

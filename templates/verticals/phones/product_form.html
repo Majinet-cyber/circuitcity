@@ -1,6 +1,12 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block title %}{% if product %}Edit{% else %}Add{% endif %} Phone Product · Emajinet{% endblock %}
+
+{% block extra_head %}
+<!-- Pricing Intelligence Styles -->
+<link rel="stylesheet" href="{% static 'css/pricing-intelligence.css' %}">
+{% endblock %}
 
 {% block content %}
 
@@ -21,6 +27,34 @@
   .btn-secondary{background:#f1f5f9;color:#475569}
   .btn-secondary:hover{background:#e2e8f0}
   .form-row{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .specs-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;margin:12px 0}
+  /* Premium RAM/ROM Cards - Mobile First */
+  .spec-button{background:#ffffff;border:3px solid #e2e8f0;border-radius:16px;padding:18px 14px;font-weight:800;color:#0f172a;cursor:pointer;transition:all 0.3s cubic-bezier(0.4,0,0.2,1);font-size:1rem;text-align:center;box-shadow:0 2px 8px rgba(15,23,42,0.04)}
+  .spec-button:hover{background:#f8fafc;border-color:#cbd5e1;transform:translateY(-3px);box-shadow:0 8px 20px rgba(59,130,246,0.12)}
+  .spec-button.selected{background:linear-gradient(135deg,#3b82f6,#8b5cf6);color:#fff;border-color:#3b82f6;box-shadow:0 6px 20px rgba(59,130,246,0.4);transform:translateY(-2px)}
+  .spec-button.selected::before{content:"✓";position:absolute;top:6px;right:6px;background:#10b981;color:#fff;width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.75rem;font-weight:800}
+  .spec-button{position:relative}
+  
+  /* Brand Cards - Premium Style */
+  .brand-selection-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:12px;margin:12px 0}
+  .brand-card-btn{background:#ffffff;border:3px solid #e2e8f0;border-radius:16px;padding:20px 14px;font-weight:800;color:#0f172a;cursor:pointer;transition:all 0.3s cubic-bezier(0.4,0,0.2,1);font-size:1rem;text-align:center;position:relative;box-shadow:0 2px 8px rgba(15,23,42,0.04)}
+  .brand-card-btn:hover{transform:translateY(-4px);box-shadow:0 12px 28px rgba(15,23,42,0.15)}
+  .brand-card-btn.selected{border-color:var(--brand-color,#3b82f6);background:linear-gradient(135deg,var(--brand-color,#3b82f6),rgba(255,255,255,0.95));color:#fff;box-shadow:0 8px 24px rgba(59,130,246,0.35)}
+  .brand-card-btn .brand-name{display:block;font-size:1.1rem;font-weight:900;letter-spacing:0.5px}
+  
+  /* Mobile Responsive - 2 cards per row on phones */
+  @media (max-width:640px){
+    .specs-grid{grid-template-columns:repeat(2,1fr);gap:12px}
+    .spec-button{padding:16px 12px;font-size:0.95rem}
+    .brand-selection-grid{grid-template-columns:repeat(2,1fr);gap:10px}
+    .brand-card-btn{padding:18px 12px;font-size:0.95rem}
+  }
+  
+  /* Tablet */
+  @media (min-width:641px) and (max-width:1024px){
+    .specs-grid{grid-template-columns:repeat(3,1fr)}
+    .brand-selection-grid{grid-template-columns:repeat(3,1fr)}
+  }
 </style>
 
 <div class="form-page">
@@ -32,42 +66,63 @@
       {% csrf_token %}
       
       {% if not product %}
-      <!-- Brand and Model (immutable after creation) -->
-      <div class="form-row">
-        <div class="form-group">
-          <label for="brand">Brand *</label>
-          <select id="brand" name="brand" required>
-            <option value="">Select brand...</option>
-            <option value="TECNO">TECNO</option>
-            <option value="ITEL">ITEL</option>
-            <option value="SAMSUNG">SAMSUNG</option>
-            <option value="INFINIX">INFINIX</option>
-            <option value="XIAOMI">XIAOMI</option>
-            <option value="OPPO">OPPO</option>
-            <option value="VIVO">VIVO</option>
-            <option value="OTHER">OTHER</option>
-          </select>
+      <!-- Brand Selection - Clickable Cards -->
+      <div class="form-group">
+        <label>Select Brand *</label>
+        <div class="brand-selection-grid">
+          <button type="button" class="brand-card-btn" data-brand="TECNO" data-color="#3b82f6">
+            <span class="brand-name">TECNO</span>
+          </button>
+          <button type="button" class="brand-card-btn" data-brand="ITEL" data-color="#ef4444">
+            <span class="brand-name">ITEL</span>
+          </button>
+          <button type="button" class="brand-card-btn" data-brand="SAMSUNG" data-color="#f97316">
+            <span class="brand-name">SAMSUNG</span>
+          </button>
+          <button type="button" class="brand-card-btn" data-brand="INFINIX" data-color="#10b981">
+            <span class="brand-name">INFINIX</span>
+          </button>
+          <button type="button" class="brand-card-btn" data-brand="XIAOMI" data-color="#8b5cf6">
+            <span class="brand-name">XIAOMI</span>
+          </button>
+          <button type="button" class="brand-card-btn" data-brand="IPHONE" data-color="#111827">
+            <span class="brand-name">IPHONE</span>
+          </button>
+          <button type="button" class="brand-card-btn" data-brand="OPPO" data-color="#06b6d4">
+            <span class="brand-name">OPPO</span>
+          </button>
+          <button type="button" class="brand-card-btn" data-brand="VIVO" data-color="#0ea5e9">
+            <span class="brand-name">VIVO</span>
+          </button>
+          <button type="button" class="brand-card-btn" data-brand="OTHER" data-color="#6b7280">
+            <span class="brand-name">OTHER</span>
+          </button>
         </div>
-        
-        <div class="form-group">
-          <label for="model_name">Model Name *</label>
-          <input type="text" id="model_name" name="model_name" placeholder="e.g., Spark 40" required>
-        </div>
+        <small>Tap a brand to select it</small>
+        <input type="hidden" id="brand" name="brand" required>
       </div>
       
-      <!-- RAM and ROM -->
-      <div class="form-row">
-        <div class="form-group">
-          <label for="ram_gb">RAM (GB) *</label>
-          <input type="number" id="ram_gb" name="ram_gb" min="1" max="32" placeholder="e.g., 4" required>
-          <small>RAM in gigabytes</small>
+      <!-- Model Name -->
+      <div class="form-group">
+        <label for="model_name">Model Name *</label>
+        <input type="text" id="model_name" name="model_name" placeholder="e.g., Spark 40" required>
+      </div>
+      
+      <!-- RAM and ROM - Premium Clickable Cards (Mobile-First, NO 32GB) -->
+      <div class="form-group">
+        <label>Storage + RAM Configuration *</label>
+        <div class="specs-grid">
+          <button type="button" class="spec-button" data-ram="2" data-rom="64">64+2</button>
+          <button type="button" class="spec-button" data-ram="3" data-rom="64">64+3</button>
+          <button type="button" class="spec-button" data-ram="3" data-rom="128">128+3</button>
+          <button type="button" class="spec-button" data-ram="4" data-rom="128">128+4</button>
+          <button type="button" class="spec-button" data-ram="8" data-rom="128">128+8</button>
+          <button type="button" class="spec-button" data-ram="4" data-rom="256">256+4</button>
+          <button type="button" class="spec-button" data-ram="8" data-rom="256">256+8</button>
         </div>
-        
-        <div class="form-group">
-          <label for="rom_gb">ROM/Storage (GB) *</label>
-          <input type="number" id="rom_gb" name="rom_gb" min="8" max="1024" placeholder="e.g., 128" required>
-          <small>Internal storage in gigabytes</small>
-        </div>
+        <small>Tap a configuration (ROM+RAM format: Storage+Memory, Malawi-relevant specs only)</small>
+        <input type="hidden" id="ram_gb" name="ram_gb" required>
+        <input type="hidden" id="rom_gb" name="rom_gb" required>
       </div>
       {% else %}
       <!-- Display immutable fields -->
@@ -92,13 +147,15 @@
         <div class="form-group">
           <label for="default_cost_price">Default Cost Price (optional)</label>
           <input type="number" id="default_cost_price" name="default_cost_price" min="0" step="0.01" placeholder="0.00" value="{% if product.default_cost_price %}{{ product.default_cost_price }}{% endif %}">
-          <small>MWK</small>
+          <small>MWK - Your purchase/order price</small>
         </div>
         
         <div class="form-group">
           <label for="default_selling_price">Default Selling Price (optional)</label>
           <input type="number" id="default_selling_price" name="default_selling_price" min="0" step="0.01" placeholder="0.00" value="{% if product.default_selling_price %}{{ product.default_selling_price }}{% endif %}">
-          <small>MWK</small>
+          <small>MWK - Customer pays this amount</small>
+          <!-- Real-time pricing intelligence feedback -->
+          <div id="price-feedback" class="pricing-feedback" style="display:none;"></div>
         </div>
       </div>
       
@@ -125,6 +182,108 @@
     </form>
   </div>
 </div>
+
+<script>
+  // Handle brand card selection
+  document.addEventListener('DOMContentLoaded', function() {
+    const brandButtons = document.querySelectorAll('.brand-card-btn');
+    const brandInput = document.getElementById('brand');
+    
+    brandButtons.forEach(button => {
+      button.addEventListener('click', function() {
+        // Remove selected class from all buttons
+        brandButtons.forEach(btn => btn.classList.remove('selected'));
+        
+        // Add selected class to clicked button
+        this.classList.add('selected');
+        
+        // Set brand color as CSS variable for selected state
+        const brandColor = this.getAttribute('data-color');
+        this.style.setProperty('--brand-color', brandColor);
+        
+        // Update hidden input
+        const brand = this.getAttribute('data-brand');
+        if (brandInput) brandInput.value = brand;
+      });
+    });
+    
+    // Handle specs (Storage + RAM) panel selection
+    const specButtons = document.querySelectorAll('.spec-button');
+    const ramInput = document.getElementById('ram_gb');
+    const romInput = document.getElementById('rom_gb');
+    
+    specButtons.forEach(button => {
+      button.addEventListener('click', function() {
+        // Remove selected class from all buttons
+        specButtons.forEach(btn => btn.classList.remove('selected'));
+        
+        // Add selected class to clicked button
+        this.classList.add('selected');
+        
+        // Update hidden inputs
+        const rom = this.getAttribute('data-rom');
+        const ram = this.getAttribute('data-ram');
+        
+        if (romInput) romInput.value = rom;
+        if (ramInput) ramInput.value = ram;
+      });
+    });
+  });
+</script>
+
+<!-- Pricing Intelligence JavaScript -->
+<script src="{% static 'js/pricing-intelligence.js' %}"></script>
+<script>
+  // Initialize pricing intelligence for selling price
+  document.addEventListener('DOMContentLoaded', function() {
+    const costPriceInput = document.getElementById('default_cost_price');
+    const sellingPriceInput = document.getElementById('default_selling_price');
+    
+    if (costPriceInput && sellingPriceInput) {
+      // Initialize pricing intelligence
+      let pricingValidator = null;
+      
+      // Function to initialize or update pricing intelligence
+      function initializePricingIntelligence() {
+        const costPrice = parseFloat(costPriceInput.value) || 0;
+        
+        if (costPrice > 0) {
+          // Calculate suggested price (20% markup as default for phones)
+          const suggestedPrice = costPrice * 1.20;
+          
+          if (pricingValidator) {
+            // Update existing validator
+            pricingValidator.updateCostPrice(costPrice);
+            pricingValidator.updateSuggestedPrice(suggestedPrice);
+          } else {
+            // Create new validator
+            pricingValidator = new PricingIntelligence({
+              sellingPriceInput: '#default_selling_price',
+              costPrice: costPrice,
+              suggestedPrice: suggestedPrice,
+              feedbackContainer: '#price-feedback',
+              currency: 'MK'
+            });
+          }
+        }
+      }
+      
+      // Listen for changes to cost price to update suggestions
+      costPriceInput.addEventListener('input', function() {
+        initializePricingIntelligence();
+      });
+      
+      costPriceInput.addEventListener('blur', function() {
+        initializePricingIntelligence();
+      });
+      
+      // Initialize on page load if cost price already exists
+      if (costPriceInput.value) {
+        initializePricingIntelligence();
+      }
+    }
+  });
+</script>
 
 {% endblock %}
 

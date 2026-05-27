@@ -1,0 +1,49 @@
+{% load marketplace_media %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Checkout - {{ listing.title }}</title>
+  <style>
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,sans-serif;background:#f0fdf4;color:#0f172a}
+    .wrap{max-width:1040px;margin:0 auto;padding:28px 16px;display:grid;grid-template-columns:1fr 420px;gap:20px}
+    .card{background:#fff;border:1px solid #bbf7d0;border-radius:20px;box-shadow:0 8px 32px rgba(5,150,105,.1);padding:20px}
+    .hero-img{width:100%;height:280px;border-radius:16px;object-fit:cover;background:#ecfdf5}
+    label{display:block;font-weight:700;font-size:.85rem;margin:.7rem 0 .25rem;color:#047857}
+    input,textarea{width:100%;box-sizing:border-box;border:1.5px solid #d1fae5;border-radius:12px;padding:.75rem;font:inherit;transition:border-color .2s}
+    input:focus,textarea:focus{outline:0;border-color:#059669;box-shadow:0 0 0 3px rgba(5,150,105,.1)}
+    button,.btn{display:inline-flex;justify-content:center;width:100%;border:0;border-radius:999px;background:linear-gradient(135deg,#059669,#047857);color:#fff;font-weight:800;padding:.85rem 1rem;text-decoration:none;cursor:pointer;box-shadow:0 4px 16px rgba(5,150,105,.3);transition:transform .15s,box-shadow .15s}
+    button:hover,.btn:hover{transform:translateY(-1px);box-shadow:0 8px 24px rgba(5,150,105,.4)}
+    .muted{color:#64748b}.price{font-size:1.7rem;font-weight:900;color:#047857}
+    .trust-badge{display:flex;align-items:center;gap:.5rem;font-size:.8rem;color:#059669;font-weight:700;margin-top:.75rem}
+    @media(max-width:820px){.wrap{grid-template-columns:1fr}.card:first-child{order:2}}
+  </style>
+</head>
+<body>
+<main class="wrap">
+  <section class="card">
+    <a href="{% url 'marketplace:listing' business.slug listing.listing_slug %}" class="muted" style="text-decoration:none;">Back to listing</a>
+    <h1>{{ listing.title }}</h1>
+    {% with media=listing|listing_card_media %}
+      {% if media.kind == "image" %}<img src="{{ media.url }}" alt="{{ media.alt }}" class="hero-img">{% else %}<div class="hero-img" style="display:grid;place-items:center;font-size:3rem;">{{ media.placeholder_icon }}</div>{% endif %}
+    {% endwith %}
+  </section>
+  <section class="card">
+    <div class="muted">{{ business.name }}</div>
+    <div class="price">{{ business.currency }} {{ listing.price|floatformat:0 }}</div>
+    {% if messages %}{% for m in messages %}<div style="background:#fee2e2;color:#991b1b;border-radius:12px;padding:.65rem;margin:.75rem 0;">{{ m }}</div>{% endfor %}{% endif %}
+    <form method="post">
+      {% csrf_token %}
+      <label>Your name</label><input name="buyer_name" required value="{{ request.POST.buyer_name }}">
+      <label>Phone</label><input name="buyer_phone" required value="{{ request.POST.buyer_phone }}">
+      <label>Email optional</label><input type="email" name="buyer_email" value="{{ request.POST.buyer_email }}">
+      <label>Quantity</label><input type="number" min="1" max="99" name="quantity" value="{{ quantity }}">
+      <label>Delivery / location notes optional</label><textarea name="delivery_notes" rows="3">{{ request.POST.delivery_notes }}</textarea>
+      <button style="margin-top:1rem;">🔒 Pay Securely with PayChangu</button>
+      <div class="trust-badge">✓ Verified by Emajinet &nbsp;·&nbsp; ✓ Secure checkout &nbsp;·&nbsp; ✓ Seller will contact you</div>
+    </form>
+  </section>
+</main>
+</body>
+</html>

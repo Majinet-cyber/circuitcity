@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Product Added · Clothing{% endblock %}
+
+{% block content %}
+
+<style>
+.success-container {
+  max-width: 600px;
+  margin: 60px auto;
+  padding: 20px;
+  text-align: center;
+}
+
+.success-icon {
+  font-size: 5rem;
+  margin-bottom: 24px;
+  animation: pop 0.5s ease-out;
+}
+
+@keyframes pop {
+  0% { transform: scale(0); }
+  50% { transform: scale(1.2); }
+  100% { transform: scale(1); }
+}
+
+.success-title {
+  font-size: 2rem;
+  font-weight: 800;
+  color: #0f172a;
+  margin-bottom: 12px;
+}
+
+.success-message {
+  font-size: 1.1rem;
+  color: #64748b;
+  margin-bottom: 40px;
+}
+
+.product-card {
+  background: white;
+  border-radius: 16px;
+  padding: 24px;
+  margin-bottom: 32px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  border: 1px solid #e2e8f0;
+  text-align: left;
+}
+
+.product-name {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin-bottom: 8px;
+}
+
+.product-meta {
+  color: #64748b;
+  font-size: 0.95rem;
+}
+
+.action-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.action-btn {
+  padding: 16px;
+  border-radius: 12px;
+  font-weight: 700;
+  font-size: 1rem;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.2s;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #0ea5e9 0%, #3b82f6 100%);
+  color: white;
+}
+
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(14, 165, 233, 0.3);
+  color: white;
+}
+
+.btn-secondary {
+  background: white;
+  color: #0f172a;
+  border: 2px solid #e2e8f0;
+}
+
+.btn-secondary:hover {
+  border-color: #0ea5e9;
+  color: #0ea5e9;
+}
+
+.btn-print {
+  background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+  color: white;
+}
+
+.btn-print:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(139, 92, 246, 0.3);
+  color: white;
+}
+</style>
+
+<div class="success-container">
+  <div class="success-icon">✅</div>
+  <h1 class="success-title">Product Added!</h1>
+  <p class="success-message">Your product has been successfully added to inventory</p>
+
+  {% if product %}
+  <div class="product-card">
+    <div class="product-name">{{ product.name }}</div>
+    <div class="product-meta">
+      <strong>SKU:</strong> {{ product.internal_sku|default:product.sku }}<br>
+      <strong>Price:</strong> K {{ product.selling_price }}<br>
+      <strong>Stock:</strong> {{ product.quantity_in_stock }} pieces
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="action-buttons">
+    <a href="{% url 'verticals:clothing_quick_add_step1' %}" class="action-btn btn-primary">
+      ➕ Add Another
+    </a>
+    
+    <a href="{% url 'verticals:clothing_fast_stock_in' %}" class="action-btn btn-secondary">
+      📦 Stock In
+    </a>
+    
+    <a href="{% url 'verticals:clothing_fast_sell' %}" class="action-btn btn-secondary">
+      🛒 Sell Now
+    </a>
+    
+    {% if product %}
+    <a href="{% url 'verticals:clothing_print_labels' product.id %}?qty=4&show_price=yes&size=medium" class="action-btn btn-print">
+      🏷️ Print Labels
+    </a>
+    {% endif %}
+  </div>
+
+  <div style="margin-top: 32px;">
+    <a href="{% url 'verticals:clothing_dashboard_v2' %}" style="color: #64748b; text-decoration: none; font-weight: 600;">
+      ← Back to Dashboard
+    </a>
+  </div>
+</div>
+
+{% endblock %}
+

@@ -8,6 +8,9 @@
 {% block notif_allow %}stock_in,stock_sold,low_stock{% endblock %}
 
 {% block extra_css %}
+<!-- Standard Scanner CSS -->
+<link rel="stylesheet" href="{% static 'css/scanner_standard.css' %}">
+
 <style>
   /* ===== Layout ===== */
   .page{margin:0 auto;max-width:1120px;padding:clamp(12px,4vw,24px)}
@@ -98,25 +101,7 @@
   .pill{font-size:12px;color:var(--cc-accent-700);background:rgba(31,111,235,.10);border:1px solid rgba(31,111,235,.25);padding:4px 8px;border-radius:999px}
   .kbd{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:var(--cc-panel);border:1px solid var(--cc-border);color:var(--cc-text);padding:2px 6px;border-radius:6px}
 
-  /* ===== Camera shell + overlay scanline ===== */
-  #cameraBox{margin-top:8px;display:none;background:var(--cc-panel);border:1px dashed var(--cc-border);border-radius:14px;padding:12px}
-  .scan-shell{position:relative;border-radius:14px;overflow:hidden;background:#000;box-shadow:var(--cc-shadow)}
-  #camera{width:100%;max-height:360px;min-height:220px;background:#000;display:block;object-fit:cover}
-  .scan-overlay{position:absolute;inset:0;pointer-events:none}
-  .scan-frame{
-    position:absolute; inset:10% 8%;
-    border:2px solid rgba(255,255,255,.25);
-    border-radius:12px;
-    box-shadow: inset 0 0 0 9999px rgba(0,0,0,.20);
-  }
-  .scanline{
-    position:absolute; left:8%; right:8%; height:2px; border-radius:2px;
-    background:linear-gradient(90deg, transparent, #00ff5a, transparent);
-    box-shadow:0 0 10px #00ff5a, 0 0 20px rgba(0,255,90,.6);
-    animation: sweep 2.0s linear infinite alternate;
-  }
-  .scanline.paused{ animation-play-state: paused; }
-  @keyframes sweep { from{ top:10%; } to{ top:90%; } }
+  /* Camera styles now handled by scanner_standard.css */
 
   /* Toast */
   .toast{
@@ -133,25 +118,7 @@
     display:none;margin-top:.5rem;padding:.6rem .8rem;border:1px solid #fbbf24;background:#fffbeb;color:#92400e;border-radius:10px
   }
 
-  /* Picker overlay when multiple codes detected */
-  #ccscan-picker{
-    position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
-    background:rgba(0,0,0,.55);z-index:9999
-  }
-  #ccscan-picker .card{
-    background:#fff;max-width:90vw;width:520px;padding:16px;border-radius:12px;
-    box-shadow:0 10px 40px rgba(0,0,0,.35);font-family:system-ui,Segoe UI,Roboto,Arial,sans-serif;
-  }
-  #ccscan-picker .list{max-height:55vh;overflow:auto;display:flex;flex-direction:column;gap:8px}
-  #ccscan-picker .item{
-    text-align:left;padding:10px 12px;border-radius:10px;border:1px solid #e5e7eb;
-    background:#f9fafb;cursor:pointer;word-break:break-all
-  }
-  #ccscan-picker .item small{display:block;color:#6b7280;margin-top:2px}
-  #ccscan-picker .actions{margin-top:12px;display:flex;justify-content:flex-end;gap:8px}
-  #ccscan-picker .cancel,.secondary{
-    padding:8px 12px;border-radius:10px;border:1px solid #e5e7eb;background:#fff;cursor:pointer
-  }
+  /* Picker styles now handled by scanner_standard.css */
 </style>
 {% endblock %}
 
@@ -176,57 +143,51 @@
           class="form"
           data-validate
           aria-describedby="imeiHelp"
-          data-default-location-id="{{ default_location.id|default:request.user.agent_profile.location.id|default:'' }}"
-          data-default-location-name="{{ default_location.name|default:request.user.agent_profile.location.name|default:'' }}"
+          data-default-location-id="{{ default_location_id|default:'' }}"
+          data-default-location-name="{{ default_location_name|default:'' }}"
           {# Optional: have your view set this to "1" for agents to lock their store #}
           data-lock-location="{{ lock_location|default:'' }}">
       {% csrf_token %}
       {% if form.non_field_errors %}<div class="help-error">{{ form.non_field_errors }}</div>{% endif %}
 
-      <!-- IMEI -->
+      <!-- IMEI Scanner (Using Standard Scanner Component) -->
       <div>
-        <label for="id_imei">IMEI</label>
+        {% comment %}
+        STANDARD SCANNER - SCAN IN MODE (PHONES)
+        =========================================
+        ✅ IMEI validation: Exactly 15 digits enforced
+        ✅ Global uniqueness: Checked via API before accepting
+        ✅ Back camera only (no front camera, no switch option)
+        ✅ Use/Scan Again UX (Fast Sell standard)
+        ✅ Multi-code picker when multiple barcodes detected
+        {% endcomment %}
+        
+        <label for="id_imei">IMEI / Barcode</label>
         <div class="field" id="imeiField">
-          <!-- never more than 15 -->
-          <input type="text"
-                 id="id_imei"
-                 name="imei"
-                 inputmode="numeric"
-                 autocomplete="off"
-                 placeholder="Scan or paste IMEI (15 digits)"
-                 aria-required="true"
-                 aria-invalid="false"
-                 maxlength="15"
-                 style="width:100%;background:transparent;border:0;padding:12px 14px;">
-          <!-- live counter badge -->
-          <span id="imeiLen"
-                class="badge rounded-pill"
-                style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:#e2e8f0;color:#0f172a;padding:.15rem .5rem;">
-            0/15
-          </span>
+          <input
+            type="text"
+            id="id_imei"
+            name="imei"
+            maxlength="15"
+            pattern="\d{15}"
+            inputmode="numeric"
+            autocomplete="off"
+            placeholder="Enter or scan 15-digit IMEI"
+            aria-required="true"
+            aria-invalid="false"
+            data-testid="imei-input">
+          <span id="imeiLen" class="badge badge-warn" style="margin-left:8px">0/15</span>
         </div>
-        <div id="imeiHelp" class="help-error" hidden>Enter a valid IMEI (exactly 15 digits).</div>
-        <div class="hstack" style="margin-top:6px">
-          <button type="button" id="pasteBtn" class="btn btn-secondary">Paste from Clipboard</button>
-          <button type="button" id="camToggle" class="btn btn-sky">Start Camera</button>
-          <button type="button" id="torchBtn" class="btn">Toggle Torch</button>
+        
+        <div class="hstack" style="margin-top:6px;gap:8px">
+          <button type="button" id="pasteBtn" class="btn">📋 Paste</button>
+          {% include "components/scanner_modal.html" with input_id="id_imei" mode="phone_scan_in" button_text="📷 Scan with Camera" %}
+          <button type="button" id="btnClear" class="btn btn-muted">✖ Clear</button>
           <span class="pill">Shortcut: <span class="kbd">Enter</span> submits</span>
-          <span class="pill">Focus: <span class="kbd">F2</span></span>
         </div>
-
-        <!-- Camera shell -->
-        <div id="cameraBox" aria-live="polite">
-          <div class="scan-shell">
-            <video id="camera" autoplay playsinline muted></video>
-            <div class="scan-overlay" aria-hidden="true">
-              <div class="scan-frame"></div>
-              <div id="scanline" class="scanline"></div>
-            </div>
-          </div>
-          <div class="hstack" style="margin-top:8px">
-            <select id="cameraSelect" class="btn" style="min-width:200px" aria-label="Choose camera"></select>
-            <button type="button" id="camStop" class="btn">Stop Camera</button>
-          </div>
+        
+        <div class="hint" style="margin-top:8px" id="imeiHelp" hidden>
+          IMEI must be exactly 15 digits.
         </div>
       </div>
 
@@ -308,7 +269,7 @@
 
       <!-- Actions -->
       <div class="hstack" style="margin-top:.25rem">
-        <button type="submit" id="submitBtn" class="btn btn-primary" disabled>Save</button>
+        <button type="submit" id="submitBtn" class="btn btn-primary" disabled data-testid="scan-in-submit">Save</button>
         <a class="btn btn-secondary" href="{{ stock_url|default:'/inventory/' }}">Cancel</a>
       </div>
     </form>
@@ -337,15 +298,7 @@
   const submitBtn  = document.getElementById('submitBtn');
   const pasteBtn   = document.getElementById('pasteBtn');
 
-  const camToggle  = document.getElementById('camToggle');
-  const camStop    = document.getElementById('camStop');
-  const camBox     = document.getElementById('cameraBox');
-  const camNode    = document.getElementById('camera');
-  const camSelect  = document.getElementById('cameraSelect');
-  const torchBtn   = document.getElementById('torchBtn');
-
   const toast      = document.getElementById('toast');
-  const scanLine   = document.getElementById('scanline');
   const secureWarn = document.getElementById('secureWarn');
   const orderPriceHint = document.getElementById('orderPriceHint');
 
@@ -690,291 +643,6 @@
     }
   });
 
-  // ===== Scanner: BarcodeDetector (QR-first, multi-pick) → ZXing → Quagga =====
-  let mediaStream = null, videoTrack = null;
-
-  async function listCameras(){
-    try{
-      const devices = await navigator.mediaDevices.enumerateDevices();
-      const cams = devices.filter(d=> d.kind==='videoinput');
-      if (camSelect){
-        camSelect.innerHTML = '';
-        cams.forEach((c,i)=>{
-          const opt = document.createElement('option');
-          opt.value = c.deviceId; opt.textContent = c.label || `Camera ${i+1}`;
-          camSelect.appendChild(opt);
-        });
-      }
-      return cams;
-    }catch{return [];}
-  }
-
-  async function startMedia(deviceId){
-    const constraints = {
-      audio:false,
-      video:{
-        facingMode: deviceId ? undefined : { ideal: 'environment' },
-        deviceId: deviceId ? { exact: deviceId } : undefined,
-        width:{ideal:1280}, height:{ideal:720}, frameRate:{ideal:30}
-      }
-    };
-    mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
-    camNode.srcObject = mediaStream;
-    await camNode.play();
-    videoTrack = mediaStream.getVideoTracks()[0];
-  }
-
-  async function enableTorch(desired){
-    if(!videoTrack) return;
-    const caps = videoTrack.getCapabilities?.() || {};
-    if (!('torch' in caps)) { showToast('Torch not supported on this camera.', false); return; }
-    try{
-      await videoTrack.applyConstraints({ advanced:[{ torch: desired }] });
-    }catch(_){}
-  }
-
-  function stopAll(){
-    // Stop ZXing session if any
-    if (startZXing._stop) { try{ startZXing._stop(); }catch(_){} }
-    // Stop Quagga
-    if (window.Quagga) try{ Quagga.offDetected && Quagga.offDetected(()=>{}); }catch(_){}
-    if (window.Quagga) try{ Quagga.stop(); }catch(_){}
-    // Stop native stream
-    if (mediaStream){ mediaStream.getTracks().forEach(t=>t.stop()); }
-    mediaStream = null; videoTrack = null;
-  }
-
-  function buildPicker(values, onPick, title='Multiple codes found — pick one'){
-    document.getElementById('ccscan-picker')?.remove();
-    const wrap = document.createElement('div');
-    wrap.id = 'ccscan-picker';
-    const card = document.createElement('div'); card.className='card';
-    const h = document.createElement('div'); h.style.fontWeight='600'; h.style.marginBottom='10px'; h.textContent=title;
-    const list = document.createElement('div'); list.className='list';
-    values.forEach(v=>{
-      const btn = document.createElement('button'); btn.type='button'; btn.className='item';
-      const main = (v.label ?? v.value ?? '').toString();
-      btn.innerHTML = `${main.replace(/</g,'&lt;').replace(/>/g,'&gt;')}${v.meta ? `<small>${v.meta}</small>` : ''}`;
-      btn.onclick = ()=>{ wrap.remove(); onPick(v.value ?? main); };
-      list.appendChild(btn);
-    });
-    const actions = document.createElement('div'); actions.className='actions';
-    const cancel = document.createElement('button'); cancel.type='button'; cancel.className='cancel'; cancel.textContent='Cancel';
-    cancel.onclick = ()=> wrap.remove();
-    const pause = document.createElement('button'); pause.type='button'; pause.className='secondary'; pause.textContent='Pause camera';
-    pause.onclick = ()=> { stopAll(); };
-    actions.append(pause, cancel);
-    card.append(h,list,actions); wrap.appendChild(card); document.body.appendChild(wrap);
-  }
-
-  function handleIMEI(value){
-    const codeRaw = digitsOnly(value);
-    if (!codeRaw) return;
-    const code = (codeRaw.length >= 15) ? codeRaw.slice(-15) : codeRaw; // prefer last 15
-    if (imeiEl){ imeiEl.value = code; updateImeiCounter(); updateFormValidity(); }
-    try{ navigator.vibrate && navigator.vibrate(20);}catch(_){}
-    if (code.length === 15 && submitBtn && !submitBtn.disabled){
-      showToast('Scanned IMEI: ' + code, true);
-      stopAll(); form.submit();
-    } else {
-      showToast('Scanned, but not a 15-digit IMEI.', false);
-    }
-  }
-
-  // Extract all possible IMEI-like candidates from a QR payload (e.g., JSON/Text with digits)
-  function imeiCandidatesFromString(s){
-    const d = digitsOnly(s||'');
-    const cands = new Set();
-    // slide a window to capture any 15-digit sequences
-    for (let i=0;i+15<=d.length;i++){
-      const chunk = d.slice(i,i+15);
-      if (chunk.length===15) cands.add(chunk);
-    }
-    return Array.from(cands);
-  }
-
-  async function startNativeDetector(deviceId){
-    await startMedia(deviceId);
-    if (!('BarcodeDetector' in window)){ return startZXing(deviceId).catch(()=>startQuagga(deviceId)); }
-
-    const detector = new window.BarcodeDetector({
-      formats: [
-        "qr_code","aztec","code_128","code_39","code_93",
-        "data_matrix","ean_13","ean_8","itf","pdf417","upc_a","upc_e"
-      ]
-    });
-
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d', { willReadFrequently: true });
-    let lastPickerAt = 0;
-
-    const loop = async () => {
-      if (!mediaStream) return;
-      requestAnimationFrame(loop);
-      if (camNode.readyState < 2) return;
-
-      canvas.width = camNode.videoWidth; canvas.height = camNode.videoHeight;
-      ctx.drawImage(camNode,0,0,canvas.width,canvas.height);
-
-      try{
-        const detections = await detector.detect(canvas);
-        if (!detections || !detections.length) return;
-
-        // Prefer QR codes in current frame
-        const qrs = detections.filter(c => (c.format||c.type) === 'qr_code');
-        if (qrs.length > 0){
-          // Build choices with full text; also map IMEI candidates for meta
-          const choices = [];
-          qrs.forEach((c, idx)=>{
-            const raw = (c.rawValue || c.rawValueText || '').trim();
-            if (!raw) return;
-            const imeis = imeiCandidatesFromString(raw);
-            const label = raw.length > 120 ? (raw.slice(0,120) + '…') : raw;
-            choices.push({
-              label,
-              value: raw,
-              meta: imeis.length ? `IMEI candidates: ${imeis.join(', ')}` : 'QR'
-            });
-          });
-
-          if (choices.length === 1){
-            const raw = choices[0].value;
-            const imeis = imeiCandidatesFromString(raw);
-            handleIMEI(imeis[0] || raw);
-          } else if (choices.length > 1){
-            const now = Date.now();
-            if (now - lastPickerAt > 600){
-              lastPickerAt = now;
-              buildPicker(choices, (picked)=>{
-                const imeis = imeiCandidatesFromString(picked);
-                handleIMEI(imeis[0] || picked);
-              }, 'Multiple QR codes found — pick one');
-            }
-          }
-          return; // don't try 1D if we already had QR
-        }
-
-        // No QR codes this frame → fall back to any detected codes (1D/others)
-        const vals = [...new Set(detections.map(c => (c.rawValue||c.rawValueText||"").trim()).filter(Boolean))];
-        if (vals.length === 1){
-          handleIMEI(vals[0]);
-        } else if (vals.length > 1){
-          const now = Date.now();
-          if (now - lastPickerAt > 600){
-            lastPickerAt = now;
-            buildPicker(vals.map(v=>({label:v.length>120?(v.slice(0,120)+'…'):v, value:v, meta:'Barcode'})),
-                        (picked)=> handleIMEI(picked),
-                        'Multiple barcodes found — pick one');
-          }
-        }
-      }catch(_){}
-    };
-    loop();
-  }
-
-  // ---- ZXing fallback (handles QR and many 1D symbologies) ----
-  async function startZXing(deviceId){
-    if (!window.ZXing || !ZXing.BrowserMultiFormatReader) {
-      throw new Error('ZXing not available');
-    }
-
-    const codeReader = new ZXing.BrowserMultiFormatReader();
-    const devices = await codeReader.listVideoInputDevices().catch(()=>[]);
-    let chosenId = deviceId || (devices[devices.length-1] || devices[0] || {}).deviceId;
-    if (!chosenId) throw new Error('No camera for ZXing');
-
-    await codeReader.decodeFromVideoDevice(chosenId, camNode, (result, err) => {
-      if (result && result.getText){
-        const raw = result.getText();
-        const imeis = imeiCandidatesFromString(raw);
-        if (imeis.length > 1){
-          buildPicker(imeis.map(v=>({label:v, value:v, meta:'IMEI'})), (picked)=> handleIMEI(picked), 'Multiple IMEIs found — pick one');
-        } else if (imeis.length === 1){
-          handleIMEI(imeis[0]);
-        } else {
-          // No clean IMEI; still try raw
-          handleIMEI(raw);
-        }
-        pauseScanline();
-        try{ navigator.vibrate?.(20); }catch(_){}
-      }
-    });
-
-    const stream = camNode.srcObject;
-    mediaStream = stream || null;
-    videoTrack = stream ? (stream.getVideoTracks()[0] || null) : null;
-
-    // allow stopAll() to reset ZXing
-    startZXing._stop = () => { try { codeReader.reset(); } catch(_){ } };
-  }
-
-  // ---- Quagga fallback (1-at-a-time; no QR support) ----
-  async function startQuagga(deviceId){
-    if (!window.Quagga) { showToast('Quagga not loaded.', false); return; }
-    Quagga.init({
-      inputStream: { type: 'LiveStream', target: camNode,
-        constraints: { facingMode: deviceId ? undefined : 'environment', deviceId: deviceId || undefined,
-          width:{ideal:1280}, height:{ideal:720} } },
-      decoder: { readers: ['code_128_reader','ean_reader','ean_8_reader','code_39_reader','upc_reader','upc_e_reader','itf_reader','codabar_reader'] },
-      locate: true,
-      numOfWorkers: navigator.hardwareConcurrency ? Math.min(4, navigator.hardwareConcurrency) : 2
-    }, (err)=>{
-      if(err){ showToast('Camera init failed. Use HTTPS or Android dev flag & allow camera.', false); return; }
-      Quagga.start();
-    });
-    Quagga.onDetected((result)=>{
-      const code = (result && result.codeResult && result.codeResult.code) || '';
-      if(!code) return;
-      handleIMEI(code);
-    });
-  }
-
-  // ---- UI buttons ----
-  camToggle && camToggle.addEventListener('click', async ()=>{
-    camBox.style.display = 'block';
-    const cams = await listCameras();
-    const firstId = (cams[0] && cams[0].deviceId) || undefined;
-
-    try{
-      if ('BarcodeDetector' in window){
-        await startNativeDetector(firstId);
-      } else if (window.ZXing && ZXing.BrowserMultiFormatReader){
-        await startZXing(firstId);
-      } else {
-        await startQuagga(firstId);
-      }
-      camToggle.textContent = 'Restart Camera';
-    }catch(err){
-      showToast('Could not start camera. Check permission / origin.', false);
-    }
-  });
-
-  camSelect && camSelect.addEventListener('change', async ()=>{
-    stopAll();
-    try{
-      if ('BarcodeDetector' in window){
-        await startNativeDetector(camSelect.value);
-      } else if (window.ZXing && ZXing.BrowserMultiFormatReader){
-        await startZXing(camSelect.value);
-      } else {
-        await startQuagga(camSelect.value);
-      }
-    }catch{
-      showToast('Could not switch camera.', false);
-    }
-  });
-
-  camStop && camStop.addEventListener('click', ()=>{
-    stopAll();
-    camBox.style.display='none';
-    camToggle.textContent='Start Camera';
-  });
-
-  torchBtn && torchBtn.addEventListener('click', ()=> enableTorch(true));
-
-  // Pause camera when tab hidden
-  document.addEventListener('visibilitychange', ()=>{ if (document.hidden) { stopAll(); } });
-
   // ---- Form submit guard: IMEI must be exactly 15 ----
   form.addEventListener('submit', (e)=>{
     clampTo15KeepLast(); // just in case
@@ -1104,9 +772,66 @@
 })();
 </script>
 
+<!-- Standard Scanner Integration -->
+<script src="https://unpkg.com/quagga@0.12.1/dist/quagga.min.js"></script>
+<script src="https://unpkg.com/@zxing/library@0.20.0"></script>
+<script src="{% static 'js/scanner_standard.js' %}"></script>
+<script>
+(function() {
+  // Initialize standard scanner for Scan In (phones)
+  StandardScanner.init('id_imei', {
+    mode: 'phone_scan_in',
+    onSuccess: function(imei) {
+      console.log('IMEI scanned successfully:', imei);
+      // IMEI already filled by scanner, update UI
+      if (typeof updateImeiCounter === 'function') {
+        updateImeiCounter();
+      }
+      if (typeof updateFormValidity === 'function') {
+        updateFormValidity();
+      }
+      // Focus on product selection
+      const prodEl = document.getElementById('id_product');
+      if (prodEl) {
+        prodEl.focus();
+        prodEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    },
+    onError: function(message) {
+      console.error('IMEI scan failed:', message);
+      if (window.showToast) {
+        showToast(message, false);
+      }
+    }
+  });
+  
+  // Add Clear button handler
+  const btnClear = document.getElementById('btnClear');
+  if (btnClear) {
+    btnClear.addEventListener('click', function() {
+      const imeiEl = document.getElementById('id_imei');
+      if (imeiEl) {
+        imeiEl.value = '';
+        if (typeof updateImeiCounter === 'function') {
+          updateImeiCounter();
+        }
+        if (typeof updateFormValidity === 'function') {
+          updateFormValidity();
+        }
+        imeiEl.focus();
+      }
+    });
+  }
+})();
+</script>
+
 <noscript>
   <div class="warn" style="display:block" role="alert">
     JavaScript is required to use the camera scanner and live validation. You can still type the IMEI and submit.
   </div>
 </noscript>
+
+{# Include mobile bottom nav (hidden on desktop) #}
+{% include 'partials/bottomnav.html' with active_tab='scan' %}
+
 {% endblock %}

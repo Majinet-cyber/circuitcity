@@ -1,0 +1,20 @@
+📈 Yesterday Sales Summary - {{ business_name }}
+
+{{ business_name }} - {{ date|date:"F d, Y" }}
+
+Total Sales: {{ total_sales }}
+Total Revenue: MK {{ total_revenue|floatformat:2 }}
+{% if total_profit %}Total Profit: MK {{ total_profit|floatformat:2 }}{% endif %}
+
+{% if top_products %}
+Top 5 Products Sold:
+{% for product in top_products %}
+- {{ product.name }}: {{ product.quantity }} sold
+{% endfor %}
+{% endif %}
+
+Great work yesterday! Keep up the momentum.
+
+---
+This is an automated email. Please do not reply directly to this message.
+

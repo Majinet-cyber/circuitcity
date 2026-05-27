@@ -1,0 +1,819 @@
+/* =====================================================================
+   MOBILE-FIRST UI SYSTEM — Circuit City / Emajinet
+   Version: 1.0.0
+   Created: 2025-12-18
+   
+   Purpose:
+   - Provide reusable, mobile-first utilities for the entire app
+   - Prevent overflow on small screens (360px+)
+   - Ensure charts, tables, KPIs, leaderboards never break layout
+   - Maintain premium glassmorphic design language
+   
+   Usage:
+   - Include in base.html and base_hq.html after tokens.css
+   - Replace inline mobile styles in templates with these utilities
+   - All utilities prefixed with .cc- for clarity
+   ===================================================================== */
+
+/* =====================================================================
+   1. CORE OVERFLOW PREVENTION UTILITIES
+   ===================================================================== */
+
+/**
+ * .cc-minw-0 — Critical for flex children
+ * Allows flex items to shrink below their content size
+ * Apply to any flex child that contains dynamic text/numbers
+ */
+.cc-minw-0 {
+  min-width: 0 !important;
+}
+
+/**
+ * .cc-ellipsis — Single-line text truncation
+ * Shows "..." when text overflows
+ * Use with title="full text" attribute for accessibility
+ */
+.cc-ellipsis {
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  min-width: 0;
+}
+
+/**
+ * .cc-wrap — Safe multi-line text wrapping
+ * Breaks long words without breaking layout
+ */
+.cc-wrap {
+  white-space: normal !important;
+  overflow-wrap: anywhere !important;
+  word-break: break-word !important;
+}
+
+/**
+ * .cc-amount — Currency and number formatting
+ * - Tabular numerals for alignment
+ * - No wrap to prevent broken amounts
+ * - Ellipsis on extreme overflow (rare)
+ */
+.cc-amount {
+  font-variant-numeric: tabular-nums;
+  -moz-font-feature-settings: "tnum";
+  -webkit-font-feature-settings: "tnum";
+  font-feature-settings: "tnum";
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: inline-block;
+  max-width: 100%;
+}
+
+/* =====================================================================
+   2. RESPONSIVE TYPOGRAPHY (clamp for fluid scaling)
+   ===================================================================== */
+
+/**
+ * Responsive font sizes that scale smoothly between mobile and desktop
+ * Use these on KPI values, headings, and key metrics
+ */
+.cc-text-kpi-value {
+  font-size: clamp(1.5rem, 5vw, 2.25rem);
+  font-weight: 900;
+  line-height: 1.1;
+}
+
+.cc-text-kpi-label {
+  font-size: clamp(0.75rem, 2vw, 0.85rem);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--cc-muted, #64748b);
+}
+
+.cc-text-metric-value {
+  font-size: clamp(1.25rem, 4vw, 1.75rem);
+  font-weight: 700;
+}
+
+.cc-text-metric-label {
+  font-size: clamp(0.7rem, 1.8vw, 0.8rem);
+  font-weight: 500;
+}
+
+.cc-text-heading {
+  font-size: clamp(1.5rem, 4vw, 2rem);
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.cc-text-subheading {
+  font-size: clamp(1rem, 2.5vw, 1.25rem);
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.cc-text-body {
+  font-size: clamp(0.875rem, 2vw, 1rem);
+  line-height: 1.5;
+}
+
+.cc-text-small {
+  font-size: clamp(0.75rem, 1.8vw, 0.875rem);
+  line-height: 1.4;
+}
+
+/* =====================================================================
+   3. RESPONSIVE KPI CARD GRID
+   ===================================================================== */
+
+/**
+ * .cc-kpi-grid — Responsive grid for dashboard KPI cards
+ * - 1 column on very small phones (< 480px)
+ * - 2 columns on normal mobile (480px - 767px)
+ * - 3 columns on tablets (768px - 991px)
+ * - 4 columns on desktop (992px+)
+ */
+.cc-kpi-grid {
+  display: grid;
+  gap: 1rem;
+  width: 100%;
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 480px) {
+  .cc-kpi-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 768px) {
+  .cc-kpi-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.25rem;
+  }
+}
+
+@media (min-width: 992px) {
+  .cc-kpi-grid {
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1.5rem;
+  }
+}
+
+/**
+ * .cc-kpi-grid-2 — Always 2 columns (except very small screens)
+ */
+.cc-kpi-grid-2 {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 480px) {
+  .cc-kpi-grid-2 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/**
+ * .cc-kpi-grid-3 — Always 3 columns (except mobile)
+ */
+.cc-kpi-grid-3 {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 576px) {
+  .cc-kpi-grid-3 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 768px) {
+  .cc-kpi-grid-3 {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+/* =====================================================================
+   4. TABLE SCROLL WRAPPER
+   ===================================================================== */
+
+/**
+ * .cc-table-scroll — Horizontal scroll wrapper for tables
+ * - Prevents tables from breaking layout on mobile
+ * - Smooth touch scrolling on iOS
+ * - Keeps table inside viewport
+ */
+.cc-table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  width: 100%;
+  margin-bottom: 1rem;
+}
+
+.cc-table-scroll table {
+  min-width: 600px; /* Force scroll if table is wider than container */
+  width: auto;
+}
+
+/* Optional: subtle scroll indicator on mobile */
+@media (max-width: 767px) {
+  .cc-table-scroll {
+    position: relative;
+  }
+  
+  .cc-table-scroll::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 20px;
+    background: linear-gradient(to left, rgba(255,255,255,0.8), transparent);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  
+  .cc-table-scroll:not(.scrolled-end)::after {
+    opacity: 1;
+  }
+}
+
+/* =====================================================================
+   5. CHART CONTAINER (PREVENTS CUT-OFF)
+   ===================================================================== */
+
+/**
+ * .cc-chart-container — Aspect-ratio safe chart wrapper
+ * - Ensures charts never overflow on mobile
+ * - Canvas/SVG stays inside bounds
+ * - Responsive height with min-height fallback
+ */
+.cc-chart-container {
+  position: relative;
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+  border-radius: 12px;
+  background: var(--cc-bg-card, #ffffff);
+  padding: 1rem;
+}
+
+.cc-chart-container canvas,
+.cc-chart-container svg {
+  max-width: 100% !important;
+  height: auto !important;
+  display: block;
+}
+
+/* Mobile: reduce chart height for better fit */
+@media (max-width: 767px) {
+  .cc-chart-container {
+    min-height: 250px;
+    max-height: 400px;
+  }
+  
+  .cc-chart-container canvas {
+    max-height: 350px !important;
+  }
+}
+
+/* Desktop: allow taller charts */
+@media (min-width: 768px) {
+  .cc-chart-container {
+    min-height: 300px;
+  }
+}
+
+/* =====================================================================
+   6. BUTTON GROUPS (STACK ON MOBILE)
+   ===================================================================== */
+
+/**
+ * .cc-btn-group — Button row that stacks on mobile
+ * - Horizontal on desktop
+ * - Vertical (stacked) on mobile for easy tapping
+ */
+.cc-btn-group {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+@media (max-width: 576px) {
+  .cc-btn-group {
+    flex-direction: column;
+    width: 100%;
+  }
+  
+  .cc-btn-group > * {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+/**
+ * .cc-btn-group-inline — Never stack (for small control groups)
+ */
+.cc-btn-group-inline {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+/* =====================================================================
+   7. LEADERBOARD / LIST ITEM UTILITIES
+   ===================================================================== */
+
+/**
+ * Safe leaderboard layout that never overflows
+ * - Name column gets flex + ellipsis
+ * - Value column stays fixed width and right-aligned
+ */
+.cc-leaderboard-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--cc-border, rgba(15,23,42,.08));
+}
+
+.cc-leaderboard-item:last-child {
+  border-bottom: none;
+}
+
+.cc-leaderboard-rank {
+  flex-shrink: 0;
+  width: 32px;
+  text-align: center;
+  font-weight: 700;
+  color: var(--cc-muted, #64748b);
+}
+
+.cc-leaderboard-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+  color: var(--cc-ink, #0f172a);
+}
+
+.cc-leaderboard-value {
+  flex-shrink: 0;
+  white-space: nowrap;
+  text-align: right;
+  font-weight: 700;
+  color: var(--cc-ink, #0f172a);
+  font-variant-numeric: tabular-nums;
+  min-width: fit-content;
+}
+
+/* Mobile: reduce value font size slightly */
+@media (max-width: 640px) {
+  .cc-leaderboard-value {
+    font-size: clamp(0.8rem, 2.5vw, 0.95rem);
+  }
+}
+
+/* =====================================================================
+   8. PANEL / CARD MOBILE PADDING
+   ===================================================================== */
+
+/**
+ * Responsive padding for cards/panels
+ * - Smaller padding on mobile (save space)
+ * - Normal padding on desktop
+ */
+.cc-panel,
+.cc-card-mobile {
+  padding: 1rem;
+  border-radius: 16px;
+  background: var(--cc-bg-card, #ffffff);
+  box-shadow: 0 4px 20px rgba(15,23,42,.08);
+  border: 1px solid var(--cc-border, rgba(15,23,42,.08));
+  margin-bottom: 1rem;
+}
+
+@media (max-width: 480px) {
+  .cc-panel,
+  .cc-card-mobile {
+    padding: 0.75rem;
+    border-radius: 12px;
+    margin-bottom: 0.75rem;
+  }
+}
+
+@media (min-width: 768px) {
+  .cc-panel,
+  .cc-card-mobile {
+    padding: 1.5rem;
+    border-radius: 20px;
+  }
+}
+
+/* =====================================================================
+   9. MOBILE SPACING TOKENS
+   ===================================================================== */
+
+/**
+ * Consistent spacing utilities for mobile-first layouts
+ */
+.cc-mb-mobile {
+  margin-bottom: 0.75rem;
+}
+
+@media (min-width: 768px) {
+  .cc-mb-mobile {
+    margin-bottom: 1.5rem;
+  }
+}
+
+.cc-gap-mobile {
+  display: flex;
+  gap: 0.75rem;
+}
+
+@media (min-width: 768px) {
+  .cc-gap-mobile {
+    gap: 1.5rem;
+  }
+}
+
+.cc-stack-mobile {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+@media (min-width: 768px) {
+  .cc-stack-mobile {
+    gap: 1.25rem;
+  }
+}
+
+/* =====================================================================
+   10. SAFE FLEX LAYOUTS
+   ===================================================================== */
+
+/**
+ * .cc-flex-safe — Flex container with overflow prevention
+ * Use for rows with dynamic content (name + amount, label + value, etc.)
+ */
+.cc-flex-safe {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.cc-flex-safe > * {
+  min-width: 0; /* Critical: allows children to shrink */
+}
+
+/**
+ * .cc-flex-between — Justify space-between with overflow protection
+ */
+.cc-flex-between {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.cc-flex-between > * {
+  min-width: 0;
+}
+
+/**
+ * .cc-flex-start — Align items start
+ */
+.cc-flex-start {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.cc-flex-start > * {
+  min-width: 0;
+}
+
+/**
+ * .cc-flex-col — Column flex
+ */
+.cc-flex-col {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+/* =====================================================================
+   11. MOBILE-SPECIFIC VISIBILITY UTILITIES
+   ===================================================================== */
+
+/**
+ * Show/hide elements based on screen size
+ */
+.cc-mobile-only {
+  display: block;
+}
+
+.cc-desktop-only {
+  display: none;
+}
+
+@media (min-width: 768px) {
+  .cc-mobile-only {
+    display: none !important;
+  }
+  
+  .cc-desktop-only {
+    display: block !important;
+  }
+}
+
+/* Inline variants */
+.cc-mobile-only-inline {
+  display: inline;
+}
+
+.cc-desktop-only-inline {
+  display: none;
+}
+
+@media (min-width: 768px) {
+  .cc-mobile-only-inline {
+    display: none !important;
+  }
+  
+  .cc-desktop-only-inline {
+    display: inline !important;
+  }
+}
+
+/* Flex variants */
+.cc-mobile-only-flex {
+  display: flex;
+}
+
+.cc-desktop-only-flex {
+  display: none;
+}
+
+@media (min-width: 768px) {
+  .cc-mobile-only-flex {
+    display: none !important;
+  }
+  
+  .cc-desktop-only-flex {
+    display: flex !important;
+  }
+}
+
+/* =====================================================================
+   12. FORM INPUT MOBILE SAFETY
+   ===================================================================== */
+
+/**
+ * Mobile-safe form inputs
+ * - 16px font size prevents iOS zoom
+ * - Full width on mobile
+ * - Proper touch targets
+ */
+.cc-input-mobile {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid var(--cc-border, rgba(15,23,42,.12));
+  border-radius: 12px;
+  font-size: 16px; /* Prevents iOS zoom on focus */
+  font-family: inherit;
+  color: var(--cc-ink, #0f172a);
+  background: var(--cc-bg-card, #ffffff);
+  transition: all 0.2s;
+}
+
+.cc-input-mobile:focus {
+  outline: none;
+  border-color: var(--cc-accent, #3b82f6);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+@media (min-width: 768px) {
+  .cc-input-mobile {
+    padding: 0.875rem 1rem;
+  }
+}
+
+/* =====================================================================
+   13. BADGE UTILITIES (MOBILE-SAFE)
+   ===================================================================== */
+
+/**
+ * Mobile-safe badges that never overflow
+ */
+.cc-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.25rem 0.5rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cc-badge-success {
+  background: #dcfce7;
+  color: #166534;
+  border: 1px solid #86efac;
+}
+
+.cc-badge-warning {
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fde68a;
+}
+
+.cc-badge-danger {
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fca5a5;
+}
+
+.cc-badge-info {
+  background: #dbeafe;
+  color: #1e40af;
+  border: 1px solid #93c5fd;
+}
+
+.cc-badge-neutral {
+  background: #f1f5f9;
+  color: #475569;
+  border: 1px solid #cbd5e1;
+}
+
+/* =====================================================================
+   14. NO HORIZONTAL SCROLL GUARANTEE
+   ===================================================================== */
+
+/**
+ * Apply to body/main containers to prevent any horizontal scroll
+ * Use carefully: ensure child elements respect width
+ */
+.cc-no-scroll-x {
+  overflow-x: hidden !important;
+  max-width: 100vw;
+}
+
+/* =====================================================================
+   15. BOTTOM NAV SAFE AREA (MOBILE PADDING)
+   ===================================================================== */
+
+/**
+ * Ensure content doesn't hide under bottom navigation
+ * - Applies to main content areas
+ * - Accounts for iOS safe area
+ */
+.cc-page-mobile {
+  padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px) + 1rem);
+}
+
+@media (min-width: 768px) {
+  .cc-page-mobile {
+    padding-bottom: 1.5rem; /* No bottom nav on desktop */
+  }
+}
+
+/* =====================================================================
+   16. GLASSMORPHIC MOBILE ENHANCEMENTS
+   ===================================================================== */
+
+/**
+ * Maintain premium glassmorphic look on mobile
+ * - Lighter blur on mobile (performance)
+ * - Preserved aesthetic
+ */
+.cc-glass-mobile {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 8px 32px rgba(15, 23, 42, 0.1);
+  border-radius: 16px;
+}
+
+@media (max-width: 767px) {
+  .cc-glass-mobile {
+    backdrop-filter: blur(8px); /* Lighter blur on mobile for performance */
+    -webkit-backdrop-filter: blur(8px);
+  }
+}
+
+/* =====================================================================
+   17. ACCESSIBLE TAP TARGETS (MOBILE)
+   ===================================================================== */
+
+/**
+ * Ensure all interactive elements meet 44x44px minimum tap target
+ */
+.cc-tap-target {
+  min-height: 44px;
+  min-width: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+/* =====================================================================
+   18. MOBILE DASHBOARD HEADER
+   ===================================================================== */
+
+/**
+ * Compact dashboard header for mobile
+ */
+.cc-dashboard-header-mobile {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.cc-dashboard-header-mobile h1 {
+  font-size: clamp(1.5rem, 4vw, 2rem);
+  font-weight: 800;
+  margin: 0;
+  color: var(--cc-ink, #0f172a);
+}
+
+.cc-dashboard-header-mobile p {
+  font-size: clamp(0.875rem, 2vw, 1rem);
+  color: var(--cc-muted, #64748b);
+  margin: 0;
+}
+
+@media (min-width: 768px) {
+  .cc-dashboard-header-mobile {
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+}
+
+/* =====================================================================
+   END OF MOBILE-FIRST UI SYSTEM
+   ===================================================================== */
+
+/**
+ * USAGE NOTES:
+ * 
+ * 1. Overflow Prevention:
+ *    - Always apply .cc-minw-0 to flex children with dynamic content
+ *    - Use .cc-ellipsis for names/titles that can be long
+ *    - Use .cc-amount for currency/numbers
+ * 
+ * 2. Responsive Grids:
+ *    - Use .cc-kpi-grid for dashboard KPI cards
+ *    - Will automatically stack on mobile
+ * 
+ * 3. Tables:
+ *    - Wrap all tables in <div class="cc-table-scroll">...</div>
+ *    - Prevents zoom-out on mobile
+ * 
+ * 4. Charts:
+ *    - Wrap chart canvas in <div class="cc-chart-container">...</div>
+ *    - Ensures charts never cut off
+ * 
+ * 5. Buttons:
+ *    - Use .cc-btn-group for action button rows
+ *    - Will stack vertically on mobile
+ * 
+ * 6. Leaderboards:
+ *    - Use .cc-leaderboard-item structure
+ *    - Names will ellipsis, values stay visible
+ * 
+ * 7. Testing:
+ *    - Test at 360px width (smallest common mobile)
+ *    - Ensure no horizontal scroll
+ *    - Check KPI values fit inside cards
+ * 
+ * 8. Desktop:
+ *    - All styles are mobile-first with desktop overrides
+ *    - Desktop layout remains premium and spacious
+ */
+

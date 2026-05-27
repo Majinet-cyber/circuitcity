@@ -1,0 +1,196 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Credit Exposure Report — {{ business.name|default:"Business" }}{% endblock %}
+
+{% block content %}
+<style>
+  .ce-page { max-width: 1100px; margin: 0 auto; padding: 0 1rem 4rem; }
+  .ce-header { background: linear-gradient(135deg, #ecfdf5, #fff); border: 1px solid #bbf7d0; border-radius: 20px; padding: 1.75rem 2rem; margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; flex-wrap: wrap; box-shadow: 0 4px 20px rgba(5,150,105,.08); }
+  .ce-header h1 { font-size: clamp(1.3rem, 3vw, 1.8rem); font-weight: 900; color: #0f172a; letter-spacing: -.02em; margin: 0; }
+  .ce-header .meta { font-size: .85rem; color: #64748b; margin-top: .35rem; }
+
+  .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+  .kpi-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 1.1rem 1.25rem; box-shadow: 0 2px 10px rgba(0,0,0,.05); }
+  .kpi-card .kl { font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; color: #64748b; font-weight: 800; }
+  .kpi-card .kv { font-size: 1.4rem; font-weight: 900; color: #0f172a; margin-top: .15rem; }
+  .kpi-card.warning .kv { color: #d97706; }
+  .kpi-card.danger .kv { color: #dc2626; }
+  .kpi-card.success .kv { color: #059669; }
+
+  /* Aging chart */
+  .aging-chart { display: flex; align-items: flex-end; gap: 16px; height: 100px; margin-bottom: 1rem; }
+  .aging-bar { flex: 1; border-radius: 6px 6px 0 0; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; font-size: .75rem; font-weight: 800; color: #fff; padding: .4rem; min-width: 40px; }
+  .aging-bar .bar-label { font-size: .65rem; margin-top: .3rem; color: #64748b; }
+
+  .section-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 18px; overflow: hidden; margin-bottom: 1.5rem; box-shadow: 0 2px 14px rgba(0,0,0,.05); }
+  .section-head { background: #ecfdf5; border-bottom: 1px solid #bbf7d0; padding: 1rem 1.5rem; display: flex; align-items: center; justify-content: space-between; }
+  .section-head h3 { font-size: .95rem; font-weight: 800; color: #047857; margin: 0; }
+
+  .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .ce-table { width: 100%; min-width: 760px; border-collapse: collapse; }
+  .ce-table th, .ce-table td { padding: .8rem 1rem; border-bottom: 1px solid #f1f5f9; vertical-align: middle; font-size: .88rem; }
+  .ce-table th { background: #ecfdf5; color: #047857; text-transform: uppercase; font-size: .7rem; letter-spacing: .05em; font-weight: 800; position: sticky; top: 0; }
+  .ce-table tbody tr:hover { background: #f8fafc; }
+  .ce-table tbody tr:last-child td { border-bottom: none; }
+  .ce-table .overdue td { background: #fff7f7 !important; }
+
+  .age-pill { display: inline-flex; padding: .2rem .55rem; border-radius: 999px; font-size: .72rem; font-weight: 800; }
+  .age-fresh { background: #dcfce7; color: #166534; }
+  .age-mid   { background: #fef3c7; color: #92400e; }
+  .age-late  { background: #fed7aa; color: #9a3412; }
+  .age-overdue { background: #fee2e2; color: #991b1b; }
+
+  .empty-state { text-align: center; padding: 4rem 1rem; color: #64748b; }
+  .empty-state .icon { font-size: 3rem; margin-bottom: .75rem; }
+
+  @media print {
+    .ce-page { max-width: 100%; }
+    .btn { display: none; }
+  }
+</style>
+
+<div class="ce-page">
+  <!-- Header -->
+  <div class="ce-header">
+    <div>
+      <h1>💳 Credit Exposure Report</h1>
+      <div class="meta">{{ business.name|default:"Business" }} · Layby Portfolio as at {{ report_date|date:"d F Y" }}</div>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+      <button class="btn btn-success rounded-pill btn-sm" onclick="window.print()">
+        <i class="bi bi-printer me-1"></i>Print
+      </button>
+      <a href="{% url 'dashboard:credit_scores' %}" class="btn btn-outline-success rounded-pill btn-sm">Business Credit Score</a>
+      <a href="{% url 'reports:home' %}" class="btn btn-outline-secondary rounded-pill btn-sm">← Reports</a>
+    </div>
+  </div>
+
+  <!-- KPIs -->
+  <div class="kpi-grid">
+    <div class="kpi-card success">
+      <div class="kl">Completed Orders</div>
+      <div class="kv">{{ summary.total_completed }}</div>
+    </div>
+    <div class="kpi-card warning">
+      <div class="kl">Active (Open)</div>
+      <div class="kv">{{ summary.total_active }}</div>
+    </div>
+    <div class="kpi-card danger">
+      <div class="kl">Cancelled</div>
+      <div class="kv">{{ summary.total_cancelled }}</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kl">Total Portfolio Value</div>
+      <div class="kv" style="font-size:1.1rem;">MWK {{ summary.total_value|floatformat:0 }}</div>
+    </div>
+    <div class="kpi-card danger">
+      <div class="kl">Outstanding Balance</div>
+      <div class="kv" style="font-size:1.1rem;">MWK {{ summary.total_outstanding|floatformat:0 }}</div>
+    </div>
+    <div class="kpi-card danger">
+      <div class="kl">Overdue (>90 days)</div>
+      <div class="kv">{{ summary.aging_over_90 }}</div>
+    </div>
+  </div>
+
+  <!-- Aging Buckets -->
+  {% if summary.total_active > 0 %}
+  <div class="section-card" style="margin-bottom:1.5rem;">
+    <div class="section-head"><h3>Aging Analysis (Active Orders)</h3></div>
+    <div style="padding: 1.5rem;">
+      <div class="aging-chart">
+        {% if summary.aging_0_30 %}<div class="aging-bar" style="height:{{ summary.aging_0_30|floatformat:0 }}0px;max-height:90px;min-height:20px;background:#059669;">
+          {{ summary.aging_0_30 }}<div class="bar-label">0–30d</div></div>{% endif %}
+        {% if summary.aging_31_60 %}<div class="aging-bar" style="height:{{ summary.aging_31_60|floatformat:0 }}0px;max-height:90px;min-height:20px;background:#d97706;">
+          {{ summary.aging_31_60 }}<div class="bar-label">31–60d</div></div>{% endif %}
+        {% if summary.aging_61_90 %}<div class="aging-bar" style="height:{{ summary.aging_61_90|floatformat:0 }}0px;max-height:90px;min-height:20px;background:#ea580c;">
+          {{ summary.aging_61_90 }}<div class="bar-label">61–90d</div></div>{% endif %}
+        {% if summary.aging_over_90 %}<div class="aging-bar" style="height:{{ summary.aging_over_90|floatformat:0 }}0px;max-height:90px;min-height:20px;background:#dc2626;">
+          {{ summary.aging_over_90 }}<div class="bar-label">>90d</div></div>{% endif %}
+      </div>
+      <div class="d-flex gap-4 flex-wrap" style="font-size:.82rem;">
+        <div><span style="display:inline-block;width:12px;height:12px;background:#059669;border-radius:3px;margin-right:4px;"></span>0–30 days: {{ summary.aging_0_30 }}</div>
+        <div><span style="display:inline-block;width:12px;height:12px;background:#d97706;border-radius:3px;margin-right:4px;"></span>31–60 days: {{ summary.aging_31_60 }}</div>
+        <div><span style="display:inline-block;width:12px;height:12px;background:#ea580c;border-radius:3px;margin-right:4px;"></span>61–90 days: {{ summary.aging_61_90 }}</div>
+        <div><span style="display:inline-block;width:12px;height:12px;background:#dc2626;border-radius:3px;margin-right:4px;"></span>>90 days (overdue): {{ summary.aging_over_90 }}</div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Orders Table -->
+  {% if orders %}
+  <div class="section-card">
+    <div class="section-head">
+      <h3>Active Layby Portfolio</h3>
+      <span class="text-muted small">{{ orders|length }} order(s)</span>
+    </div>
+    <div class="table-wrap">
+      <table class="ce-table">
+        <thead>
+          <tr>
+            <th>Ref</th>
+            <th>Customer</th>
+            <th>Phone</th>
+            <th>Value (MWK)</th>
+            <th>Outstanding</th>
+            <th>Age</th>
+            <th>Term</th>
+            <th>Status</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for order in orders %}
+          <tr {% if order.is_overdue %}class="overdue"{% endif %}>
+            <td class="fw-bold">{{ order.ref }}</td>
+            <td>{{ order.customer }}</td>
+            <td class="text-muted">{{ order.phone }}</td>
+            <td>{{ order.value|floatformat:0 }}</td>
+            <td class="fw-bold {% if order.outstanding > 0 %}text-danger{% else %}text-success{% endif %}">
+              {{ order.outstanding|floatformat:0 }}
+            </td>
+            <td>
+              {% if order.age_days <= 30 %}
+                <span class="age-pill age-fresh">{{ order.age_days }}d</span>
+              {% elif order.age_days <= 60 %}
+                <span class="age-pill age-mid">{{ order.age_days }}d</span>
+              {% elif order.age_days <= 90 %}
+                <span class="age-pill age-late">{{ order.age_days }}d</span>
+              {% else %}
+                <span class="age-pill age-overdue">{{ order.age_days }}d ⚠</span>
+              {% endif %}
+            </td>
+            <td>{{ order.term_months }}mo</td>
+            <td>
+              {% if order.is_overdue %}
+                <span class="badge bg-danger">Overdue</span>
+              {% else %}
+                <span class="badge bg-success">Active</span>
+              {% endif %}
+            </td>
+            <td>
+              <a href="{% url 'dashboard:credit_score_detail' order.phone %}?name={{ order.customer|urlencode }}" class="btn btn-sm btn-outline-success rounded-pill" style="font-size:.75rem;">Score</a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% else %}
+  <div class="section-card">
+    <div class="empty-state">
+      <div class="icon">📭</div>
+      <h5 class="fw-bold">No Active Layby Orders</h5>
+      <p>No credit exposure at this time. All orders are either completed or there are no layby orders yet.</p>
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="text-muted text-center" style="font-size:.78rem;margin-top:2rem;">
+    Confidential · {{ business.name|default:"Emajinet" }} Credit Report · {{ report_date|date:"d M Y" }}
+  </div>
+</div>
+{% endblock %}

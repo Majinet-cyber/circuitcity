@@ -1,8 +1,17 @@
 ﻿import os
+from pathlib import Path
+
+# Load .env file before Django settings
+try:
+    from dotenv import load_dotenv
+
+    BASE_DIR = Path(__file__).resolve().parent.parent
+    load_dotenv(BASE_DIR / ".env")
+except Exception:
+    pass  # python-dotenv not installed or .env not found
+
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "cc.settings")
+
 from django.core.asgi import get_asgi_application
 
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'cc.settings')
-
 application = get_asgi_application()
-
-

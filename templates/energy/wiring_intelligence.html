@@ -1,0 +1,985 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Wiring Intelligence – {{ business.name }}{% endblock %}
+
+{% block content %}
+<style>
+/* ============================================================
+   WIRING INTELLIGENCE — Emajinet Energy Flagship
+   12V / 24V / 48V System Intelligence + Series/Parallel Logic
+   ============================================================ */
+:root {
+  --wi-blue:   #1d4ed8;
+  --wi-green:  #059669;
+  --wi-amber:  #d97706;
+  --wi-red:    #dc2626;
+  --wi-slate:  #0f172a;
+  --wi-muted:  #64748b;
+  --wi-border: #e2e8f0;
+  --wi-radius: 16px;
+  --wi-shadow: 0 2px 12px rgba(15,23,42,.07);
+  --wi-gold:   #ca8a04;
+}
+.wi-hero {
+  background: linear-gradient(135deg,#0f172a 0%,#1e3a5f 50%,#1d4ed8 100%);
+  border-radius:var(--wi-radius); padding:2rem 2.25rem 1.75rem;
+  position:relative; overflow:hidden; margin-bottom:1.75rem; color:#fff;
+}
+.wi-hero::before {
+  content:''; position:absolute; top:-80px; right:-80px;
+  width:320px; height:320px;
+  background:radial-gradient(circle,rgba(99,102,241,.2) 0%,transparent 70%);
+}
+.wi-hero::after {
+  content:''; position:absolute; bottom:-60px; left:20%;
+  width:260px; height:260px;
+  background:radial-gradient(circle,rgba(16,185,129,.12) 0%,transparent 70%);
+}
+.wi-hero-inner { position:relative; z-index:1; }
+.wi-eyebrow {
+  font-size:.68rem; font-weight:700; letter-spacing:.12em; text-transform:uppercase;
+  color:rgba(255,255,255,.5); margin-bottom:.35rem; display:flex; align-items:center; gap:.5rem;
+}
+.wi-hero h1 { font-size:1.65rem; font-weight:800; color:#fff; margin-bottom:.2rem; }
+.wi-hero-sub { font-size:.88rem; color:rgba(255,255,255,.65); max-width:560px; }
+.wi-hero-badges { display:flex; gap:.5rem; flex-wrap:wrap; margin-top:1rem; }
+.wi-badge {
+  background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.18);
+  border-radius:999px; padding:.28rem .75rem; font-size:.72rem; font-weight:600;
+  color:rgba(255,255,255,.85);
+}
+.wi-badge.gold { background:rgba(202,138,4,.2); border-color:rgba(202,138,4,.4); color:#fbbf24; }
+
+/* ── CARD ── */
+.wi-card {
+  background:#fff; border-radius:var(--wi-radius); border:1.5px solid var(--wi-border);
+  box-shadow:var(--wi-shadow); padding:1.5rem; margin-bottom:1.25rem;
+  transition:box-shadow .15s;
+}
+.wi-card:hover { box-shadow:0 6px 24px rgba(15,23,42,.1); }
+.wi-card-header {
+  display:flex; align-items:center; gap:.6rem; margin-bottom:1.1rem;
+  padding-bottom:.75rem; border-bottom:1px solid #f1f5f9;
+}
+.wi-card-icon {
+  width:36px; height:36px; border-radius:10px;
+  display:flex; align-items:center; justify-content:center;
+  font-size:1rem; flex-shrink:0;
+}
+.wi-card-title { font-size:.95rem; font-weight:700; color:var(--wi-slate); }
+.wi-card-sub { font-size:.75rem; color:var(--wi-muted); }
+
+/* ── VOLTAGE SELECTOR ── */
+.volt-selector { display:flex; gap:.75rem; flex-wrap:wrap; margin-bottom:1.25rem; }
+.volt-btn {
+  flex:1; min-width:80px; padding:.65rem 1rem; border-radius:12px; font-weight:700;
+  font-size:.9rem; border:2px solid var(--wi-border); background:#f8fafc;
+  cursor:pointer; transition:all .15s; text-align:center; color:var(--wi-slate);
+}
+.volt-btn:hover { border-color:#6366f1; background:#eef2ff; color:#4f46e5; }
+.volt-btn.active { border-color:#1d4ed8; background:#1d4ed8; color:#fff; box-shadow:0 3px 12px rgba(29,78,216,.3); }
+
+/* ── INPUT GRID ── */
+.wi-form-grid { display:grid; grid-template-columns:1fr 1fr; gap:1rem; }
+@media(max-width:576px) { .wi-form-grid { grid-template-columns:1fr; } }
+.wi-label { font-size:.78rem; font-weight:700; color:#475569; text-transform:uppercase; letter-spacing:.05em; margin-bottom:.35rem; display:block; }
+.wi-input {
+  width:100%; padding:.55rem .85rem; border-radius:10px; border:1.5px solid var(--wi-border);
+  font-size:.88rem; color:var(--wi-slate); background:#fff;
+  transition:border-color .15s; outline:none;
+}
+.wi-input:focus { border-color:#6366f1; box-shadow:0 0 0 3px rgba(99,102,241,.12); }
+.wi-select {
+  width:100%; padding:.55rem .85rem; border-radius:10px; border:1.5px solid var(--wi-border);
+  font-size:.88rem; color:var(--wi-slate); background:#fff; cursor:pointer;
+}
+
+/* ── RESULT CARDS ── */
+.wi-results { display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:.85rem; margin-bottom:1.25rem; }
+.wi-result {
+  background:#f8fafc; border-radius:12px; border:1.5px solid #e2e8f0;
+  padding:1rem .9rem; text-align:center;
+}
+.wi-result.highlight { background:#eff6ff; border-color:#bfdbfe; }
+.wi-result.warn { background:#fff7ed; border-color:#fed7aa; }
+.wi-result.success { background:#f0fdf4; border-color:#bbf7d0; }
+.wi-result.danger { background:#fff1f2; border-color:#fca5a5; }
+.wi-result-val { font-size:1.5rem; font-weight:800; color:var(--wi-slate); line-height:1.1; }
+.wi-result-lbl { font-size:.67rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--wi-muted); margin-top:.2rem; }
+.wi-result-sub { font-size:.72rem; color:#94a3b8; margin-top:.1rem; }
+
+/* ── INTELLIGENCE BOX ── */
+.wi-intel {
+  background:linear-gradient(135deg,#eff6ff,#f0fdf4);
+  border:1.5px solid #bfdbfe; border-radius:12px; padding:1rem 1.1rem;
+  margin-bottom:.75rem;
+}
+.wi-intel-title { font-size:.8rem; font-weight:700; color:#1e40af; margin-bottom:.4rem; }
+.wi-intel p { font-size:.83rem; color:#374151; margin:0; line-height:1.5; }
+.wi-intel.warn-box { background:#fff7ed; border-color:#fed7aa; }
+.wi-intel.warn-box .wi-intel-title { color:#9a3412; }
+.wi-intel.warn-box p { color:#7c2d12; }
+.wi-intel.success-box { background:#f0fdf4; border-color:#bbf7d0; }
+.wi-intel.success-box .wi-intel-title { color:#166534; }
+
+/* ── SVG WIRING DIAGRAM ── */
+.wiring-diagram-wrap {
+  background:#0f172a; border-radius:14px; padding:1.25rem;
+  overflow-x:auto; position:relative;
+}
+.wiring-diagram-wrap svg { display:block; margin:0 auto; }
+.diagram-label { font-size:.75rem; font-weight:600; fill:#94a3b8; }
+.diagram-value { font-size:.82rem; font-weight:800; fill:#f1f5f9; }
+.diagram-title { font-size:.7rem; font-weight:700; fill:#64748b; text-transform:uppercase; letter-spacing:.06em; }
+.wire-pos { stroke:#ef4444; stroke-width:3; fill:none; }
+.wire-neg { stroke:#1d4ed8; stroke-width:3; fill:none; }
+.wire-ac  { stroke:#f59e0b; stroke-width:3; fill:none; }
+.wire-conn { stroke:#10b981; stroke-width:2.5; fill:none; stroke-dasharray:none; }
+.component-box { rx:8; ry:8; }
+.bat-fill { fill:#1e293b; stroke:#334155; stroke-width:1.5; }
+.bat-positive { fill:#ef4444; }
+.bat-negative { fill:#3b82f6; }
+.panel-fill { fill:#1e3a5f; stroke:#3b82f6; stroke-width:1.5; }
+.inv-fill { fill:#2d1b69; stroke:#8b5cf6; stroke-width:1.5; }
+.cc-fill { fill:#1a3a2a; stroke:#10b981; stroke-width:1.5; }
+.load-fill { fill:#292524; stroke:#f59e0b; stroke-width:1.5; }
+
+/* ── TABS ── */
+.wi-tabs { display:flex; gap:.35rem; flex-wrap:wrap; border-bottom:2px solid #e2e8f0; margin-bottom:1.25rem; }
+.wi-tab {
+  padding:.5rem 1rem; border-radius:8px 8px 0 0; font-size:.82rem; font-weight:600;
+  color:var(--wi-muted); cursor:pointer; border:none; background:none;
+  transition:all .15s; position:relative; bottom:-2px; border-bottom:2px solid transparent;
+}
+.wi-tab.active { color:#1d4ed8; border-bottom-color:#1d4ed8; background:#eff6ff; }
+.wi-tab-content { display:none; }
+.wi-tab-content.active { display:block; }
+
+/* ── ANALYSIS TABLE ── */
+.wi-table { width:100%; border-collapse:collapse; font-size:.83rem; }
+.wi-table th { background:#f8fafc; color:#475569; font-weight:700; font-size:.72rem; text-transform:uppercase; letter-spacing:.05em; padding:.55rem .75rem; border-bottom:2px solid #e2e8f0; text-align:left; }
+.wi-table td { padding:.55rem .75rem; border-bottom:1px solid #f1f5f9; color:#374151; vertical-align:middle; }
+.wi-table tr:last-child td { border-bottom:none; }
+.wi-table tr:hover td { background:#f8fafc; }
+
+/* ── PULSE ANIMATION ── */
+@keyframes pulse-dot { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.6;transform:scale(1.3)} }
+.live-dot { display:inline-block; width:8px; height:8px; border-radius:50%; background:#10b981; animation:pulse-dot 2s infinite; margin-right:.35rem; }
+
+/* ── FUSE GUIDE ── */
+.fuse-chip {
+  display:inline-flex; align-items:center; gap:.4rem; background:#fefce8;
+  border:1.5px solid #fde047; border-radius:8px; padding:.35rem .65rem;
+  font-size:.78rem; font-weight:700; color:#713f12; margin:.2rem;
+}
+
+/* ── ORIENTATION TOGGLE ── */
+.orient-toggle { display:flex; gap:.4rem; }
+.orient-btn {
+  padding:.3rem .7rem; border-radius:8px; font-size:.75rem; font-weight:600;
+  border:1.5px solid #e2e8f0; background:#f8fafc; cursor:pointer; color:#475569;
+  transition:all .12s;
+}
+.orient-btn.active { background:#1d4ed8; border-color:#1d4ed8; color:#fff; }
+</style>
+
+<div class="container-fluid py-4">
+
+  <!-- ── HERO ── -->
+  <div class="wi-hero mb-4">
+    <div class="wi-hero-inner">
+      <div class="wi-eyebrow"><i class="bi bi-lightning-charge-fill"></i> Emajinet Wiring Intelligence</div>
+      <h1>12V · 24V · 48V System Intelligence</h1>
+      <div class="wi-hero-sub">
+        Engineering-grade battery configuration, series/parallel logic, inverter matching,
+        charge controller sizing, cable selection, and fuse protection — all in one intelligent tool.
+      </div>
+      <div class="wi-hero-badges">
+        <span class="wi-badge gold"><i class="bi bi-mortarboard-fill me-1"></i>University-Grade</span>
+        <span class="wi-badge"><i class="bi bi-diagram-3 me-1"></i>Series &amp; Parallel</span>
+        <span class="wi-badge"><i class="bi bi-lightning me-1"></i>Live Calculations</span>
+        <span class="wi-badge"><i class="bi bi-shield-check me-1"></i>Safety Margins</span>
+        <span class="wi-badge"><i class="bi bi-file-earmark-pdf me-1"></i>Export Report</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-3">
+
+    <!-- ── LEFT COLUMN: INPUTS ── -->
+    <div class="col-lg-5">
+
+      <!-- Voltage Selector -->
+      <div class="wi-card">
+        <div class="wi-card-header">
+          <div class="wi-card-icon" style="background:#eff6ff;"><i class="bi bi-lightning-charge" style="color:#1d4ed8;"></i></div>
+          <div><div class="wi-card-title">System Voltage</div><div class="wi-card-sub">Choose the DC bus voltage for your system</div></div>
+        </div>
+        <div class="volt-selector">
+          <button class="volt-btn" onclick="setVoltage(12)" id="v12">12V</button>
+          <button class="volt-btn active" onclick="setVoltage(24)" id="v24">24V</button>
+          <button class="volt-btn" onclick="setVoltage(48)" id="v48">48V</button>
+        </div>
+        <div class="wi-intel" id="volt-explain">
+          <div class="wi-intel-title">💡 Why 24V?</div>
+          <p id="volt-reason">24V is the sweet spot for small-to-medium systems (1–5 kW). Lower cable losses than 12V, simpler battery bank than 48V. Ideal for homes, clinics, and small shops.</p>
+        </div>
+      </div>
+
+      <!-- Battery Configuration -->
+      <div class="wi-card">
+        <div class="wi-card-header">
+          <div class="wi-card-icon" style="background:#f0fdf4;"><i class="bi bi-battery-charging" style="color:#059669;"></i></div>
+          <div><div class="wi-card-title">Battery Bank Configuration</div><div class="wi-card-sub">Define your battery specs and bank size</div></div>
+        </div>
+        <div class="wi-form-grid mb-3">
+          <div>
+            <label class="wi-label">Battery Type</label>
+            <select class="wi-select" id="batType" onchange="recalculate()">
+              <option value="lead_acid_flooded">Lead-Acid Flooded (2V cells / 12V mono)</option>
+              <option value="lead_acid_gel">Lead-Acid Gel (GEL VRLA)</option>
+              <option value="lead_acid_agm">Lead-Acid AGM</option>
+              <option value="lithium_lifepo4" selected>Lithium LiFePO4</option>
+              <option value="lithium_nmc">Lithium NMC</option>
+            </select>
+          </div>
+          <div>
+            <label class="wi-label">Battery Nominal Voltage (V)</label>
+            <select class="wi-select" id="batNomV" onchange="recalculate()">
+              <option value="2">2V (Single Cell)</option>
+              <option value="6">6V</option>
+              <option value="12" selected>12V</option>
+              <option value="24">24V</option>
+              <option value="48">48V</option>
+            </select>
+          </div>
+          <div>
+            <label class="wi-label">Capacity per Battery (Ah)</label>
+            <input type="number" class="wi-input" id="batAh" value="100" min="1" max="3000" oninput="recalculate()">
+          </div>
+          <div>
+            <label class="wi-label">Number of Batteries</label>
+            <input type="number" class="wi-input" id="batCount" value="4" min="1" max="100" oninput="recalculate()">
+          </div>
+          <div>
+            <label class="wi-label">Depth of Discharge (%)</label>
+            <input type="number" class="wi-input" id="batDOD" value="80" min="20" max="100" oninput="recalculate()">
+          </div>
+          <div>
+            <label class="wi-label">Load Current Draw (A)</label>
+            <input type="number" class="wi-input" id="loadAmps" value="20" min="0.1" max="2000" step="0.1" oninput="recalculate()">
+          </div>
+        </div>
+        <div class="d-flex justify-content-end gap-2">
+          <button class="btn btn-sm rounded-pill px-3" style="background:#eff6ff;color:#1d4ed8;border:1.5px solid #bfdbfe;font-weight:600;" onclick="suggestBatteries()">
+            <i class="bi bi-magic me-1"></i>Auto-Suggest
+          </button>
+        </div>
+      </div>
+
+      <!-- Solar Array Inputs -->
+      <div class="wi-card">
+        <div class="wi-card-header">
+          <div class="wi-card-icon" style="background:#fefce8;"><i class="bi bi-sun" style="color:#d97706;"></i></div>
+          <div><div class="wi-card-title">Solar Array Configuration</div><div class="wi-card-sub">Panel arrangement and charge controller sizing</div></div>
+        </div>
+        <div class="wi-form-grid">
+          <div>
+            <label class="wi-label">Panel Wattage (Wp)</label>
+            <input type="number" class="wi-input" id="panelW" value="550" min="10" max="800" oninput="recalculate()">
+          </div>
+          <div>
+            <label class="wi-label">Panel Voc (V)</label>
+            <input type="number" class="wi-input" id="panelVoc" value="49.8" step="0.1" min="10" max="100" oninput="recalculate()">
+          </div>
+          <div>
+            <label class="wi-label">Panel Vmp (V)</label>
+            <input type="number" class="wi-input" id="panelVmp" value="41.6" step="0.1" min="10" max="90" oninput="recalculate()">
+          </div>
+          <div>
+            <label class="wi-label">Panel Isc (A)</label>
+            <input type="number" class="wi-input" id="panelIsc" value="13.9" step="0.1" min="1" max="25" oninput="recalculate()">
+          </div>
+          <div>
+            <label class="wi-label">Number of Panels</label>
+            <input type="number" class="wi-input" id="panelCount" value="8" min="1" max="500" oninput="recalculate()">
+          </div>
+          <div>
+            <label class="wi-label">Charge Controller Type</label>
+            <select class="wi-select" id="ccType" onchange="recalculate()">
+              <option value="mppt" selected>MPPT (Recommended)</option>
+              <option value="pwm">PWM</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /col-lg-5 -->
+
+    <!-- ── RIGHT COLUMN: RESULTS + DIAGRAM ── -->
+    <div class="col-lg-7">
+
+      <!-- Key Results -->
+      <div class="wi-card">
+        <div class="wi-card-header">
+          <div class="wi-card-icon" style="background:#f0fdf4;"><i class="bi bi-graph-up" style="color:#059669;"></i></div>
+          <div><div class="wi-card-title">System Intelligence Output</div><div class="wi-card-sub"><span class="live-dot"></span>Recalculates instantly as you type</div></div>
+        </div>
+        <div class="wi-results" id="resultsGrid">
+          <!-- filled by JS -->
+        </div>
+        <div id="intelligenceBoxes">
+          <!-- filled by JS -->
+        </div>
+      </div>
+
+      <!-- Wiring Diagram -->
+      <div class="wi-card">
+        <div class="wi-card-header">
+          <div class="wi-card-icon" style="background:#eef2ff;"><i class="bi bi-diagram-3" style="color:#6366f1;"></i></div>
+          <div>
+            <div class="wi-card-title">Wiring Diagram</div>
+            <div class="wi-card-sub">Engineering-grade schematic — auto-generated from your inputs</div>
+          </div>
+          <div class="ms-auto orient-toggle">
+            <button class="orient-btn active" onclick="setOrient('portrait')" id="oPort">Portrait</button>
+            <button class="orient-btn" onclick="setOrient('landscape')" id="oLand">Landscape</button>
+          </div>
+        </div>
+        <div class="wiring-diagram-wrap">
+          <div id="wiringDiagramSVG"></div>
+        </div>
+        <div class="mt-2 d-flex gap-2 flex-wrap">
+          <span style="font-size:.75rem;color:#94a3b8;"><span style="display:inline-block;width:16px;height:3px;background:#ef4444;border-radius:2px;vertical-align:middle;margin-right:4px;"></span>Positive (+)</span>
+          <span style="font-size:.75rem;color:#94a3b8;"><span style="display:inline-block;width:16px;height:3px;background:#3b82f6;border-radius:2px;vertical-align:middle;margin-right:4px;"></span>Negative (−)</span>
+          <span style="font-size:.75rem;color:#94a3b8;"><span style="display:inline-block;width:16px;height:3px;background:#f59e0b;border-radius:2px;vertical-align:middle;margin-right:4px;"></span>AC Output</span>
+          <span style="font-size:.75rem;color:#94a3b8;"><span style="display:inline-block;width:16px;height:3px;background:#10b981;border-radius:2px;vertical-align:middle;margin-right:4px;"></span>Data / Comms</span>
+        </div>
+      </div>
+
+      <!-- Detailed Analysis Tabs -->
+      <div class="wi-card">
+        <div class="wi-tabs">
+          <button class="wi-tab active" onclick="openTab('battery_tab')" id="tab-battery_tab">Battery Analysis</button>
+          <button class="wi-tab" onclick="openTab('panel_tab')" id="tab-panel_tab">Panel Array</button>
+          <button class="wi-tab" onclick="openTab('cable_tab')" id="tab-cable_tab">Cable Sizing</button>
+          <button class="wi-tab" onclick="openTab('fuse_tab')" id="tab-fuse_tab">Fuse &amp; Protection</button>
+          <button class="wi-tab" onclick="openTab('safety_tab')" id="tab-safety_tab">Safety Checks</button>
+        </div>
+
+        <div id="battery_tab" class="wi-tab-content active">
+          <div id="batteryAnalysis"></div>
+        </div>
+        <div id="panel_tab" class="wi-tab-content">
+          <div id="panelAnalysis"></div>
+        </div>
+        <div id="cable_tab" class="wi-tab-content">
+          <div id="cableAnalysis"></div>
+        </div>
+        <div id="fuse_tab" class="wi-tab-content">
+          <div id="fuseAnalysis"></div>
+        </div>
+        <div id="safety_tab" class="wi-tab-content">
+          <div id="safetyChecks"></div>
+        </div>
+      </div>
+
+    </div><!-- /col-lg-7 -->
+  </div><!-- /row -->
+
+  <!-- ── REFERENCE GUIDE ── -->
+  <div class="row g-3 mt-1">
+    <div class="col-12">
+      <div class="wi-card">
+        <div class="wi-card-header">
+          <div class="wi-card-icon" style="background:#fefce8;"><i class="bi bi-book" style="color:#d97706;"></i></div>
+          <div><div class="wi-card-title">Engineering Reference Guide</div><div class="wi-card-sub">Series vs parallel explained — why it matters</div></div>
+        </div>
+        <div class="row g-3">
+          <div class="col-md-4">
+            <div style="background:#f0fdf4;border-radius:12px;padding:1rem;border:1.5px solid #bbf7d0;">
+              <div style="font-size:.82rem;font-weight:700;color:#166534;margin-bottom:.5rem;"><i class="bi bi-battery me-1"></i>BATTERIES IN SERIES</div>
+              <p style="font-size:.8rem;color:#14532d;margin:0;line-height:1.6;">
+                <strong>Voltage increases, capacity stays the same.</strong><br>
+                2× 12V 100Ah → 24V 100Ah bank.<br>
+                Use when system voltage is higher than single battery voltage.<br>
+                <em>Example: Need 48V? Stack 4× 12V in series.</em>
+              </p>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div style="background:#eff6ff;border-radius:12px;padding:1rem;border:1.5px solid #bfdbfe;">
+              <div style="font-size:.82rem;font-weight:700;color:#1e40af;margin-bottom:.5rem;"><i class="bi bi-battery-full me-1"></i>BATTERIES IN PARALLEL</div>
+              <p style="font-size:.8rem;color:#1e3a8a;margin:0;line-height:1.6;">
+                <strong>Capacity increases, voltage stays the same.</strong><br>
+                2× 12V 100Ah → 12V 200Ah bank.<br>
+                Use when you need more energy storage at same voltage.<br>
+                <em>Caution: Balance cells carefully. Max 4 strings recommended.</em>
+              </p>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div style="background:#fefce8;border-radius:12px;padding:1rem;border:1.5px solid #fde047;">
+              <div style="font-size:.82rem;font-weight:700;color:#713f12;margin-bottom:.5rem;"><i class="bi bi-grid me-1"></i>SERIES + PARALLEL (MIXED)</div>
+              <p style="font-size:.8rem;color:#78350f;margin:0;line-height:1.6;">
+                <strong>Both voltage and capacity increase.</strong><br>
+                4× 12V 100Ah (2S2P) → 24V 200Ah bank.<br>
+                Series first to reach system voltage, then parallel for capacity.<br>
+                <em>Best approach for large banks. Label strings clearly.</em>
+              </p>
+            </div>
+          </div>
+        </div>
+        <!-- Quick reference table -->
+        <div class="mt-3" style="overflow-x:auto;">
+          <table class="wi-table">
+            <thead>
+              <tr>
+                <th>System Voltage</th>
+                <th>12V Battery Config</th>
+                <th>Min Array Voltage (MPPT)</th>
+                <th>Typical Inverter Rating</th>
+                <th>Max Recommended Load</th>
+                <th>Best For</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td><strong>12V</strong></td><td>1× 12V bank</td><td>≥18V (1× panel)</td><td>1–2 kW</td><td>~1.5 kW</td><td>Pico, lights, fans, TV</td></tr>
+              <tr><td><strong>24V</strong></td><td>2× 12V series</td><td>≥36V (2× panel series)</td><td>2–5 kW</td><td>~4 kW</td><td>Homes, clinics, shops</td></tr>
+              <tr><td><strong>48V</strong></td><td>4× 12V series</td><td>≥72V (3-4× panel series)</td><td>5–30 kW</td><td>~25 kW</td><td>Commercial, mini-grid</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /container -->
+
+<script>
+/* ============================================================
+   WIRING INTELLIGENCE ENGINE — Pure Frontend Calculations
+   Engineering-grade results, real-time, no server roundtrip
+   ============================================================ */
+
+let systemVoltage = 24;
+let diagramOrientation = 'portrait';
+
+const VOLT_REASONS = {
+  12: {
+    title: "Why 12V?",
+    text: "12V is ideal for small pico systems: lighting, fans, TV, phone charging. Simple wiring, widely available equipment. Limited to ~1.5 kW inverter load — good for rural homes and small shops."
+  },
+  24: {
+    title: "Why 24V?",
+    text: "24V is the sweet spot for small-to-medium systems (1–5 kW). Lower cable losses than 12V, simpler battery bank than 48V. Ideal for homes, clinics, small businesses and irrigation pumps."
+  },
+  48: {
+    title: "Why 48V?",
+    text: "48V is the professional standard for larger systems (5 kW+). Dramatically lower cable losses, thinner wires, and supports high-power inverters. Preferred for commercial buildings, mini-grids, and industrial sites."
+  }
+};
+
+const CABLE_TABLE = [
+  // [max_amps, cross_section_mm2, label]
+  [8,   1.5,  "1.5 mm²"],
+  [12,  2.5,  "2.5 mm²"],
+  [20,  4,    "4 mm²"],
+  [27,  6,    "6 mm²"],
+  [36,  10,   "10 mm²"],
+  [48,  16,   "16 mm²"],
+  [68,  25,   "25 mm²"],
+  [80,  35,   "35 mm²"],
+  [99,  50,   "50 mm²"],
+  [130, 70,   "70 mm²"],
+  [162, 95,   "95 mm²"],
+  [196, 120,  "120 mm²"],
+  [230, 150,  "150 mm²"],
+  [999, 185,  "185 mm²"]
+];
+
+function getCableSize(amps) {
+  for (const row of CABLE_TABLE) {
+    if (amps <= row[0]) return { mm2: row[1], label: row[2] };
+  }
+  return { mm2: 185, label: "185 mm² (consult engineer)" };
+}
+
+function setVoltage(v) {
+  systemVoltage = v;
+  ['v12','v24','v48'].forEach(id => document.getElementById(id).classList.remove('active'));
+  document.getElementById('v' + v).classList.add('active');
+  const r = VOLT_REASONS[v];
+  document.getElementById('volt-reason').textContent = r.text;
+  document.querySelector('#volt-explain .wi-intel-title').textContent = '💡 ' + r.title;
+  recalculate();
+}
+
+function setOrient(o) {
+  diagramOrientation = o;
+  document.getElementById('oPort').classList.toggle('active', o === 'portrait');
+  document.getElementById('oLand').classList.toggle('active', o === 'landscape');
+  recalculate();
+}
+
+function openTab(tabId) {
+  document.querySelectorAll('.wi-tab-content').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.wi-tab').forEach(el => el.classList.remove('active'));
+  document.getElementById(tabId).classList.add('active');
+  document.getElementById('tab-' + tabId).classList.add('active');
+}
+
+function num(id) { return parseFloat(document.getElementById(id).value) || 0; }
+function sel(id) { return document.getElementById(id).value; }
+
+function recalculate() {
+  const batNomV = num('batNomV');
+  const batAh   = num('batAh');
+  const batCount = num('batCount');
+  const batDOD  = num('batDOD') / 100;
+  const batType = sel('batType');
+  const loadAmps = num('loadAmps');
+  const panelW   = num('panelW');
+  const panelVoc = num('panelVoc');
+  const panelVmp = num('panelVmp');
+  const panelIsc = num('panelIsc');
+  const panelCount = num('panelCount');
+  const ccType   = sel('ccType');
+  const sysV     = systemVoltage;
+
+  // ── Battery bank analysis ──────────────────────────────
+  // How many batteries in series to reach system voltage?
+  const seriesPerString = Math.max(1, Math.round(sysV / batNomV));
+  // How many strings in parallel?
+  const parallelStrings = Math.max(1, Math.round(batCount / seriesPerString));
+  const actualBatCount  = seriesPerString * parallelStrings;
+
+  // Total bank capacity
+  const bankVoltage     = seriesPerString * batNomV;
+  const bankAh          = parallelStrings * batAh;
+  const bankKwh         = (bankVoltage * bankAh) / 1000;
+  const usableKwh       = bankKwh * batDOD;
+
+  // Battery runtime at load current
+  // Load power = loadAmps * sysV
+  const loadPowerW      = loadAmps * sysV;
+  const runtimeHrs      = loadPowerW > 0 ? (usableKwh * 1000 / loadPowerW) : 0;
+
+  // Check: config matches system voltage
+  const configMatch = Math.abs(bankVoltage - sysV) < 0.5;
+  const configWarning = !configMatch ?
+    `⚠️ Warning: Battery bank voltage (${bankVoltage}V) does not match system voltage (${sysV}V). Adjust battery count or nominal voltage.` : null;
+
+  // DOD warning for lead acid
+  let dodWarning = null;
+  if (batType.includes('lead') && batDOD > 0.5) {
+    dodWarning = `⚠️ Lead-acid batteries: recommended DOD is ≤50%. Deep cycling above 50% significantly reduces lifespan. Consider LiFePO4 for deeper discharge.`;
+  }
+  if (batType === 'lithium_lifepo4' && batDOD > 0.9) {
+    dodWarning = `⚠️ Even LiFePO4: avoid 100% DOD in continuous cycling. Recommend ≤80–90% DOD for longest lifespan.`;
+  }
+
+  // Parallel string warning
+  let parallelWarning = null;
+  if (parallelStrings > 4) {
+    parallelWarning = `⚠️ ${parallelStrings} parallel strings detected. More than 4 strings can cause balancing issues. Consider using a battery balancer or upgrading to larger individual batteries.`;
+  }
+
+  // ── Solar array analysis ───────────────────────────────
+  // String configuration: panels in series, strings in parallel
+  // For MPPT: Voc must not exceed controller max (typically 150V)
+  // Minimum panels in series: ensure Vmp_string > 1.15 × Vbat_max
+  const vbatMax = sysV * 1.15; // charging voltage
+  const minSeriesPanels = Math.ceil(vbatMax / panelVmp);
+  const maxSeriesPanelsVoc = Math.floor(150 / panelVoc); // 150V typical MPPT max
+  const maxSeriesPanelsVmp = Math.floor(145 / panelVmp);
+
+  let recommendedSeriesPanels;
+  if (ccType === 'mppt') {
+    recommendedSeriesPanels = Math.max(minSeriesPanels, Math.min(maxSeriesPanelsVmp, Math.ceil(sysV / panelVmp * 1.3)));
+  } else {
+    // PWM: panel voltage close to battery voltage
+    recommendedSeriesPanels = Math.max(1, Math.round(sysV / 18)); // 18V = typical 12V panel Voc
+  }
+  recommendedSeriesPanels = Math.max(1, recommendedSeriesPanels);
+
+  const parallelPanelStrings = Math.max(1, Math.round(panelCount / recommendedSeriesPanels));
+  const actualPanels         = recommendedSeriesPanels * parallelPanelStrings;
+  const arrayVoc             = recommendedSeriesPanels * panelVoc;
+  const arrayVmp             = recommendedSeriesPanels * panelVmp;
+  const arrayPeakW           = actualPanels * panelW;
+
+  // Charge controller sizing
+  const iScTotal = parallelPanelStrings * panelIsc * 1.25; // 25% safety
+  const ccMinAmps = Math.ceil(iScTotal);
+
+  // PWM check
+  let pwmWarning = null;
+  if (ccType === 'pwm') {
+    pwmWarning = `ℹ️ PWM charge controllers work only with panels matched to battery voltage. For a ${sysV}V system, use panels with nominal ${sysV}V output. MPPT is recommended for efficiency gains of 20–30%.`;
+  }
+
+  // ── Cable sizing ───────────────────────────────────────
+  // Battery bank output current = loadAmps
+  const batBusCurrent = loadAmps;
+  const batCable      = getCableSize(batBusCurrent * 1.25);
+
+  // Solar panel cable (Isc per string × 1.25)
+  const panelStringCurrent = panelIsc * 1.25;
+  const panelCable         = getCableSize(panelStringCurrent);
+
+  // Inverter input cable (DC side, amps = inverter W / sysV × 1.25)
+  // Approx inverter current from load
+  const invInputAmps  = loadAmps * 1.25;
+  const invCable      = getCableSize(invInputAmps);
+
+  // Voltage drop (assumes 1m cable run as reference — full calc in cable_sizing)
+  const copperResistivity = 0.0175; // Ω·mm²/m
+
+  // ── Fuse/breaker sizing ────────────────────────────────
+  // Battery fuse: 1.25× max current, next standard size up
+  const standardFuses = [20,25,30,40,50,63,80,100,125,160,200,250,300,400,500];
+  function nextFuse(amps) {
+    return standardFuses.find(f => f >= amps) || amps;
+  }
+  const batFuse     = nextFuse(batBusCurrent * 1.25);
+  const panelFuse   = nextFuse(panelStringCurrent);
+  const invFuse     = nextFuse(invInputAmps);
+
+  // ── Safety checks ──────────────────────────────────────
+  const checks = [];
+  checks.push({ label: "Battery bank voltage matches system voltage", ok: configMatch, note: configMatch ? `${bankVoltage}V ✓` : `${bankVoltage}V ≠ ${sysV}V` });
+  checks.push({ label: "Charge controller array voltage within spec", ok: arrayVoc <= 150, note: `Array Voc = ${arrayVoc.toFixed(1)}V (max 150V)` });
+  checks.push({ label: "Lead-acid DOD ≤ 50%", ok: batType.includes('lead') ? batDOD <= 0.5 : true, note: batType.includes('lead') ? `DOD = ${(batDOD*100).toFixed(0)}%` : "LiFePO4 – N/A" });
+  checks.push({ label: "Parallel strings ≤ 4", ok: parallelStrings <= 4, note: `${parallelStrings} strings` });
+  checks.push({ label: "Cable rated for load current", ok: true, note: `${batCable.label} for ${batBusCurrent.toFixed(0)}A` });
+  checks.push({ label: "Array Vmp > 1.15 × system voltage", ok: arrayVmp >= vbatMax, note: `${arrayVmp.toFixed(1)}V vs ${vbatMax.toFixed(1)}V required` });
+
+  // ── Render results ──────────────────────────────────────
+  const intels = [];
+  if (configWarning) intels.push({ type: 'warn', title: 'Configuration Alert', text: configWarning });
+  if (dodWarning)    intels.push({ type: 'warn', title: 'Battery Health Alert', text: dodWarning });
+  if (parallelWarning) intels.push({ type: 'warn', title: 'Parallel String Warning', text: parallelWarning });
+  if (pwmWarning)    intels.push({ type: 'info', title: 'Charge Controller Note', text: pwmWarning });
+  if (intels.length === 0) {
+    intels.push({ type: 'success', title: '✅ Configuration Valid', text: `Your ${sysV}V system is correctly configured. ${seriesPerString}S${parallelStrings}P battery bank, ${actualPanels} panels (${recommendedSeriesPanels}S${parallelPanelStrings}P array).` });
+  }
+
+  document.getElementById('resultsGrid').innerHTML = `
+    <div class="wi-result highlight">
+      <div class="wi-result-val" style="color:#1d4ed8;">${bankVoltage}V</div>
+      <div class="wi-result-lbl">Bank Voltage</div>
+      <div class="wi-result-sub">${seriesPerString}S × ${parallelStrings}P</div>
+    </div>
+    <div class="wi-result success">
+      <div class="wi-result-val" style="color:#059669;">${bankAh.toFixed(0)} Ah</div>
+      <div class="wi-result-lbl">Total Capacity</div>
+      <div class="wi-result-sub">${bankKwh.toFixed(2)} kWh gross</div>
+    </div>
+    <div class="wi-result">
+      <div class="wi-result-val" style="color:#6366f1;">${usableKwh.toFixed(2)} kWh</div>
+      <div class="wi-result-lbl">Usable Storage</div>
+      <div class="wi-result-sub">@ ${(batDOD*100).toFixed(0)}% DOD</div>
+    </div>
+    <div class="wi-result ${runtimeHrs < 2 ? 'danger' : runtimeHrs < 4 ? 'warn' : 'success'}">
+      <div class="wi-result-val">${runtimeHrs.toFixed(1)} h</div>
+      <div class="wi-result-lbl">Runtime @ ${loadAmps}A</div>
+      <div class="wi-result-sub">${loadPowerW.toFixed(0)} W load</div>
+    </div>
+    <div class="wi-result highlight">
+      <div class="wi-result-val" style="color:#d97706;">${arrayPeakW.toFixed(0)} Wp</div>
+      <div class="wi-result-lbl">Solar Array</div>
+      <div class="wi-result-sub">${actualPanels} panels ${recommendedSeriesPanels}S${parallelPanelStrings}P</div>
+    </div>
+    <div class="wi-result">
+      <div class="wi-result-val" style="color:#8b5cf6;">${ccMinAmps}A</div>
+      <div class="wi-result-lbl">CC Min Rating</div>
+      <div class="wi-result-sub">${ccType.toUpperCase()} required</div>
+    </div>
+  `;
+
+  document.getElementById('intelligenceBoxes').innerHTML = intels.map(i => `
+    <div class="wi-intel ${i.type === 'warn' ? 'warn-box' : i.type === 'success' ? 'success-box' : ''}">
+      <div class="wi-intel-title">${i.title}</div>
+      <p>${i.text}</p>
+    </div>
+  `).join('');
+
+  // Battery analysis tab
+  document.getElementById('batteryAnalysis').innerHTML = `
+    <table class="wi-table">
+      <thead><tr><th>Parameter</th><th>Value</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td>Configuration</td><td><strong>${seriesPerString}S ${parallelStrings}P</strong></td><td>${seriesPerString} in series, ${parallelStrings} strings in parallel</td></tr>
+        <tr><td>Total Batteries</td><td>${actualBatCount}</td><td>${batCount} requested → ${actualBatCount} for clean S×P layout</td></tr>
+        <tr><td>Bank Voltage</td><td>${bankVoltage}V</td><td>${configMatch ? '✅ Matches system voltage' : '⚠️ Mismatch'}</td></tr>
+        <tr><td>Bank Capacity</td><td>${bankAh.toFixed(0)} Ah</td><td>${bankKwh.toFixed(3)} kWh</td></tr>
+        <tr><td>Usable Capacity</td><td>${(usableKwh*1000).toFixed(0)} Wh</td><td>At ${(batDOD*100).toFixed(0)}% DoD</td></tr>
+        <tr><td>Runtime</td><td>${runtimeHrs.toFixed(1)} hours</td><td>At ${loadAmps}A (${loadPowerW.toFixed(0)}W) load</td></tr>
+        <tr><td>Battery Type</td><td>${batType.replace(/_/g,' ')}</td><td>${batType === 'lithium_lifepo4' ? 'Best choice: long life, deep DoD, safe' : 'Good value; watch DoD'}</td></tr>
+      </tbody>
+    </table>
+    <div class="mt-3 wi-intel">
+      <div class="wi-intel-title">📐 Wiring Sequence</div>
+      <p>
+        <strong>Step 1:</strong> Connect ${seriesPerString} batteries in series to create one ${bankVoltage}V string.<br>
+        <strong>Step 2:</strong> ${parallelStrings > 1 ? `Connect ${parallelStrings} strings in parallel for ${bankAh.toFixed(0)}Ah total. Ensure equal cable lengths per string.` : 'Only 1 string — no parallel connection needed.'}<br>
+        <strong>Step 3:</strong> Connect positive bus bar to inverter/CC positive terminal.<br>
+        <strong>Step 4:</strong> Install fuse/breaker (${batFuse}A) on positive terminal closest to battery.
+      </p>
+    </div>
+  `;
+
+  // Panel array tab
+  document.getElementById('panelAnalysis').innerHTML = `
+    <table class="wi-table">
+      <thead><tr><th>Parameter</th><th>Value</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td>Array Configuration</td><td><strong>${recommendedSeriesPanels}S ${parallelPanelStrings}P</strong></td><td>${recommendedSeriesPanels} panels in series per string, ${parallelPanelStrings} strings</td></tr>
+        <tr><td>Array Voc</td><td>${arrayVoc.toFixed(1)} V</td><td>${arrayVoc <= 150 ? '✅ Within 150V MPPT limit' : '⚠️ Exceeds 150V — reduce series count'}</td></tr>
+        <tr><td>Array Vmp</td><td>${arrayVmp.toFixed(1)} V</td><td>${arrayVmp >= vbatMax ? '✅ Above charging threshold' : '⚠️ Too low for charging'}</td></tr>
+        <tr><td>Total Array Power</td><td>${arrayPeakW.toFixed(0)} Wp</td><td>${actualPanels} panels × ${panelW}W</td></tr>
+        <tr><td>CC Current Required</td><td>${ccMinAmps} A</td><td>${parallelPanelStrings} strings × ${panelIsc}A × 1.25 safety</td></tr>
+        <tr><td>CC Type</td><td>${ccType.toUpperCase()}</td><td>${ccType === 'mppt' ? 'Recommended — 20-30% more harvest' : 'Lower cost; match panel voltage to system voltage'}</td></tr>
+      </tbody>
+    </table>
+    <div class="mt-3 wi-intel" style="${pwmWarning ? 'background:#fff7ed;border-color:#fed7aa;' : ''}">
+      <div class="wi-intel-title" style="${pwmWarning ? 'color:#9a3412;' : ''}">📐 Array Wiring Sequence</div>
+      <p>
+        Connect ${recommendedSeriesPanels} panels in a string from positive to negative. 
+        ${parallelPanelStrings > 1 ? `Join ${parallelPanelStrings} strings at combiner box with ${panelFuse}A string fuses per string.` : 'Run single string directly to charge controller.'}
+        Use ${panelCable.label} cable rated for ${panelStringCurrent.toFixed(1)}A string current.
+      </p>
+    </div>
+  `;
+
+  // Cable analysis
+  document.getElementById('cableAnalysis').innerHTML = `
+    <table class="wi-table">
+      <thead><tr><th>Connection</th><th>Current (A)</th><th>Recommended Cable</th><th>Fuse/Breaker</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Battery → Inverter (DC)</strong></td><td>${invInputAmps.toFixed(0)}</td><td>${invCable.label}</td><td>${invFuse}A</td></tr>
+        <tr><td><strong>Battery → Bus Bar</strong></td><td>${batBusCurrent.toFixed(0)}</td><td>${batCable.label}</td><td>${batFuse}A</td></tr>
+        <tr><td><strong>Panel String → CC</strong></td><td>${panelStringCurrent.toFixed(1)}</td><td>${panelCable.label}</td><td>${panelFuse}A per string</td></tr>
+        <tr><td><strong>CC → Battery</strong></td><td>${ccMinAmps}</td><td>${getCableSize(ccMinAmps*1.1).label}</td><td>${nextFuse(ccMinAmps*1.1)}A</td></tr>
+      </tbody>
+    </table>
+    <div class="mt-3" style="background:#f0fdf4;border-radius:10px;padding:.9rem;border:1.5px solid #bbf7d0;">
+      <div style="font-size:.8rem;font-weight:700;color:#166534;margin-bottom:.4rem;">⚡ Cable Selection Tips</div>
+      <ul style="font-size:.8rem;color:#14532d;margin:0;padding-left:1.1rem;line-height:1.8;">
+        <li>Use flexible welding cable or tinned copper for DC connections</li>
+        <li>Keep cable runs as <strong>short as possible</strong> to minimize voltage drop</li>
+        <li>Use equal cable lengths on parallel battery strings to balance current</li>
+        <li>Color-code: <strong style="color:#dc2626;">Red = Positive</strong>, <strong style="color:#1d4ed8;">Black/Blue = Negative</strong></li>
+        <li>Size cables for <strong>1.25× max current</strong> for continuous loads</li>
+      </ul>
+    </div>
+  `;
+
+  // Fuse analysis
+  document.getElementById('fuseAnalysis').innerHTML = `
+    <div class="mb-3">
+      <div style="font-size:.82rem;font-weight:700;color:#374151;margin-bottom:.5rem;">Recommended Protection Devices</div>
+      <div class="d-flex flex-wrap">
+        <div class="fuse-chip">⚡ Battery Main: ${batFuse}A ANL Fuse</div>
+        <div class="fuse-chip">⚡ Inverter Input: ${invFuse}A ANL Fuse</div>
+        <div class="fuse-chip">☀️ Per Panel String: ${panelFuse}A Blade Fuse</div>
+        <div class="fuse-chip">🔌 CC Output: ${nextFuse(ccMinAmps*1.1)}A Circuit Breaker</div>
+      </div>
+    </div>
+    <table class="wi-table">
+      <thead><tr><th>Location</th><th>Type</th><th>Rating</th><th>Placement</th></tr></thead>
+      <tbody>
+        <tr><td>Battery positive terminal</td><td>ANL Fuse or Class T</td><td>${batFuse}A</td><td>Within 18cm of terminal</td></tr>
+        <tr><td>Inverter DC input</td><td>ANL Fuse</td><td>${invFuse}A</td><td>Between battery bus and inverter</td></tr>
+        <tr><td>Each panel string</td><td>Blade / MC4 inline fuse</td><td>${panelFuse}A</td><td>At combiner box or string end</td></tr>
+        <tr><td>CC battery output</td><td>Disconnect circuit breaker</td><td>${nextFuse(ccMinAmps*1.1)}A</td><td>Between CC and battery</td></tr>
+        <tr><td>AC output</td><td>MCB</td><td>Per load sizing</td><td>Main distribution board</td></tr>
+      </tbody>
+    </table>
+    <div class="mt-2 wi-intel warn-box">
+      <div class="wi-intel-title">🛡️ Safety Rule — Fuse Placement</div>
+      <p>Every positive DC cable must have a fuse or circuit breaker within 18cm (≤45cm for cables &gt;50mm²) of the battery or power source. This prevents catastrophic fire in case of short circuit.</p>
+    </div>
+  `;
+
+  // Safety checks
+  document.getElementById('safetyChecks').innerHTML = `
+    <table class="wi-table">
+      <thead><tr><th>Safety Check</th><th>Status</th><th>Detail</th></tr></thead>
+      <tbody>
+        ${checks.map(c => `
+          <tr>
+            <td>${c.label}</td>
+            <td><span style="font-size:.78rem;font-weight:700;color:${c.ok ? '#059669' : '#dc2626'};">${c.ok ? '✅ PASS' : '❌ FAIL'}</span></td>
+            <td style="font-size:.78rem;color:#64748b;">${c.note}</td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+    <div class="mt-3 wi-intel">
+      <div class="wi-intel-title">📋 Pre-Commissioning Checklist</div>
+      <p>
+        □ All connections tight and torqued to spec<br>
+        □ No exposed conductors at terminals<br>
+        □ All fuses/breakers installed before energising<br>
+        □ Battery terminals insulated except during connection<br>
+        □ Polarity verified at every connection point<br>
+        □ Cable labels applied (+ and −, circuit names)<br>
+        □ Charge controller programmed for correct battery type<br>
+        □ Inverter configured for correct system voltage (${sysV}V)<br>
+        □ Over-voltage protection active on battery BMS
+      </p>
+    </div>
+  `;
+
+  // Draw SVG diagram
+  drawWiringDiagram(seriesPerString, parallelStrings, recommendedSeriesPanels, parallelPanelStrings, sysV, ccType);
+}
+
+function drawWiringDiagram(batS, batP, panS, panP, sysV, ccType) {
+  const landscape = diagramOrientation === 'landscape';
+  const w = landscape ? 700 : 480;
+  const h = landscape ? 340 : 560;
+
+  let svg = `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg" style="max-width:100%;">`;
+  svg += `<rect width="${w}" height="${h}" fill="#0f172a" rx="10"/>`;
+
+  if (landscape) {
+    // Landscape: Solar → CC → Battery → Inverter → Load (left to right)
+    // Solar panels top-left
+    svg += drawPanelBlock(20, 20, panS, panP, 'landscape');
+    // Arrow Solar → CC
+    svg += `<line x1="140" y1="80" x2="200" y2="80" stroke="#f59e0b" stroke-width="2.5" marker-end="url(#arrowAmber)"/>`;
+    // CC
+    svg += drawCC(200, 45, ccType);
+    // Arrow CC → Battery
+    svg += `<line x1="290" y1="80" x2="340" y2="80" stroke="#ef4444" stroke-width="2.5"/>`;
+    svg += `<line x1="290" y1="100" x2="340" y2="100" stroke="#3b82f6" stroke-width="2.5"/>`;
+    // Battery bank
+    svg += drawBatteryBlock(340, 20, batS, batP, sysV, 'landscape');
+    // Inverter
+    svg += drawInverter(490, 45);
+    // Load
+    svg += drawLoad(620, 45);
+    // Battery → Inverter
+    svg += `<line x1="480" y1="80" x2="490" y2="80" stroke="#ef4444" stroke-width="2.5"/>`;
+    svg += `<line x1="480" y1="100" x2="490" y2="100" stroke="#3b82f6" stroke-width="2.5"/>`;
+    // Inverter → Load
+    svg += `<line x1="560" y1="80" x2="620" y2="80" stroke="#f59e0b" stroke-width="2.5"/>`;
+    // Labels
+    svg += `<text x="${w/2}" y="${h-12}" text-anchor="middle" class="diagram-title" font-size="10" fill="#334155">Emajinet Wiring Intelligence · ${sysV}V System · ${batS}S${batP}P Battery · ${panS}S${panP}P Panels · ${ccType.toUpperCase()}</text>`;
+  } else {
+    // Portrait: Panels at top, CC middle-left, Battery middle-right, Inverter bottom, Load at bottom
+    svg += drawPanelBlock(20, 20, panS, panP, 'portrait');
+    // Arrow panels down to CC
+    svg += `<line x1="120" y1="130" x2="120" y2="185" stroke="#f59e0b" stroke-width="2.5"/>`;
+    // CC block
+    svg += drawCC(75, 185, ccType);
+    // Arrow CC to battery  
+    svg += `<line x1="185" y1="205" x2="265" y2="205" stroke="#ef4444" stroke-width="2.5"/>`;
+    svg += `<line x1="185" y1="225" x2="265" y2="225" stroke="#3b82f6" stroke-width="2.5"/>`;
+    // Battery block  
+    svg += drawBatteryBlock(265, 175, batS, batP, sysV, 'portrait');
+    // Arrow battery to inverter
+    svg += `<line x1="310" y1="285" x2="240" y2="345" stroke="#ef4444" stroke-width="2.5"/>`;
+    svg += `<line x1="330" y1="285" x2="260" y2="345" stroke="#3b82f6" stroke-width="2.5"/>`;
+    // Inverter
+    svg += drawInverter(195, 345);
+    // Inverter to load
+    svg += `<line x1="255" y1="385" x2="255" y2="440" stroke="#f59e0b" stroke-width="2.5"/>`;
+    // Load
+    svg += drawLoad(195, 440);
+    svg += `<text x="${w/2}" y="${h-8}" text-anchor="middle" font-size="9" fill="#334155">Emajinet · ${sysV}V · ${batS}S${batP}P · ${panS}S${panP}P · ${ccType.toUpperCase()}</text>`;
+  }
+
+  // Defs for arrowheads
+  svg += `<defs>
+    <marker id="arrowAmber" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#f59e0b"/>
+    </marker>
+  </defs>`;
+
+  svg += `</svg>`;
+  document.getElementById('wiringDiagramSVG').innerHTML = svg;
+}
+
+function drawPanelBlock(x, y, seriesCount, parallelCount, orient) {
+  let out = '';
+  const pw = 45, ph = 30, gap = 6;
+  const shownSeries = Math.min(seriesCount, 3);
+  const shownParallel = Math.min(parallelCount, 2);
+  for (let p = 0; p < shownParallel; p++) {
+    for (let s = 0; s < shownSeries; s++) {
+      const bx = x + s*(pw+gap);
+      const by = y + p*(ph+gap);
+      out += `<rect x="${bx}" y="${by}" width="${pw}" height="${ph}" rx="4" class="panel-fill"/>`;
+      out += `<text x="${bx+pw/2}" y="${by+ph/2+4}" text-anchor="middle" font-size="8" fill="#93c5fd">☀️</text>`;
+    }
+  }
+  const labelX = x + (shownSeries*(pw+gap))/2;
+  const labelY = y + shownParallel*(ph+gap) + 12;
+  out += `<text x="${labelX}" y="${labelY}" text-anchor="middle" font-size="9" fill="#f59e0b" font-weight="bold">${seriesCount}S${parallelCount}P Array</text>`;
+  return out;
+}
+
+function drawCC(x, y, ccType) {
+  return `
+    <rect x="${x}" y="${y}" width="100" height="50" rx="8" class="cc-fill"/>
+    <text x="${x+50}" y="${y+20}" text-anchor="middle" font-size="9" fill="#10b981" font-weight="bold">CHARGE</text>
+    <text x="${x+50}" y="${y+32}" text-anchor="middle" font-size="9" fill="#10b981" font-weight="bold">CONTROLLER</text>
+    <text x="${x+50}" y="${y+44}" text-anchor="middle" font-size="8" fill="#34d399">${ccType.toUpperCase()}</text>
+  `;
+}
+
+function drawBatteryBlock(x, y, seriesCount, parallelCount, sysV, orient) {
+  const bw = 42, bh = 26, gap = 4;
+  let out = '';
+  const shownSeries  = Math.min(seriesCount, 4);
+  const shownParallel = Math.min(parallelCount, 2);
+  for (let p = 0; p < shownParallel; p++) {
+    for (let s = 0; s < shownSeries; s++) {
+      const bx = x + s*(bw+gap);
+      const by = y + p*(bh+gap);
+      out += `<rect x="${bx}" y="${by}" width="${bw}" height="${bh}" rx="4" class="bat-fill"/>`;
+      out += `<text x="${bx+bw/2}" y="${by+bh/2+3}" text-anchor="middle" font-size="7" fill="#94a3b8">🔋${s===0?'+':''}</text>`;
+    }
+  }
+  const labelX = x + (shownSeries*(bw+gap))/2;
+  const labelY = y + shownParallel*(bh+gap) + 12;
+  out += `<text x="${labelX}" y="${labelY}" text-anchor="middle" font-size="9" fill="#facc15" font-weight="bold">${sysV}V Battery (${seriesCount}S${parallelCount}P)</text>`;
+  return out;
+}
+
+function drawInverter(x, y) {
+  return `
+    <rect x="${x}" y="${y}" width="110" height="55" rx="8" class="inv-fill"/>
+    <text x="${x+55}" y="${y+22}" text-anchor="middle" font-size="9" fill="#c4b5fd" font-weight="bold">INVERTER /</text>
+    <text x="${x+55}" y="${y+34}" text-anchor="middle" font-size="9" fill="#c4b5fd" font-weight="bold">CHARGE HYBRID</text>
+    <text x="${x+55}" y="${y+48}" text-anchor="middle" font-size="8" fill="#a78bfa">DC → AC</text>
+  `;
+}
+
+function drawLoad(x, y) {
+  return `
+    <rect x="${x}" y="${y}" width="110" height="45" rx="8" class="load-fill"/>
+    <text x="${x+55}" y="${y+18}" text-anchor="middle" font-size="9" fill="#fbbf24" font-weight="bold">LOADS</text>
+    <text x="${x+55}" y="${y+30}" text-anchor="middle" font-size="8" fill="#fde68a">Lights · Fans · Pumps</text>
+    <text x="${x+55}" y="${y+42}" text-anchor="middle" font-size="8" fill="#fde68a">Appliances · Equipment</text>
+  `;
+}
+
+function suggestBatteries() {
+  const sysV = systemVoltage;
+  document.getElementById('batNomV').value = 12;
+  document.getElementById('batAh').value = 200;
+  document.getElementById('batCount').value = sysV === 12 ? 2 : sysV === 24 ? 4 : 8;
+  document.getElementById('batDOD').value = 80;
+  document.getElementById('batType').value = 'lithium_lifepo4';
+  recalculate();
+}
+
+// Initial calculation on load
+recalculate();
+</script>
+{% endblock %}

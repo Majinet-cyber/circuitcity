@@ -101,6 +101,7 @@ def _unpack_value(value: str) -> Tuple[str, str, Decimal]:
 
 # -------- form --------
 
+
 class LaybyOrderForm(forms.ModelForm):
     """
     Shows a `product` ChoiceField sourced from inventory.
@@ -117,16 +118,18 @@ class LaybyOrderForm(forms.ModelForm):
         fields = [
             "customer_name",
             "customer_phone",
-            "product",        # virtual field (ChoiceField) â€“ not on model
-            "item_name",      # hidden; set from product
-            "sku",            # hidden; set from product
+            "product",  # virtual field (ChoiceField) â€“ not on model
+            "item_name",  # hidden; set from product
+            "sku",  # hidden; set from product
             "term_months",
-            "total_price",    # hidden; set from product
+            "total_price",  # hidden; set from product
             "deposit_amount",
         ]
         widgets = {
             "customer_name": forms.TextInput(attrs={"class": "form-control", "placeholder": "Customer full name"}),
-            "customer_phone": forms.TextInput(attrs={"class": "form-control", "placeholder": "e.g. 0999 000 000", "inputmode": "tel"}),
+            "customer_phone": forms.TextInput(
+                attrs={"class": "form-control", "placeholder": "e.g. 0999 000 000", "inputmode": "tel"}
+            ),
             "item_name": forms.HiddenInput(),
             "sku": forms.HiddenInput(),
             "term_months": forms.NumberInput(attrs={"class": "form-control", "min": 1, "max": 12}),
@@ -139,9 +142,15 @@ class LaybyOrderForm(forms.ModelForm):
         ("id_number", forms.TextInput(attrs={"class": "form-control", "placeholder": "National ID / Passport"})),
         ("id_photo", forms.ClearableFileInput(attrs={"class": "form-control"})),
         ("kin1_name", forms.TextInput(attrs={"class": "form-control", "placeholder": "Kin #1 full name"})),
-        ("kin1_phone", forms.TextInput(attrs={"class": "form-control", "placeholder": "Kin #1 phone", "inputmode": "tel"})),
+        (
+            "kin1_phone",
+            forms.TextInput(attrs={"class": "form-control", "placeholder": "Kin #1 phone", "inputmode": "tel"}),
+        ),
         ("kin2_name", forms.TextInput(attrs={"class": "form-control", "placeholder": "Kin #2 full name"})),
-        ("kin2_phone", forms.TextInput(attrs={"class": "form-control", "placeholder": "Kin #2 phone", "inputmode": "tel"})),
+        (
+            "kin2_phone",
+            forms.TextInput(attrs={"class": "form-control", "placeholder": "Kin #2 phone", "inputmode": "tel"}),
+        ),
     ]
 
     def __init__(self, *args, **kwargs):
@@ -165,7 +174,9 @@ class LaybyOrderForm(forms.ModelForm):
         for fname, widget in self.OPTIONAL_FIELDS:
             if fname in model_field_names:
                 # Insert just before term_months for a nicer flow
-                self.fields[fname] = forms.CharField(required=(fname != "id_photo"), widget=widget, label=fname.replace("_", " ").title())
+                self.fields[fname] = forms.CharField(
+                    required=(fname != "id_photo"), widget=widget, label=fname.replace("_", " ").title()
+                )
                 if fname == "id_photo":
                     # Use FileField when present on model; required=False to allow mobile-first capture later
                     self.fields[fname] = forms.FileField(required=False, widget=widget, label="Photo of ID")
@@ -244,5 +255,3 @@ class LaybyOrderForm(forms.ModelForm):
             # No extra work needed here because ModelForm took care of model-bound fields.
 
         return inst
-
-

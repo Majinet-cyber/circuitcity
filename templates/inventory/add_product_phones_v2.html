@@ -1,0 +1,664 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Add Products · Phones{% endblock %}
+{% block header_title %}📱 Add Products (Phones){% endblock %}
+
+{% block extra_css %}
+<style>
+  :root {
+    --brand-tecno: #3b82f6;
+    --brand-itel: #ef4444;
+    --brand-samsung: #f97316;
+    --brand-pixel: #10b981;
+    --brand-redmi: #8b5cf6;
+    --brand-iphone: #111827;
+  }
+
+  .page-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: clamp(12px, 3vw, 24px);
+    padding-bottom: calc(var(--cc-nav-h, 80px) + 24px); /* Space for bottom nav */
+  }
+
+  .page-header {
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.05), rgba(16, 185, 129, 0.05));
+    border-radius: 16px;
+    padding: 20px;
+    margin-bottom: 24px;
+    border: 1px solid rgba(0, 0, 0, 0.06);
+  }
+
+  .page-header h1 {
+    font-size: clamp(1.5rem, 4vw, 2rem);
+    font-weight: 800;
+    margin: 0 0 8px 0;
+    color: #0f172a;
+  }
+
+  .page-header p {
+    color: #64748b;
+    margin: 0;
+    font-size: 0.95rem;
+  }
+
+  /* Brand Panels Grid */
+  .brand-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+    gap: 20px;
+    margin-bottom: 24px;
+  }
+
+  .brand-panel {
+    background: #ffffff;
+    border: 2px solid rgba(0, 0, 0, 0.08);
+    border-radius: 16px;
+    padding: 20px;
+    transition: all 0.25s ease;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+  }
+
+  .brand-panel:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.08);
+  }
+
+  .brand-panel.expanded {
+    border-color: var(--brand-color);
+    box-shadow: 0 0 0 3px rgba(var(--brand-color-rgb), 0.1), 0 12px 24px rgba(0, 0, 0, 0.08);
+  }
+
+  .brand-panel[data-brand="tecno"] { --brand-color: var(--brand-tecno); --brand-color-rgb: 59, 130, 246; }
+  .brand-panel[data-brand="itel"] { --brand-color: var(--brand-itel); --brand-color-rgb: 239, 68, 68; }
+  .brand-panel[data-brand="samsung"] { --brand-color: var(--brand-samsung); --brand-color-rgb: 249, 115, 22; }
+  .brand-panel[data-brand="google_pixel"] { --brand-color: var(--brand-pixel); --brand-color-rgb: 16, 185, 129; }
+  .brand-panel[data-brand="redmi"] { --brand-color: var(--brand-redmi); --brand-color-rgb: 139, 92, 246; }
+  .brand-panel[data-brand="iphone"] { --brand-color: var(--brand-iphone); --brand-color-rgb: 17, 24, 39; }
+
+  .brand-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+
+  .brand-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .brand-icon {
+    width: 48px;
+    height: 48px;
+    object-fit: contain;
+    flex-shrink: 0;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+  }
+
+  .brand-name {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--brand-color);
+    margin: 0;
+  }
+
+  .brand-description {
+    font-size: 0.9rem;
+    color: #64748b;
+    margin-bottom: 12px;
+  }
+
+  .expand-icon {
+    font-size: 1.5rem;
+    color: var(--brand-color);
+    transition: transform 0.25s ease;
+  }
+
+  .brand-panel.expanded .expand-icon {
+    transform: rotate(180deg);
+  }
+
+  /* Inline Form */
+  .inline-form {
+    display: none;
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid rgba(0, 0, 0, 0.08);
+  }
+
+  .brand-panel.expanded .inline-form {
+    display: block;
+  }
+
+  .form-group {
+    margin-bottom: 12px;
+  }
+
+  .form-group label {
+    display: block;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #334155;
+    margin-bottom: 4px;
+  }
+
+  .form-group input {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    transition: border-color 0.2s;
+  }
+
+  .form-group input:focus {
+    outline: none;
+    border-color: var(--brand-color);
+    box-shadow: 0 0 0 3px rgba(var(--brand-color-rgb), 0.1);
+  }
+
+  /* Glassmorphic RAM/ROM Cards */
+  .specs-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(85px, 1fr));
+    gap: 8px;
+    margin: 10px 0;
+  }
+
+  .spec-card {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.9), rgba(248, 250, 252, 0.9));
+    border: 2px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 14px 10px;
+    font-weight: 800;
+    font-size: 0.9rem;
+    color: #0f172a;
+    cursor: pointer;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    text-align: center;
+    box-shadow: 0 2px 6px rgba(15, 23, 42, 0.04);
+    position: relative;
+  }
+
+  .spec-card:hover {
+    background: linear-gradient(135deg, #f8fafc, #e2e8f0);
+    border-color: var(--brand-color);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(59, 130, 246, 0.15);
+  }
+
+  .spec-card.selected {
+    background: linear-gradient(135deg, var(--brand-color), rgba(var(--brand-color-rgb), 0.85));
+    color: #fff;
+    border-color: var(--brand-color);
+    box-shadow: 0 6px 20px rgba(var(--brand-color-rgb), 0.4);
+    transform: translateY(-2px);
+  }
+
+  .spec-card.selected::before {
+    content: "✓";
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    background: #10b981;
+    color: #fff;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.7rem;
+    font-weight: 900;
+  }
+
+  /* Model Selection Cards */
+  .model-card:hover {
+    background: linear-gradient(135deg, #f8fafc, #e2e8f0) !important;
+    border-color: var(--brand-color) !important;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+  }
+
+  .model-card.selected {
+    background: linear-gradient(135deg, var(--brand-color), rgba(var(--brand-color-rgb), 0.85)) !important;
+    color: #fff !important;
+    border-color: var(--brand-color) !important;
+  }
+
+  .form-help {
+    font-size: 0.8rem;
+    color: #94a3b8;
+    margin-top: 4px;
+  }
+
+  .specs-custom-input {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    transition: border-color 0.2s;
+    box-sizing: border-box;
+  }
+
+  .specs-custom-input:focus {
+    outline: none;
+    border-color: var(--brand-color);
+    box-shadow: 0 0 0 3px rgba(var(--brand-color-rgb), 0.1);
+  }
+
+  .specs-custom-input.specs-custom-active {
+    border-color: #6366f1;
+    background: #faf5ff;
+  }
+
+  .btn-submit {
+    width: 100%;
+    padding: 12px;
+    background: var(--brand-color);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .btn-submit:hover {
+    opacity: 0.9;
+    transform: translateY(-1px);
+  }
+
+  /* Recent Models */
+  .recent-models {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid rgba(0, 0, 0, 0.06);
+  }
+
+  .recent-models h4 {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #475569;
+    margin: 0 0 12px 0;
+  }
+
+  .model-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 300px;
+    overflow-y: auto;
+  }
+
+  .model-item {
+    padding: 10px 12px;
+    background: #f8fafc;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .model-info {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .model-name {
+    font-weight: 600;
+    color: #1e293b;
+  }
+
+  .model-specs {
+    color: #64748b;
+    margin-left: 8px;
+  }
+
+  .model-price {
+    color: var(--brand-color);
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .btn-remove {
+    padding: 6px 12px;
+    background: #ef4444;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+
+  .btn-remove:hover {
+    background: #dc2626;
+    transform: scale(1.05);
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 20px;
+    color: #94a3b8;
+    font-size: 0.9rem;
+  }
+
+  /* Mobile adjustments */
+  @media (max-width: 430px) {
+    .page-container {
+      padding: 12px;
+    }
+
+    .brand-grid {
+      gap: 16px;
+    }
+
+    .brand-panel {
+      padding: 16px;
+    }
+
+    .brand-icon {
+      width: 40px;
+      height: 40px;
+    }
+
+    .brand-info {
+      gap: 10px;
+    }
+
+    .brand-name {
+      font-size: 1.2rem;
+    }
+
+    .form-group input {
+      font-size: 16px; /* Prevents zoom on iOS */
+    }
+
+    .specs-grid {
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+    }
+
+    .spec-card {
+      padding: 10px 6px;
+      font-size: 0.82rem;
+    }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-container">
+  <!-- Category tabs -->
+  <div class="tabs-row" style="display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap;">
+    <a href="{% url 'inventory:phone_products' %}" style="padding: 10px 16px; border-radius: 10px; text-decoration: none; font-weight: 600; background: #3b82f6; color: #fff;">Phones</a>
+    <a href="{% url 'inventory:laptop_products' %}" style="padding: 10px 16px; border-radius: 10px; text-decoration: none; font-weight: 600; color: #64748b; background: #f1f5f9;">Laptops</a>
+    <a href="{% url 'inventory:desktop_products' %}" style="padding: 10px 16px; border-radius: 10px; text-decoration: none; font-weight: 600; color: #64748b; background: #f1f5f9;">Desktops</a>
+  </div>
+
+  <!-- Page Header -->
+  <div class="page-header">
+    <h1>Add Products</h1>
+    <p>Create phone models by brand. Click a brand panel to add a new model.</p>
+  </div>
+
+  <!-- Brand Panels Grid -->
+  <div class="brand-grid">
+    {% for item in brands_with_models %}
+    <div class="brand-panel" data-brand="{{ item.config.key }}" onclick="toggleBrand(this)">
+      <div class="brand-header">
+        <div class="brand-info">
+          {% load static %}
+          <img 
+            src="{% if item.config.icon %}{% static item.config.icon %}{% else %}{% static 'img/brands/default.svg' %}{% endif %}" 
+            alt="{{ item.config.display }}" 
+            class="brand-icon"
+            data-fallback="{% static 'img/brands/default.svg' %}"
+            onerror="handleImageError(this);"
+          >
+          <div>
+            <h3 class="brand-name">{{ item.config.display }}</h3>
+            <p class="brand-description">{{ item.config.description }}</p>
+          </div>
+        </div>
+        <div class="expand-icon">▼</div>
+      </div>
+
+      <!-- Inline Form (hidden by default) -->
+      <div class="inline-form">
+        <form method="post" onclick="event.stopPropagation()">
+          {% csrf_token %}
+          <input type="hidden" name="brand" value="{{ item.config.key }}">
+
+          <div class="form-group">
+            <label>Model Name <span style="color: #ef4444;">*</span></label>
+            {% if item.flagship_models %}
+            <div class="model-selection-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; margin-bottom: 12px;">
+              {% for model in item.flagship_models %}
+              <button type="button" class="model-card" data-model="{{ model }}" style="background: linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(248, 250, 252, 0.95)); border: 2px solid #e2e8f0; border-radius: 10px; padding: 10px 8px; font-weight: 700; font-size: 0.85rem; color: #0f172a; cursor: pointer; transition: all 0.2s; text-align: center;">
+                {{ model }}
+              </button>
+              {% endfor %}
+            </div>
+            {% endif %}
+            <input type="text" name="model_name" placeholder="Or type custom model name..." required>
+            <div class="form-help">Select above or enter custom model</div>
+          </div>
+
+          <div class="form-group">
+            <label>Model Number</label>
+            <input type="text" name="model_number" placeholder="e.g., SM-A146P (optional)">
+            <div class="form-help">Optional internal SKU</div>
+          </div>
+
+          <div class="form-group">
+            <label>Storage + RAM Configuration <span style="color: #ef4444;">*</span></label>
+            <div class="specs-grid">
+              <button type="button" class="spec-card" data-specs="32+2">32+2</button>
+              <button type="button" class="spec-card" data-specs="32+3">32+3</button>
+              <button type="button" class="spec-card" data-specs="64+2">64+2</button>
+              <button type="button" class="spec-card" data-specs="64+3">64+3</button>
+              <button type="button" class="spec-card" data-specs="64+4">64+4</button>
+              <button type="button" class="spec-card" data-specs="128+3">128+3</button>
+              <button type="button" class="spec-card" data-specs="128+4">128+4</button>
+              <button type="button" class="spec-card" data-specs="128+6">128+6</button>
+              <button type="button" class="spec-card" data-specs="128+8">128+8</button>
+              <button type="button" class="spec-card" data-specs="256+4">256+4</button>
+              <button type="button" class="spec-card" data-specs="256+6">256+6</button>
+              <button type="button" class="spec-card" data-specs="256+8">256+8</button>
+              <button type="button" class="spec-card" data-specs="256+12">256+12</button>
+              <button type="button" class="spec-card" data-specs="512+8">512+8</button>
+              <button type="button" class="spec-card" data-specs="512+12">512+12</button>
+            </div>
+            <input type="text" name="specs" class="specs-custom-input"
+                   placeholder="e.g. 128+6, 256+12, 512+12"
+                   autocomplete="off"
+                   style="margin-top: 8px;">
+            <div class="form-help">Select a preset above or type any configuration &mdash; e.g. 128+6, 256+12, 512+8, 1TB+16</div>
+          </div>
+
+          <div class="form-group">
+            <label>Order Price (Cost)</label>
+            <input type="number" name="order_price" placeholder="0.00" step="0.01" min="0">
+            <div class="form-help">Your cost per unit (optional)</div>
+          </div>
+
+          <button type="submit" class="btn-submit">
+            ✅ Add Model
+          </button>
+        </form>
+      </div>
+
+      <!-- Recent Models -->
+      {% if item.recent_models %}
+      <div class="recent-models">
+        <h4>Recent models ({{ item.recent_models|length }})</h4>
+        <div class="model-list">
+          {% for model in item.recent_models %}
+          <div class="model-item">
+            <div class="model-info">
+              <span class="model-name">{{ model.model_name }}</span>
+              <span class="model-specs">{{ model.variant_label }}</span>
+            </div>
+            {% if model.default_cost_price %}
+            <div class="model-price">MWK {{ model.default_cost_price|floatformat:0 }}</div>
+            {% endif %}
+            <!-- Manager-only Remove button -->
+            {% if request.user.is_staff or user.role == 'manager' or user.role == 'owner' %}
+            <form method="post" action="{% url 'inventory:phone_product_remove' model.id %}" style="margin: 0;" onsubmit="return confirm('Remove {{ model.display_name }} from catalog? Historical sales will remain intact.');">
+              {% csrf_token %}
+              <button type="submit" class="btn-remove" onclick="event.stopPropagation();">
+                🗑️ Remove
+              </button>
+            </form>
+            {% endif %}
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% else %}
+      <div class="recent-models">
+        <div class="empty-state">No models yet. Add your first one!</div>
+      </div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- Back Button -->
+  <div style="text-align: center; margin-top: 24px;">
+    <a href="{% url 'inventory:inventory_dashboard' %}" class="btn btn-secondary">
+      ← Back to Dashboard
+    </a>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function handleImageError(img) {
+  // Fallback to default icon if image fails to load
+  if (img.dataset.fallback && img.src !== img.dataset.fallback) {
+    img.src = img.dataset.fallback;
+  }
+  img.onerror = null; // Prevent infinite loop
+}
+
+function toggleBrand(panel) {
+  // Don't toggle if clicking inside form
+  if (event.target.closest('.inline-form')) {
+    return;
+  }
+
+  // Close all other panels
+  document.querySelectorAll('.brand-panel').forEach(p => {
+    if (p !== panel) {
+      p.classList.remove('expanded');
+    }
+  });
+
+  // Toggle current panel
+  panel.classList.toggle('expanded');
+
+  // Focus first input if expanded
+  if (panel.classList.contains('expanded')) {
+    setTimeout(() => {
+      const firstInput = panel.querySelector('.inline-form input[name="model_name"]');
+      if (firstInput) {
+        firstInput.focus();
+      }
+    }, 100);
+  }
+}
+
+// Handle model and spec card selection
+document.addEventListener('DOMContentLoaded', function() {
+  document.querySelectorAll('.brand-panel').forEach(panel => {
+    // Model card selection
+    const modelCards = panel.querySelectorAll('.model-card');
+    const modelInput = panel.querySelector('input[name="model_name"]');
+
+    modelCards.forEach(card => {
+      card.addEventListener('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        // Remove selected class from all model cards in this panel
+        panel.querySelectorAll('.model-card').forEach(c => c.classList.remove('selected'));
+
+        // Add selected class to clicked card
+        this.classList.add('selected');
+
+        // Update model input value
+        if (modelInput) {
+          modelInput.value = this.dataset.model;
+        }
+      });
+    });
+
+    // Spec card + custom input interaction
+    const specCards = panel.querySelectorAll('.spec-card');
+    const specsInput = panel.querySelector('input[name="specs"]');
+
+    // Clicking a preset chip fills the text input and marks that chip selected
+    specCards.forEach(card => {
+      card.addEventListener('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        panel.querySelectorAll('.spec-card').forEach(c => c.classList.remove('selected'));
+        this.classList.add('selected');
+
+        if (specsInput) {
+          specsInput.value = this.dataset.specs;
+          specsInput.classList.remove('specs-custom-active');
+        }
+      });
+    });
+
+    // Typing in the text input deselects presets (unless value matches one)
+    if (specsInput) {
+      specsInput.addEventListener('input', function() {
+        const typed = this.value.trim();
+        let matched = false;
+        panel.querySelectorAll('.spec-card').forEach(c => {
+          if (c.dataset.specs === typed) {
+            c.classList.add('selected');
+            matched = true;
+          } else {
+            c.classList.remove('selected');
+          }
+        });
+        this.classList.toggle('specs-custom-active', typed.length > 0 && !matched);
+      });
+    }
+
+    // Form submit validation: ensure specs field is not blank
+    const form = panel.querySelector('.inline-form form');
+    if (form) {
+      form.addEventListener('submit', function(e) {
+        if (specsInput && !specsInput.value.trim()) {
+          e.preventDefault();
+          specsInput.focus();
+          specsInput.style.borderColor = '#ef4444';
+          specsInput.placeholder = 'Required — select a preset or type e.g. 128+6';
+          setTimeout(() => { specsInput.style.borderColor = ''; }, 2000);
+        }
+      });
+    }
+  });
+});
+</script>
+{% endblock %}
+

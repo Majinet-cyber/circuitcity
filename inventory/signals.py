@@ -1,14 +1,46 @@
 ﻿# inventory/signals.py
 from __future__ import annotations
 
+from datetime import date, datetime
 from typing import Dict, List, Optional, Any
 
 from django.conf import settings
+from django.apps import apps
+from django.contrib.auth import get_user_model
+from django.db import transaction
 from django.db.models.signals import pre_save, post_save, post_delete
 from django.dispatch import receiver
 from django.utils import timezone
 
-from .models import InventoryItem
+from .models import InventoryItem, AgentProfile
+
+
+def _ensure_aware_datetime(val):
+    """
+    Convert date or naive datetime to timezone-aware datetime.
+    Returns timezone.now() if val is None.
+    """
+    if val is None:
+        return timezone.now()
+    # If it's a date (not datetime), convert to datetime at midnight
+    if isinstance(val, date) and not isinstance(val, datetime):
+        val = datetime.combine(val, datetime.min.time())
+    # If it's a naive datetime, make it timezone-aware
+    if isinstance(val, datetime) and timezone.is_naive(val):
+        val = timezone.make_aware(val, timezone.get_current_timezone())
+    return val
+
+
+def _first_attr(obj, names, default=None):
+    for name in names:
+        try:
+            value = getattr(obj, name)
+        except Exception:
+            continue
+        if value not in (None, ""):
+            return value
+    return default
+
 try:
     from .models import InventoryAudit  # optional in some setups
 except Exception:  # pragma: no cover
@@ -38,16 +70,23 @@ except Exception:  # pragma: no cover
 try:
     from asgiref.local import Local
 except Exception:  # pragma: no cover
+
     class Local:  # fall-back stub
-        def __init__(self): self.value = None
+        def __init__(self):
+            self.value = None
+
 
 _request_local = Local()
+
 
 def get_current_request():
     return getattr(_request_local, "value", None)
 
+
 class RequestMiddleware:
-    def __init__(self, get_response): self.get_response = get_response
+    def __init__(self, get_response):
+        self.get_response = get_response
+
     def __call__(self, request):
         _request_local.value = request
         try:
@@ -55,12 +94,15 @@ class RequestMiddleware:
         finally:
             _request_local.value = None
 
+
 # Optional: dashboard cache version bump
 try:
     from .cache_utils import bump_dashboard_cache_version as _bump_cache
 except Exception:  # pragma: no cover
+
     def _bump_cache() -> None:
         pass
+
 
 # ---------------------------------------------------------------------
 # InventoryItem change snapshot + audit trail
@@ -80,10 +122,20 @@ def _invitem_snap(sender, instance: InventoryItem, **kwargs):
     try:
         qs = sender.objects
         instance._before = qs.only(
-            "id", "status", "location_id", "current_location_id",
-            "assigned_agent_id", "agent_id",
-            "selling_price", "price", "order_price", "cost",
-            "sold_at", "received_at", "is_active", "active",
+            "id",
+            "status",
+            "location_id",
+            "current_location_id",
+            "assigned_agent_id",
+            "agent_id",
+            "selling_price",
+            "price",
+            "order_price",
+            "cost",
+            "sold_at",
+            "received_at",
+            "is_active",
+            "active",
         ).get(pk=pk)
     except sender.DoesNotExist:
         instance._before = None
@@ -151,8 +203,8 @@ def _invitem_audit(sender, instance: InventoryItem, created: bool, **kwargs):
                     "location_id": getattr(instance, "location_id", None),
                     "current_location_id": getattr(instance, "current_location_id", None),
                     "selling_price": getattr(instance, "selling_price", None)
-                        if hasattr(instance, "selling_price")
-                        else getattr(instance, "price", None),
+                    if hasattr(instance, "selling_price")
+                    else getattr(instance, "price", None),
                 }
                 log_audit(
                     actor=getattr(request, "user", None),
@@ -219,9 +271,107 @@ def _invitem_deleted(sender, instance: InventoryItem, **kwargs):
 
     _bump_cache()
 
+
+def _record_vertical_sale_cash(sender, instance, created: bool, **kwargs):
+    if not created:
+        return
+    if getattr(instance, "is_deleted", False) or getattr(instance, "is_void", False):
+        return
+    if getattr(instance, "is_reversed", False) or getattr(instance, "is_free", False):
+        return
+
+    business_id = getattr(instance, "business_id", None)
+    sale_id = getattr(instance, "pk", None)
+    if not business_id or not sale_id:
+        return
+    model_label = instance._meta.label
+
+    def _record():
+        try:
+            from wallet.business_memory import record_sale_cash_memory, record_cash_bank_transaction
+            from wallet.models import CashBankTransaction
+
+            sale = sender.objects.get(pk=sale_id)
+            business = getattr(sale, "business", None)
+            if not business:
+                return
+            sold_at = _first_attr(sale, ("sold_at", "date", "created_at"))
+            created_by = _first_attr(sale, ("sold_by", "created_by"))
+            payment_method = _first_attr(sale, ("payment_method",), "cash")
+
+            split_amounts = [
+                ("cash_amount", "cash", "Cash sale payment"),
+                ("bank_amount", "bank", "Bank sale payment"),
+                ("mobile_money_amount", "mobile_money", "Mobile money sale payment"),
+            ]
+            wrote_split = False
+            for field, method, category in split_amounts:
+                amount = _first_attr(sale, (field,), None)
+                if amount and amount > 0:
+                    wrote_split = True
+                    record_cash_bank_transaction(
+                        business=business,
+                        amount=amount,
+                        direction=CashBankTransaction.Direction.CASH_IN,
+                        category=category,
+                        payment_method=method,
+                        tx_date=sold_at,
+                        description=f"Recorded from {model_label} #{sale_id}",
+                        related_sale_reference=f"sale:{model_label}:{sale_id}:{method}",
+                        created_by=created_by,
+                    )
+            if wrote_split:
+                return
+
+            amount = _first_attr(sale, ("total_price", "total_amount", "total_mwk", "amount", "price"), 0)
+            record_sale_cash_memory(
+                sale=sale,
+                business=business,
+                amount=amount,
+                payment_method=payment_method,
+                sold_at=sold_at,
+                created_by=created_by,
+                reference=f"sale:{model_label}:{sale_id}",
+                category="Sale payment",
+            )
+        except Exception:
+            import logging
+
+            logging.getLogger(__name__).exception("Failed to record cash/bank memory for %s #%s", model_label, sale_id)
+
+    transaction.on_commit(_record)
+
+
+def _connect_business_memory_sale_signals():
+    labels = (
+        ("inventory", "ClothingSale"),
+        ("inventory", "LiquorSale"),
+        ("inventory", "PharmacySale"),
+        ("inventory", "GrocerySale"),
+        ("inventory", "CementSale"),
+        ("inventory", "FarmCropSale"),
+        ("inventory", "EnergyItemSale"),
+    )
+    for app_label, model_name in labels:
+        try:
+            model = apps.get_model(app_label, model_name)
+        except Exception:
+            continue
+        post_save.connect(
+            _record_vertical_sale_cash,
+            sender=model,
+            dispatch_uid=f"business_memory_cash_{app_label}_{model_name}",
+            weak=False,
+        )
+
+
+_connect_business_memory_sale_signals()
+
+
 # ---------------------------------------------------------------------
 # Sale hooks (guarded if sales app not present)
 # ---------------------------------------------------------------------
+
 
 def _wallet_fields() -> Dict[str, Optional[str]]:
     """
@@ -246,7 +396,9 @@ def _wallet_fields() -> Dict[str, Optional[str]]:
     reason_key = "reason" if "reason" in field_names else ("kind" if "kind" in field_names else None)
     memo_key = "memo" if "memo" in field_names else ("note" if "note" in field_names else None)
     ref_key = "ref" if "ref" in field_names else None
-    when_key = "happened_at" if "happened_at" in field_names else ("created_at" if "created_at" in field_names else None)
+    when_key = (
+        "happened_at" if "happened_at" in field_names else ("created_at" if "created_at" in field_names else None)
+    )
     kind_credit_value = "CREDIT"
     return {
         "agent_key": agent_key,
@@ -274,6 +426,7 @@ def _compute_commission_amount(sale: Any):
 
 
 if Sale is not None:
+
     @receiver(post_save, sender=Sale)
     def _sale_finalize(sender, instance: Any, created: bool, **kwargs):
         """
@@ -293,49 +446,88 @@ if Sale is not None:
             return
 
         if created:
+            # Send email notification after commit
+            from django.db import transaction
+            from notifications.services import notify_sale_completion, send_important_alert
+            from django.conf import settings
+
+            transaction.on_commit(lambda sale=instance: notify_sale_completion(sale))
+
+            # Check for important sale threshold
+            important_threshold = getattr(settings, "IMPORTANT_SALE_THRESHOLD", 500000)
+            if hasattr(instance, "price") and instance.price and float(instance.price) >= important_threshold:
+                business = None
+                if hasattr(instance, "business"):
+                    business = instance.business
+                elif hasattr(instance, "location") and instance.location:
+                    business = getattr(instance.location, "business", None)
+
+                if business:
+                    transaction.on_commit(
+                        lambda: send_important_alert(
+                            business=business,
+                            subject=f"Big sale completed: MK {instance.price:,.0f}",
+                            message=f"A large sale has been completed with a total of MK {instance.price:,.0f}.",
+                        )
+                    )
+
             updates: list[str] = []
             try:
                 # Status to SOLD (uppercase to normalize)
                 if getattr(item, "status", None) != "SOLD":
-                    item.status = "SOLD"; updates.append("status=SOLD")
+                    item.status = "SOLD"
+                    updates.append("status=SOLD")
 
                 # sold_at from sale timestamp if not already set
                 if not getattr(item, "sold_at", None):
-                    item.sold_at = getattr(instance, "sold_at", None) or timezone.now()
+                    raw_sold_at = getattr(instance, "sold_at", None)
+                    if isinstance(raw_sold_at, date) and not isinstance(raw_sold_at, datetime):
+                        # Sale.sold_at is a DateField; convert to aware datetime for DateTimeField
+                        from django.utils.timezone import make_aware
+                        raw_sold_at = make_aware(datetime.combine(raw_sold_at, datetime.min.time()))
+                    item.sold_at = raw_sold_at or timezone.now()
                     updates.append("sold_at from sale")
 
                 # carry price if item does not already have a selling value
                 sale_price = getattr(instance, "price", None)
                 if hasattr(item, "selling_price"):
                     if not getattr(item, "selling_price", None) and sale_price is not None:
-                        item.selling_price = sale_price; updates.append("selling_price from sale")
+                        item.selling_price = sale_price
+                        updates.append("selling_price from sale")
                 elif hasattr(item, "price"):
                     if not getattr(item, "price", None) and sale_price is not None:
-                        item.price = sale_price; updates.append("price from sale")
+                        item.price = sale_price
+                        updates.append("price from sale")
 
                 # location coherence (prefer current_location_id)
                 sale_loc_id = getattr(instance, "location_id", None)
                 if sale_loc_id:
                     if hasattr(item, "current_location_id"):
                         if getattr(item, "current_location_id", None) != sale_loc_id:
-                            item.current_location_id = sale_loc_id; updates.append("location from sale")
+                            item.current_location_id = sale_loc_id
+                            updates.append("location from sale")
                     elif hasattr(item, "location_id"):
                         if getattr(item, "location_id", None) != sale_loc_id:
-                            item.location_id = sale_loc_id; updates.append("location from sale")
+                            item.location_id = sale_loc_id
+                            updates.append("location from sale")
 
                 # optional flags that represent availability (do not touch is_active)
                 if hasattr(item, "is_sold"):
                     if not getattr(item, "is_sold", False):
-                        item.is_sold = True; updates.append("is_sold=True")
+                        item.is_sold = True
+                        updates.append("is_sold=True")
                 if hasattr(item, "in_stock"):
                     if getattr(item, "in_stock", True):
-                        item.in_stock = False; updates.append("in_stock=False")
+                        item.in_stock = False
+                        updates.append("in_stock=False")
                 if hasattr(item, "available"):
                     if getattr(item, "available", True):
-                        item.available = False; updates.append("available=False")
+                        item.available = False
+                        updates.append("available=False")
                 if hasattr(item, "availability"):
                     if getattr(item, "availability", True):
-                        item.availability = False; updates.append("availability=False")
+                        item.availability = False
+                        updates.append("availability=False")
 
                 # save without triggering _invitem_snap re-fetch (allowed audit)
                 item._actor = getattr(instance, "agent", None)
@@ -390,9 +582,12 @@ if Sale is not None:
             # Wallet credit (optional)
             try:
                 fields = _wallet_fields()
-                agent_key = fields["agent_key"]; reason_key = fields["reason_key"]
-                memo_key = fields["memo_key"]; ref_key = fields["ref_key"]
-                when_key = fields["when_key"]; credit_value = fields["kind_credit_value"]
+                agent_key = fields["agent_key"]
+                reason_key = fields["reason_key"]
+                memo_key = fields["memo_key"]
+                ref_key = fields["ref_key"]
+                when_key = fields["when_key"]
+                credit_value = fields["kind_credit_value"]
 
                 if WalletTxn is not None and agent_key and memo_key:
                     memo = f"Commission Sale #{getattr(instance, 'pk', None)}"
@@ -404,10 +599,9 @@ if Sale is not None:
                         if ref_key:
                             exists = tx_qs.filter(**{ref_key: ref_val}).exists()
                         else:
-                            exists = tx_qs.filter(**{
-                                agent_key: getattr(instance, "agent", None),
-                                memo_key: memo
-                            }).exists()
+                            exists = tx_qs.filter(
+                                **{agent_key: getattr(instance, "agent", None), memo_key: memo}
+                            ).exists()
                     except Exception:
                         exists = False
 
@@ -422,7 +616,7 @@ if Sale is not None:
                             if ref_key:
                                 create_kwargs[ref_key] = ref_val
                             if when_key:
-                                create_kwargs[when_key] = getattr(instance, "sold_at", None) or timezone.now()
+                                create_kwargs[when_key] = _ensure_aware_datetime(getattr(instance, "sold_at", None))
                             try:
                                 WalletTxn.objects.create(**create_kwargs)
                             except Exception:
@@ -434,6 +628,7 @@ if Sale is not None:
 
 
 if Sale is not None:
+
     @receiver(post_delete, sender=Sale)
     def _sale_deleted(sender, instance: Any, **kwargs):
         if _AUDIT_ENABLED and log_audit:
@@ -450,3 +645,49 @@ if Sale is not None:
             except Exception:
                 pass
         _bump_cache()
+
+
+# ---------------------------------------------------------------------
+# Auto-create AgentProfile for new users
+# ---------------------------------------------------------------------
+# This ensures tests that access user.agent_profile don't fail with
+# RelatedObjectDoesNotExist. The profile is created with no location
+# initially; the location is set when the user is assigned to a business.
+
+User = get_user_model()
+
+
+@receiver(post_save, sender=User, dispatch_uid="inventory.ensure_agent_profile_for_user")
+def ensure_agent_profile_for_user(sender, instance, created, **kwargs):
+    """
+    Auto-create AgentProfile for every new user.
+    
+    This is idempotent - if AgentProfile already exists, this is a no-op.
+    The profile is created with no location initially; location is set
+    when the user is assigned to a business/membership.
+    
+    IMPORTANT: This signal ensures legacy test code that accesses
+    user.agent_profile works without RelatedObjectDoesNotExist errors.
+    """
+    if not created:
+        return
+    
+    # Skip staff/superuser accounts - they typically don't need agent profiles
+    if getattr(instance, 'is_superuser', False) or getattr(instance, 'is_staff', False):
+        return
+    
+    # Idempotent check - don't create if already exists
+    try:
+        if hasattr(instance, 'agent_profile') and instance.agent_profile is not None:
+            return
+    except AgentProfile.DoesNotExist:
+        pass
+    except Exception:
+        pass
+    
+    # Create AgentProfile with no location (location can be set later)
+    try:
+        AgentProfile.objects.get_or_create(user=instance, defaults={'location': None})
+    except Exception:
+        # Don't break user creation if profile creation fails
+        pass

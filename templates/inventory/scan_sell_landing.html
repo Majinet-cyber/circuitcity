@@ -1,0 +1,214 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Scan &amp; Sell · {{ business.name }}{% endblock %}
+{% block header_title %}🛒 Scan &amp; Sell{% endblock %}
+
+{% block extra_css %}
+<style>
+:root {
+  --sl-blue: #3b82f6; --sl-blue-rgb: 59,130,246;
+  --sl-green: #10b981; --sl-green-rgb: 16,185,129;
+  --sl-purple: #8b5cf6; --sl-purple-rgb: 139,92,246;
+  --sl-amber: #f59e0b;
+  --sl-border: #e2e8f0; --sl-bg: #f8fafc;
+  --sl-text: #0f172a; --sl-muted: #64748b;
+  --sl-card: #ffffff;
+  --sl-shadow: 0 4px 20px rgba(15,23,42,.08);
+}
+
+.sl-page {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: clamp(16px,4vw,32px);
+  padding-bottom: 80px;
+}
+
+/* ── Header ── */
+.sl-header {
+  text-align: center;
+  margin-bottom: 36px;
+}
+.sl-header h1 {
+  font-size: clamp(1.5rem, 4vw, 2rem);
+  font-weight: 900;
+  color: var(--sl-text);
+  margin: 0 0 8px;
+}
+.sl-header p {
+  font-size: .95rem;
+  color: var(--sl-muted);
+  margin: 0;
+}
+
+/* ── Category cards grid ── */
+.sl-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+  margin-bottom: 40px;
+}
+@media (max-width: 620px) {
+  .sl-grid { grid-template-columns: 1fr; gap: 14px; }
+}
+
+.sl-card {
+  background: var(--sl-card);
+  border: 2.5px solid var(--sl-border);
+  border-radius: 20px;
+  padding: 28px 20px 24px;
+  text-align: center;
+  text-decoration: none;
+  color: inherit;
+  display: block;
+  transition: all .25s cubic-bezier(.4,0,.2,1);
+  box-shadow: var(--sl-shadow);
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+}
+.sl-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity .25s;
+  border-radius: 18px;
+}
+.sl-card:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 16px 40px rgba(15,23,42,.14);
+}
+.sl-card:hover::before { opacity: 1; }
+.sl-card:focus { outline: 3px solid var(--sl-blue); outline-offset: 2px; }
+
+/* Blue/Phone card */
+.sl-card.phones { border-color: transparent; background: linear-gradient(145deg,#eff6ff,#dbeafe); }
+.sl-card.phones::before { background: linear-gradient(145deg,rgba(var(--sl-blue-rgb),.08),rgba(var(--sl-blue-rgb),.15)); }
+.sl-card.phones:hover { border-color: var(--sl-blue); }
+.sl-card.phones .sl-card-icon { color: var(--sl-blue); }
+.sl-card.phones .sl-card-btn { background: var(--sl-blue); }
+
+/* Green/Laptop card */
+.sl-card.laptops { border-color: transparent; background: linear-gradient(145deg,#f0fdf4,#dcfce7); }
+.sl-card.laptops::before { background: linear-gradient(145deg,rgba(var(--sl-green-rgb),.08),rgba(var(--sl-green-rgb),.15)); }
+.sl-card.laptops:hover { border-color: var(--sl-green); }
+.sl-card.laptops .sl-card-icon { color: var(--sl-green); }
+.sl-card.laptops .sl-card-btn { background: var(--sl-green); }
+
+/* Purple/Desktop card */
+.sl-card.desktops { border-color: transparent; background: linear-gradient(145deg,#faf5ff,#ede9fe); }
+.sl-card.desktops::before { background: linear-gradient(145deg,rgba(var(--sl-purple-rgb),.08),rgba(var(--sl-purple-rgb),.15)); }
+.sl-card.desktops:hover { border-color: var(--sl-purple); }
+.sl-card.desktops .sl-card-icon { color: var(--sl-purple); }
+.sl-card.desktops .sl-card-btn { background: var(--sl-purple); }
+
+.sl-card-icon { font-size: 3.2rem; margin-bottom: 14px; display: block; }
+.sl-card-title { font-size: 1.25rem; font-weight: 800; color: var(--sl-text); margin-bottom: 6px; }
+.sl-card-sub { font-size: .82rem; color: var(--sl-muted); margin-bottom: 18px; min-height: 36px; }
+.sl-card-btn {
+  display: inline-block;
+  padding: 10px 22px;
+  border-radius: 10px;
+  color: #fff;
+  font-weight: 700;
+  font-size: .88rem;
+  transition: opacity .15s;
+}
+.sl-card:hover .sl-card-btn { opacity: .9; }
+
+/* ── Quick links row ── */
+.sl-quick {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+.sl-quick a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 18px;
+  background: var(--sl-card);
+  border: 1.5px solid var(--sl-border);
+  border-radius: 10px;
+  font-size: .85rem;
+  font-weight: 600;
+  color: var(--sl-muted);
+  text-decoration: none;
+  transition: all .18s;
+}
+.sl-quick a:hover {
+  border-color: var(--sl-blue);
+  color: var(--sl-blue);
+  background: rgba(var(--sl-blue-rgb), .04);
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="sl-page">
+
+  <!-- Messages -->
+  {% if messages %}
+  <div style="margin-bottom:20px">
+    {% for m in messages %}
+    <div style="padding:12px 16px;border-radius:10px;margin-bottom:8px;
+                background:{% if m.tags == 'error' %}#fef2f2{% elif m.tags == 'success' %}#f0fdf4{% else %}#fffbeb{% endif %};
+                border:1px solid {% if m.tags == 'error' %}#fecaca{% elif m.tags == 'success' %}#bbf7d0{% else %}#fde68a{% endif %};
+                color:{% if m.tags == 'error' %}#dc2626{% elif m.tags == 'success' %}#15803d{% else %}#92400e{% endif %};
+                font-size:.88rem">
+      {{ m }}
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <!-- Header -->
+  <div class="sl-header">
+    <h1>🛒 What are you selling today?</h1>
+    <p>Choose a category to start the sale wizard.</p>
+  </div>
+
+  <!-- Category Cards -->
+  <div class="sl-grid">
+
+    <!-- Phones -->
+    <a href="{{ phone_wizard_url }}" class="sl-card phones">
+      <span class="sl-card-icon">📱</span>
+      <div class="sl-card-title">Phones</div>
+      <div class="sl-card-sub">IMEI-tracked · 5-step gamified wizard</div>
+      <span class="sl-card-btn">Sell a Phone →</span>
+    </a>
+
+    <!-- Laptops -->
+    <a href="{{ laptop_wizard_url }}" class="sl-card laptops">
+      <span class="sl-card-icon">💻</span>
+      <div class="sl-card-title">Laptops</div>
+      <div class="sl-card-sub">Serial-tracked · Brand → Model → Unit</div>
+      <span class="sl-card-btn">Sell a Laptop →</span>
+    </a>
+
+    <!-- Desktops -->
+    <a href="{{ desktop_wizard_url }}" class="sl-card desktops">
+      <span class="sl-card-icon">🖥️</span>
+      <div class="sl-card-title">Desktops</div>
+      <div class="sl-card-sub">Serial-tracked · Brand → Model → Unit</div>
+      <span class="sl-card-btn">Sell a Desktop →</span>
+    </a>
+
+  </div>
+
+  <!-- Quick Links -->
+  <div class="sl-quick">
+    <a href="{{ scan_in_url }}">
+      <i class="bi bi-box-arrow-in-down"></i> Scan IN
+    </a>
+    <a href="{{ stock_list_url }}">
+      <i class="bi bi-list-ul"></i> Stock List
+    </a>
+  </div>
+
+</div>
+{% endblock %}

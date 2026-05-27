@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Restock Alert — {{ business_name }}</title>
+  <style>
+    body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; background: #f1f5f9; }
+    .wrapper { max-width: 600px; margin: 32px auto; background: #fff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,.08); }
+    .header { background: linear-gradient(135deg, #f59e0b, #d97706); padding: 32px 24px; text-align: center; }
+    .header h1 { margin: 0; color: #fff; font-size: 22px; font-weight: 800; }
+    .header p { margin: 8px 0 0; color: rgba(255,255,255,.85); font-size: 14px; }
+    .body { padding: 32px 24px; }
+    .alert-badge { display: inline-block; background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; border-radius: 999px; padding: 4px 14px; font-size: 13px; font-weight: 700; margin-bottom: 20px; }
+    .product-name { font-size: 24px; font-weight: 800; color: #0f172a; margin: 0 0 4px; }
+    .metric-row { display: flex; gap: 16px; margin: 20px 0; flex-wrap: wrap; }
+    .metric { flex: 1; min-width: 120px; background: #f8fafc; border-radius: 12px; padding: 16px; text-align: center; }
+    .metric-value { font-size: 28px; font-weight: 800; color: #0f172a; margin: 0; }
+    .metric-label { font-size: 12px; color: #64748b; font-weight: 600; margin-top: 4px; text-transform: uppercase; letter-spacing: .05em; }
+    .metric.warning .metric-value { color: #d97706; }
+    .metric.danger .metric-value { color: #dc2626; }
+    .action-box { background: #fffbeb; border: 1px solid #fcd34d; border-radius: 12px; padding: 16px 20px; margin-top: 24px; }
+    .action-box h3 { margin: 0 0 8px; font-size: 15px; color: #92400e; }
+    .action-box p { margin: 0; color: #78350f; font-size: 14px; }
+    .footer { padding: 20px 24px; border-top: 1px solid #e2e8f0; text-align: center; color: #94a3b8; font-size: 13px; }
+  </style>
+</head>
+<body>
+<div class="wrapper">
+  <div class="header">
+    <h1>⚠️ {{ alert_label }} Alert</h1>
+    <p>{{ business_name }}</p>
+  </div>
+  <div class="body">
+    <span class="alert-badge">{{ alert_label }}</span>
+    <div class="product-name">{{ product_name }}</div>
+
+    <div class="metric-row">
+      <div class="metric {% if current_stock == 0 %}danger{% else %}warning{% endif %}">
+        <p class="metric-value">{{ current_stock }}</p>
+        <p class="metric-label">In Stock</p>
+      </div>
+      <div class="metric">
+        <p class="metric-value">{{ threshold }}</p>
+        <p class="metric-label">Reorder Level</p>
+      </div>
+      <div class="metric">
+        <p class="metric-value">{{ suggested_reorder }}</p>
+        <p class="metric-label">Suggested Order</p>
+      </div>
+    </div>
+
+    <div class="action-box">
+      <h3>📦 Action Required</h3>
+      <p>
+        {% if current_stock == 0 %}
+          <strong>{{ product_name }}</strong> is completely out of stock. Place a reorder of at least
+          <strong>{{ suggested_reorder }} units</strong> immediately to avoid lost sales.
+        {% else %}
+          <strong>{{ product_name }}</strong> is running low ({{ current_stock }} units remaining,
+          threshold: {{ threshold }}). Consider reordering at least <strong>{{ suggested_reorder }} units</strong>.
+        {% endif %}
+      </p>
+    </div>
+  </div>
+  <div class="footer">
+    Emajinet · {{ business_name }} · Automated restock alert
+  </div>
+</div>
+</body>
+</html>

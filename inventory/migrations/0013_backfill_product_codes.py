@@ -1,13 +1,12 @@
 from django.db import migrations
 from django.utils.text import slugify
 
+
 def populate_codes(apps, schema_editor):
     Product = apps.get_model("inventory", "Product")
 
     # Cache existing codes to avoid extra queries in the collision loop
-    existing = set(
-        Product.objects.exclude(code__isnull=True).exclude(code__exact="").values_list("code", flat=True)
-    )
+    existing = set(Product.objects.exclude(code__isnull=True).exclude(code__exact="").values_list("code", flat=True))
 
     for p in Product.objects.all():
         if p.code:
@@ -32,8 +31,10 @@ def populate_codes(apps, schema_editor):
         p.save(update_fields=["code"])
         existing.add(candidate)
 
+
 def noop(apps, schema_editor):
     pass
+
 
 class Migration(migrations.Migration):
     dependencies = [

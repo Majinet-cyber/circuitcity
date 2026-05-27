@@ -75,14 +75,13 @@
 
     <div class="grid">
       {% for p in plans %}
-      {% with is_current=sub.plan_id == p.id %}
-      <label class="plan {% if is_current %}current{% endif %}">
+      <label class="plan {% if sub.plan_id == p.id %}current{% endif %}">
         <div class="head">
           <div class="name">
             <i class="bi bi-lightning-charge" style="-webkit-text-fill-color:transparent;background:linear-gradient(120deg,#22d3ee,#10b981);-webkit-background-clip:text"></i>
             {{ p.name }}
           </div>
-          {% if is_current %}
+          {% if sub.plan_id == p.id %}
             <span class="badge"><i class="bi bi-check2-circle"></i> Current</span>
           {% endif %}
         </div>
@@ -96,7 +95,7 @@
           {% if form and form.plan %}
             {{ form.plan.as_widget }}
           {% else %}
-            <input type="radio" name="plan" value="{{ p.id }}" {% if is_current %}checked{% endif %} id="plan-{{ p.id }}">
+            <input type="radio" name="plan" value="{{ p.id }}" {% if sub.plan_id == p.id %}checked{% endif %} id="plan-{{ p.id }}">
           {% endif %}
           <label for="plan-{{ p.id }}" class="subtle">Select {{ p.name }}</label>
         </div>
@@ -124,14 +123,13 @@
           <button class="btn" type="submit" name="plan" value="{{ p.id }}">
             <i class="bi bi-bag-check"></i> Continue with {{ p.name }}
           </button>
-          {% if not is_current %}
+          {% if sub.plan_id != p.id %}
             <span class="btn-ghost" onclick="document.getElementById('plan-{{ p.id }}')?.click()" role="button">
               <i class="bi bi-hand-index-thumb"></i> Select
             </span>
           {% endif %}
         </div>
       </label>
-      {% endwith %}
       {% empty %}
         <div class="plan">
           <div class="name">No active plans</div>

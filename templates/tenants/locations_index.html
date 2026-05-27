@@ -16,7 +16,7 @@
 <td class="text-end">
 <a class="btn btn-sm btn-outline-secondary" href="{% url 'tenants:location_edit' loc.pk %}">Edit</a>
 <a class="btn btn-sm btn-outline-danger" href="{% url 'tenants:location_delete' loc.pk %}">Delete</a>
-{% if hasattr(loc, 'is_default') %}
+{% if loc.is_default is not None %}
 <a class="btn btn-sm btn-outline-primary" href="{% url 'tenants:location_set_default' loc.pk %}">Make default</a>
 {% endif %}
 </td>

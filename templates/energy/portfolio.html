@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Portfolio Command Center · {{ business.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+.page-wrapper{max-width:1400px;margin:0 auto;padding:16px}
+.page-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:12px}
+.page-header h2{font-size:1.5rem;font-weight:700;color:#1e293b;margin:0}
+.totals-bar{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:28px}
+.total-card{background:#fff;border-radius:14px;padding:20px;text-align:center;box-shadow:0 2px 10px rgba(0,0,0,.05)}
+.total-card .num{font-size:1.6rem;font-weight:800;color:#1e293b}
+.total-card .lbl{color:#64748b;font-size:.8rem;text-transform:uppercase;letter-spacing:.5px;margin-top:4px}
+.section-title{font-size:1.15rem;font-weight:700;color:#1e293b;margin:24px 0 14px;display:flex;align-items:center;gap:8px}
+.site-table{width:100%;border-collapse:collapse;background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 2px 10px rgba(0,0,0,.05)}
+.site-table th{background:#f8fafc;padding:12px 16px;text-align:left;font-size:.8rem;text-transform:uppercase;color:#64748b;letter-spacing:.5px}
+.site-table td{padding:12px 16px;border-top:1px solid #f1f5f9;font-size:.9rem;color:#1e293b}
+.site-table tr:hover{background:#f8fafc}
+.health-bar{height:8px;border-radius:4px;background:#e2e8f0;overflow:hidden;width:80px;display:inline-block;vertical-align:middle}
+.health-bar .fill{height:100%;border-radius:4px}
+.fill-green{background:#10b981}
+.fill-yellow{background:#f59e0b}
+.fill-red{background:#ef4444}
+.tag{padding:2px 8px;border-radius:6px;font-size:.75rem;font-weight:600;display:inline-block}
+.tag-best{background:#d1fae5;color:#065f46}
+.tag-risk{background:#fee2e2;color:#991b1b}
+.empty-state{text-align:center;padding:60px 20px;color:#94a3b8}
+.empty-state i{font-size:3rem;margin-bottom:12px;display:block}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-wrapper">
+  <div class="page-header">
+    <h2><i class="bi bi-building-gear"></i> Portfolio Command Center</h2>
+    <a href="{% url 'verticals:energy_dashboard' %}" class="btn btn-outline"><i class="bi bi-arrow-left"></i> Dashboard</a>
+  </div>
+
+  {% if totals %}
+  <div class="totals-bar">
+    <div class="total-card"><div class="num">{{ totals.total_sites }}</div><div class="lbl">Active Sites</div></div>
+    <div class="total-card"><div class="num">{{ totals.total_capacity|floatformat:1 }} kW</div><div class="lbl">Installed Capacity</div></div>
+    <div class="total-card"><div class="num">{{ totals.total_generation|floatformat:0|intcomma }} kWh</div><div class="lbl">Generation (30d)</div></div>
+    <div class="total-card"><div class="num">{{ totals.total_consumption|floatformat:0|intcomma }} kWh</div><div class="lbl">Consumption (30d)</div></div>
+    <div class="total-card"><div class="num">MWK {{ totals.total_savings|floatformat:0|intcomma }}</div><div class="lbl">Savings (30d)</div></div>
+  </div>
+  {% endif %}
+
+  {% if best_sites %}
+  <div class="section-title"><i class="bi bi-trophy text-success"></i> Top Performing Sites</div>
+  <table class="site-table">
+    <thead><tr><th>Site</th><th>Type</th><th>Capacity</th><th>Generation</th><th>Savings</th><th>Health</th><th>Assets</th></tr></thead>
+    <tbody>
+    {% for s in best_sites %}
+    <tr>
+      <td><a href="{% url 'verticals:energy_site_detail' site_id=s.site.id %}">{{ s.site.name }}</a> <span class="tag tag-best">Top</span></td>
+      <td>{{ s.site.get_site_type_display }}</td>
+      <td>{{ s.capacity_kw|floatformat:1 }} kW</td>
+      <td>{{ s.generation_30d|floatformat:0|intcomma }} kWh</td>
+      <td>MWK {{ s.savings_30d|floatformat:0|intcomma }}</td>
+      <td><div class="health-bar"><div class="fill {% if s.avg_health >= 70 %}fill-green{% elif s.avg_health >= 40 %}fill-yellow{% else %}fill-red{% endif %}" style="width:{{ s.avg_health }}%"></div></div> {{ s.avg_health }}%</td>
+      <td>{{ s.asset_count }}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+
+  {% if worst_sites %}
+  <div class="section-title"><i class="bi bi-exclamation-triangle text-danger"></i> Highest Risk Sites</div>
+  <table class="site-table">
+    <thead><tr><th>Site</th><th>Type</th><th>Capacity</th><th>Generation</th><th>Health</th><th>Assets</th></tr></thead>
+    <tbody>
+    {% for s in worst_sites %}
+    <tr>
+      <td><a href="{% url 'verticals:energy_site_detail' site_id=s.site.id %}">{{ s.site.name }}</a> {% if s.avg_health < 50 %}<span class="tag tag-risk">At Risk</span>{% endif %}</td>
+      <td>{{ s.site.get_site_type_display }}</td>
+      <td>{{ s.capacity_kw|floatformat:1 }} kW</td>
+      <td>{{ s.generation_30d|floatformat:0|intcomma }} kWh</td>
+      <td><div class="health-bar"><div class="fill {% if s.avg_health >= 70 %}fill-green{% elif s.avg_health >= 40 %}fill-yellow{% else %}fill-red{% endif %}" style="width:{{ s.avg_health }}%"></div></div> {{ s.avg_health }}%</td>
+      <td>{{ s.asset_count }}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+
+  {% if not site_data %}
+  <div class="empty-state">
+    <i class="bi bi-building"></i>
+    <h3>No active sites yet</h3>
+    <p>Add energy sites to see your portfolio analytics.</p>
+    <a href="{% url 'verticals:energy_site_create' %}" class="btn btn-primary" style="margin-top:12px">Add First Site</a>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

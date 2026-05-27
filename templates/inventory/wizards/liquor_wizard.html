@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Choose Liquor Category{% endblock %}
+
+{% block extra_css %}
+<!-- LIQUOR_WIZARD_V2 -->
+<style>
+.category-container {
+  max-width: 900px;
+  margin: 2rem auto;
+  padding: 0 1rem;
+}
+
+.category-header {
+  text-align: center;
+  margin-bottom: 3rem;
+}
+
+.category-header h1 {
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: #1f2937;
+  margin-bottom: 0.5rem;
+}
+
+.category-header p {
+  color: #6b7280;
+  font-size: 1.2rem;
+}
+
+.category-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.category-link {
+  display: block;
+  background: white;
+  border: 3px solid #e5e7eb;
+  border-radius: 16px;
+  padding: 2rem;
+  text-align: center;
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+
+.category-link:hover {
+  border-color: #10b981;
+  transform: translateY(-4px);
+  box-shadow: 0 8px 20px rgba(16, 185, 129, 0.2);
+  text-decoration: none;
+}
+
+.category-icon {
+  font-size: 4rem;
+  margin-bottom: 1rem;
+}
+
+.category-name {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 0.5rem;
+}
+
+.category-desc {
+  font-size: 0.95rem;
+  color: #6b7280;
+}
+
+@media (max-width: 768px) {
+  .category-grid {
+    grid-template-columns: 1fr;
+  }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- LIQUOR_WIZARD_V2 - Proof marker for new template -->
+<div class="d-none" data-proof="LIQUOR_WIZARD_V2"></div>
+
+<div class="category-container">
+  <div class="category-header">
+    <h1>🍾 Choose Liquor Category</h1>
+    <p>Select a category to view products</p>
+  </div>
+
+  {% if messages %}
+    {% for message in messages %}
+    <div class="alert alert-{{ message.tags }} alert-dismissible fade show">
+      {{ message }}
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    {% endfor %}
+  {% endif %}
+
+  <div class="category-grid">
+    <a href="{% url 'inventory:liquor_catalog' category='beer' %}" class="category-link">
+      <div class="category-icon">🍺</div>
+      <div class="category-name">Beer</div>
+      <div class="category-desc">Bottles & Crates</div>
+    </a>
+
+    <a href="{% url 'inventory:liquor_catalog' category='cider' %}" class="category-link">
+      <div class="category-icon">🍎</div>
+      <div class="category-name">Cider</div>
+      <div class="category-desc">6-Packs & Bottles</div>
+    </a>
+
+    <a href="{% url 'inventory:liquor_catalog' category='wine' %}" class="category-link">
+      <div class="category-icon">🍷</div>
+      <div class="category-name">Wine</div>
+      <div class="category-desc">By Bottle or Glass</div>
+    </a>
+
+    <a href="{% url 'inventory:liquor_catalog' category='spirits' %}" class="category-link">
+      <div class="category-icon">🥃</div>
+      <div class="category-name">Spirits</div>
+      <div class="category-desc">Shots & Bottles</div>
+    </a>
+
+    <a href="{% url 'inventory:liquor_catalog' category='whisky' %}" class="category-link">
+      <div class="category-icon">🥃</div>
+      <div class="category-name">Whisky</div>
+      <div class="category-desc">Shots & Bottles</div>
+    </a>
+  </div>
+
+  <div style="text-align: center;">
+    <a href="{% url 'verticals:liquor_dashboard' %}" class="btn btn-outline-secondary">
+      ← Back to Dashboard
+    </a>
+  </div>
+</div>
+{% endblock %}
+

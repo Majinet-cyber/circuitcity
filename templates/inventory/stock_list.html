@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load humanize static %}
+{% load humanize static agent_links %}
 
 {% block title %}Stock List · Emajinet{% endblock %}
 {% block header_title %}
@@ -33,7 +33,8 @@
     --chart-grid:   rgba(148,163,184,.28);
   }
 
-  section{max-width:1200px;margin-inline:auto;color:var(--cc-text)}
+  section{max-width:1200px;margin-inline:auto;color:var(--cc-text);padding:0 1rem}
+  @media (max-width: 768px){ section{ padding:0 0.5rem; } }
 
   /* ===== Glassmorphic buttons ===== */
   .glass-btn,
@@ -105,6 +106,22 @@
   }
   .kpi-pill b{ font-weight:800 }
 
+  /* CRITICAL: Ensure offcanvas modals are ALWAYS hidden by default (even if Bootstrap CSS fails to load) */
+  .offcanvas:not(.show) {
+    visibility: hidden !important;
+    transform: translateX(-100%) !important;
+  }
+  .offcanvas.offcanvas-bottom:not(.show) {
+    transform: translateY(100%) !important;
+  }
+  .offcanvas.offcanvas-end:not(.show) {
+    transform: translateX(100%) !important;
+  }
+  /* Also ensure modals are hidden by default */
+  .modal:not(.show) {
+    display: none !important;
+  }
+
   .filters-wrap{ margin:.25rem 0 .85rem }
   .filters-row{ display:flex; gap:.5rem; align-items:center; flex-wrap:wrap }
   .filters-row input[type="text"], .filters-row select, .filters-row input[type="number"]{
@@ -127,11 +144,14 @@
   }
   #stockTable thead th{
     position:sticky; top:0; z-index:1; font-weight:700; color:#fff;
-    background:var(--cc-accent); letter-spacing:.02em;
+    background:var(--cc-accent); letter-spacing:.02em; padding:.8rem .75rem;
   }
   #stockTable th,#stockTable td{ padding:.7rem .75rem; border-bottom:1px solid var(--cc-border); vertical-align:middle }
-  #stockTable tbody tr:hover td{ background: color-mix(in oklab, var(--cc-accent) 12%, transparent); color:#0b1220 }
+  #stockTable tbody tr:hover td{ background: color-mix(in oklab, var(--cc-accent) 8%, transparent); transition:background .15s ease }
   #stockTable td.num{ text-align:right; font-variant-numeric:tabular-nums }
+  @media (max-width: 991px){
+    #stockTable th,#stockTable td{ padding:.5rem .4rem; font-size:.9rem }
+  }
 
   .table-mobile{ width:100%; border:1px solid var(--cc-border); border-radius:12px; overflow:hidden; background:var(--cc-panel); box-shadow:var(--cc-shadow) }
   .table-mobile tr{ border-bottom:1px solid var(--cc-border) }
@@ -140,9 +160,10 @@
     content: attr(data-label) " · "; color:var(--cc-muted); font-weight:700; margin-right:.25rem;
   }
 
-  .badge-chip{ display:inline-block; padding:.22rem .55rem; border-radius:999px; border:1px solid var(--cc-border); font-weight:700 }
+  .badge-chip{ display:inline-block; padding:.22rem .55rem; border-radius:999px; border:1px solid var(--cc-border); font-weight:700; white-space:nowrap }
   .badge-chip.green{ background:#ecfdf5; color:#065f46; border-color:#a7f3d0 }
   .badge-chip.red{ background:#fef2f2; color:#991b1b; border-color:#fecaca }
+  .badge.rounded-pill{ white-space:nowrap; font-weight:600; padding:.25rem .65rem }
 
   .charts{ display:grid; grid-template-columns:1.4fr 1fr; gap:14px; margin-top:14px }
   .chart-card{ background:var(--cc-panel-2); border:1px solid var(--cc-border); border-radius:14px; padding:12px; position:relative; overflow:hidden; color:var(--cc-text) }
@@ -156,10 +177,11 @@
 
   .battery-card{ background:var(--cc-panel-2); border:1px solid var(--cc-border); border-radius:14px; padding:12px; margin-top:14px }
   .battery-wrap{ display:flex; align-items:center; gap:1rem; flex-wrap:wrap }
-  .battery{ position:relative; width:220px; height:68px; border-radius:14px;
-            border:4px solid #cbd5e1; padding:6px; background:linear-gradient(180deg,#ffffff,#f8fafc); }
-  .battery:after{ content:""; position:absolute; right:-16px; top:18px; width:14px; height:32px; background:#cbd5e1; border-radius:3px }
-  .battery-fill{ height:100%; width:0%; border-radius:10px; transition:width .45s ease; background:linear-gradient(90deg,#22c55e,#06b6d4) }
+  .battery{ position:relative; width:180px; height:64px; border-radius:14px;
+            border:4px solid #cbd5e1; padding:4px; background:linear-gradient(180deg,#fff,#f8fafc);
+            box-shadow:inset 0 1px 0 rgba(255,255,255,.9); }
+  .battery:after{ content:""; position:absolute; right:-14px; top:16px; width:14px; height:30px; background:#cbd5e1; border-radius:3px }
+  .battery-fill{ height:100%; width:0%; border-radius:10px; transition:width .5s ease; background:linear-gradient(90deg,#22c55e,#06b6d4) }
   .battery-label{ font-weight:800 }
   .battery-hint{ color:var(--cc-muted); font-size:.85rem }
 
@@ -180,11 +202,71 @@
   }
 
   /* small action chips */
-  .act-chip{ display:inline-flex; align-items:center; gap:.4rem; padding:.35rem .6rem; border-radius:10px; font-weight:700; text-decoration:none; }
+  .act-chip{ display:inline-flex; align-items:center; gap:.4rem; padding:.35rem .6rem; border-radius:10px; font-weight:700; text-decoration:none; white-space:nowrap; font-size:.85rem }
   .act-edit{ background:#eef2ff; color:#1e40af; border:1px solid #c7d2fe; }
   .act-price{ background:#f0fdf4; color:#166534; border:1px solid #bbf7d0; }
   .act-del{ background:#fef2f2; color:#991b1b; border:1px solid #fecaca; }
   .act-wrap{ display:flex; gap:.4rem; flex-wrap:wrap; }
+  @media (max-width: 991px){
+    .act-wrap{ flex-direction:column; align-items:stretch }
+    .act-chip{ justify-content:center; padding:.45rem .7rem }
+  }
+  
+  /* Kebab dropdown for mobile actions */
+  .actions-kebab{ position:relative; display:inline-block }
+  .kebab-btn{ background:transparent; border:none; padding:.4rem .6rem; cursor:pointer; color:var(--cc-text); font-size:1.2rem; line-height:1; transition:background .15s }
+  .kebab-btn:hover{ background:rgba(37,99,235,.1); border-radius:.5rem }
+  .kebab-menu{ display:none; position:absolute; right:0; top:100%; min-width:180px; background:var(--cc-panel); border:1px solid var(--cc-border); border-radius:.75rem; box-shadow:0 8px 24px rgba(0,0,0,.15); z-index:100; margin-top:.25rem; padding:.35rem 0 }
+  .kebab-menu.show{ display:block }
+  .kebab-menu a, .kebab-menu button{ display:block; width:100%; text-align:left; padding:.5rem .85rem; background:transparent; border:none; color:var(--cc-text); text-decoration:none; font-size:.9rem; cursor:pointer; transition:background .12s }
+  .kebab-menu a:hover, .kebab-menu button:hover{ background:rgba(37,99,235,.08) }
+  .kebab-menu a i, .kebab-menu button i{ margin-right:.5rem; width:1rem; display:inline-block }
+
+  /* Ensure Actions buttons and dropdown items have proper cursor */
+  .stock-actions .btn,
+  .stock-actions .dropdown-item,
+  .dropdown .btn,
+  .dropdown-item,
+  .kebab-btn {
+    cursor: pointer;
+  }
+
+  /* Prevent dropdowns getting clipped inside responsive tables */
+  .table-responsive { overflow-y: visible; }
+  
+  /* ===== FIX: Mobile bottom nav spacing ===== */
+  /* Ensure content isn't hidden behind bottom nav on mobile */
+  @media (max-width: 768px) {
+    section {
+      padding-bottom: 80px; /* Add bottom padding to prevent content being hidden */
+    }
+    
+    /* Ensure table wrapper has horizontal scroll for wide tables */
+    .table-wrapper, .table-responsive {
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    
+    /* Make table more mobile-friendly */
+    #stockTable {
+      min-width: 800px; /* Ensure table doesn't squish too much */
+    }
+    
+    /* Ensure dropdowns/modals aren't clipped */
+    .dropdown-menu {
+      position: fixed !important;
+      will-change: transform;
+    }
+  }
+  
+  /* Safe area for devices with notches/home indicators */
+  @supports (padding-bottom: env(safe-area-inset-bottom)) {
+    @media (max-width: 768px) {
+      section {
+        padding-bottom: calc(80px + env(safe-area-inset-bottom));
+      }
+    }
+  }
 </style>
 {% endblock %}
 
@@ -203,24 +285,16 @@
   {% url 'settings' as settings_url %}
   {% url 'inventory:settings' as settings_url2 %}
 
-  <!-- Top: brand + quick actions -->
+  <!-- Top: simplified header with scanner -->
   <div class="hero-row">
     <button class="glass-btn tap is-primary btn-sm" type="button" data-bs-toggle="offcanvas" data-bs-target="#ccMenu" aria-label="Menu" onclick="window.buzz&&buzz(8)">
       <span class="glass-icon">≡</span>
     </button>
-    <a href="{{ dash_url|default:'/' }}" class="brand-chip tap" onclick="window.buzz&&buzz(6)"><span class="glass-icon">📊</span> Emajinet</a>
 
-    <a class="glass-btn is-green tap" href="{{ scan_in_url|default:'#' }}" onclick="window.buzz&&buzz(10)"><span class="glass-icon">➕</span> Stock IN</a>
-    <a class="glass-btn is-amber tap" href="{{ scan_sold_url|default:'#' }}" onclick="window.buzz&&buzz(10)"><span class="glass-icon">✅</span> Scan SOLD</a>
-    <a class="glass-btn is-primary tap" href="{{ scan_web_url|default:'#' }}" onclick="window.buzz&&buzz(10)"><span class="glass-icon">🌐</span> Scan (Web)</a>
-
-    {% if place_order_url %}
-      {% if IS_MANAGER|default:False or request.user.is_staff or request.user.is_superuser or request.user.profile.is_manager %}
-        <a class="glass-btn tap is-amber" href="{{ place_order_url }}" onclick="window.buzz&&buzz(8)"><span class="glass-icon">🧾</span> Place Order</a>
-      {% endif %}
-    {% endif %}
-
-    <a class="glass-btn tap is-primary" href="{{ feedback_url|default:'/feedback/' }}" onclick="window.buzz&&buzz(6)"><span class="glass-icon">💬</span> Feedback</a>
+    <!-- Single Scanner Entry Point -->
+    <a class="glass-btn is-green tap" href="{{ scan_in_url|default:'#' }}" onclick="window.buzz&&buzz(10)" title="Scan IMEI for Stock IN or Sell">
+      <span class="glass-icon"><i class="bi bi-upc-scan"></i></span> Scan IMEI
+    </a>
 
     <span class="ms-auto d-none d-md-inline text-muted fw-bold">
       {% if request.user.is_authenticated %}<i class="bi bi-person-circle me-1"></i>{{ request.user.username }}{% endif %}
@@ -235,6 +309,11 @@
     <span class="kpi-pill" id="kpiSold" title="Total items sold">Sold: <b data-target="{{ sold_count|default:0 }}" data-type="count">0</b></span>
     <span class="kpi-pill" id="kpiOrder" title="Total order/cost price">Sum order: <b data-target="{{ sum_order|default:0|floatformat:0 }}" data-type="money">0</b></span>
     <span class="kpi-pill" id="kpiSelling" title="Total selling price">Sum selling: <b data-target="{{ sum_selling|default:0|floatformat:0 }}" data-type="money">0</b></span>
+    {% if IS_MANAGER and suspicious_count > 0 %}
+      <a href="{% url 'inventory:phones_suspicious_prices' %}" class="kpi-pill tap" style="background:#fee2e2;border-color:#fca5a5;color:#991b1b" onclick="window.buzz&&buzz(8)" title="Review suspicious phone prices">
+        <i class="bi bi-exclamation-triangle"></i> Suspicious prices <span class="badge" style="background:#dc2626;color:white;padding:0.15rem 0.4rem;border-radius:0.25rem;margin-left:0.25rem">{{ suspicious_count }}</span>
+      </a>
+    {% endif %}
     {% if IS_MANAGER and trial_banner.show %}
       <a href="{% url 'billing:plans' %}" class="kpi-pill tap" style="background:linear-gradient(135deg,#fef3c7,#fde68a);border-color:#fbbf24;color:#92400e" onclick="window.buzz&&buzz(8)" title="Upgrade to unlock premium features">
         <i class="bi bi-rocket-takeoff"></i> Upgrade
@@ -247,12 +326,12 @@
   <!-- Filters -->
   <div class="filters-wrap">
     <button class="glass-btn tap is-primary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#filtersPanel" aria-expanded="true" onclick="window.buzz&&buzz(8)">
-      <span class="glass-icon">⚙️</span> Filters
+      <span class="glass-icon"><i class="bi bi-funnel"></i></span> Filters
     </button>
 
     <div id="filtersPanel" class="collapse show mt-2">
       <form class="filters-row" method="get" action="{{ stock_url|default:'/inventory/list/' }}">
-        <input type="hidden" name="view" value="{{ request.GET.view|default:'all' }}">
+        <input type="hidden" name="view" value="{{ view_mode|default:'table' }}">
         <input type="text" name="q" placeholder="Search IMEI/brand/model…" value="{{ q|default:'' }}" inputmode="search" autocomplete="off">
 
         <label class="status-inline">Status:
@@ -292,7 +371,7 @@
   <!-- ========== Ticker / Preview ========== -->
   <div id="ticker" class="ticker" role="region" aria-live="polite" aria-label="Rotating stock">
     <div class="ticker-row" id="tickerRow">
-      <div>IMEI</div><div>Product</div><div>Status</div><div>Order Price</div><div>Selling Price</div><div>Location</div><div>Agent</div>
+      <div>IMEI</div><div>Product</div><div>Status</div><div>Order Price</div><div>Selling Price</div><div>Location</div><div>{% if BUSINESS_VERTICAL == "gym" %}Trainer{% else %}Agent{% endif %}</div>
     </div>
     <div class="ticker-controls">
       <button class="btn-deep tap is-primary btn-sm" id="prevRow" type="button" aria-label="Previous" onclick="window.buzz&&buzz(6)">◀ Prev</button>
@@ -306,19 +385,222 @@
   </div>
 
   <!-- ========== Full Table ========== -->
-  <div id="stockTableWrap" {% if request.GET.view == 'all' %}{% else %}hidden{% endif %} class="mt-2">
+  <div id="stockTableWrap" {% if view_mode == 'all' %}{% else %}hidden{% endif %} class="mt-2">
     <div style="display:flex;justify-content:space-between;align-items:center;margin:.5rem 0 .75rem">
       <div style="font-weight:700;color:var(--cc-muted)">All stock</div>
       <a class="btn-deep tap is-primary" href="{{ request.path }}" onclick="window.buzz&&buzz(6)">Hide table</a>
     </div>
 
-    <div class="table-responsive d-none d-lg-block">
+    <!-- Mobile: Card view (NO ELLIPSIS ON IMEI OR PRODUCT) -->
+    <div class="d-lg-none" style="margin-bottom:20px">
+      {% if page_obj %}
+        {% for it in page_obj.object_list %}
+          <div class="cc-stock-card">
+            <div class="cc-stock-card__header">
+              <div style="flex:1;min-width:0">
+                <!-- IMEI: ALWAYS fully visible (word-break) -->
+                <div class="cc-stock-card__imei" data-cy="mobile-stock-imei">
+                  {{ it.imei|default:"No IMEI" }}
+                </div>
+                <!-- Product: ALWAYS fully visible (no dots) -->
+                <div class="cc-stock-card__product" style="margin-top:8px" data-cy="mobile-stock-product">
+                  {{ it.product }}
+                </div>
+              </div>
+              <div>
+                {% if it.status|lower == 'sold' %}
+                  <span class="cc-stock-card__badge cc-stock-card__badge--danger">Sold</span>
+                {% else %}
+                  <span class="cc-stock-card__badge cc-stock-card__badge--success">In stock</span>
+                {% endif %}
+              </div>
+            </div>
+            
+            <div class="cc-stock-card__meta">
+              <span class="cc-stock-card__badge cc-stock-card__badge--info">
+                Order: MK {{ it.order_price|default:0|floatformat:0|intcomma }}
+              </span>
+              <span class="cc-stock-card__badge cc-stock-card__badge--info">
+                Sell: MK {{ it.selling_price|default:0|floatformat:0|intcomma }}
+              </span>
+            </div>
+            
+            {% if it.current_location_id %}
+            <div style="margin-top:8px;font-size:0.85rem;color:#64748b">
+              <i class="bi bi-geo-alt"></i> {{ it.current_location.name }}
+            </div>
+            {% endif %}
+            
+            {% if it.assigned_agent_id %}
+            <div style="margin-top:4px;font-size:0.85rem;color:#64748b">
+              <i class="bi bi-person"></i> {{ it.assigned_agent|agent_link:request.user }}
+            </div>
+            {% endif %}
+            
+            {% if IS_MANAGER|default:False or request.user.is_staff or request.user.is_superuser or request.user.profile.is_manager %}
+            <div style="margin-top:12px;display:flex;gap:8px">
+              <a href="{% url 'inventory:stock_edit' it.id %}" class="btn btn-sm btn-outline-primary" style="flex:1">
+                <i class="bi bi-pencil"></i> Edit
+              </a>
+              <a href="{% url 'inventory:stock_delete' it.id %}" class="btn btn-sm btn-outline-danger">
+                <i class="bi bi-trash"></i>
+              </a>
+            </div>
+            {% endif %}
+          </div>
+        {% endfor %}
+      {% else %}
+        {% for row in rows %}
+          <div class="cc-stock-card">
+            <div class="cc-stock-card__header">
+              <div style="flex:1;min-width:0">
+                <div class="cc-stock-card__imei">{{ row.imei }}</div>
+                <div class="cc-stock-card__product" style="margin-top:8px">{{ row.product }}</div>
+              </div>
+              <div>
+                {% if row.status|lower == 'sold' %}
+                  <span class="cc-stock-card__badge cc-stock-card__badge--danger">Sold</span>
+                {% else %}
+                  <span class="cc-stock-card__badge cc-stock-card__badge--success">In stock</span>
+                {% endif %}
+              </div>
+            </div>
+            
+            <div class="cc-stock-card__meta">
+              <span class="cc-stock-card__badge cc-stock-card__badge--info">
+                Order: MK {{ row.order_price|floatformat:0|intcomma }}
+              </span>
+              <span class="cc-stock-card__badge cc-stock-card__badge--info">
+                Sell: MK {{ row.selling_price|default:0|floatformat:0|intcomma }}
+              </span>
+            </div>
+            
+            <div style="margin-top:8px;font-size:0.85rem;color:#64748b">
+              <i class="bi bi-geo-alt"></i> {{ row.location }}
+            </div>
+            <div style="margin-top:4px;font-size:0.85rem;color:#64748b">
+              <i class="bi bi-person"></i> {{ row.agent }}
+            </div>
+          </div>
+        {% empty %}
+          <div class="text-center" style="padding:40px;color:#64748b">
+            No stock yet. <a href="{{ scan_in_url|default:'#' }}">Scan IN your first item →</a>
+          </div>
+        {% endfor %}
+      {% endif %}
+    </div>
+
+    <!-- Mobile: Horizontal scrollable table with hint -->
+    <div class="d-lg-none cc-table-slider-container" style="position:relative;margin-top:8px;">
+      <div class="cc-table-slider__viewport" data-cc-table-slider style="overflow-x:auto;-webkit-overflow-scrolling:touch;border-radius:12px;box-shadow:var(--cc-shadow);">
+        <table id="stockTableMobile" style="width:100%;min-width:900px;border-collapse:separate;border-spacing:0;background:var(--cc-panel);border:1px solid var(--cc-border);">
+          <thead>
+            <tr>
+              <th style="position:sticky;top:0;z-index:1;font-weight:700;color:#fff;background:var(--cc-accent);letter-spacing:.02em;padding:.8rem .75rem;">IMEI</th>
+              <th style="position:sticky;top:0;z-index:1;font-weight:700;color:#fff;background:var(--cc-accent);letter-spacing:.02em;padding:.8rem .75rem;">Product</th>
+              <th style="position:sticky;top:0;z-index:1;font-weight:700;color:#fff;background:var(--cc-accent);letter-spacing:.02em;padding:.8rem .75rem;">Status</th>
+              <th style="position:sticky;top:0;z-index:1;font-weight:700;color:#fff;background:var(--cc-accent);letter-spacing:.02em;padding:.8rem .75rem;">Order Price</th>
+              <th style="position:sticky;top:0;z-index:1;font-weight:700;color:#fff;background:var(--cc-accent);letter-spacing:.02em;padding:.8rem .75rem;">Selling Price</th>
+              <th style="position:sticky;top:0;z-index:1;font-weight:700;color:#fff;background:var(--cc-accent);letter-spacing:.02em;padding:.8rem .75rem;">Location</th>
+              <th style="position:sticky;top:0;z-index:1;font-weight:700;color:#fff;background:var(--cc-accent);letter-spacing:.02em;padding:.8rem .75rem;">{% if BUSINESS_VERTICAL == "gym" %}Trainer{% else %}Agent{% endif %}</th>
+              {% if IS_MANAGER|default:False or request.user.is_staff or request.user.is_superuser or request.user.profile.is_manager %}
+                <th style="position:sticky;top:0;z-index:1;font-weight:700;color:#fff;background:var(--cc-accent);letter-spacing:.02em;padding:.8rem .75rem;text-align:right;">Actions</th>
+              {% endif %}
+            </tr>
+          </thead>
+          <tbody>
+            {% if page_obj %}
+              {% for it in page_obj.object_list %}
+                <tr>
+                  <td style="padding:.5rem .4rem;border-bottom:1px solid var(--cc-border);">{{ it.imei|default:"" }}</td>
+                  <td style="padding:.5rem .4rem;border-bottom:1px solid var(--cc-border);">{{ it.product }}</td>
+                  <td style="padding:.5rem .4rem;border-bottom:1px solid var(--cc-border);">
+                    {% if it.status|lower == 'sold' %}
+                      <span class="badge-chip red">Sold</span>
+                    {% else %}
+                      <span class="badge-chip green">In stock</span>
+                    {% endif %}
+                  </td>
+                  <td style="padding:.5rem .4rem;border-bottom:1px solid var(--cc-border);text-align:right;font-variant-numeric:tabular-nums;">{% if it.order_price is not None %}{{ it.order_price|floatformat:0|intcomma }}{% else %}—{% endif %}</td>
+                  <td style="padding:.5rem .4rem;border-bottom:1px solid var(--cc-border);text-align:right;font-variant-numeric:tabular-nums;">{% if it.selling_price is not None %}{{ it.selling_price|floatformat:0|intcomma }}{% else %}—{% endif %}</td>
+                  <td style="padding:.5rem .4rem;border-bottom:1px solid var(--cc-border);">{% if it.current_location_id %}{{ it.current_location.name }}{% else %}—{% endif %}</td>
+                  <td style="padding:.5rem .4rem;border-bottom:1px solid var(--cc-border);">
+                    {% if it.assigned_agent_id %}
+                      <span class="badge rounded-pill bg-light text-dark border" style="white-space:nowrap;">
+                        {{ it.assigned_agent|agent_link:request.user }}
+                      </span>
+                    {% else %}
+                      <span class="text-muted">—</span>
+                    {% endif %}
+                  </td>
+                  {% if IS_MANAGER|default:False or request.user.is_staff or request.user.is_superuser or request.user.profile.is_manager %}
+                    <td style="padding:.5rem .4rem;border-bottom:1px solid var(--cc-border);text-align:right;white-space:nowrap;">
+                      <!-- Mobile Actions: Use button to open modal instead of dropdown -->
+                      <button class="btn btn-sm btn-outline-secondary" 
+                              type="button"
+                              onclick="showMobileActionsModal({{ it.pk }}, '{{ it.imei|default:""|escapejs }}', {{ show_archived|yesno:'true,false' }}, '{{ it.status|lower }}', {% if it.status|lower == 'sold' %}{{ it.selling_price|default:0 }}{% else %}{{ it.order_price|default:0 }}{% endif %})"
+                              style="font-size:.85rem;padding:.35rem .6rem;">
+                        Actions
+                      </button>
+                    </td>
+                  {% endif %}
+                </tr>
+              {% empty %}
+                <tr><td colspan="8" style="text-align:center;color:var(--cc-muted);padding:1rem;">
+                  No stock yet. <a href="{{ scan_in_url|default:'#' }}" class="ms-1">Scan IN your first item →</a>
+                </td></tr>
+              {% endfor %}
+            {% else %}
+              {% for row in rows %}
+              <tr>
+                <td style="padding:.5rem .4rem;border-bottom:1px solid var(--cc-border);">{{ row.imei }}</td>
+                <td style="padding:.5rem .4rem;border-bottom:1px solid var(--cc-border);">{{ row.product }}</td>
+                <td style="padding:.5rem .4rem;border-bottom:1px solid var(--cc-border);">
+                  {% if row.status|lower == 'sold' %}
+                    <span class="badge-chip red">Sold</span>
+                  {% else %}
+                    <span class="badge-chip green">In stock</span>
+                  {% endif %}
+                </td>
+                <td style="padding:.5rem .4rem;border-bottom:1px solid var(--cc-border);text-align:right;">{{ row.order_price }}</td>
+                <td style="padding:.5rem .4rem;border-bottom:1px solid var(--cc-border);text-align:right;">{{ row.selling_price|default:"—" }}</td>
+                <td style="padding:.5rem .4rem;border-bottom:1px solid var(--cc-border);">{{ row.location }}</td>
+                <td style="padding:.5rem .4rem;border-bottom:1px solid var(--cc-border);">{{ row.agent }}</td>
+                <td style="padding:.5rem .4rem;border-bottom:1px solid var(--cc-border);text-align:right;">
+                  <span class="text-muted">—</span>
+                </td>
+              </tr>
+              {% empty %}
+              <tr>
+                <td colspan="8" style="text-align:center;color:var(--cc-muted);padding:1rem;">
+                  No stock yet. <a href="{{ scan_in_url|default:'#' }}" class="ms-1">Scan IN your first item →</a>
+                </td>
+              </tr>
+              {% endfor %}
+            {% endif %}
+          </tbody>
+        </table>
+      </div>
+      <!-- Swipe hint (shown only when overflow exists) -->
+      <div class="cc-table-slider__hint" style="display:none;position:absolute;top:50%;right:10px;transform:translateY(-50%);background:rgba(37,99,235,.9);color:#fff;padding:.45rem .75rem;border-radius:999px;font-size:.85rem;font-weight:700;pointer-events:none;z-index:2;box-shadow:0 4px 12px rgba(37,99,235,.4);">
+        Swipe to see more →
+      </div>
+      <!-- Optional: Scroll chevrons -->
+      <button class="cc-table-slider__prev" style="display:none;position:absolute;left:4px;top:50%;transform:translateY(-50%);background:rgba(255,255,255,.95);border:1px solid var(--cc-border);border-radius:50%;width:36px;height:36px;display:grid;place-items:center;box-shadow:0 4px 12px rgba(0,0,0,.15);z-index:2;cursor:pointer;" aria-label="Scroll left">
+        ◀
+      </button>
+      <button class="cc-table-slider__next" style="display:none;position:absolute;right:4px;top:50%;transform:translateY(-50%);background:rgba(255,255,255,.95);border:1px solid var(--cc-border);border-radius:50%;width:36px;height:36px;display:grid;place-items:center;box-shadow:0 4px 12px rgba(0,0,0,.15);z-index:2;cursor:pointer;" aria-label="Scroll right">
+        ▶
+      </button>
+    </div>
+
+    <div class="table-responsive cc-table-scroll d-none d-lg-block">
       <table id="stockTable" data-kb-table>
         <thead>
           <tr>
-            <th>IMEI</th><th>Product</th><th>Status</th><th>Order Price</th><th>Selling Price</th><th>Location</th><th>Agent</th><th>Owner</th>
+            <th>IMEI</th><th>Product</th><th>Status</th><th class="d-none d-lg-table-cell">Order Price</th><th class="d-none d-lg-table-cell">Selling Price</th><th class="d-none d-lg-table-cell">Location</th><th>{% if BUSINESS_VERTICAL == "gym" %}Trainer{% else %}Agent{% endif %}</th>
             {% if IS_MANAGER|default:False or request.user.is_staff or request.user.is_superuser or request.user.profile.is_manager %}
-              <th style="width:220px">Actions</th>
+              <th class="text-end">Actions</th>
             {% endif %}
           </tr>
         </thead>
@@ -335,65 +617,24 @@
                     <span class="badge-chip green">In stock</span>
                   {% endif %}
                 </td>
-                <td class="num">{% if it.order_price is not None %}{{ it.order_price|floatformat:0|intcomma }}{% else %}—{% endif %}</td>
-                <td class="num">{% if it.selling_price is not None %}{{ it.selling_price|floatformat:0|intcomma }}{% else %}—{% endif %}</td>
-                <td>{% if it.current_location_id %}{{ it.current_location.name }}{% else %}—{% endif %}</td>
-                <td>{% if it.assigned_agent_id %}{{ it.assigned_agent.username }}{% else %}—{% endif %}</td>
+                <td class="num d-none d-lg-table-cell">{% if it.order_price is not None %}{{ it.order_price|floatformat:0|intcomma }}{% else %}—{% endif %}</td>
+                <td class="num d-none d-lg-table-cell">{% if it.selling_price is not None %}{{ it.selling_price|floatformat:0|intcomma }}{% else %}—{% endif %}</td>
+                <td class="d-none d-lg-table-cell">{% if it.current_location_id %}{{ it.current_location.name }}{% else %}—{% endif %}</td>
                 <td>
-                  {% if it.assigned_agent %}
-                    <span class="badge rounded-pill bg-light text-dark">
-                      {{ it.assigned_agent.get_full_name|default:it.assigned_agent.username }}
+                  {% if it.assigned_agent_id %}
+                    <span class="badge rounded-pill bg-light text-dark border">
+                      {{ it.assigned_agent|agent_link:request.user }}
                     </span>
                   {% else %}
-                    <span class="badge rounded-pill bg-secondary-subtle text-dark">
-                      Manager
-                    </span>
+                    <span class="text-muted">—</span>
                   {% endif %}
                 </td>
-                {% if IS_MANAGER|default:False or request.user.is_staff or request.user.is_superuser or request.user.profile.is_manager %}
-                  <td>
-                    <div class="act-wrap">
-                      {# Assign Stock (managers only) #}
-                      {% if it.status|lower != 'sold' %}
-                        <button
-                          class="act-chip tap"
-                          style="background:#eef2ff;color:#1e40af;border:1px solid #c7d2fe;cursor:pointer"
-                          data-bs-toggle="modal"
-                          data-bs-target="#assignStockModal"
-                          data-item-id="{{ it.id }}"
-                          data-item-label="{{ it.imei|default:'' }} · {{ it.product }}"
-                          title="Assign stock"
-                          type="button"
-                        >
-                          <i class="bi bi-person-plus"></i> Assign
-                        </button>
-                      {% endif %}
-
-                      {# Edit (full edit screen) #}
-                      <a class="act-chip act-edit tap" href="/inventory/stock/{{ it.id }}/edit/" title="Edit">
-                        <i class="bi bi-pencil-square"></i> Edit
-                      </a>
-
-                      {# Edit Price (same edit page, hint tab=price) #}
-                      <a class="act-chip act-price tap" href="/inventory/stock/{{ it.id }}/edit/?tab=price" title="Edit Price">
-                        <i class="bi bi-currency-exchange"></i> Edit Price
-                      </a>
-
-                      {# Delete only when NOT sold #}
-                      {% if it.status|lower != 'sold' %}
-                        <form method="post" action="/inventory/stock/{{ it.id }}/delete/" onsubmit="return confirm('Delete this in-stock item permanently?');" style="display:inline">
-                          {% csrf_token %}
-                          <button type="submit" class="act-chip act-del tap">
-                            <i class="bi bi-trash"></i> Delete
-                          </button>
-                        </form>
-                      {% endif %}
-                    </div>
-                  </td>
-                {% endif %}
+                <td class="text-end">
+                  {% include "inventory/partials/_stock_row_actions.html" with item=it is_manager=IS_MANAGER show_archived=show_archived %}
+                </td>
               </tr>
             {% empty %}
-              <tr><td colspan="{% if IS_MANAGER|default:False or request.user.is_staff or request.user.is_superuser or request.user.profile.is_manager %}9{% else %}8{% endif %}" style="text-align:center;color:var(--cc-muted)">
+              <tr><td colspan="8" style="text-align:center;color:var(--cc-muted)">
                 No stock yet. <a href="{{ scan_in_url|default:'#' }}" class="ms-1">Scan IN your first item →</a>
               </td></tr>
             {% endfor %}
@@ -409,117 +650,20 @@
                   <span class="badge-chip green">In stock</span>
                 {% endif %}
               </td>
-              <td class="num">{{ row.order_price }}</td>
-              <td class="num">{{ row.selling_price|default:"—" }}</td>
-              <td>{{ row.location }}</td>
+              <td class="num d-none d-lg-table-cell">{{ row.order_price }}</td>
+              <td class="num d-none d-lg-table-cell">{{ row.selling_price|default:"—" }}</td>
+              <td class="d-none d-lg-table-cell">{{ row.location }}</td>
               <td>{{ row.agent }}</td>
-              <td>—</td>
               {# Fallback rows have no guaranteed id → omit actions to avoid 500s #}
-              {% if IS_MANAGER|default:False or request.user.is_staff or request.user.is_superuser or request.user.profile.is_manager %}
-                <td>
-                  <div class="text-muted">—</div>
-                </td>
-              {% endif %}
+              <td class="text-end">
+                <span class="text-muted">—</span>
+              </td>
             </tr>
             {% empty %}
             <tr>
-              <td colspan="{% if IS_MANAGER|default:False or request.user.is_staff or request.user.is_superuser or request.user.profile.is_manager %}9{% else %}8{% endif %}" style="text-align:center;color:var(--cc-muted)">
+              <td colspan="8" style="text-align:center;color:var(--cc-muted)">
                 No stock yet. <a href="{{ scan_in_url|default:'#' }}" class="ms-1">Scan IN your first item →</a>
               </td>
-            </tr>
-            {% endfor %}
-          {% endif %}
-        </tbody>
-      </table>
-    </div>
-
-    <!-- Mobile table -->
-    <div class="d-lg-none" style="margin-top:8px">
-      <table class="table-mobile">
-        <tbody>
-          {% if page_obj %}
-            {% for it in page_obj.object_list %}
-            <tr>
-              <td data-label="IMEI">{{ it.imei|default:"" }}</td>
-              <td data-label="Product">{{ it.product }}</td>
-              <td data-label="Status">
-                {% if it.status|lower == 'sold' %}
-                  <span class="badge-chip red">Sold</span>
-                {% else %}
-                  <span class="badge-chip green">In stock</span>
-                {% endif %}
-              </td>
-              <td data-label="Order Price" class="num">{% if it.order_price is not None %}{{ it.order_price|floatformat:0|intcomma }}{% else %}—{% endif %}</td>
-              <td data-label="Selling Price" class="num">{% if it.selling_price is not None %}{{ it.selling_price|floatformat:0|intcomma }}{% else %}—{% endif %}</td>
-              <td data-label="Location">{% if it.current_location_id %}{{ it.current_location.name }}{% else %}—{% endif %}</td>
-              <td data-label="Agent">{% if it.assigned_agent_id %}{{ it.assigned_agent.username }}{% else %}—{% endif %}</td>
-              <td data-label="Owner">
-                {% if it.assigned_agent %}
-                  <span class="badge rounded-pill bg-light text-dark">
-                    {{ it.assigned_agent.get_full_name|default:it.assigned_agent.username }}
-                  </span>
-                {% else %}
-                  <span class="badge rounded-pill bg-secondary-subtle text-dark">
-                    Manager
-                  </span>
-                {% endif %}
-              </td>
-              {% if IS_MANAGER|default:False or request.user.is_staff or request.user.is_superuser or request.user.profile.is_manager %}
-                <td data-label="Actions">
-                  <div class="act-wrap">
-                    {% if it.status|lower != 'sold' %}
-                      <button
-                        class="act-chip tap"
-                        style="background:#eef2ff;color:#1e40af;border:1px solid #c7d2fe;cursor:pointer"
-                        data-bs-toggle="modal"
-                        data-bs-target="#assignStockModal"
-                        data-item-id="{{ it.id }}"
-                        data-item-label="{{ it.imei|default:'' }} · {{ it.product }}"
-                        title="Assign stock"
-                        type="button"
-                      >
-                        <i class="bi bi-person-plus"></i> Assign
-                      </button>
-                    {% endif %}
-                    <a class="act-chip act-edit tap" href="/inventory/stock/{{ it.id }}/edit/" title="Edit">
-                      <i class="bi bi-pencil-square"></i> Edit
-                    </a>
-                    <a class="act-chip act-price tap" href="/inventory/stock/{{ it.id }}/edit/?tab=price" title="Edit Price">
-                      <i class="bi bi-currency-exchange"></i> Edit Price
-                    </a>
-                    {% if it.status|lower != 'sold' %}
-                      <form method="post" action="/inventory/stock/{{ it.id }}/delete/" onsubmit="return confirm('Delete this in-stock item permanently?');" style="display:inline">
-                        {% csrf_token %}
-                        <button type="submit" class="act-chip act-del tap">
-                          <i class="bi bi-trash"></i> Delete
-                        </button>
-                      </form>
-                    {% endif %}
-                  </div>
-                </td>
-              {% endif %}
-            </tr>
-            {% endfor %}
-          {% else %}
-            {% for row in rows %}
-            <tr>
-              <td data-label="IMEI">{{ row.imei }}</td>
-              <td data-label="Product">{{ row.product }}</td>
-              <td data-label="Status">
-                {% if row.status|lower == 'sold' %}
-                  <span class="badge-chip red">Sold</span>
-                {% else %}
-                  <span class="badge-chip green">In stock</span>
-                {% endif %}
-              </td>
-              <td data-label="Order Price" class="num">{{ row.order_price }}</td>
-              <td data-label="Selling Price" class="num">{{ row.selling_price|default:"—" }}</td>
-              <td data-label="Location">{{ row.location }}</td>
-              <td data-label="Agent">{{ row.agent }}</td>
-              <td data-label="Owner">—</td>
-              {% if IS_MANAGER|default:False or request.user.is_staff or request.user.is_superuser or request.user.profile.is_manager %}
-                <td data-label="Actions"><div class="text-muted">—</div></td>
-              {% endif %}
             </tr>
             {% endfor %}
           {% endif %}
@@ -600,6 +744,35 @@
   </div>
 </section>
 
+{% comment %}
+============================================================
+MODALS: Defined ONCE at page level (outside responsive tables)
+This prevents duplicate modal IDs from desktop/mobile tables.
+Each modal is dynamically populated via JS when action button is clicked.
+============================================================
+{% endcomment %}
+
+<!-- Mobile Actions Modal (Offcanvas) -->
+{% if IS_MANAGER|default:False or request.user.is_staff or request.user.is_superuser or request.user.profile.is_manager %}
+<div class="offcanvas offcanvas-bottom" tabindex="-1" id="mobileActionsModal" aria-labelledby="mobileActionsLabel" style="height:auto;max-height:80vh;">
+  <div class="offcanvas-header" style="border-bottom:1px solid var(--cc-border);">
+    <h5 class="offcanvas-title" id="mobileActionsLabel">Stock Actions</h5>
+    <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+  </div>
+  <div class="offcanvas-body">
+    <p class="mb-3 small text-muted">
+      IMEI: <strong id="mobile-action-imei" class="text-dark"></strong>
+    </p>
+    <input type="hidden" id="mobile-action-item-id">
+    <input type="hidden" id="mobile-action-show-archived">
+    
+    <div class="d-grid gap-2" id="mobile-actions-list">
+      <!-- Actions populated dynamically -->
+    </div>
+  </div>
+</div>
+{% endif %}
+
 <!-- Assign Stock Modal -->
 {% if IS_MANAGER|default:False or request.user.is_staff or request.user.is_superuser or request.user.profile.is_manager %}
 <div class="modal fade" id="assignStockModal" tabindex="-1" aria-hidden="true">
@@ -637,6 +810,99 @@
         <div class="modal-footer" style="border-top:1px solid var(--cc-border)">
           <button class="btn btn-outline-secondary" type="button" data-bs-dismiss="modal">Cancel</button>
           <button class="btn btn-primary" type="submit">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Transfer Stock Modal -->
+<div class="modal fade" id="transferModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content" style="background:var(--cc-panel);border:1px solid var(--cc-border);border-radius:14px;box-shadow:var(--cc-shadow)">
+      <form method="post" id="transferForm">
+        {% csrf_token %}
+        <div class="modal-header" style="border-bottom:1px solid var(--cc-border)">
+          <h5 class="modal-title">Transfer Stock</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <p class="mb-2">Transfer stock <strong id="transferImei"></strong> to:</p>
+          <select name="agent_id" class="form-select" style="padding:.5rem .6rem;border-radius:.55rem;border:1px solid var(--cc-border);background:var(--cc-panel);color:var(--cc-text);min-height:44px">
+            <option value="unassign">Unassign (return to store)</option>
+            {% for location_name, memberships in transfer_agents_by_location %}
+              <optgroup label="{{ location_name }}">
+                {% for membership in memberships %}
+                  <option value="{{ membership.user.id }}">
+                    {{ membership.user.get_full_name|default:membership.user.username }}
+                    {% if membership.role == 'MANAGER' %} (Manager){% endif %}
+                  </option>
+                {% endfor %}
+              </optgroup>
+            {% empty %}
+              <option disabled>No agents available — add team members first</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="modal-footer" style="border-top:1px solid var(--cc-border)">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Transfer</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Edit IMEI Modal -->
+<div class="modal fade" id="editImeiModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content" style="background:var(--cc-panel);border:1px solid var(--cc-border);border-radius:14px;box-shadow:var(--cc-shadow)">
+      <form method="post" id="editImeiForm">
+        {% csrf_token %}
+        <div class="modal-header" style="border-bottom:1px solid var(--cc-border)">
+          <h5 class="modal-title">Edit IMEI</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <p class="mb-2">Current IMEI: <strong id="currentImei"></strong></p>
+          <label class="form-label">
+            New IMEI (15 digits):
+            <input type="text" name="imei" pattern="\d{15}" maxlength="15" required 
+                   class="form-control" style="width:100%;padding:.5rem .6rem;margin-top:4px;border-radius:.55rem;border:1px solid var(--cc-border);background:var(--cc-panel);color:var(--cc-text)">
+          </label>
+        </div>
+        <div class="modal-footer" style="border-top:1px solid var(--cc-border)">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Update IMEI</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Price Modal -->
+<div class="modal fade" id="editPriceModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content" style="background:var(--cc-panel);border:1px solid var(--cc-border);border-radius:14px;box-shadow:var(--cc-shadow)">
+      <form method="post" id="editPriceForm">
+        {% csrf_token %}
+        <input type="hidden" name="next" id="editPriceNext" value="">
+        <div class="modal-header" style="border-bottom:1px solid var(--cc-border)">
+          <h5 class="modal-title" id="editPriceTitle">Edit Price</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <p class="mb-2" id="editPriceDescription">Current price: <strong id="currentPrice"></strong></p>
+          <label class="form-label" style="display:block; margin:12px 0;">
+            <span id="editPriceLabel">New price:</span>
+            <input type="number" name="price" step="0.01" min="0" required 
+                   class="form-control" style="width:100%;padding:.5rem .6rem;margin-top:4px;border-radius:.55rem;border:1px solid var(--cc-border);background:var(--cc-panel);color:var(--cc-text)"
+                   placeholder="0.00" id="editPriceInput">
+          </label>
+        </div>
+        <div class="modal-footer" style="border-top:1px solid var(--cc-border)">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Update Price</button>
         </div>
       </form>
     </div>
@@ -682,10 +948,14 @@
   </div>
 </div>
 
-<!-- Mobile FAB -->
-<a href="{{ scan_web_url|default:scan_sold_url|default:'/inventory/scan-sold/' }}" class="cc-fab" onclick="window.buzz&&buzz(10)" aria-label="Scan">
+<!-- Mobile FAB - Single Scanner Entry -->
+<a href="{{ scan_in_url|default:'/inventory/scan-in/' }}" class="cc-fab" onclick="window.buzz&&buzz(10)" aria-label="Scan IMEI" title="Scan IMEI for Stock IN or Sell">
   <i class="bi bi-upc-scan fs-4"></i>
 </a>
+
+{# Include mobile bottom nav (hidden on desktop) #}
+{% include 'partials/bottomnav.html' with active_tab='stock' %}
+
 {% endblock %}
 
 {% block extra_js %}
@@ -1042,8 +1312,270 @@ $id('invTopPeriod')?.addEventListener('change', loadInvTopModels);
 })();
 </script>
 
-{# Assign Stock Modal JS #}
+{# Stock Controls Modal JS (Transfer, Edit IMEI) #}
 {% if IS_MANAGER|default:False or request.user.is_staff or request.user.is_superuser or request.user.profile.is_manager %}
+<script>
+// ===== TABLE SLIDER: Detect overflow and show hints/controls (mobile only) =====
+(function initTableSlider() {
+  const viewport = document.querySelector('[data-cc-table-slider]');
+  if (!viewport) return;
+  
+  const container = viewport.closest('.cc-table-slider-container');
+  if (!container) return;
+  
+  const hint = container.querySelector('.cc-table-slider__hint');
+  const prevBtn = container.querySelector('.cc-table-slider__prev');
+  const nextBtn = container.querySelector('.cc-table-slider__next');
+  
+  function checkOverflow() {
+    // Only on mobile (below 992px)
+    if (window.innerWidth >= 992) {
+      if (hint) hint.style.display = 'none';
+      if (prevBtn) prevBtn.style.display = 'none';
+      if (nextBtn) nextBtn.style.display = 'none';
+      return;
+    }
+    
+    const hasOverflow = viewport.scrollWidth > viewport.clientWidth;
+    
+    if (hasOverflow) {
+      if (hint) hint.style.display = 'block';
+      if (prevBtn) prevBtn.style.display = 'grid';
+      if (nextBtn) nextBtn.style.display = 'grid';
+      
+      // Hide hint after first scroll
+      let hintHidden = false;
+      viewport.addEventListener('scroll', function() {
+        if (!hintHidden && hint) {
+          hint.style.opacity = '0';
+          hint.style.transition = 'opacity 0.3s ease';
+          setTimeout(() => { hint.style.display = 'none'; }, 300);
+          hintHidden = true;
+        }
+      }, { once: true });
+    } else {
+      if (hint) hint.style.display = 'none';
+      if (prevBtn) prevBtn.style.display = 'none';
+      if (nextBtn) nextBtn.style.display = 'none';
+    }
+  }
+  
+  // Scroll buttons
+  if (prevBtn) {
+    prevBtn.addEventListener('click', function() {
+      viewport.scrollBy({ left: -200, behavior: 'smooth' });
+    });
+  }
+  
+  if (nextBtn) {
+    nextBtn.addEventListener('click', function() {
+      viewport.scrollBy({ left: 200, behavior: 'smooth' });
+    });
+  }
+  
+  // Check on load and resize
+  checkOverflow();
+  window.addEventListener('resize', checkOverflow);
+  
+  // Re-check when table becomes visible (view=all)
+  const observer = new MutationObserver(function(mutations) {
+    mutations.forEach(function(mutation) {
+      if (mutation.attributeName === 'hidden') {
+        setTimeout(checkOverflow, 100);
+      }
+    });
+  });
+  
+  const tableWrap = document.getElementById('stockTableWrap');
+  if (tableWrap) {
+    observer.observe(tableWrap, { attributes: true });
+  }
+})();
+
+// ===== MOBILE ACTIONS MODAL =====
+window.showMobileActionsModal = function(itemId, imei, showArchived, status, currentPrice) {
+  const modal = new bootstrap.Offcanvas(document.getElementById('mobileActionsModal'));
+  
+  document.getElementById('mobile-action-imei').textContent = imei || '#' + itemId;
+  document.getElementById('mobile-action-item-id').value = itemId;
+  document.getElementById('mobile-action-show-archived').value = showArchived ? 'true' : 'false';
+  
+  const actionsList = document.getElementById('mobile-actions-list');
+  actionsList.innerHTML = '';
+  
+  if (!showArchived) {
+    // Transfer button
+    const transferBtn = document.createElement('button');
+    transferBtn.className = 'btn btn-outline-primary';
+    transferBtn.innerHTML = '<i class="bi bi-arrow-left-right me-2"></i>Transfer';
+    transferBtn.onclick = function() {
+      modal.hide();
+      showTransferModal(itemId, imei);
+    };
+    actionsList.appendChild(transferBtn);
+    
+    // Edit IMEI button
+    const editBtn = document.createElement('button');
+    editBtn.className = 'btn btn-outline-secondary';
+    editBtn.innerHTML = '<i class="bi bi-hash me-2"></i>Edit IMEI';
+    editBtn.onclick = function() {
+      modal.hide();
+      showEditImeiModal(itemId, imei);
+    };
+    actionsList.appendChild(editBtn);
+    
+    // Edit Price button
+    const editPriceBtn = document.createElement('button');
+    editPriceBtn.className = 'btn btn-outline-secondary';
+    editPriceBtn.innerHTML = '<i class="bi bi-currency-dollar me-2"></i>Edit price';
+    editPriceBtn.setAttribute('data-testid', 'stock-edit-price');
+    editPriceBtn.onclick = function() {
+      modal.hide();
+      const isSold = status === 'sold';
+      showEditPriceModal(itemId, currentPrice, isSold, imei);
+    };
+    actionsList.appendChild(editPriceBtn);
+    
+    // Archive button
+    const archiveForm = document.createElement('form');
+    archiveForm.method = 'post';
+    archiveForm.action = '/inventory/stock/' + itemId + '/archive/';
+    archiveForm.onsubmit = function() { 
+      return confirm('Archive this item?'); 
+    };
+    archiveForm.innerHTML = `
+      {% csrf_token %}
+      <button type="submit" class="btn btn-outline-danger w-100">
+        <i class="bi bi-archive me-2"></i>Archive
+      </button>
+    `;
+    actionsList.appendChild(archiveForm);
+  } else {
+    // Restore button
+    const restoreForm = document.createElement('form');
+    restoreForm.method = 'post';
+    restoreForm.action = '/inventory/stock/' + itemId + '/restore/';
+    restoreForm.innerHTML = `
+      {% csrf_token %}
+      <button type="submit" class="btn btn-outline-success w-100">
+        <i class="bi bi-arrow-counterclockwise me-2"></i>Restore
+      </button>
+    `;
+    actionsList.appendChild(restoreForm);
+  }
+  
+  modal.show();
+};
+
+// ===== MOVE MODALS TO BODY (Fixes z-index/stacking-context issues) =====
+document.addEventListener('DOMContentLoaded', function() {
+  // Move all Bootstrap modals to document.body so they're not trapped
+  // inside transformed/glassmorphic containers
+  const modals = document.querySelectorAll('.modal');
+  modals.forEach(function(modal) {
+    if (modal.parentElement !== document.body) {
+      document.body.appendChild(modal);
+    }
+  });
+  
+  // Verify z-index values in console (for debugging)
+  if (window.console && console.log) {
+    modals.forEach(function(modal) {
+      const computedStyle = window.getComputedStyle(modal);
+      console.log('Modal z-index:', modal.id, '=', computedStyle.zIndex);
+    });
+    const backdrops = document.querySelectorAll('.modal-backdrop');
+    backdrops.forEach(function(backdrop) {
+      const computedStyle = window.getComputedStyle(backdrop);
+      console.log('Backdrop z-index:', computedStyle.zIndex);
+    });
+  }
+});
+
+// Transfer Modal
+function showTransferModal(itemId, imei) {
+  const modal = new bootstrap.Modal(document.getElementById('transferModal'));
+  const form = document.getElementById('transferForm');
+  document.getElementById('transferImei').textContent = imei || '#' + itemId;
+  form.action = '/inventory/stock/' + itemId + '/transfer/';
+  modal.show();
+}
+
+// Edit IMEI Modal
+function showEditImeiModal(itemId, imei) {
+  const modal = new bootstrap.Modal(document.getElementById('editImeiModal'));
+  const form = document.getElementById('editImeiForm');
+  document.getElementById('currentImei').textContent = imei || '(none)';
+  form.action = '/inventory/stock/' + itemId + '/edit-imei/';
+  modal.show();
+}
+
+// Edit Price Modal
+function showEditPriceModal(itemId, currentPrice, isSold, imei) {
+  const modal = new bootstrap.Modal(document.getElementById('editPriceModal'));
+  const form = document.getElementById('editPriceForm');
+  const title = document.getElementById('editPriceTitle');
+  const description = document.getElementById('editPriceDescription');
+  const label = document.getElementById('editPriceLabel');
+  const input = document.getElementById('editPriceInput');
+  const nextInput = document.getElementById('editPriceNext');
+  
+  // Set form action
+  form.action = '/inventory/stock/' + itemId + '/edit-price/';
+  
+  // Set next URL to return to current page with filters
+  nextInput.value = window.location.pathname + window.location.search;
+  
+  // Update title and labels based on sold status
+  if (isSold) {
+    title.textContent = 'Edit Selling Price';
+    label.textContent = 'New selling price:';
+    description.innerHTML = 'Item <strong>' + (imei || '#' + itemId) + '</strong> (SOLD)<br>Current selling price: <strong>MK ' + (currentPrice || '—') + '</strong>';
+  } else {
+    title.textContent = 'Edit Order Price';
+    label.textContent = 'New order price (cost):';
+    description.innerHTML = 'Item <strong>' + (imei || '#' + itemId) + '</strong> (IN STOCK)<br>Current order price: <strong>MK ' + (currentPrice || '—') + '</strong>';
+  }
+  
+  // Prefill current price (remove commas if present)
+  if (currentPrice) {
+    const priceValue = currentPrice.toString().replace(/,/g, '');
+    input.value = priceValue;
+    // Select the input for easy replacement
+    setTimeout(() => input.select(), 100);
+  } else {
+    input.value = '';
+  }
+  
+  modal.show();
+}
+
+// ===== GLOBAL MODAL CLEANUP (Fixes blur/lock issue) =====
+(function () {
+  function cleanupBootstrapBackdrops() {
+    // Only cleanup if there is no modal currently shown
+    if (document.querySelectorAll(".modal.show").length === 0) {
+      document.querySelectorAll(".modal-backdrop").forEach(b => b.remove());
+      document.body.classList.remove("modal-open");
+      document.body.style.removeProperty("overflow");
+      document.body.style.removeProperty("padding-right");
+    }
+  }
+
+  // Cleanup on load (fixes already-stuck pages)
+  document.addEventListener("DOMContentLoaded", cleanupBootstrapBackdrops);
+
+  // Cleanup whenever any modal finishes hiding
+  document.addEventListener("hidden.bs.modal", cleanupBootstrapBackdrops);
+
+  // Extra safety: if something cancels show/hide mid-way
+  window.addEventListener("keydown", function (e) {
+    if (e.key === "Escape") setTimeout(cleanupBootstrapBackdrops, 0);
+  });
+})();
+</script>
+
+{# Assign Stock Modal JS #}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
   const assignModal = document.getElementById('assignStockModal');
@@ -1062,6 +1594,24 @@ document.addEventListener('DOMContentLoaded', function() {
       if (modalItemLabel) modalItemLabel.textContent = itemLabel;
     });
   }
+  
+  // Kebab dropdown menu handler
+  document.addEventListener('click', function(e) {
+    if (e.target.closest('.kebab-btn')) {
+      e.stopPropagation();
+      const menu = e.target.closest('.actions-kebab').querySelector('.kebab-menu');
+      const wasShown = menu.classList.contains('show');
+      
+      // Close all other menus
+      document.querySelectorAll('.kebab-menu.show').forEach(m => m.classList.remove('show'));
+      
+      // Toggle current menu
+      if (!wasShown) menu.classList.add('show');
+    } else {
+      // Close all menus when clicking outside
+      document.querySelectorAll('.kebab-menu.show').forEach(m => m.classList.remove('show'));
+    }
+  });
 });
 </script>
 {% endif %}

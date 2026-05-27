@@ -26,6 +26,12 @@ def record_sale_commission_to_wallet(
     This is the SINGLE SOURCE OF TRUTH for recording sale commissions to agent wallets.
     Call this after a Sale is created/finalized.
     
+    Respects CommissionConfig settings:
+    - commissions_enabled: If False, no commission is created
+    - commission_mode: PERCENT or FIXED
+    - base_commission_pct: Used when mode is PERCENT
+    - fixed_commission_amount: Used when mode is FIXED
+    
     Args:
         sale: Sale instance
         created_by: User who triggered the commission (optional)
@@ -44,17 +50,57 @@ def record_sale_commission_to_wallet(
     if not business:
         return None
     
-    # Determine if this is an agent sale (sale.agent is set)
-    is_agent_sale = bool(sale.agent)
+    # Check if agent is assigned
+    if not sale.agent:
+        return None
     
-    # Get commission percentage from config (12% for agent sales by default)
-    commission_pct_fraction = get_phone_commission_pct(business, is_agent_sale=is_agent_sale)
+    # Get commission config for this business
+    try:
+        from sales.models import CommissionConfig
+        config = CommissionConfig.get_active(business)
+    except Exception:
+        config = None
     
-    # Calculate commission amount
-    commission_amount = sale.price * commission_pct_fraction
+    # If commissions are disabled, return early (no commission created)
+    if config and not config.commissions_enabled:
+        return None
+    
+    # Calculate commission based on mode
+    commission_amount = Decimal("0.00")
+    commission_mode = None
+    commission_rate = None
+    
+    if config:
+        commission_mode = config.commission_mode
+        
+        if config.commission_mode == 'FIXED':
+            # Fixed amount per sale
+            commission_amount = config.fixed_commission_amount
+            commission_rate = None
+        else:
+            # Percentage of sale price (default mode)
+            commission_rate = config.base_commission_pct
+            commission_amount = sale.price * (commission_rate / Decimal("100.00"))
+    else:
+        # Fallback: use legacy percentage calculation if no config exists
+        commission_pct_fraction = get_phone_commission_pct(business, is_agent_sale=True)
+        commission_amount = sale.price * commission_pct_fraction
+        commission_rate = commission_pct_fraction * Decimal("100.00")
+        commission_mode = 'PERCENT'
     
     if commission_amount <= 0:
         return None
+    
+    # Build metadata
+    meta = {
+        "sale_id": sale.id,
+        "item_id": sale.item_id,
+        "sale_price": str(sale.price),
+        "commission_mode": commission_mode,
+    }
+    
+    if commission_rate is not None:
+        meta["commission_pct"] = str(commission_rate)
     
     # Create wallet transaction
     txn = WalletTransaction.objects.create(
@@ -62,17 +108,12 @@ def record_sale_commission_to_wallet(
         agent=sale.agent,
         type=TxnType.COMMISSION,
         amount=commission_amount,
-        note=f"Commission for Sale #{sale.id}",
+        note=f"Commission for Sale #{sale.id}" + (f" ({commission_mode})" if commission_mode else ""),
         reference=f"SALE-{sale.id}",
         effective_date=sale.sold_at,
         created_by=created_by,
         business=business,
-        meta={
-            "sale_id": sale.id,
-            "item_id": sale.item_id,
-            "sale_price": str(sale.price),
-            "commission_pct": str(commission_pct_fraction * 100),  # Store as percentage for clarity
-        },
+        meta=meta,
     )
     
     return txn

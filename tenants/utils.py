@@ -1,4 +1,4 @@
-﻿# tenants/utils.py
+# tenants/utils.py
 from __future__ import annotations
 
 from functools import wraps
@@ -219,7 +219,18 @@ def set_active_business(request: "HttpRequest", business) -> None:
     """
     Persist the selected business in session, attach it to the request,
     and mirror into thread-local (if available). Pass business=None to clear.
+    
+    UPDATED: Now delegates to SSOT service when available (backwards compatible).
     """
+    # Try SSOT service first (if available)
+    try:
+        from tenants.services.active_business import set_active_business as ssot_set
+        ssot_set(request, business)
+        return
+    except ImportError:
+        pass  # Fall back to legacy implementation
+    
+    # Legacy implementation (for backwards compatibility)
     try:
         if business is None:
             # Clear session + request (canonical + legacy) and mark modified
@@ -239,11 +250,14 @@ def set_active_business(request: "HttpRequest", business) -> None:
             return
 
         # Persist selection (write both canonical and legacy keys to be safe)
+        # Clear cached product_mode so the middleware re-derives it from the
+        # new business on the next request — prevents stale vertical in mobile nav.
         bid = getattr(business, "pk", None)
         try:
             request.session[TENANT_SESSION_KEY] = bid
             request.session["active_business_id"] = bid
             request.session["biz_id"] = bid  # legacy compatibility
+            request.session.pop("product_mode", None)
             request.session.modified = True
         except Exception:
             pass
@@ -268,7 +282,17 @@ def get_active_business(request: "HttpRequest"):
     """
     Return the Business referenced by request or session, caching onto request.
     Tries request.business first, then tolerant session keys.
+    
+    UPDATED: Now delegates to SSOT service when available (backwards compatible).
     """
+    # Try SSOT service first (if available)
+    try:
+        from tenants.services.active_business import get_active_business as ssot_get
+        return ssot_get(request)
+    except ImportError:
+        pass  # Fall back to legacy implementation
+    
+    # Legacy implementation (for backwards compatibility)
     # If middleware already set request.business, keep it authoritative.
     b = getattr(request, "business", None)
     if b is not None:
@@ -300,40 +324,73 @@ def ensure_active_business_id(
     auto_select_single: bool = True,
 ) -> Optional[int]:
     """
-    Robustly determine the active business id for API/views.
+    Robustly determine the active business id for API/views with SECURITY ENFORCEMENT.
 
-    Resolution order:
-      1) business_id from request (GET/POST/header)
-      2) session (tolerant keys)
+    Resolution order (UPDATED FOR MULTI-TENANCY HARDENING):
+      0) **SECURITY**: If user has exactly ONE business membership, FORCE that business
+         and IGNORE any session override (prevents business hijacking)
+      1) business_id from request (GET/POST/header) - only if user has membership
+      2) session (tolerant keys) - only if user has membership
       3) if user has EXACTLY ONE membership (pref ACTIVE), set it and return (when auto_select_single=True)
 
     If a concrete Business cannot be resolved for the id discovered in (1) or (2),
     this returns None (and does NOT mutate session) unless auto_select_single can resolve one.
     """
-    # 1) Request-provided id
+    user = getattr(request, "user", None)
+    
+    # 0) SECURITY ENFORCEMENT: Force single-membership users to their business
+    if user and getattr(user, "is_authenticated", False):
+        membership = user_business_membership(user)
+        if membership:
+            forced_business = membership.business
+            # If session/request tries to override, ignore and force correct business
+            current_bid = _read_session_business_id(request) or _read_request_business_id(request)
+            if current_bid and int(current_bid) != forced_business.id:
+                # Security: user trying to access different business - reset to their business
+                set_active_business(request, forced_business)
+            elif not current_bid:
+                # No business set yet - set theirs
+                set_active_business(request, forced_business)
+            return int(forced_business.id)
+    
+    # 1) Request-provided id (validate user has membership)
     bid = _read_request_business_id(request)
     if bid:
         b = _resolve_business_by_id(bid)
         if b is not None:
+            # Verify user has membership in this business
+            if user and getattr(user, "is_authenticated", False):
+                if not user_has_membership(user, b.id):
+                    # User trying to access business they don't belong to - deny
+                    return None
             # Persist as the active business for the session/thread
             set_active_business(request, b)
             return int(getattr(b, "id", bid))
 
-    # 2) Session
+    # 2) Session (validate user has membership)
     bid = _read_session_business_id(request)
     if bid:
         b = _resolve_business_by_id(bid)
         if b is not None:
-            # Cache onto request and mirror thread-local (idempotent)
-            try:
-                setattr(request, "business", b)
-            except Exception:
-                pass
-            try:
-                set_current_business_id(getattr(b, "pk", None))
-            except Exception:
-                pass
-            return int(getattr(b, "id", bid))
+            # Verify user has membership in this business
+            if user and getattr(user, "is_authenticated", False):
+                if not user_has_membership(user, b.id):
+                    # User's session has wrong business - clear and fallback
+                    set_active_business(request, None)
+                    bid = None
+                    b = None
+            
+            if b is not None:
+                # Cache onto request and mirror thread-local (idempotent)
+                try:
+                    setattr(request, "business", b)
+                except Exception:
+                    pass
+                try:
+                    set_current_business_id(getattr(b, "pk", None))
+                except Exception:
+                    pass
+                return int(getattr(b, "id", bid))
 
     # 3) Single membership auto-pick
     if auto_select_single:
@@ -433,6 +490,159 @@ def user_highest_role(user) -> Optional[str]:
             if pref in roles_upper:
                 return pref
         return next(iter(roles_upper), None)
+    except Exception:
+        return None
+
+
+def get_single_business_membership_or_none(user) -> Optional["Membership"]:
+    """
+    Return the user's ACTIVE business membership ONLY when the user belongs to
+    exactly ONE business.  Returns None for multi-workspace users so that callers
+    do not force an arbitrary business onto a user who intentionally has multiple
+    workspaces.
+
+    This is the explicitly-named version of ``user_business_membership``.
+    Prefer this name in new code; the legacy alias is retained for compatibility.
+
+    Returns:
+        Membership  – if user has exactly one active membership (any role)
+        None        – if user has 0 memberships OR memberships in >1 businesses
+    """
+    if Membership is None or not getattr(user, "is_authenticated", False):
+        return None
+
+    try:
+        qs = Membership.objects.filter(user=user).select_related("business")
+        if _membership_has_status_field():
+            qs = qs.filter(status__iexact="ACTIVE")
+
+        memberships = list(qs.filter(business__status="ACTIVE"))
+
+        if len(memberships) == 0:
+            return None
+        if len(memberships) == 1:
+            return memberships[0]
+
+        # Multiple memberships – check how many distinct businesses
+        business_ids = {m.business_id for m in memberships}
+        if len(business_ids) > 1:
+            # Multi-workspace user: cannot determine a single "active" business here.
+            # The caller must use session / explicit selection instead.
+            return None
+
+        # Same business, multiple roles (e.g. MANAGER + AGENT in the same biz).
+        # Prefer MANAGER.
+        managers = [m for m in memberships if (m.role or "").upper() == "MANAGER"]
+        if len(managers) == 1:
+            return managers[0]
+
+        return memberships[0]
+    except Exception:
+        return None
+
+
+# Legacy alias — kept for backward compatibility with existing callers and tests.
+# New code should use get_single_business_membership_or_none directly.
+user_business_membership = get_single_business_membership_or_none
+
+
+def user_has_any_business(user) -> bool:
+    """
+    Returns True if user has ANY active membership (regardless of how many workspaces)
+    or has created any business.  Safe for multi-workspace users.
+    """
+    if not getattr(user, "is_authenticated", False):
+        return False
+
+    # Direct count check – works for single AND multi-workspace users
+    if Membership is not None:
+        try:
+            qs = Membership.objects.filter(user=user)
+            if _membership_has_status_field():
+                qs = qs.filter(status__iexact="ACTIVE")
+            if qs.filter(business__status="ACTIVE").exists():
+                return True
+        except Exception:
+            pass
+
+    # Fall back: did the user create any business (even if no active membership yet)?
+    if Business is not None:
+        try:
+            return Business.objects.filter(created_by=user).exists()
+        except Exception:
+            pass
+
+    return False
+
+
+def require_business_membership(view_func):
+    """
+    Decorator: Requires user to have an active business membership.
+    Redirects to onboarding if no membership exists.
+    """
+    @wraps(view_func)
+    def wrapper(request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return redirect(_safe_reverse("login", "/accounts/login/"))
+        
+        if not user_has_any_business(request.user):
+            messages.info(request, "Please set up or join a business first.")
+            return redirect(_safe_reverse("onboarding:start", "/onboarding/"))
+        
+        return view_func(request, *args, **kwargs)
+    
+    return wrapper
+
+
+def scope_queryset_to_business(qs, business):
+    """
+    Helper to scope any queryset to a specific business.
+    Returns filtered queryset if business is valid, otherwise returns empty qs.
+    
+    Special case: If queryset is for the Business model itself, filter by pk.
+    """
+    if business is None:
+        return qs.none()
+    
+    business_id = getattr(business, "id", None) or getattr(business, "pk", None)
+    if business_id is None:
+        return qs.none()
+    
+    # Try common field names
+    if hasattr(qs.model, "_meta"):
+        model = qs.model
+        field_names = {f.name for f in model._meta.get_fields()}
+        
+        # Special case: If the model IS the Business model, filter by pk
+        if model.__name__ == "Business":
+            return qs.filter(pk=business_id).distinct()
+        
+        if "business" in field_names:
+            return qs.filter(business_id=business_id).distinct()
+        elif "business_id" in field_names:
+            return qs.filter(business_id=business_id).distinct()
+    
+    return qs
+
+
+def get_object_for_business(model_class, business, **filter_kwargs):
+    """
+    Business-scoped get_object_or_404 alternative.
+    Returns object only if it belongs to the specified business, else None.
+    """
+    from django.shortcuts import get_object_or_404
+    
+    if business is None:
+        return None
+    
+    business_id = getattr(business, "id", None) or getattr(business, "pk", None)
+    if business_id is None:
+        return None
+    
+    try:
+        # Try to filter by business
+        qs = model_class.objects.filter(business_id=business_id, **filter_kwargs)
+        return qs.first()
     except Exception:
         return None
 
@@ -778,11 +988,19 @@ def require_business(_fn: Optional[Callable] = None) -> Callable:
 
             user = getattr(request, "user", None)
 
-            # Auto-pick if they have exactly one membership
-            auto_biz = _single_membership_business(user)
-            if auto_biz is not None:
-                set_active_business(request, auto_biz)
-                return view_func(request, *args, **kwargs)
+            # CRITICAL: Use SSOT service to auto-select single-business users
+            # This ensures consistent behavior with middleware
+            try:
+                from tenants.services.active_business import ensure_active_business
+                auto_biz = ensure_active_business(request, user, auto_select_single=True)
+                if auto_biz is not None:
+                    return view_func(request, *args, **kwargs)
+            except ImportError:
+                # Fallback to legacy logic if SSOT not available
+                auto_biz = _single_membership_business(user)
+                if auto_biz is not None:
+                    set_active_business(request, auto_biz)
+                    return view_func(request, *args, **kwargs)
 
             # Superusers should not be forced into tenant onboarding.
             if getattr(user, "is_authenticated", False) and getattr(user, "is_superuser", False):
@@ -874,15 +1092,48 @@ def require_role(roles: Optional[Iterable[str]] = None) -> Callable:
                 href = f"{target}?next={next_q}" if next_q else target
                 return redirect(href)
 
-            # Must be an ACTIVE member of the active business
-            if not _has_active_membership(user, biz):
+            # Map role names to normalized forms for case-insensitive comparison
+            role_set_upper = {r.upper() for r in role_set}
+            # "Manager" and "Admin" roles should both match membership role "MANAGER"
+            manager_roles_requested = "MANAGER" in role_set_upper or "ADMIN" in role_set_upper
+            if manager_roles_requested:
+                role_set_upper.add("MANAGER")
+                role_set_upper.add("OWNER")  # Owner implies manager-level access
+            
+            # CRITICAL: Check if user is business owner/creator (always has manager access)
+            # This handles cases where business was created but membership wasn't explicitly set up
+            if manager_roles_requested:
                 try:
-                    messages.error(request, "You don’t have access to this business.")
+                    if getattr(biz, "created_by_id", None) == user.pk:
+                        return fn(request, *args, **kwargs)
+                except Exception:
+                    pass
+
+            # Check ACTIVE membership in the active business
+            membership = None
+            try:
+                if Membership is not None:
+                    membership = Membership.objects.filter(
+                        user=user, business=biz, status__iexact="ACTIVE"
+                    ).first()
+            except Exception:
+                pass
+            
+            # If membership exists, check role
+            if membership:
+                mem_role = getattr(membership, "role", "")
+                if mem_role and mem_role.upper() in role_set_upper:
+                    return fn(request, *args, **kwargs)
+            
+            # If no membership but checking for Agent role, deny access (agents must have membership)
+            if not membership and "AGENT" in role_set_upper and not manager_roles_requested:
+                try:
+                    messages.error(request, "You don't have access to this business.")
                 except Exception:
                     pass
                 return redirect_manager_safe_choose(request)
-
-            # Check group role
+            
+            # Check group role (Django groups) as fallback
             if _user_group_names(user).intersection(role_set):
                 return fn(request, *args, **kwargs)
 
@@ -969,6 +1220,14 @@ def bootstrap_manager_tenant(
             # Do not block signup on seed failures
             pass
 
+    # Mixed Retail: ensure department enrollment records exist
+    if getattr(b, "business_kind", None) == "mixed_retail":
+        try:
+            from inventory.mixed_retail_seed import ensure_mixed_retail_defaults
+            ensure_mixed_retail_defaults(b)
+        except Exception:
+            pass
+
     # Activate for this session (+ thread-local mirror)
     set_active_business(request, b)
 
@@ -1016,6 +1275,60 @@ def agents_home_url(business: Optional["Business"] = None) -> str:
     )
 
 
+def get_business_home_url(user=None, business: Optional["Business"] = None) -> str:
+    """
+    Compute the appropriate business home/dashboard URL for a user.
+    
+    SSOT: Uses inventory.utils_verticals for vertical-specific dashboard routing.
+    
+    Priority:
+      1) Vertical-specific dashboard (based on business_kind)
+      2) Inventory dashboard (fallback)
+      3) Generic dashboard:home
+      4) Root (/)
+    
+    Args:
+        user: Optional user instance (for future role-based routing)
+        business: Optional Business instance for vertical detection
+    
+    Returns:
+        str: The URL path to redirect to
+    """
+    # SSOT: Use vertical routing from utils_verticals
+    if business:
+        try:
+            from inventory.utils_verticals import get_vertical_kind, get_vertical_dashboard_url
+            from django.urls import reverse
+            
+            vertical_kind = get_vertical_kind(business)
+            dashboard_url_name = get_vertical_dashboard_url(vertical_kind)
+            
+            if dashboard_url_name:
+                try:
+                    return reverse(dashboard_url_name)
+                except Exception:
+                    pass
+        except ImportError:
+            pass
+    
+    # Fallback: Try common dashboard URLs
+    url = safe_reverse_many(
+        (
+            "inventory_verticals:phones_dashboard",
+            "inventory:inventory_dashboard",
+            "inventory:dashboard",
+            "dashboard:home",
+        ),
+        default="/",
+    )
+    
+    # If we got a valid URL that's not just root, use it
+    if url and url != "/":
+        return url
+    
+    return "/"
+
+
 __all__ = [
     # session/context
     "set_active_business", "get_active_business", "get_active_business_id",
@@ -1036,5 +1349,5 @@ __all__ = [
     # bootstrap
     "bootstrap_manager_tenant",
     # urls
-    "safe_reverse_many", "agents_home_url",
+    "safe_reverse_many", "agents_home_url", "get_business_home_url",
 ]

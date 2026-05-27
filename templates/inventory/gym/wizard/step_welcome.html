@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Add Member - {{ business.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+.wizard-container {
+    max-width: 600px;
+    margin: 0 auto;
+    padding: 1rem;
+}
+
+.wizard-card {
+    background: rgba(255, 255, 255, 0.98);
+    border-radius: 24px;
+    padding: 3rem 2rem;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.12);
+    text-align: center;
+}
+
+.wizard-icon {
+    font-size: 4rem;
+    margin-bottom: 1.5rem;
+    animation: bounce 2s infinite;
+}
+
+@keyframes bounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+}
+
+.wizard-title {
+    font-size: 2rem;
+    font-weight: bold;
+    margin-bottom: 1rem;
+    color: #1e293b;
+}
+
+.wizard-subtitle {
+    font-size: 1.1rem;
+    color: #64748b;
+    margin-bottom: 2rem;
+}
+
+.feature-list {
+    list-style: none;
+    padding: 0;
+    margin: 2rem 0;
+    text-align: left;
+}
+
+.feature-list li {
+    padding: 0.75rem 0;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.feature-icon {
+    width: 32px;
+    height: 32px;
+    background: #10b981;
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.wizard-btn {
+    font-size: 1.2rem;
+    padding: 1rem 3rem;
+    border-radius: 12px;
+    font-weight: 600;
+    transition: all 0.3s ease;
+}
+
+.wizard-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 20px rgba(59, 130, 246, 0.3);
+}
+
+@media (max-width: 576px) {
+    .wizard-card {
+        padding: 2rem 1.5rem;
+    }
+    
+    .wizard-title {
+        font-size: 1.5rem;
+    }
+    
+    .wizard-subtitle {
+        font-size: 1rem;
+    }
+    
+    .wizard-icon {
+        font-size: 3rem;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="wizard-container">
+    <div class="wizard-card">
+        <div class="wizard-icon">🏋️‍♂️</div>
+        <h1 class="wizard-title">Add New Member</h1>
+        <p class="wizard-subtitle">Quick & easy member registration</p>
+        
+        <ul class="feature-list">
+            <li>
+                <div class="feature-icon"><i class="bi bi-lightning-charge"></i></div>
+                <span>Just 3 simple steps</span>
+            </li>
+            <li>
+                <div class="feature-icon"><i class="bi bi-qr-code"></i></div>
+                <span>Automatic QR code generation</span>
+            </li>
+            <li>
+                <div class="feature-icon"><i class="bi bi-calendar-check"></i></div>
+                <span>30-day membership tracking</span>
+            </li>
+            <li>
+                <div class="feature-icon"><i class="bi bi-person-badge"></i></div>
+                <span>Optional trainer assignment</span>
+            </li>
+        </ul>
+        
+        <form method="post">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-primary wizard-btn">
+                <i class="bi bi-arrow-right-circle"></i> Get Started
+            </button>
+        </form>
+        
+        <div class="mt-3">
+            <a href="{% url 'gym:members_list' %}" class="text-muted">
+                <i class="bi bi-arrow-left"></i> Back to Members
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+

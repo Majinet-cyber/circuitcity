@@ -1,0 +1,411 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Scan Member - {{ business.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+.scan-container {
+    max-width: 600px;
+    margin: 0 auto;
+    padding: 1rem;
+}
+
+.video-container {
+    position: relative;
+    width: 100%;
+    max-width: 500px;
+    margin: 0 auto;
+    background: #000;
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+#scanVideo {
+    width: 100%;
+    height: auto;
+    display: block;
+}
+
+.scan-overlay {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 70%;
+    height: 50%;
+    border: 3px solid #10b981;
+    border-radius: 12px;
+    pointer-events: none;
+    box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
+}
+
+.scan-controls {
+    margin-top: 1.5rem;
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.status-message {
+    text-align: center;
+    padding: 1rem;
+    margin-top: 1rem;
+    border-radius: 8px;
+}
+
+.status-message.scanning {
+    background: #dbeafe;
+    color: #1e40af;
+}
+
+.status-message.success {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.status-message.error {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.result-card {
+    background: white;
+    border-radius: 18px;
+    padding: 2rem;
+    margin-top: 2rem;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+    border: 2px solid #e5e7eb;
+}
+
+.result-card.active {
+    border-color: #10b981;
+}
+
+.result-card.expired {
+    border-color: #ef4444;
+}
+
+.member-name {
+    font-size: 1.5rem;
+    font-weight: bold;
+    margin-bottom: 0.5rem;
+}
+
+.days-badge {
+    display: inline-block;
+    font-size: 3rem;
+    font-weight: bold;
+    padding: 1rem 2rem;
+    border-radius: 12px;
+    margin: 1rem 0;
+}
+
+.days-badge.active {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.days-badge.expired {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+@media (max-width: 576px) {
+    .scan-container {
+        padding: 0.5rem;
+    }
+    
+    .result-card {
+        padding: 1.5rem;
+    }
+    
+    .days-badge {
+        font-size: 2rem;
+        padding: 0.75rem 1.5rem;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="scan-container">
+    <!-- Header -->
+    <div class="text-center mb-4">
+        <h2>Scan Member</h2>
+        <p class="text-muted">Scan a member's QR code to view their status</p>
+    </div>
+
+    <!-- Video Container -->
+    <div class="video-container" id="videoContainer" style="display: none;">
+        <video id="scanVideo" playsinline></video>
+        <div class="scan-overlay"></div>
+    </div>
+
+    <!-- Controls -->
+    <div class="scan-controls">
+        <button id="startBtn" class="btn btn-success btn-lg">
+            <i class="bi bi-camera"></i> Start Scanning
+        </button>
+        <button id="stopBtn" class="btn btn-danger btn-lg" style="display: none;">
+            <i class="bi bi-stop-circle"></i> Stop
+        </button>
+        <a href="{% url 'gym:dashboard' %}" class="btn btn-outline-secondary btn-lg">
+            <i class="bi bi-arrow-left"></i> Back
+        </a>
+    </div>
+
+    <!-- Status Message -->
+    <div id="statusMessage" class="status-message" style="display: none;"></div>
+
+    <!-- Result Card (shown after successful scan) -->
+    <div id="resultCard" class="result-card" style="display: none;">
+        <div class="text-center">
+            <div class="member-name" id="memberName"></div>
+            <div class="text-muted mb-2" id="memberPhone"></div>
+            <div class="text-muted mb-2" id="memberTrainer"></div>
+            
+            <div class="days-badge" id="daysBadge"></div>
+            
+            <div class="mt-3">
+                <span class="badge" id="statusBadge"></span>
+            </div>
+            
+            <div class="mt-3 text-muted" id="membershipDates"></div>
+            
+            <!-- Action Buttons -->
+            <div class="mt-4 d-flex gap-2 justify-content-center flex-wrap" id="actionButtons">
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/cc-scanner.js' %}"></script>
+<script>
+(function() {
+    const video = document.getElementById('scanVideo');
+    const videoContainer = document.getElementById('videoContainer');
+    const startBtn = document.getElementById('startBtn');
+    const stopBtn = document.getElementById('stopBtn');
+    const statusMessage = document.getElementById('statusMessage');
+    const resultCard = document.getElementById('resultCard');
+    
+    let stream = null;
+    let scanning = false;
+    let barcodeDetector = null;
+    let rafId = null;
+    
+    startBtn.addEventListener('click', startScanning);
+    stopBtn.addEventListener('click', stopScanning);
+    
+    async function startScanning() {
+        try {
+            // Request rear camera
+            const constraints = {
+                audio: false,
+                video: {
+                    facingMode: { exact: "environment" },  // Force rear camera
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 },
+                }
+            };
+            
+            try {
+                stream = await navigator.mediaDevices.getUserMedia(constraints);
+            } catch (err) {
+                // Fallback if rear camera not available
+                console.warn('Rear camera not available, trying default:', err);
+                stream = await navigator.mediaDevices.getUserMedia({
+                    video: { width: { ideal: 1280 }, height: { ideal: 720 } },
+                    audio: false
+                });
+            }
+            
+            video.srcObject = stream;
+            await video.play();
+            
+            videoContainer.style.display = 'block';
+            startBtn.style.display = 'none';
+            stopBtn.style.display = 'inline-block';
+            resultCard.style.display = 'none';
+            
+            showStatus('Scanning... Point camera at QR code', 'scanning');
+            
+            // Try BarcodeDetector API first
+            if ('BarcodeDetector' in window) {
+                try {
+                    barcodeDetector = new BarcodeDetector({ formats: ['qr_code'] });
+                    scanning = true;
+                    scanLoop();
+                } catch (e) {
+                    showStatus('Barcode detector not supported', 'error');
+                }
+            } else {
+                showStatus('QR scanning not supported in this browser', 'error');
+            }
+            
+        } catch (err) {
+            console.error('Camera error:', err);
+            showStatus('Camera access denied or not available', 'error');
+        }
+    }
+    
+    async function scanLoop() {
+        if (!scanning || !barcodeDetector) return;
+        
+        try {
+            const barcodes = await barcodeDetector.detect(video);
+            if (barcodes.length > 0) {
+                const code = barcodes[0].rawValue;
+                handleScan(code);
+                return;  // Stop loop after successful scan
+            }
+        } catch (e) {
+            console.error('Detection error:', e);
+        }
+        
+        rafId = requestAnimationFrame(scanLoop);
+    }
+    
+    function stopScanning() {
+        scanning = false;
+        if (rafId) {
+            cancelAnimationFrame(rafId);
+            rafId = null;
+        }
+        if (stream) {
+            stream.getTracks().forEach(track => track.stop());
+            stream = null;
+        }
+        
+        video.srcObject = null;
+        videoContainer.style.display = 'none';
+        startBtn.style.display = 'inline-block';
+        stopBtn.style.display = 'none';
+        hideStatus();
+    }
+    
+    async function handleScan(code) {
+        scanning = false;  // Pause scanning
+        stopScanning();
+        
+        showStatus('Looking up member...', 'scanning');
+        
+        try {
+            const response = await fetch('{% url "gym:scan_lookup" %}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+                body: JSON.stringify({ code: code })
+            });
+            
+            const data = await response.json();
+            
+            if (data.ok && data.member) {
+                displayMemberResult(data.member);
+            } else {
+                showStatus(data.error || 'Member not found', 'error');
+                setTimeout(() => startScanning(), 2000);  // Auto-restart
+            }
+        } catch (err) {
+            console.error('Lookup error:', err);
+            showStatus('Error looking up member', 'error');
+            setTimeout(() => startScanning(), 2000);
+        }
+    }
+    
+    function displayMemberResult(member) {
+        hideStatus();
+        
+        // Set member name and details
+        document.getElementById('memberName').textContent = member.name;
+        document.getElementById('memberPhone').textContent = member.phone || '—';
+        document.getElementById('memberTrainer').textContent = 
+            member.trainer ? `Trainer: ${member.trainer}` : 'No trainer assigned';
+        
+        // Days remaining badge
+        const daysBadge = document.getElementById('daysBadge');
+        const statusBadge = document.getElementById('statusBadge');
+        
+        if (member.is_active) {
+            daysBadge.className = 'days-badge active';
+            daysBadge.textContent = `${member.days_left} days left`;
+            statusBadge.className = 'badge bg-success fs-5';
+            statusBadge.textContent = '✓ Active Membership';
+            resultCard.className = 'result-card active';
+        } else if (member.is_overdue) {
+            daysBadge.className = 'days-badge expired';
+            daysBadge.textContent = 'EXPIRED';
+            statusBadge.className = 'badge bg-danger fs-5';
+            statusBadge.textContent = '⚠ Membership Expired';
+            resultCard.className = 'result-card expired';
+        } else {
+            daysBadge.className = 'days-badge expired';
+            daysBadge.textContent = 'PENDING';
+            statusBadge.className = 'badge bg-warning fs-5';
+            statusBadge.textContent = '⏳ Pending Payment';
+            resultCard.className = 'result-card expired';
+        }
+        
+        // Membership dates
+        const datesEl = document.getElementById('membershipDates');
+        if (member.membership_start && member.membership_end) {
+            datesEl.innerHTML = `
+                <strong>Membership Period:</strong><br>
+                ${formatDate(member.membership_start)} to ${formatDate(member.membership_end)}
+            `;
+        } else {
+            datesEl.textContent = 'No active membership';
+        }
+        
+        // Action buttons
+        const actionsEl = document.getElementById('actionButtons');
+        actionsEl.innerHTML = `
+            <a href="/gym/member/${member.id}/" class="btn btn-primary">
+                <i class="bi bi-person"></i> View Profile
+            </a>
+            ${!member.is_active ? `
+                <form method="post" action="/gym/member/${member.id}/set-paid/" style="display: inline;">
+                    <input type="hidden" name="csrfmiddlewaretoken" value="${getCsrfToken()}">
+                    <button type="submit" class="btn btn-success">
+                        <i class="bi bi-cash-coin"></i> Collect Payment
+                    </button>
+                </form>
+            ` : ''}
+            <button onclick="location.reload()" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-clockwise"></i> Scan Another
+            </button>
+        `;
+        
+        // Helper function to get CSRF token
+        function getCsrfToken() {
+            const csrfCookie = document.cookie.split('; ').find(row => row.startsWith('csrftoken='));
+            return csrfCookie ? csrfCookie.split('=')[1] : '';
+        }
+        
+        resultCard.style.display = 'block';
+    }
+    
+    function showStatus(message, type) {
+        statusMessage.textContent = message;
+        statusMessage.className = `status-message ${type}`;
+        statusMessage.style.display = 'block';
+    }
+    
+    function hideStatus() {
+        statusMessage.style.display = 'none';
+    }
+    
+    function formatDate(dateStr) {
+        const d = new Date(dateStr);
+        return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+    }
+})();
+</script>
+{% endblock %}
+

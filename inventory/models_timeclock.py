@@ -6,8 +6,10 @@ from django.utils import timezone
 
 User = settings.AUTH_USER_MODEL
 
+
 class TimeGeofence(models.Model):
     """Manager defines a store perimeter once (radius in meters)."""
+
     business = models.ForeignKey("tenants.Business", on_delete=models.CASCADE, related_name="geofences")
     name = models.CharField(max_length=120)
     lat = models.FloatField()
@@ -25,6 +27,7 @@ class TimeGeofence(models.Model):
 
 class TimeSession(models.Model):
     """Single source of truth per user per geofence per day."""
+
     class State(models.TextChoices):
         ONSITE = "onsite", "On site"
         OFFSITE = "offsite", "Off site"
@@ -79,6 +82,7 @@ class TimeSession(models.Model):
 
 class TimeEvent(models.Model):
     """Immutable audit of transitions / pings."""
+
     class Kind(models.TextChoices):
         PING = "ping", "Ping"
         ARRIVE = "arrive", "Arrive"
@@ -100,5 +104,3 @@ class TimeEvent(models.Model):
 
     def __str__(self):
         return f"{self.kind}@{self.at:%H:%M}"
-
-

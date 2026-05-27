@@ -8,12 +8,15 @@ from django.shortcuts import redirect
 try:
     from tenants.utils import default_business_for_request  # type: ignore
 except Exception:
+
     def default_business_for_request(request):  # type: ignore
         return getattr(request, "business", None)
+
 
 try:
     from inventory.utils import default_location_for_request  # type: ignore
 except Exception:
+
     def default_location_for_request(request):  # type: ignore
         return getattr(request, "active_location", None)
 
@@ -53,6 +56,11 @@ class ActiveContextMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
+        # CRITICAL: Bypass HQ paths at the very top to prevent redirect loops
+        path = request.path_info or request.path or "/"
+        if path.startswith("/hq/"):
+            return self.get_response(request)
+
         try:
             self._prime_context(request)
             resp = self._maybe_redirect_with_qs(request)
@@ -118,11 +126,13 @@ class ActiveContextMiddleware:
                 if bid is not None:
                     for k in LEGACY_BIZ_IDS:
                         if sess.get(k) != bid:
-                            sess[k] = bid; changed = True
+                            sess[k] = bid
+                            changed = True
                 if bname:
                     for k in LEGACY_BIZ_NAMES:
                         if sess.get(k) != bname:
-                            sess[k] = bname; changed = True
+                            sess[k] = bname
+                            changed = True
 
             loc = getattr(request, "active_location", None)
             if loc is not None:
@@ -131,11 +141,13 @@ class ActiveContextMiddleware:
                 if lid is not None:
                     for k in LEGACY_LOC_IDS:
                         if sess.get(k) != lid:
-                            sess[k] = lid; changed = True
+                            sess[k] = lid
+                            changed = True
                 if lname:
                     for k in LEGACY_LOC_NAMES:
                         if sess.get(k) != lname:
-                            sess[k] = lname; changed = True
+                            sess[k] = lname
+                            changed = True
             if changed and hasattr(sess, "modified"):
                 sess.modified = True
         except Exception:
@@ -147,6 +159,11 @@ class ActiveContextMiddleware:
         if ?biz/loc are missing but we know them, redirect to add them.
         """
         path = (request.path or "").rstrip("/")
+
+        # CRITICAL: Never redirect HQ paths to prevent loops
+        if path.startswith("/hq/"):
+            return None
+
         if not (path.startswith("/inventory") or path == "/dashboard"):
             return None
         # Donâ€™t redirect API calls or POSTs
@@ -164,6 +181,11 @@ class ActiveContextMiddleware:
         qs = request.GET.copy()
         for k, v in need.items():
             qs[k] = v
-        return redirect(f"{request.path}?{qs.urlencode()}")
 
+        # Anti-loop guard: Never redirect if target equals current path
+        target = f"{request.path}?{qs.urlencode()}"
+        current_path = request.path_info or request.path or "/"
+        if target.rstrip("/").rstrip("?") == current_path.rstrip("/"):
+            return None
 
+        return redirect(target)

@@ -118,7 +118,9 @@ class CardForm(forms.Form):
         label="CVV",
         min_length=3,
         max_length=4,
-        widget=forms.PasswordInput(attrs={"autocomplete": "cc-csc", "inputmode": "numeric", "class": "input", "style": "max-width:120px"}),
+        widget=forms.PasswordInput(
+            attrs={"autocomplete": "cc-csc", "inputmode": "numeric", "class": "input", "style": "max-width:120px"}
+        ),
     )
 
     def clean_number(self) -> str:
@@ -138,5 +140,3 @@ class CardForm(forms.Form):
             if year < today.year or (year == today.year and month < today.month):
                 raise ValidationError("Card is expired.")
         return cleaned
-
-

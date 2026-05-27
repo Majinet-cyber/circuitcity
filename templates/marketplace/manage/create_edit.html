@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+{% load static marketplace_media %}
+
+{% block title %}{% if editing %}Edit Listing{% else %}New Listing{% endif %} – {{ business.name }}{% endblock %}
+
+{% block content %}
+<style>
+  .form-section{background:#fff;border-radius:16px;padding:1.5rem;border:1.5px solid #e2e8f0;margin-bottom:1rem;}
+  .section-title{font-size:.8rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:#64748b;margin-bottom:1rem;}
+  .img-preview-wrap{display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.5rem;}
+  .img-preview{width:80px;height:80px;object-fit:cover;border-radius:8px;border:1.5px solid #e2e8f0;}
+  .status-select option[value=live]{color:#16a34a;}
+  .status-select option[value=draft]{color:#b45309;}
+  .status-select option[value=offline]{color:#64748b;}
+  .status-select option[value=sold]{color:#dc2626;}
+  .status-select option[value=out_of_stock]{color:#db2777;}
+</style>
+
+<div class="container py-4" style="max-width:720px;">
+  <div class="d-flex align-items-center gap-3 mb-4">
+    <a href="{% url 'inventory:manage_listings' %}" class="btn btn-outline-secondary btn-sm rounded-pill">
+      <i class="bi bi-arrow-left me-1"></i>Back
+    </a>
+    <div>
+      <h4 class="fw-bold mb-0">{% if editing %}Edit Listing{% else %}New Listing{% endif %}</h4>
+      <div class="text-muted small">{{ business.name }}</div>
+    </div>
+  </div>
+
+  {% if messages %}{% for m in messages %}<div class="alert alert-{{ m.tags|default:'info' }} rounded-3 mb-3">{{ m }}</div>{% endfor %}{% endif %}
+
+  <form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+
+    {# Basic info #}
+    <div class="form-section">
+      <div class="section-title">Listing Details</div>
+      <div class="mb-3">
+        <label class="form-label fw-semibold">Title *</label>
+        <input type="text" name="title" class="form-control"
+               value="{{ listing.title|default:form_data.title|default:'' }}" required placeholder="e.g., Samsung Galaxy A34">
+      </div>
+      <div class="mb-3">
+        <label class="form-label fw-semibold">Price</label>
+        <div class="input-group">
+          <span class="input-group-text">{{ business.currency }}</span>
+          <input type="number" name="price" class="form-control" step="0.01" min="0"
+                 value="{{ listing.price|default:form_data.price|default:'' }}" placeholder="0.00">
+        </div>
+        <div class="form-text">Leave blank for "Contact for price"</div>
+      </div>
+      <div class="mb-3">
+        <label class="form-label fw-semibold">Description</label>
+        <textarea name="description" class="form-control" rows="4"
+                  placeholder="Describe your product or service...">{{ listing.description|default:form_data.description|default:'' }}</textarea>
+      </div>
+    </div>
+
+    {# Status #}
+    <div class="form-section">
+      <div class="section-title">Status</div>
+      <select name="status" class="form-select status-select">
+        {% for val, label in ListingStatus.choices %}
+          <option value="{{ val }}" {% if listing.status == val or form_data.status == val %}selected{% elif not editing and val == 'draft' %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+      <div class="form-text">Set to <strong>Live</strong> for the listing to appear publicly.</div>
+    </div>
+
+    {% if vertical_meta_rows %}
+    <div class="form-section">
+      <div class="section-title">Listing specifics</div>
+      <p class="small text-muted mb-2">Add detail once — it carries through to the public page.</p>
+      {% for row in vertical_meta_rows %}
+      <div class="mb-2">
+        <label class="form-label fw-semibold small mb-0">{{ row.label }}</label>
+        <input type="text" class="form-control" name="meta_{{ row.field }}"
+               value="{{ row.value|default:'' }}" placeholder="{{ row.label }}">
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {# Photos #}
+    <div class="form-section">
+      <div class="section-title">Photos</div>
+      <p class="small text-muted">Listings with a clear main photo and a few extra angles get more enquiries.</p>
+      {% if listing.primary_image or listing.media_file %}
+      <div class="mb-2">
+        <div class="text-muted small mb-1">Current primary image:</div>
+        {% with media=listing|listing_card_media %}
+        {% if media.kind == "image" %}
+          <img src="{{ media.url }}" alt="Primary" class="img-preview">
+        {% elif media.kind == "video" %}
+          <video class="img-preview" muted playsinline preload="metadata"><source src="{{ media.url }}"></video>
+        {% endif %}
+        {% endwith %}
+        {% if listing.all_images|length > 1 %}
+        <div class="img-preview-wrap">
+          {% for img in listing.all_images %}
+          {% if not forloop.first %}
+            {% with extra_url=img.image|safe_media_url %}
+            {% if extra_url %}<img src="{{ extra_url }}" alt="img{{ forloop.counter }}" class="img-preview">{% endif %}
+            {% endwith %}
+          {% endif %}
+          {% endfor %}
+        </div>
+        {% endif %}
+      </div>
+      {% endif %}
+      <div class="mb-2">
+        <label class="form-label fw-semibold small">Primary image</label>
+        <input type="file" name="media_file" class="form-control" accept="image/jpeg,image/png,image/webp">
+      </div>
+      <div class="mb-2">
+        <label class="form-label fw-semibold small">Additional images (up to 5)</label>
+        <input type="file" name="images" class="form-control" accept="image/jpeg,image/png,image/webp" multiple>
+      </div>
+    </div>
+
+    {# Contact info #}
+    <div class="form-section">
+      <div class="section-title">Contact &amp; Location</div>
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label fw-semibold small">Phone</label>
+          <input type="tel" name="contact_phone" class="form-control" value="{{ listing.contact_phone|default:'' }}" placeholder="+265 99x xxx xxx">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold small">Email</label>
+          <input type="email" name="contact_email" class="form-control" value="{{ listing.contact_email|default:'' }}" placeholder="shop@email.com">
+        </div>
+        <div class="col-12">
+          <label class="form-label fw-semibold small">Location / Address</label>
+          <input type="text" name="location_text" class="form-control" value="{{ listing.location_text|default:'' }}" placeholder="e.g., Area 25, Lilongwe">
+        </div>
+      </div>
+    </div>
+
+    {# Actions #}
+    <div class="d-flex gap-2">
+      <button type="submit" class="btn btn-primary px-4 rounded-pill fw-bold">
+        {% if editing %}<i class="bi bi-check-lg me-1"></i>Save Changes{% else %}<i class="bi bi-plus-lg me-1"></i>Create Listing{% endif %}
+      </button>
+      <a href="{% url 'inventory:manage_listings' %}" class="btn btn-outline-secondary rounded-pill">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

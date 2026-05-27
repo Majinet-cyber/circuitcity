@@ -33,6 +33,18 @@ def _reverse_or(path_name: str, fallback: str) -> str:
         return fallback
 
 
+def _normalize_path(path: str) -> str:
+    """Normalize path by removing duplicate slashes."""
+    # Replace multiple slashes with single slash
+    import re
+
+    normalized = re.sub(r"/+", "/", path)
+    # Ensure it starts with /
+    if not normalized.startswith("/"):
+        normalized = "/" + normalized
+    return normalized
+
+
 def _import_optional(path: str):
     try:
         return import_module(path)
@@ -76,6 +88,7 @@ class RequestIDMiddleware(MiddlewareMixin):
     • Exposes request.request_id for views/templates.
     • Echoes back X-Request-ID on the response headers.
     """
+
     IN_HEADER = "HTTP_X_REQUEST_ID"
     OUT_HEADER = "X-Request-ID"
 
@@ -108,11 +121,10 @@ class AccessLogMiddleware(MiddlewareMixin):
 
     def process_response(self, request: HttpRequest, response: HttpResponse):
         try:
-            latency_ms = int(
-                (time.perf_counter() - getattr(request, "_start_ts", time.perf_counter())) * 1000
-            )
+            latency_ms = int((time.perf_counter() - getattr(request, "_start_ts", time.perf_counter())) * 1000)
             user = getattr(request, "user", None)
             user_id = _safe_user_id(user)
+
             access_logger.info(
                 "http_request",
                 extra={
@@ -157,14 +169,26 @@ _is_hq_admin = _get_is_hq_admin()
 
 # Always allowed for HQ shell / admin / static
 _HQ_ALLOW_PREFIXES = (
-    "/hq", "/admin", "/accounts", "/static", "/media",
-    "/favicon.ico", "/robots.txt", "/healthz", "/healthz/",
+    "/hq",
+    "/admin",
+    "/accounts",
+    "/static",
+    "/media",
+    "/favicon.ico",
+    "/robots.txt",
+    "/healthz",
+    "/healthz/",
     "/api/global-search/",
 )
 
 # Client/tenant entry points we block for HQ admins
 _BLOCK_PREFIXES = (
-    "/tenants", "/inventory", "/dashboard", "/sell", "/scan", "/stock",
+    "/tenants",
+    "/inventory",
+    "/dashboard",
+    "/sell",
+    "/scan",
+    "/stock",
 )
 
 
@@ -173,9 +197,25 @@ class PreventHQFromClientUI(MiddlewareMixin):
     If user is an HQ admin, redirect any request to tenant/store UI
     back to the HQ shell. We redirect directly to **hq:subscriptions**
     (not hq:home) to avoid alias loops.
+
+    CRITICAL LOOP GUARDS:
+    - Never redirect when already on /hq/ paths
+    - Never redirect if target equals current path
     """
 
+    def __call__(self, request):
+        # CRITICAL: Bypass HQ paths at the very top to prevent redirect loops
+        path = request.path_info or request.path or "/"
+        if path.startswith("/hq/"):
+            return self.get_response(request)
+        return super().__call__(request)
+
     def process_request(self, request: HttpRequest):
+        # PART B: Rule 1 - HQ pages must never be redirected by tenant/business enforcement
+        path = (request.path_info or request.path or "/").split("?")[0]
+        if path.startswith("/hq/"):
+            return None
+
         user = getattr(request, "user", None)
         # ⚠️ Never boolean-cast the lazy user; use the safe helper.
         if not _safe_is_authenticated(user):
@@ -188,7 +228,7 @@ class PreventHQFromClientUI(MiddlewareMixin):
             # If role resolution fails (e.g., DB hiccup), treat as non-HQ and continue
             return None
 
-        path = (request.path or "")
+        path = path.rstrip("/")
 
         # HQ/admin/static/etc. are always allowed
         for p in _HQ_ALLOW_PREFIXES:
@@ -198,7 +238,17 @@ class PreventHQFromClientUI(MiddlewareMixin):
         # Block classic store/tenant entry points
         for p in _BLOCK_PREFIXES:
             if path.startswith(p):
-                return redirect(_reverse_or("hq:subscriptions", "/hq/subscriptions/"))
+                target = _reverse_or("hq:subscriptions", "/hq/subscriptions/")
+                # Normalize target (remove query string if present)
+                target = target.split("?")[0] if target else "/"
+                target_normalized = target.rstrip("/")
+                path_normalized = path.rstrip("/")
+
+                # Anti-loop guard: Never redirect if target equals current path
+                if target.rstrip("/") == path.rstrip("/"):
+                    return None
+
+                return redirect(target)
 
         return None
 
@@ -208,12 +258,17 @@ class PreventHQFromClientUI(MiddlewareMixin):
 # ------------------------------------------------------------------
 class AutoSelectBusinessMiddleware(MiddlewareMixin):
     """
+    SSOT-based active business middleware.
+    
     If an authenticated user has exactly one active membership, automatically set:
       - request.active_business / request.session['active_business_id']
       - request.active_location  (first active location for that business)
 
-    This makes pages like stock list / scan-in work without the user manually
-    choosing a business each time.
+    This prevents 302 redirects to /tenants/ for single-business users.
+    Multi-business users still see the tenant chooser (no behavior change).
+    
+    CRITICAL: This must run BEFORE any middleware that checks for active business
+    and redirects to /tenants/ (e.g., require_business decorator logic).
     """
 
     def process_request(self, request: HttpRequest):
@@ -222,48 +277,65 @@ class AutoSelectBusinessMiddleware(MiddlewareMixin):
             if not _safe_is_authenticated(user):
                 return
 
+            # Use SSOT service to ensure active business
+            try:
+                from tenants.services.active_business import ensure_active_business, _ensure_default_location
+                
+                biz = ensure_active_business(request, user, auto_select_single=True)
+                
+                # If business was set, ensure location too
+                if biz:
+                    _ensure_default_location(request, biz)
+            except ImportError:
+                # SSOT service not available, fall back to inline logic
+                self._fallback_auto_select(request, user)
+        except Exception:
+            # Never break requests because of auto-select logic
+            pass
+
+    # ----------------- fallback for backwards compatibility -----------------
+
+    def _fallback_auto_select(self, request: HttpRequest, user):
+        """Fallback implementation if SSOT service is not available."""
+        try:
             # If already set on request or session, do nothing.
-            try:
-                if getattr(request, "active_business", None) or request.session.get("active_business_id"):
-                    # Ensure a location is present if business exists but location isn't set.
-                    if getattr(request, "active_business", None) and not getattr(request, "active_location", None):
-                        self._ensure_location(request)
-                    return
-            except Exception:
-                # If session access explodes due to DB, quietly skip auto-select
+            if getattr(request, "active_business", None) or request.session.get("active_business_id"):
+                # Ensure a location is present if business exists but location isn't set.
+                if getattr(request, "active_business", None) and not getattr(request, "active_location", None):
+                    self._ensure_location(request)
                 return
 
-            # Try tenants models (prefer un-namespaced, then circuitcity.*)
-            BM = self._import_membership_model()
-            if not BM:
+            # Try tenants models
+            try:
+                from tenants.models import Membership
+            except ImportError:
                 return
 
-            qs = BM.objects.filter(user=user)
-            # Be defensive about flags
+            qs = Membership.objects.filter(user=user).select_related("business")
+            
+            # Filter active memberships
             try:
-                field_names = [fld.name for fld in BM._meta.fields]
+                field_names = {f.name for f in Membership._meta.fields}
+                if "status" in field_names:
+                    qs = qs.filter(status="ACTIVE")
+                elif "is_active" in field_names:
+                    qs = qs.filter(is_active=True)
             except Exception:
-                field_names = []
+                pass
 
-            for f in ("is_active", "active", "accepted"):
-                if f in field_names:
-                    try:
-                        qs = qs.filter(**{f: True})
-                    except Exception:
-                        pass
-
-            # Avoid expensive count() if DB is unhappy
+            # Filter active businesses
             try:
-                count = qs.count()
+                qs = qs.filter(business__status="ACTIVE")
             except Exception:
-                return
+                pass
 
+            # Only auto-select if exactly ONE
+            count = qs.count()
             if count != 1:
                 return
 
-            try:
-                membership = qs.first()
-            except Exception:
+            membership = qs.first()
+            if not membership:
                 return
 
             biz = getattr(membership, "business", None)
@@ -272,65 +344,61 @@ class AutoSelectBusinessMiddleware(MiddlewareMixin):
 
             # Set business on request and session
             request.active_business = biz
+            request.business = biz
             request.active_business_id = getattr(biz, "id", None)
+            
             try:
                 request.session["active_business_id"] = getattr(biz, "id", None)
-                # legacy keys some old code might read
                 request.session["biz_id"] = getattr(biz, "id", None)
+                request.session.modified = True
             except Exception:
-                # If session write fails, still keep request-scoped values
                 pass
 
             # Ensure a default location
             self._ensure_location(request)
         except Exception:
-            # Never break requests because of auto-select logic
             pass
 
-    # ----------------- helpers -----------------
-
-    def _import_membership_model(self):
-        try:
-            from tenants.models import BusinessMembership  # type: ignore
-            return BusinessMembership
-        except Exception:
-            try:
-                from circuitcity.tenants.models import BusinessMembership  # type: ignore
-                return BusinessMembership
-            except Exception:
-                return None
-
-    def _import_location_model(self):
-        try:
-            from tenants.models import Location  # type: ignore
-            return Location
-        except Exception:
-            try:
-                from circuitcity.tenants.models import Location  # type: ignore
-                return Location
-            except Exception:
-                return None
-
     def _ensure_location(self, request: HttpRequest):
-        biz = getattr(request, "active_business", None)
+        """Ensure a default location is set."""
+        biz = getattr(request, "active_business", None) or getattr(request, "business", None)
         if not biz:
             return
-        Location = self._import_location_model()
-        if not Location:
+        
+        # Skip if already set
+        if getattr(request, "active_location", None):
             return
+        
         try:
-            field_names = [f.name for f in Location._meta.fields]
-        except Exception:
-            field_names = []
+            from tenants.models import Location
+        except ImportError:
+            return
 
         try:
             qs = Location.objects.filter(business=biz)
-            if "is_active" in field_names:
-                qs = qs.filter(is_active=True)
-            loc = qs.order_by("name").first()
+            
+            # Prefer active locations
+            try:
+                if hasattr(Location, "is_active"):
+                    qs = qs.filter(is_active=True)
+            except Exception:
+                pass
+            
+            # Prefer headquarters or default
+            loc = (
+                qs.filter(is_headquarters=True).first()
+                or qs.filter(is_default=True).first()
+                or qs.order_by("name").first()
+            )
+            
             if loc:
                 request.active_location = loc
                 request.active_location_id = getattr(loc, "id", None)
+                try:
+                    request.session["active_location_id"] = getattr(loc, "id", None)
+                    request.session.modified = True
+                except Exception:
+                    pass
         except Exception:
             pass
 
@@ -375,3 +443,33 @@ class FriendlyErrorsMiddleware(MiddlewareMixin):
         except Exception:
             # As a last resort, return a minimal safe response
             return HttpResponse("Sorry — something went wrong.", status=500)
+
+
+# ------------------------------------------------------------------
+# URL Normalization Middleware (fixes double slashes)
+# ------------------------------------------------------------------
+class NormalizeURLMiddleware(MiddlewareMixin):
+    """
+    Middleware to normalize URLs by removing duplicate slashes.
+    Redirects /foo//bar/ to /foo/bar/ (permanent redirect).
+    Prevents 404s caused by accidental double slashes.
+    """
+
+    def process_request(self, request: HttpRequest):
+        """Normalize URL path by removing duplicate slashes."""
+        original_path = request.path
+        normalized_path = _normalize_path(original_path)
+
+        # If path changed, redirect to normalized version
+        if original_path != normalized_path:
+            # Preserve query string
+            query_string = request.META.get("QUERY_STRING", "")
+            if query_string:
+                normalized_url = f"{normalized_path}?{query_string}"
+            else:
+                normalized_url = normalized_path
+
+            # 301 permanent redirect
+            return redirect(normalized_url, permanent=True)
+
+        return None

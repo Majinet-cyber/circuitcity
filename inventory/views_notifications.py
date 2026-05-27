@@ -1,6 +1,7 @@
 ﻿from django.http import JsonResponse
 from django.utils import timezone
 
+
 def inbox_json(request):
     """
     Lightweight, always-safe feed the header can consume.
@@ -48,5 +49,3 @@ def inbox_json(request):
         },
     ]
     return JsonResponse({"items": sample[:limit]})
-
-

@@ -1,0 +1,13 @@
+New Subscription - Emajinet
+
+A business has subscribed:
+
+- Business: {{ business_name }}
+- Plan: {{ plan_name }}
+- Amount: {{ amount }}
+
+View in HQ: https://emajinet.africa/hq/billing/
+
+---
+Emajinet Platform - Owner Alert
+

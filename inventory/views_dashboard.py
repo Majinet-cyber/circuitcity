@@ -1,308 +1,537 @@
-# circuitcity/inventory/views_dashboard.py
+# inventory/views_dashboard.py
+"""
+Legacy Inventory Dashboard View - Richer layout with low stock alerts, charts, and top models.
+
+This is the general-purpose inventory dashboard that works across all verticals.
+It uses the centralized dashboard_metrics service for accurate KPI calculations.
+"""
 from __future__ import annotations
-from django.shortcuts import render
+
+import json
+import logging
+from datetime import datetime, timedelta
+from decimal import Decimal
+from typing import Any, Dict
+
+from django.contrib.auth.decorators import login_required
+from django.db.models import Q, Sum, Count, Avg, F, DecimalField
+from django.db.models.functions import Coalesce
 from django.http import HttpRequest, HttpResponse, JsonResponse
+from django.shortcuts import render
+from django.utils import timezone
+from django.views.decorators.cache import never_cache
+
+from tenants.utils import require_business
+
+logger = logging.getLogger(__name__)
 
 
+def _try_import(modpath: str, attr: str | None = None):
+    """Import helper that never explodes."""
+    try:
+        mod = __import__(modpath, fromlist=[attr] if attr else [])
+        return getattr(mod, attr) if attr else mod
+    except Exception:
+        return None
+
+
+# Import metrics service (single source of truth for KPIs)
+_get_inventory_kpis = _try_import("inventory.services.dashboard_metrics", "get_inventory_kpis")
+
+# Prefer the single-source-of-truth helpers if present
+_dashboard_counts = _try_import("inventory.query", "dashboard_counts")
+_sales_in_range = _try_import("inventory.query", "sales_in_range")
+_compute_agent_ranking = _try_import("inventory.services.agent_ranking", "compute_agent_ranking")
+_format_rank = _try_import("inventory.services.agent_ranking", "format_rank")
+
+
+def _parse_date_range(request):
+    """
+    Parse date range from query parameters.
+
+    Supports:
+    - ?range=today
+    - ?range=7d (last 7 days)
+    - ?range=mtd (month to date, DEFAULT)
+    - ?range=custom&start=YYYY-MM-DD&end=YYYY-MM-DD
+
+    Returns:
+        tuple: (range_key, start_datetime, end_datetime, display_label)
+    """
+    now = timezone.now()
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    today_end = today_start + timedelta(days=1)
+
+    range_param = request.GET.get("range", "mtd").lower()
+
+    if range_param == "today":
+        return ("today", today_start, today_end, "Today")
+
+    elif range_param == "7d":
+        start = today_start - timedelta(days=7)
+        return ("7d", start, today_end, "Last 7 Days")
+
+    elif range_param == "custom":
+        # Parse custom dates from query params
+        start_str = request.GET.get("start", "")
+        end_str = request.GET.get("end", "")
+
+        try:
+            start_date = datetime.strptime(start_str, "%Y-%m-%d").date()
+            end_date = datetime.strptime(end_str, "%Y-%m-%d").date()
+
+            # Convert to timezone-aware datetimes
+            start_dt = timezone.make_aware(datetime.combine(start_date, datetime.min.time()))
+            end_dt = timezone.make_aware(datetime.combine(end_date, datetime.max.time()))
+
+            label = f"{start_date.strftime('%b %d')} – {end_date.strftime('%b %d, %Y')}"
+            return ("custom", start_dt, end_dt, label)
+        except (ValueError, TypeError):
+            # Fall back to MTD if custom dates are invalid
+            pass
+
+    # Default: month-to-date
+    month_start = today_start.replace(day=1)
+    return ("mtd", month_start, today_end, "This Month")
+
+
+@login_required
+@never_cache
+@require_business
 def inventory_dashboard(request: HttpRequest) -> HttpResponse:
     """
-    Inventory dashboard view.
+    Legacy Inventory Dashboard with rich layout:
+    - Business KPIs strip (Units Sold, Revenue, Costs, Profit)
+    - Low stock alerts
+    - Profit vs Costs chart data
+    - Top models/SKUs
 
-    - If Accept header asks for JSON → return a small JSON stub.
-    - Otherwise render a template (inventory/dashboard.html).
-    - Falls back to a plain HttpResponse if the template is missing.
+    - Uses centralized dashboard_metrics service for accurate KPIs
+    - Supports date range filtering: Today / Last 7 Days / MTD / Custom
+    - Works across all business verticals
+    - JSON if: ?format=json or Accept: application/json
+    - Otherwise renders inventory/dashboard.html
+
+    NOTE: For PHONES vertical, this now redirects to Analytics (replaces dashboard).
     """
-    if request.headers.get("accept", "").startswith("application/json"):
-        return JsonResponse({"ok": True, "message": "Inventory dashboard ready"})
-    # circuitcity/inventory/views_dashboard.py
+    # Get business from request
+    business = getattr(request, "business", None) or getattr(request, "active_business", None)
+    if not business:
+        return HttpResponse("No active business found", status=400)
 
-    from typing import Any, Dict
-    import logging
+    # Route to vertical-specific dashboards
+    from inventory.helpers import business_vertical, PHONES, FARM, WELDING, CEMENT, CLOTHING, LIQUOR, GYM, GROCERY
+    from django.shortcuts import redirect
 
-    from django.contrib.auth.decorators import login_required
-    from django.http import HttpRequest, HttpResponse, JsonResponse
-    from django.shortcuts import render
-    from django.views.decorators.cache import never_cache
-
-    log = logging.getLogger(__name__)
-
-    def _try_import(modpath: str, attr: str | None = None):
-        """Import helper that never explodes."""
+    vertical = business_vertical(request)
+    
+    # Check if JSON is requested - if so, we still need to provide data
+    wants_json = (
+        (request.GET.get("format") or "").lower() == "json"
+        or request.headers.get("x-requested-with") == "XMLHttpRequest"
+        or "application/json" in (request.headers.get("Accept") or request.headers.get("accept") or "")
+    )
+    
+    # PHONES: redirect to analytics (replaces inventory dashboard)
+    if vertical == PHONES and not wants_json:
         try:
-            mod = __import__(modpath, fromlist=[attr] if attr else [])
-            return getattr(mod, attr) if attr else mod
+            from django.urls import reverse
+            analytics_url = reverse("app_router:analytics")
+            return redirect(analytics_url)
         except Exception:
-            return None
-
-    # Prefer the single-source-of-truth helpers if present
-    _dashboard_counts = _try_import("inventory.query", "dashboard_counts")
-    _sales_in_range = _try_import("inventory.query", "sales_in_range")
-    _compute_agent_ranking = _try_import("inventory.services.agent_ranking", "compute_agent_ranking")
-    _format_rank = _try_import("inventory.services.agent_ranking", "format_rank")
-
-    @login_required
-    @never_cache
-    def inventory_dashboard(request: HttpRequest) -> HttpResponse:
-        """
-        Inventory dashboard view (single source of truth).
-
-        - Reads counts from inventory.query.{dashboard_counts,sales_in_range} if available.
-        - Accepts `?days=7|30` for the "Sales (last N days)" card.
-        - JSON if: `?format=json` or Accept: application/json (for widgets/AJAX).
-        - Otherwise renders `inventory/dashboard.html` with a compact context.
-        """
-        # ------------ filters ------------
+            return redirect("/app/analytics/")
+    elif vertical == PHONES and wants_json:
+        # For JSON requests, continue with analytics data (analytics view handles JSON)
+        from inventory.views_analytics import analytics_dashboard
+        return analytics_dashboard(request)
+    
+    # FARM: redirect to farm dashboard
+    if vertical == FARM and not wants_json:
         try:
-            last_days = int(request.GET.get("days") or 7)
-            last_days = max(1, min(90, last_days))
+            from django.urls import reverse
+            return redirect(reverse("verticals:farm_dashboard"))
         except Exception:
-            last_days = 7
-
-        # Optional toggle (if you want "Products" = SKUs that are currently in stock)
-        products_in_stock_only = (request.GET.get("products_in_stock_only") or "").lower() in {
-            "1", "true", "on"
-        }
-
-        wants_json = (
-                (request.GET.get("format") or "").lower() == "json"
-                or request.headers.get("x-requested-with") == "XMLHttpRequest"
-                or "application/json" in (request.headers.get("Accept") or request.headers.get("accept") or "")
-        )
-
-        # ------------ compute metrics ------------
-        products = items_in_stock = sales_mtd = 0
-        sales_last = 0
-
-        if callable(_dashboard_counts):
-            try:
-                counts = _dashboard_counts(request, products_in_stock_only=products_in_stock_only)
-                products = int(counts.get("products") or 0)
-                items_in_stock = int(counts.get("items_in_stock") or 0)
-                sales_mtd = float(counts.get("sales_mtd") or 0)
-            except Exception as e:
-                log.exception("dashboard_counts failed: %s", e)
-
-        if callable(_sales_in_range):
-            try:
-                sales_last = float(_sales_in_range(request, days=last_days) or 0)
-            except Exception as e:
-                log.exception("sales_in_range failed: %s", e)
-
-        # ------------ JSON short-circuit ------------
-        if wants_json:
-            return JsonResponse(
-                {
-                    "ok": True,
-                    "metrics": {
-                        "products": products,
-                        "items_in_stock": items_in_stock,
-                        "sales_mtd": sales_mtd,
-                        "sales_last": sales_last,
-                    },
-                    "filters": {
-                        "days": last_days,
-                        "products_in_stock_only": products_in_stock_only,
-                    },
-                },
-                status=200,
-            )
-
-        # ------------ Agent Ranking (for agents only) ------------
-        ranking_data = None
-        user = getattr(request, "user", None)
-        business = getattr(request, "business", None)
-        
-        # Check if user is an agent (not manager/staff)
-        is_agent = False
-        if user and user.is_authenticated and business:
-            try:
-                from tenants.models import Membership
-                membership = Membership.objects.filter(
-                    user=user, business=business, role="AGENT", status="ACTIVE"
-                ).first()
-                is_agent = membership is not None
-            except Exception:
-                pass
-        
-        if is_agent and callable(_compute_agent_ranking) and business:
-            try:
-                # Default to last 30 days for agent ranking
-                ranking_days = 30
-                ranking_data = _compute_agent_ranking(business, days=ranking_days, agent_user=user)
-                if _format_rank and ranking_data.get("agent_rank"):
-                    ranking_data["agent_rank_formatted"] = _format_rank(ranking_data["agent_rank"])
-            except Exception as e:
-                log.exception("Agent ranking failed: %s", e)
-        
-        # ------------ Compute additional metrics for dashboard cards ------------
-        # Get sales data to compute total_units and stock_value
+            return redirect("/verticals/farm/dashboard/")
+    
+    # WELDING: redirect to welding dashboard
+    if vertical == WELDING and not wants_json:
         try:
-            from inventory.models import InventoryItem
-            from inventory.queries import inventory_qs_tenant, SOLD_Q
-            from decimal import Decimal
-            from django.utils import timezone
-            from datetime import timedelta
-            from django.db.models import Sum, Q, Count
-            from django.db.models.functions import Coalesce
-            
-            business = getattr(request, "business", None)
-            
-            # Month-to-date sales count
-            now = timezone.now()
-            month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-            
-            base_inv = inventory_qs_tenant(request) if business else InventoryItem.objects.all()
-            
-            # Total units sold (MTD)
-            sold_items_mtd = base_inv.filter(SOLD_Q(), sold_at__gte=month_start)
-            total_units = sold_items_mtd.count()
-            
-            # Total revenue (MTD) - use sales_mtd which is already computed
-            total_revenue = sales_mtd
-            
-            # Stock value (cost value of items in stock)
-            stock_items = base_inv.filter(status="IN_STOCK", is_active=True)
-            stock_value = stock_items.aggregate(
-                total=Coalesce(Sum("order_price"), Decimal("0.00"))
-            )["total"] or Decimal("0.00")
-            
-            # Active stock count (for "Active Stock" card) - this is items_in_stock
-            active_stock_count = items_in_stock
-            
-            # Low/out items (items with low or zero stock)
-            # This depends on your business logic - using a simple heuristic here
-            try:
-                from inventory.models import Product
-                # Count products that are low or out of stock
-                low_items = Product.objects.filter(
-                    business=business
-                ).annotate(
-                    stock_count=Count("inventoryitem", filter=Q(
-                        inventoryitem__status="IN_STOCK", 
-                        inventoryitem__is_active=True
-                    ))
-                ).filter(
-                    Q(stock_count=0) | Q(stock_count__lte=2)  # Out of stock or low stock (2 or fewer)
-                ).count() if business else 0
-            except Exception:
-                low_items = 0
-            
-        except Exception as e:
-            log.exception("Failed to compute dashboard metrics: %s", e)
-            total_units = 0
-            total_revenue = sales_mtd
-            stock_value = Decimal("0.00")
-            active_stock_count = items_in_stock
-            low_items = 0
-        
-        # ------------ Profit & Payment Mix (MTD) ------------
-        # Import helpers locally to avoid circular imports
+            from django.urls import reverse
+            return redirect(reverse("verticals:welding_dashboard"))
+        except Exception:
+            return redirect("/verticals/welding/dashboard/")
+    
+    # CEMENT: redirect to cement dashboard
+    if vertical == CEMENT and not wants_json:
         try:
-            from dashboard.dashboard_metrics import (
-                add_profit_context,
-                add_payment_mix_context,
-                get_mtd_dates,
-            )
-            from sales.models import Sale
-            from decimal import Decimal
-            
-            # Get MTD date range
-            start_date, end_date = get_mtd_dates()
-            business = getattr(request, "business", None)
-            
-            # Build sales queryset for MTD
-            sales_qs = None
-            if business and Sale is not None:
-                sales_qs = Sale.objects.filter(
-                    location__business=business,
-                    sold_at__gte=start_date,
-                    sold_at__lte=end_date,
-                )
-            
-            # Revenue is already calculated as sales_mtd
-            revenue_total = Decimal(str(total_revenue))
-            
-            # Create initial context with all dashboard card variables
-            ctx: Dict[str, Any] = {
-                "products": products,
-                "items_in_stock": items_in_stock,
-                "active_stock_count": active_stock_count,  # For "Active Stock" card
-                "sales_mtd": sales_mtd,
-                "sales_last": sales_last,
-                "last_days": last_days,
-                "products_in_stock_only": products_in_stock_only,
-                "agent_ranking": ranking_data,
-                "is_agent": is_agent,
-                # Dashboard card variables (for KPI band in template)
-                "total_revenue": total_revenue,
-                "total_units": total_units,
-                "stock_value": float(stock_value),
-                "low_items": low_items,
-                "period": "month",  # Default period for display
-            }
-            
-            # Add profit context
-            if business:
-                ctx = add_profit_context(
-                    ctx,
+            from django.urls import reverse
+            return redirect(reverse("verticals:cement_dashboard"))
+        except Exception:
+            return redirect("/verticals/cement/dashboard/")
+    
+    # CLOTHING: redirect to clothing dashboard
+    if vertical == CLOTHING and not wants_json:
+        try:
+            from django.urls import reverse
+            return redirect(reverse("verticals:clothing_dashboard"))
+        except Exception:
+            return redirect("/verticals/clothing/dashboard/")
+    
+    # LIQUOR: redirect to liquor dashboard
+    if vertical == LIQUOR and not wants_json:
+        try:
+            from django.urls import reverse
+            return redirect(reverse("verticals:liquor_dashboard"))
+        except Exception:
+            return redirect("/verticals/liquor/dashboard/")
+    
+    # GYM: redirect to gym dashboard
+    if vertical == GYM and not wants_json:
+        try:
+            from django.urls import reverse
+            return redirect(reverse("verticals:gym_dashboard"))
+        except Exception:
+            return redirect("/verticals/gym/dashboard/")
+    
+    # GROCERY: redirect to groceries dashboard
+    if vertical == GROCERY and not wants_json:
+        try:
+            from django.urls import reverse
+            return redirect(reverse("groceries:dashboard"))
+        except Exception:
+            return redirect("/verticals/groceries/dashboard/")
+
+    # Parse date range
+    range_key, start_date, end_date, range_label = _parse_date_range(request)
+
+    # Check if JSON response is requested
+    wants_json = (
+        (request.GET.get("format") or "").lower() == "json"
+        or request.headers.get("x-requested-with") == "XMLHttpRequest"
+        or "application/json" in (request.headers.get("Accept") or request.headers.get("accept") or "")
+    )
+
+    # ================================================================
+    # COMPUTE METRICS USING CENTRALIZED SERVICE
+    # ================================================================
+
+    # Get location (optional)
+    location = getattr(request, "location", None) or getattr(request, "active_location", None)
+
+    # Build sales queryset for the selected period
+    try:
+        from sales.models import Sale
+
+        sales_qs = Sale.objects.filter(
+            Q(item__business=business) | Q(location__business=business),
+            created_at__gte=start_date,
+            created_at__lt=end_date,
+        ).select_related("item", "item__product", "agent")
+
+        # Optional location filter
+        if location:
+            sales_qs = sales_qs.filter(location=location)
+
+        # Compute KPIs using the centralized metrics service
+        kpis = {}
+        if callable(_get_inventory_kpis):
+            try:
+                kpis = _get_inventory_kpis(
                     business=business,
-                    revenue=revenue_total,
+                    location=location,
+                    sales_qs=sales_qs,
                     start_date=start_date,
                     end_date=end_date,
-                    period_label="MTD",
                 )
-            
-            # Add payment mix context
-            if sales_qs is not None:
-                ctx = add_payment_mix_context(
-                    ctx,
-                    sales_queryset=sales_qs,
-                    period_label="MTD",
-                )
-        except Exception as e:
-            # If profit/payment mix fails, continue with basic context
-            log.exception("Failed to add profit/payment mix context: %s", e)
-            ctx: Dict[str, Any] = {
-                "products": products,
-                "items_in_stock": items_in_stock,
-                "active_stock_count": active_stock_count,
-                "sales_mtd": sales_mtd,
-                "sales_last": sales_last,
-                "last_days": last_days,
-                "products_in_stock_only": products_in_stock_only,
-                "agent_ranking": ranking_data,
-                "is_agent": is_agent,
-                "total_revenue": total_revenue,
-                "total_units": total_units,
-                "stock_value": float(stock_value),
-                "low_items": low_items,
-                "period": "month",
-            }
+            except Exception as e:
+                logger.exception("Failed to compute dashboard KPIs: %s", e)
 
-        # ------------ HTML ------------
+        # Extract key metrics
+        total_revenue = kpis.get("total_revenue", Decimal("0.00"))
+        costs_total = kpis.get("total_costs", Decimal("0.00"))
+        cost_of_goods = kpis.get("total_cogs", Decimal("0.00"))
+        business_costs = kpis.get("total_admin_costs", Decimal("0.00"))
+        profit_total = kpis.get("total_profit", Decimal("0.00"))
+        profit_margin = kpis.get("profit_margin", 0.0)
+
+        # Profit = revenue - total costs (cost of goods + business costs)
+        # Defensive check: Ensure profit is ALWAYS revenue - costs, never just -costs
+        profit_total = total_revenue - costs_total
+        profit_margin = float((profit_total / total_revenue) * 100) if total_revenue > 0 else 0.0
+
+        # Units sold
+        total_units = sales_qs.count()
+
+    except ImportError:
+        logger.warning("Sale model not available, metrics will be zero")
+        total_revenue = costs_total = profit_total = Decimal("0.00")
+        cost_of_goods = business_costs = Decimal("0.00")
+        profit_margin = 0.0
+        total_units = 0
+        kpis = {}
+    except Exception as e:
+        logger.exception("Error computing dashboard metrics: %s", e)
+        total_revenue = costs_total = profit_total = Decimal("0.00")
+        cost_of_goods = business_costs = Decimal("0.00")
+        profit_margin = 0.0
+        total_units = 0
+        kpis = {}
+
+    # ================================================================
+    # STOCK COUNTS
+    # ================================================================
+    products = items_in_stock = 0
+
+    if callable(_dashboard_counts):
         try:
-            return render(request, "inventory/dashboard.html", ctx)
-        except Exception:
-            # Gentle fallback if the template isn't ready yet.
-            html = f"""
-            <section style="max-width:720px;margin:24px auto;font-family:system-ui, -apple-system, Segoe UI, Roboto, sans-serif">
-              <h1 style="margin:0 0 8px">Inventory Dashboard</h1>
-              <p style="margin:0 0 18px;color:#475569">Template <code>inventory/dashboard.html</code> not found. Showing fallback.</p>
-              <ul style="line-height:1.7">
-                <li><strong>Products</strong>: {products}</li>
-                <li><strong>Items in stock</strong>: {items_in_stock}</li>
-                <li><strong>Sales (MTD)</strong>: {sales_mtd:,.0f}</li>
-                <li><strong>Sales (last {last_days} days)</strong>: {sales_last:,.0f}</li>
-              </ul>
-            </section>
-            """.strip()
-            return HttpResponse(html, content_type="text/html")
+            counts = _dashboard_counts(request, products_in_stock_only=False)
+            products = int(counts.get("products") or 0)
+            items_in_stock = int(counts.get("items_in_stock") or 0)
+        except Exception as e:
+            logger.exception("dashboard_counts failed: %s", e)
 
+    # ================================================================
+    # LOW STOCK ALERTS (products with 2 or fewer items in stock)
+    # ================================================================
+    low_stock_items = []
     try:
-        return render(request, "inventory/dashboard.html")
-    except Exception:
-        return HttpResponse(
-            "<h1>Inventory Dashboard</h1><p>Coming soon.</p>"
+        from inventory.models import Product, InventoryItem
+
+        # Get products with their stock counts
+        products_with_stock = (
+            Product.objects.filter(business=business)
+            .annotate(
+                stock_count=Count(
+                    "inventoryitem", filter=Q(inventoryitem__status="IN_STOCK", inventoryitem__is_active=True)
+                )
+            )
+            .filter(Q(stock_count=0) | Q(stock_count__lte=2))
+            .order_by("stock_count")[:10]
+        )  # Top 10 low/out of stock
+
+        for product in products_with_stock:
+            low_stock_items.append(
+                {
+                    "id": product.id,
+                    "name": f"{product.brand or ''} {product.model or ''} {product.variant or ''}".strip()
+                    or "Unknown Product",
+                    "stock_count": product.stock_count,
+                    "status": "OUT" if product.stock_count == 0 else "LOW",
+                }
+            )
+
+    except Exception as e:
+        logger.exception("Failed to compute low stock alerts: %s", e)
+
+    # ================================================================
+    # TOP MODELS / TOP SKUS (top 5 by units sold in selected range)
+    # ================================================================
+    top_models = []
+    try:
+        from sales.models import Sale
+
+        # Query top products by units sold
+        top_products_query = (
+            sales_qs.values(
+                "item__product__id", "item__product__brand", "item__product__model", "item__product__variant"
+            )
+            .annotate(
+                units_sold=Count("id"), revenue=Coalesce(Sum("price"), Decimal("0.00"), output_field=DecimalField())
+            )
+            .order_by("-units_sold")[:5]
         )
 
+        for item in top_products_query:
+            brand = item["item__product__brand"] or "Unknown"
+            model = item["item__product__model"] or "Unknown"
+            variant = item["item__product__variant"] or ""
+            product_name = f"{brand} {model} {variant}".strip()
 
+            top_models.append(
+                {
+                    "product_id": item["item__product__id"],
+                    "product_name": product_name,
+                    "units_sold": item["units_sold"],
+                    "revenue": item["revenue"],
+                }
+            )
+
+    except Exception as e:
+        logger.exception("Failed to compute top models: %s", e)
+
+    # ================================================================
+    # PROFIT VS COSTS CHART DATA (last 30 days)
+    # ================================================================
+    profit_cost_series = []
+    try:
+        from sales.models import Sale
+
+        now = timezone.now()
+        today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+
+        # Generate last 30 days of data
+        for i in range(30):
+            day_start = today_start - timedelta(days=29 - i)
+            day_end = day_start + timedelta(days=1)
+
+            # Sales for this day
+            day_sales = Sale.objects.filter(
+                Q(item__business=business) | Q(location__business=business),
+                created_at__gte=day_start,
+                created_at__lt=day_end,
+            )
+
+            if location:
+                day_sales = day_sales.filter(location=location)
+
+            # Revenue
+            day_revenue = day_sales.aggregate(
+                total=Coalesce(Sum("price"), Decimal("0.00"), output_field=DecimalField())
+            )["total"] or Decimal("0.00")
+
+            # COGS
+            day_cogs = day_sales.aggregate(
+                total=Coalesce(Sum("item__order_price"), Decimal("0.00"), output_field=DecimalField())
+            )["total"] or Decimal("0.00")
+
+            # Profit
+            day_profit = day_revenue - day_cogs
+
+            profit_cost_series.append(
+                {
+                    "date": day_start.strftime("%Y-%m-%d"),
+                    "date_short": day_start.strftime("%b %d"),
+                    "revenue": float(day_revenue),
+                    "costs": float(day_cogs),
+                    "profit": float(day_profit),
+                }
+            )
+
+    except Exception as e:
+        logger.exception("Failed to generate profit/cost chart data: %s", e)
+
+    # Serialize for JavaScript
+    profit_cost_json = json.dumps(profit_cost_series)
+
+    # ================================================================
+    # BUILD CONTEXT
+    # ================================================================
+    ctx = {
+        # Business & location info
+        "business": business,
+        "location": location,
+        "location_label": location.name if location else "All Locations",
+        # Date range info
+        "range_key": range_key,
+        "range_label": range_label,
+        "start_date": start_date,
+        "end_date": end_date,
+        "period": range_label,
+        # Core KPIs (using centralized metrics service)
+        "total_revenue": float(total_revenue),
+        "revenue_total": float(total_revenue),  # Alias for template compatibility
+        "costs_total": float(costs_total),
+        "cost_of_goods": float(cost_of_goods),
+        "business_costs": float(business_costs),
+        "profit_total": float(profit_total),
+        "profit_margin": profit_margin,
+        "margin_pct": profit_margin,  # Alias
+        # Units
+        "total_units": total_units,
+        "units_sold": total_units,  # Alias
+        # Stock info
+        "products": products,
+        "items_in_stock": items_in_stock,
+        "active_stock_count": items_in_stock,  # Alias
+        # Inventory-specific features
+        "low_stock_items": low_stock_items,
+        "top_models": top_models,
+        "profit_cost_series": profit_cost_series,
+        "profit_cost_json": profit_cost_json,
+        # Additional KPIs from service
+        "kpis": kpis,
+        # Template metadata
+        "active_tab": "inventory_dashboard",
+        "page_title": "Inventory Dashboard",
+    }
+
+    # ================================================================
+    # JSON RESPONSE
+    # ================================================================
+    if wants_json:
+        return JsonResponse(
+            {
+                "ok": True,
+                "metrics": {
+                    "products": products,
+                    "items_in_stock": items_in_stock,
+                    "total_revenue": float(total_revenue),
+                    "costs_total": float(costs_total),
+                    "profit_total": float(profit_total),
+                    "profit_margin": profit_margin,
+                    "total_units": total_units,
+                },
+                "low_stock_count": len(low_stock_items),
+                "top_models_count": len(top_models),
+                "period": range_label,
+            }
+        )
+
+    # ================================================================
+    # HTML RESPONSE
+    # ================================================================
+    try:
+        return render(request, "inventory/dashboard.html", ctx)
+    except Exception as e:
+        logger.exception("Failed to render dashboard template: %s", e)
+        # Fallback HTML
+        html = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Inventory Dashboard</title>
+            <meta charset="utf-8">
+            <style>
+                body {{ font-family: system-ui; background: #0b1020; color: #eef2ff; margin: 0; padding: 20px; }}
+                .panel {{ background: #0e152b; border: 1px solid #1c2541; border-radius: 12px; padding: 20px; margin-bottom: 16px; }}
+                .kpi {{ display: inline-block; margin: 10px 20px; }}
+                .kpi .label {{ font-size: 0.9rem; color: #8ea0b5; }}
+                .kpi .value {{ font-size: 1.8rem; font-weight: 900; }}
+            </style>
+        </head>
+        <body>
+            <div class="panel">
+                <h1>Inventory Dashboard</h1>
+                <p>Period: {range_label}</p>
+                <div class="kpi">
+                    <div class="label">Revenue</div>
+                    <div class="value">MK {total_revenue:,.0f}</div>
+                </div>
+                <div class="kpi">
+                    <div class="label">Costs</div>
+                    <div class="value">MK {costs_total:,.0f}</div>
+                </div>
+                <div class="kpi">
+                    <div class="label">Profit</div>
+                    <div class="value">MK {profit_total:,.0f}</div>
+                </div>
+                <div class="kpi">
+                    <div class="label">Units Sold</div>
+                    <div class="value">{total_units}</div>
+                </div>
+            </div>
+            <div class="panel">
+                <p><strong>Cost Breakdown:</strong></p>
+                <p>Cost of goods: MK {cost_of_goods:,.0f}</p>
+                <p>Business costs: MK {business_costs:,.0f}</p>
+            </div>
+            <div class="panel">
+                <p><strong>Low Stock Alerts:</strong> {len(low_stock_items)} items</p>
+            </div>
+            <div class="panel">
+                <p><strong>Top Models:</strong> {len(top_models)} products</p>
+            </div>
+        </body>
+        </html>
+        """
+        return HttpResponse(html, content_type="text/html")

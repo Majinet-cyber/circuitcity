@@ -1,6 +1,6 @@
 ﻿from __future__ import annotations
 
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import Decimal
 from typing import Optional
 
 from django.conf import settings
@@ -12,19 +12,11 @@ from django.utils import timezone
 # Use AUTH_USER_MODEL string for FKs to avoid import cycles
 User = settings.AUTH_USER_MODEL
 
+from .money import q2
 
 # ----------------------------------------------------------------------
 # Utilities
 # ----------------------------------------------------------------------
-def q2(x: Optional[Decimal]) -> Decimal:
-    """Quantize to 2 dp (HALF_UP)."""
-    if x is None:
-        return Decimal("0.00")
-    if not isinstance(x, Decimal):
-        x = Decimal(str(x))
-    return x.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-
-
 def is_manager_like(user) -> bool:
     """Admins (is_staff) or profile.is_manager."""
     try:
@@ -162,6 +154,83 @@ class WalletTransaction(models.Model):
         super().save(*args, **kwargs)
 
 
+class CashBankTransaction(models.Model):
+    class Direction(models.TextChoices):
+        CASH_IN = "cash_in", "Cash In"
+        CASH_OUT = "cash_out", "Cash Out"
+
+    class PaymentMethod(models.TextChoices):
+        CASH = "cash", "Cash"
+        BANK = "bank", "Bank"
+        AIRTEL = "airtel_money", "Airtel Money"
+        MPAMBA = "mpamba", "Mpamba"
+        OTHER = "other", "Other"
+
+    business = models.ForeignKey(
+        "tenants.Business",
+        on_delete=models.CASCADE,
+        related_name="cash_bank_transactions",
+    )
+    date = models.DateField(default=timezone.localdate, db_index=True)
+    direction = models.CharField(max_length=12, choices=Direction.choices)
+    category = models.CharField(max_length=80)
+    payment_method = models.CharField(max_length=20, choices=PaymentMethod.choices, default=PaymentMethod.CASH)
+    amount = models.DecimalField(max_digits=14, decimal_places=2, validators=[MinValueValidator(Decimal("0.01"))])
+    description = models.TextField(blank=True, default="")
+    related_sale_reference = models.CharField(max_length=80, blank=True, default="")
+    balance_after = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal("0.00"))
+    created_by = models.ForeignKey(
+        User,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="cash_bank_transactions_created",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ("-date", "-id")
+        indexes = [
+            models.Index(fields=["business", "date"]),
+            models.Index(fields=["business", "payment_method", "date"]),
+            models.Index(fields=["business", "direction", "date"]),
+            models.Index(fields=["business", "category", "date"]),
+        ]
+
+    def __str__(self) -> str:
+        sign = "+" if self.direction == self.Direction.CASH_IN else "-"
+        return f"{self.date} {sign}{self.amount} {self.get_payment_method_display()}"
+
+    @property
+    def signed_amount(self) -> Decimal:
+        amount = q2(self.amount)
+        return amount if self.direction == self.Direction.CASH_IN else -amount
+
+    def save(self, *args, **kwargs):
+        self.amount = q2(self.amount)
+        super().save(*args, **kwargs)
+        recalculate_cash_bank_balances(self.business_id)
+
+    def delete(self, *args, **kwargs):
+        business_id = self.business_id
+        result = super().delete(*args, **kwargs)
+        recalculate_cash_bank_balances(business_id)
+        return result
+
+
+def recalculate_cash_bank_balances(business_id: int | None) -> None:
+    if not business_id:
+        return
+    balance = Decimal("0.00")
+    rows = CashBankTransaction.objects.filter(business_id=business_id).order_by("date", "created_at", "id")
+    for row in rows.only("id", "amount", "direction", "balance_after"):
+        balance += row.signed_amount
+        new_balance = q2(balance)
+        if row.balance_after != new_balance:
+            CashBankTransaction.objects.filter(pk=row.pk).update(balance_after=new_balance)
+
+
 # ----------------------------------------------------------------------
 # Sales Targets & Attendance
 # ----------------------------------------------------------------------
@@ -269,22 +338,39 @@ def _default_base_salary() -> Decimal:
 
 
 class PayslipStatus(models.TextChoices):
-    DRAFT = "DRAFT", "Draft"
-    SENT = "SENT", "Sent"
+    DRAFT = "DRAFT", "Prepared"
+    SENT = "SENT", "Issued"
     PAID = "PAID", "Paid"
-    FAILED = "FAILED", "Failed"
+    FAILED = "FAILED", "Cancelled"
 
 
 class Payslip(models.Model):
-    agent = models.ForeignKey(User, on_delete=models.CASCADE, related_name="payslips")
+    business = models.ForeignKey(
+        "tenants.Business",
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name="payslips",
+    )
+    agent = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name="payslips")
     year = models.IntegerField()
     month = models.IntegerField()  # 1..12
+    period_start = models.DateField(null=True, blank=True)
+    period_end = models.DateField(null=True, blank=True)
+
+    employee_name = models.CharField(max_length=160, blank=True, default="")
+    employee_role = models.CharField(max_length=120, blank=True, default="")
+    employee_phone = models.CharField(max_length=60, blank=True, default="")
+    employee_email = models.EmailField(blank=True, default="")
+    employee_identifier = models.CharField(max_length=80, blank=True, default="")
 
     # Components
     base_salary = models.DecimalField(max_digits=12, decimal_places=2, default=_default_base_salary)
     commission = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0"))
     bonuses_fees = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0"))
+    other_earnings = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0"))
     deductions = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0"))
+    payment_method_label = models.CharField(max_length=80, blank=True, default="")
 
     # Totals
     gross = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0"))
@@ -309,13 +395,36 @@ class Payslip(models.Model):
     class Meta:
         unique_together = [("agent", "year", "month")]
         indexes = [
+            models.Index(fields=["business", "year", "month"]),
             models.Index(fields=["agent", "year", "month"]),
+            models.Index(fields=["employee_name"]),
             models.Index(fields=["status"]),
         ]
         ordering = ("-issued_at",)
 
     def __str__(self) -> str:
-        return f"{self.reference or 'NOREF'} Â· {self.agent_id} Â· {self.year}-{self.month:02d}"
+        return f"{self.reference or 'NOREF'} - {self.display_employee_name} - {self.year}-{self.month:02d}"
+
+    @property
+    def display_employee_name(self) -> str:
+        if self.employee_name:
+            return self.employee_name
+        if self.agent_id:
+            full = self.agent.get_full_name()
+            return full or self.agent.get_username()
+        return "Employee"
+
+    @property
+    def display_status(self) -> str:
+        if self.status == PayslipStatus.DRAFT:
+            return "Prepared"
+        if self.status == PayslipStatus.SENT:
+            return "Issued"
+        if self.status == PayslipStatus.PAID:
+            return "Paid"
+        if self.status == PayslipStatus.FAILED:
+            return "Cancelled"
+        return str(self.status or "Prepared").title()
 
     def _make_reference(self) -> str:
         ts = timezone.now().strftime("%y%m%d%H%M%S")
@@ -327,10 +436,16 @@ class Payslip(models.Model):
             while Payslip.objects.filter(reference=ref).exists():
                 ref = self._make_reference()
             self.reference = ref
-        if not self.email_to and hasattr(self, "agent") and getattr(self.agent, "email", ""):
+        if not self.email_to and self.employee_email:
+            self.email_to = self.employee_email
+        if not self.employee_name and self.agent_id:
+            self.employee_name = self.agent.get_full_name() or self.agent.get_username()
+        if not self.employee_email and self.agent_id and getattr(self.agent, "email", ""):
+            self.employee_email = self.agent.email
+        if not self.email_to and self.agent_id and getattr(self.agent, "email", ""):
             self.email_to = self.agent.email
 
-        gross = q2((self.base_salary or 0) + (self.commission or 0) + (self.bonuses_fees or 0))
+        gross = q2((self.base_salary or 0) + (self.commission or 0) + (self.bonuses_fees or 0) + (self.other_earnings or 0))
         net = q2(gross - (self.deductions or 0))
         self.gross = gross
         self.net = net
@@ -339,6 +454,7 @@ class Payslip(models.Model):
         self.base_salary = q2(self.base_salary)
         self.commission = q2(self.commission)
         self.bonuses_fees = q2(self.bonuses_fees)
+        self.other_earnings = q2(self.other_earnings)
         self.deductions = q2(self.deductions)
         self.gross = q2(self.gross)
         self.net = q2(self.net)
@@ -408,13 +524,20 @@ class PayoutSchedule(models.Model):
 # Admin Purchase Orders
 # ----------------------------------------------------------------------
 class PurchaseOrderStatus(models.TextChoices):
-    DRAFT = "draft", "Draft"
+    DRAFT = "draft", "Prepared"
     SENT = "sent", "Sent"
     COMPLETED = "completed", "Completed"
     CANCELLED = "cancelled", "Cancelled"
 
 
 class AdminPurchaseOrder(models.Model):
+    business = models.ForeignKey(
+        "tenants.Business",
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name="admin_purchase_orders",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     created_by = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name="admin_pos_created")
 
@@ -424,6 +547,8 @@ class AdminPurchaseOrder(models.Model):
     agent_name = models.CharField(max_length=120, blank=True)
 
     notes = models.TextField(blank=True)
+    payment_terms = models.CharField(max_length=255, blank=True, default="")
+    expected_delivery_date = models.DateField(null=True, blank=True)
     currency = models.CharField(max_length=8, default="MWK")
 
     subtotal = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal("0.00"))
@@ -431,10 +556,12 @@ class AdminPurchaseOrder(models.Model):
     total = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal("0.00"))
 
     status = models.CharField(max_length=20, choices=PurchaseOrderStatus.choices, default=PurchaseOrderStatus.DRAFT)
+    pdf = models.FileField(upload_to="purchase_orders/", null=True, blank=True)
 
     class Meta:
         ordering = ("-created_at",)
         indexes = [
+            models.Index(fields=["business", "created_at"]),
             models.Index(fields=["status", "created_at"]),
             models.Index(fields=["supplier_name"]),
         ]

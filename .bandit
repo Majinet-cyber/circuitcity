@@ -1,0 +1,47 @@
+# Bandit Configuration
+# Run: bandit -r . -c .bandit
+
+[bandit]
+# Exclude paths (migrations, virtual envs, test data)
+exclude_dirs = [
+    '/migrations/',
+    '/venv/',
+    '/.venv/',
+    '/node_modules/',
+    '/staticfiles/',
+    '/media/',
+    '/.git/',
+    '/__pycache__/',
+]
+
+# Tests to skip (with justification)
+skips = [
+    # B101: assert_used - Used extensively in tests (acceptable)
+    'B101',
+    
+    # B110: try_except_pass - Sometimes needed for optional imports
+    'B110',
+    
+    # B311: random - Using random for non-crypto purposes is OK
+    # 'B311',  # Uncomment if needed
+]
+
+# Severity levels to report (LOW, MEDIUM, HIGH)
+# Default: Show MEDIUM and above
+# For stricter checking, use: -ll (LOW and above)
+level = 'MEDIUM'
+
+# Confidence levels (LOW, MEDIUM, HIGH)
+# Default: Show MEDIUM and above
+confidence = 'MEDIUM'
+
+[bandit.plugins]
+# Plugin-specific configurations
+
+# B201: flask_debug_true - Not using Flask
+# B501, B502, B503: SSL/TLS checks - Important for Django HTTPS
+# B601, B602, B603: Shell injection - Critical
+# B608: SQL injection - Critical (but Django ORM handles this)
+
+# Custom baselines can be added here for suppression
+

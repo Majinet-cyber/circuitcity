@@ -1,0 +1,769 @@
+{% extends "base.html" %}
+{% load humanize marketplace_media %}
+
+{% block title %}{{ batch.name }} — Livestock{% endblock %}
+
+{% block content %}
+<div class="container py-4" style="max-width:920px;">
+  <nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb mb-0">
+      <li class="breadcrumb-item"><a href="/verticals/farm/dashboard/">Dashboard</a></li>
+      <li class="breadcrumb-item"><a href="/verticals/farm/livestock/">Livestock</a></li>
+      <li class="breadcrumb-item active">{{ batch.name }}</li>
+    </ol>
+  </nav>
+
+  {% if messages %}{% for m in messages %}<div class="alert alert-{{ m.tags|default:'info' }} rounded-3">{{ m }}</div>{% endfor %}{% endif %}
+
+  <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+    <div>
+      <h1 class="h3 fw-bold mb-1">{{ batch.name }}</h1>
+      <div class="text-muted small">{{ batch.get_animal_type_display }} · {{ batch.get_animal_subtype_display }}</div>
+    </div>
+    <div class="d-flex flex-wrap gap-2 align-items-center">
+      {% if margin_band == 'healthy' %}
+      <span class="badge rounded-pill bg-success-subtle text-success border border-success">Margin: healthy</span>
+      {% elif margin_band == 'caution' %}
+      <span class="badge rounded-pill bg-warning-subtle text-dark border">Margin: caution</span>
+      {% elif margin_band == 'risky' %}
+      <span class="badge rounded-pill bg-danger-subtle text-danger border">Margin: risky</span>
+      {% else %}
+      <span class="badge rounded-pill bg-secondary-subtle text-secondary border">Add cost + ask price for margin</span>
+      {% endif %}
+      {% if margin_pct is not None %}
+      <span class="text-muted small">{{ margin_pct|floatformat:1 }}% est. margin</span>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="row g-3 mb-4">
+    <div class="col-md-4">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-body">
+          <div class="text-muted text-uppercase small fw-bold">Current count</div>
+          <div class="fs-2 fw-bold text-primary">{{ snapshot.count_current|intcomma }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-body">
+          <div class="text-muted text-uppercase small fw-bold">Marketplace</div>
+          {% if listing_is_live %}
+          <div class="text-success fw-bold">Live</div>
+          <a class="small" href="{% url 'inventory:manage_listings' %}">Manage listings</a>
+          {% elif listing %}
+          <div class="text-secondary">{{ listing.get_status_display }}</div>
+          {% else %}
+          <div class="text-muted">Not published</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-body">
+          <div class="text-muted text-uppercase small fw-bold">Photos</div>
+          <div class="small">{% if batch.primary_image or batch.gallery_images.count %}Ready{% else %}<span class="text-warning">Add photos for better conversion</span>{% endif %}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ INTELLIGENCE CARDS ═══ -->
+  {% if intelligence %}
+  <div style="margin-bottom:1.5rem;">
+    <h5 class="fw-bold mb-3 d-flex align-items-center gap-2" style="color:#0f172a;">
+      <i class="bi bi-cpu text-primary"></i> Batch Intelligence
+    </h5>
+    <div class="row g-3">
+
+      <!-- Mortality Risk -->
+      <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm h-100 p-3 text-center"
+          style="background:{% if intelligence.mortality_risk_level == 'good' %}#f0fdf4{% elif intelligence.mortality_risk_level == 'watch' %}#fefce8{% elif intelligence.mortality_risk_level == 'high_risk' %}#fff7ed{% else %}#fef2f2{% endif %}">
+          <i class="bi bi-activity mb-2"
+            style="font-size:1.6rem;color:{% if intelligence.mortality_risk_level == 'good' %}#15803d{% elif intelligence.mortality_risk_level == 'watch' %}#92400e{% elif intelligence.mortality_risk_level == 'high_risk' %}#c2410c{% else %}#dc2626{% endif %}"></i>
+          <div class="text-muted fw-bold" style="font-size:.65rem;text-transform:uppercase;letter-spacing:.06em;">Mortality Risk</div>
+          <div class="fw-black mt-1"
+            style="font-size:1rem;color:{% if intelligence.mortality_risk_level == 'good' %}#15803d{% elif intelligence.mortality_risk_level == 'watch' %}#92400e{% elif intelligence.mortality_risk_level == 'high_risk' %}#c2410c{% else %}#dc2626{% endif %}">
+            {{ intelligence.mortality_risk_level|replace:"_, "|title }}
+          </div>
+          {% if intelligence.mortality_rate is not None %}
+          <div class="text-muted" style="font-size:.75rem;">{{ intelligence.mortality_rate|floatformat:1 }}% rate</div>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Health Score -->
+      <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm h-100 p-3 text-center">
+          <i class="bi bi-heart-pulse mb-2"
+            style="font-size:1.6rem;color:{% if intelligence.batch_health_score >= 75 %}#15803d{% elif intelligence.batch_health_score >= 50 %}#d97706{% else %}#dc2626{% endif %}"></i>
+          <div class="text-muted fw-bold" style="font-size:.65rem;text-transform:uppercase;letter-spacing:.06em;">Health Score</div>
+          <div class="fw-black mt-1"
+            style="font-size:1.5rem;color:{% if intelligence.batch_health_score >= 75 %}#15803d{% elif intelligence.batch_health_score >= 50 %}#d97706{% else %}#dc2626{% endif %}">
+            {{ intelligence.batch_health_score }}<span style="font-size:0.85rem;color:#64748b;">/100</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Cost Per Animal -->
+      <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm h-100 p-3 text-center">
+          <i class="bi bi-cash-coin mb-2" style="font-size:1.6rem;color:#0369a1;"></i>
+          <div class="text-muted fw-bold" style="font-size:.65rem;text-transform:uppercase;letter-spacing:.06em;">Cost / Animal</div>
+          <div class="fw-black mt-1" style="font-size:1rem;color:#0f172a;">
+            {% if intelligence.cost_per_surviving_animal_mwk %}
+              MWK {{ intelligence.cost_per_surviving_animal_mwk|floatformat:0|intcomma }}
+            {% else %}—{% endif %}
+          </div>
+        </div>
+      </div>
+
+      <!-- Break-even Price -->
+      <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm h-100 p-3 text-center">
+          <i class="bi bi-bar-chart-line mb-2" style="font-size:1.6rem;color:#7c3aed;"></i>
+          <div class="text-muted fw-bold" style="font-size:.65rem;text-transform:uppercase;letter-spacing:.06em;">Break-even</div>
+          <div class="fw-black mt-1" style="font-size:1rem;color:#0f172a;">
+            {% if intelligence.break_even_price_mwk %}
+              MWK {{ intelligence.break_even_price_mwk|floatformat:0|intcomma }}
+            {% else %}—{% endif %}
+          </div>
+        </div>
+      </div>
+
+      <!-- Feed Cost -->
+      <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm h-100 p-3 text-center">
+          <i class="bi bi-basket mb-2" style="font-size:1.6rem;color:#059669;"></i>
+          <div class="text-muted fw-bold" style="font-size:.65rem;text-transform:uppercase;letter-spacing:.06em;">Feed Cost</div>
+          <div class="fw-black mt-1" style="font-size:1rem;color:#0f172a;">
+            MWK {{ intelligence.feed_cost_mwk|floatformat:0|intcomma|default:"0" }}
+          </div>
+        </div>
+      </div>
+
+      <!-- Net Profit -->
+      <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm h-100 p-3 text-center"
+          style="background:{% if intelligence.net_profit_mwk >= 0 %}#f0fdf4{% else %}#fef2f2{% endif %}">
+          <i class="bi bi-{% if intelligence.net_profit_mwk >= 0 %}graph-up-arrow{% else %}graph-down-arrow{% endif %} mb-2"
+            style="font-size:1.6rem;color:{% if intelligence.net_profit_mwk >= 0 %}#15803d{% else %}#dc2626{% endif %};"></i>
+          <div class="text-muted fw-bold" style="font-size:.65rem;text-transform:uppercase;letter-spacing:.06em;">Net Profit</div>
+          <div class="fw-black mt-1"
+            style="font-size:1rem;color:{% if intelligence.net_profit_mwk >= 0 %}#15803d{% else %}#dc2626{% endif %}">
+            MWK {{ intelligence.net_profit_mwk|floatformat:0|intcomma }}
+          </div>
+        </div>
+      </div>
+
+      <!-- Days in Cycle -->
+      <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm h-100 p-3 text-center">
+          <i class="bi bi-calendar-range mb-2" style="font-size:1.6rem;color:#0ea5e9;"></i>
+          <div class="text-muted fw-bold" style="font-size:.65rem;text-transform:uppercase;letter-spacing:.06em;">Days in Cycle</div>
+          <div class="fw-black mt-1" style="font-size:1.5rem;color:#0f172a;">{{ intelligence.days_in_cycle }}</div>
+        </div>
+      </div>
+
+      <!-- Survival Rate -->
+      <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm h-100 p-3 text-center">
+          <i class="bi bi-shield-check mb-2" style="font-size:1.6rem;color:#059669;"></i>
+          <div class="text-muted fw-bold" style="font-size:.65rem;text-transform:uppercase;letter-spacing:.06em;">Survival Rate</div>
+          <div class="fw-black mt-1" style="font-size:1rem;color:#0f172a;">
+            {% if intelligence.survival_rate is not None %}
+              {{ intelligence.survival_rate|floatformat:1 }}%
+            {% else %}—{% endif %}
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Recommendations from intelligence -->
+    {% if intelligence.recommendations %}
+    <div class="mt-3 p-3 rounded-3" style="background:#eff6ff;border:1px solid #bfdbfe;">
+      <h6 class="fw-bold mb-2" style="color:#1d4ed8;font-size:.85rem;">
+        <i class="bi bi-compass me-1"></i>Smart Recommendations
+      </h6>
+      {% for rec in intelligence.recommendations %}
+      <div class="d-flex align-items-start gap-2 mb-1">
+        <i class="bi bi-arrow-right-circle-fill text-primary flex-shrink-0 mt-1" style="font-size:.8rem;"></i>
+        <span style="font-size:.82rem;color:#1e40af;">{{ rec }}</span>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  <!-- ═══ LIVESTOCK SIMULATION PANEL ═══ -->
+  <div class="card border-0 shadow-sm mb-4" style="border-left:4px solid #7c3aed!important;">
+    <div class="card-header bg-transparent d-flex align-items-center gap-2">
+      <i class="bi bi-calculator" style="color:#7c3aed;font-size:1.1rem;"></i>
+      <h6 class="mb-0 fw-bold">Profit Simulation</h6>
+      <span style="background:#f3e8ff;color:#7c3aed;font-size:.62rem;padding:2px 7px;border-radius:99px;font-weight:700;text-transform:uppercase;">Simulator</span>
+    </div>
+    <div class="card-body">
+      <form method="get" id="simulation-form" class="row g-3 mb-3">
+        <div class="col-6 col-md-3">
+          <label class="form-label fw-semibold" style="font-size:.8rem;">Sale Price / Animal (MWK)</label>
+          <input type="number" name="sim_sale_price" class="form-control form-control-sm" step="100"
+            value="{{ sim_sale_price }}" placeholder="e.g. 25000">
+        </div>
+        <div class="col-6 col-md-3">
+          <label class="form-label fw-semibold" style="font-size:.8rem;">Animals to Sell</label>
+          <input type="number" name="sim_animals_to_sell" class="form-control form-control-sm" step="1"
+            value="{{ sim_animals_to_sell }}" placeholder="{{ batch.count_current|default:0 }}">
+        </div>
+        <div class="col-6 col-md-3">
+          <label class="form-label fw-semibold" style="font-size:.8rem;">Expected Mortality (%)</label>
+          <input type="number" name="sim_expected_mortality" class="form-control form-control-sm" step="0.5" min="0" max="100"
+            value="{{ sim_expected_mortality }}" placeholder="0">
+        </div>
+        <div class="col-6 col-md-3">
+          <label class="form-label fw-semibold" style="font-size:.8rem;">Extra Feed Cost (MWK)</label>
+          <input type="number" name="sim_extra_feed_cost" class="form-control form-control-sm" step="100"
+            value="{{ sim_extra_feed_cost }}" placeholder="0">
+        </div>
+        <div class="col-12">
+          <button type="submit" class="btn btn-sm" style="background:#7c3aed;color:#fff;border-radius:20px;padding:6px 20px;font-weight:700;">
+            <i class="bi bi-play-circle me-1"></i> Run Simulation
+          </button>
+        </div>
+      </form>
+
+      {% if simulation_result %}
+      <div class="row g-2 mt-1">
+        <div class="col-12">
+          <div class="alert alert-sm mb-2 py-2 px-3 rounded-3"
+            style="background:{% if simulation_result.projected_profit >= 0 %}#f0fdf4;border-color:#86efac{% else %}#fef2f2;border-color:#fca5a5{% endif %};">
+            <div class="d-flex flex-wrap gap-4 align-items-center">
+              <div>
+                <span class="text-muted" style="font-size:.7rem;">Animals Sold</span>
+                <div class="fw-black" style="font-size:1.2rem;">{{ simulation_result.animals_sold }}</div>
+              </div>
+              <div>
+                <span class="text-muted" style="font-size:.7rem;">Projected Revenue</span>
+                <div class="fw-black text-success" style="font-size:1.2rem;">MWK {{ simulation_result.projected_revenue|floatformat:0|intcomma }}</div>
+              </div>
+              <div>
+                <span class="text-muted" style="font-size:.7rem;">Total Cost</span>
+                <div class="fw-black text-danger" style="font-size:1.2rem;">MWK {{ simulation_result.total_cost|floatformat:0|intcomma }}</div>
+              </div>
+              <div>
+                <span class="text-muted" style="font-size:.7rem;">Projected Profit</span>
+                <div class="fw-black" style="font-size:1.4rem;color:{% if simulation_result.projected_profit >= 0 %}#15803d{% else %}#dc2626{% endif %}">
+                  MWK {{ simulation_result.projected_profit|floatformat:0|intcomma }}
+                </div>
+              </div>
+              {% if simulation_result.roi_pct is not None %}
+              <div>
+                <span class="text-muted" style="font-size:.7rem;">ROI</span>
+                <div class="fw-black" style="font-size:1.2rem;color:{% if simulation_result.roi_pct >= 0 %}#15803d{% else %}#dc2626{% endif %}">
+                  {{ simulation_result.roi_pct|floatformat:1 }}%
+                </div>
+              </div>
+              {% endif %}
+              {% if simulation_result.break_even_price %}
+              <div>
+                <span class="text-muted" style="font-size:.7rem;">Break-even Price</span>
+                <div class="fw-black" style="font-size:1.2rem;color:#1d4ed8;">MWK {{ simulation_result.break_even_price|floatformat:0|intcomma }}</div>
+              </div>
+              {% endif %}
+            </div>
+          </div>
+          <!-- Best/Worst case row -->
+          <div class="d-flex gap-3 flex-wrap mt-1">
+            <div class="p-2 rounded-2" style="background:#f0fdf4;flex:1;min-width:120px;">
+              <div class="text-muted" style="font-size:.65rem;font-weight:700;text-transform:uppercase;">Best Case</div>
+              <div class="fw-bold text-success" style="font-size:.95rem;">MWK {{ simulation_result.best_case_profit|floatformat:0|intcomma }}</div>
+            </div>
+            <div class="p-2 rounded-2" style="background:#fef3c7;flex:1;min-width:120px;">
+              <div class="text-muted" style="font-size:.65rem;font-weight:700;text-transform:uppercase;">Expected</div>
+              <div class="fw-bold" style="font-size:.95rem;color:#92400e;">MWK {{ simulation_result.projected_profit|floatformat:0|intcomma }}</div>
+            </div>
+            <div class="p-2 rounded-2" style="background:#fef2f2;flex:1;min-width:120px;">
+              <div class="text-muted" style="font-size:.65rem;font-weight:700;text-transform:uppercase;">Worst Case</div>
+              <div class="fw-bold text-danger" style="font-size:.95rem;">MWK {{ simulation_result.worst_case_profit|floatformat:0|intcomma }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      {% else %}
+      <div class="text-muted text-center py-3" style="font-size:.85rem;">
+        <i class="bi bi-calculator" style="font-size:1.5rem;display:block;margin-bottom:6px;"></i>
+        Enter a sale price and click <strong>Run Simulation</strong> to see projected profit, ROI, and break-even.
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- ═══ HOUSING PLANNER PLACEHOLDER ═══ -->
+  <div class="card border-0 shadow-sm mb-4" style="border-left:4px solid #0ea5e9!important;">
+    <div class="card-header bg-transparent d-flex align-items-center gap-2">
+      <i class="bi bi-house-gear" style="color:#0284c7;font-size:1.1rem;"></i>
+      <h6 class="mb-0 fw-bold">Housing Planner</h6>
+      <span style="background:#e0f2fe;color:#0284c7;font-size:.62rem;padding:2px 7px;border-radius:99px;font-weight:700;text-transform:uppercase;">Beta</span>
+    </div>
+    <div class="card-body">
+      <div class="row g-3">
+        {% if housing_space_estimate %}
+        <div class="col-6 col-md-4">
+          <div class="text-muted fw-bold" style="font-size:.7rem;text-transform:uppercase;">Recommended Space</div>
+          <div class="fw-black" style="font-size:1.25rem;">{{ housing_space_estimate|floatformat:1 }} m²</div>
+          <div class="text-muted" style="font-size:.75rem;">For {{ batch.count_current }} {{ batch.get_animal_type_display }}</div>
+        </div>
+        {% endif %}
+        <div class="col-6 col-md-4">
+          <div class="text-muted fw-bold" style="font-size:.7rem;text-transform:uppercase;">Housing Type</div>
+          <div class="fw-semibold" style="font-size:.9rem;">
+            {% if batch.animal_type == 'chickens' %}Poultry House
+            {% elif batch.animal_type == 'pigs' %}Pig Pen
+            {% elif batch.animal_type == 'cattle' %}Kraal / Shed
+            {% elif batch.animal_type == 'goats' %}Goat Pen
+            {% else %}Animal Housing{% endif %}
+          </div>
+        </div>
+        <div class="col-12">
+          <div class="checklist mt-1" style="display:flex;flex-wrap:wrap;gap:8px;">
+            <span style="background:#f0fdf4;color:#166534;font-size:.75rem;font-weight:600;padding:4px 10px;border-radius:8px;border:1px solid #bbf7d0;"><i class="bi bi-check-circle-fill me-1"></i>Adequate ventilation</span>
+            <span style="background:#f0fdf4;color:#166534;font-size:.75rem;font-weight:600;padding:4px 10px;border-radius:8px;border:1px solid #bbf7d0;"><i class="bi bi-check-circle-fill me-1"></i>Fresh water access</span>
+            <span style="background:#f0fdf4;color:#166534;font-size:.75rem;font-weight:600;padding:4px 10px;border-radius:8px;border:1px solid #bbf7d0;"><i class="bi bi-check-circle-fill me-1"></i>Feed storage area</span>
+            <span style="background:#f0fdf4;color:#166534;font-size:.75rem;font-weight:600;padding:4px 10px;border-radius:8px;border:1px solid #bbf7d0;"><i class="bi bi-check-circle-fill me-1"></i>Separate sick pen</span>
+            <span style="background:#f0fdf4;color:#166534;font-size:.75rem;font-weight:600;padding:4px 10px;border-radius:8px;border:1px solid #bbf7d0;"><i class="bi bi-check-circle-fill me-1"></i>Hygiene protocol</span>
+          </div>
+        </div>
+        <div class="col-12">
+          <div class="p-3 rounded-3 text-center" style="background:linear-gradient(135deg,#f0f9ff,#e0f2fe);border:1.5px dashed #38bdf8;">
+            <i class="bi bi-grid-3x3-gap" style="font-size:2rem;color:#0284c7;display:block;margin-bottom:6px;"></i>
+            <div class="fw-bold" style="color:#0284c7;font-size:.85rem;">3D Housing Preview — Coming Soon</div>
+            <div class="text-muted" style="font-size:.75rem;margin-top:2px;">Interactive layout planner with WebGL/Three.js integration</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== SMART LIVESTOCK ASSISTANT ===== -->
+  <div class="card border-0 shadow-sm mb-4" id="smart-livestock-panel">
+    <div class="card-header bg-transparent d-flex align-items-center justify-content-between">
+      <h6 class="mb-0 d-flex align-items-center gap-2">
+        <i class="bi bi-stars text-primary"></i>
+        Smart Livestock Assistant
+        <span style="background:#dbeafe;color:#1d4ed8;font-size:.6rem;padding:2px 7px;border-radius:99px;font-weight:700;text-transform:uppercase;">Guide</span>
+      </h6>
+      <button type="button" onclick="toggleLivestockGuide()" id="livestock-guide-toggle"
+        style="background:#f1f5f9;color:#475569;border:none;border-radius:6px;padding:5px 12px;font-weight:700;cursor:pointer;font-size:.8rem">
+        Show Guide
+      </button>
+    </div>
+    <div id="livestock-guide-body" style="display:none">
+      <div class="card-body">
+        <style>
+          .ls-timeline{border-left:3px solid #e2e8f0;padding-left:16px}
+          .ls-phase{margin-bottom:16px;position:relative}
+          .ls-phase-dot{width:10px;height:10px;border-radius:50%;background:#94a3b8;position:absolute;left:-21px;top:5px}
+          .ls-phase.current .ls-phase-dot{background:#10b981;box-shadow:0 0 0 3px rgba(16,185,129,.2)}
+          .ls-phase-week{font-size:.68rem;text-transform:uppercase;letter-spacing:.06em;color:#94a3b8;font-weight:700}
+          .ls-phase.current .ls-phase-week{color:#059669}
+          .ls-phase-title{font-size:.9rem;font-weight:800;color:#0f172a}
+          .ls-phase-list{list-style:none;padding:0;margin:4px 0 0}
+          .ls-phase-list li{font-size:.8rem;color:#475569;padding:2px 0;padding-left:12px;position:relative}
+          .ls-phase-list li::before{content:'▸';position:absolute;left:0;color:#10b981}
+          .ls-alert-box{background:#fef3c7;border:1px solid #fde68a;border-radius:8px;padding:8px 12px;font-size:.78rem;color:#92400e;margin-top:6px}
+          .ls-guide-banner{background:linear-gradient(135deg,#eff6ff,#dbeafe);border:1px solid #bfdbfe;border-radius:12px;padding:14px 16px;margin-bottom:14px}
+        </style>
+        <div id="livestock-guide-content">
+          <!-- Filled by JS based on animal_type and age -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+  (function() {
+    var animalType = "{{ batch.animal_type|lower|default:'' }}";
+    var ageMonths  = parseInt("{{ batch.age_months|default:0 }}", 10) || 0;
+    var batchCount = parseInt("{{ snapshot.count_current|default:0 }}", 10) || 0;
+    var batchName  = "{{ batch.name|escapejs }}";
+
+    var GUIDES = {
+      chicken: {
+        label: "Broiler / Layers",
+        phases: [
+          { weeks: [0,1], label: "Day 1–7 (Brooding)", title: "Brooding & Early Growth",
+            tasks: ["Maintain brooder temperature 32–35°C", "Provide starter feed ad libitum (chick mash)", "Ensure clean water access at all times",
+                    "Dip chicks' beaks in water on arrival", "Provide 24h light for first 3 days"],
+            feed_per_bird_g: 15, alert: "⚠ Chick mortality risk is highest in week 1. Monitor temperature and water closely." },
+          { weeks: [2,3], label: "Week 2–3", title: "Fast Growth Phase",
+            tasks: ["Reduce brooder temperature by 3°C/week", "Continue starter feed", "Monitor for respiratory signs",
+                    "Deworm at Day 14 if on deep litter", "Vaccinate against Newcastle Disease (if not done)"],
+            feed_per_bird_g: 45, alert: null },
+          { weeks: [4,5], label: "Week 4–5", title: "Grower Phase",
+            tasks: ["Switch from starter to grower feed at Week 4", "Increase ventilation as birds grow", "Vaccinate against Gumboro at Day 21",
+                    "Monitor water intake (x2 feed intake is normal)", "Check for footpad dermatitis"],
+            feed_per_bird_g: 90, alert: null },
+          { weeks: [6,7], label: "Week 6–7", title: "Finisher / Harvest Prep",
+            tasks: ["Switch to finisher feed at Week 6", "Target market weight: 1.8–2.5kg by Week 7", "Withdraw anti-coccidial 5 days before slaughter",
+                    "Arrange transport and market", "Calculate profit per bird"],
+            feed_per_bird_g: 130, alert: "Optimal slaughter window is Day 42–49. Delay reduces feed efficiency significantly." },
+        ]
+      },
+      pig: {
+        label: "Pigs / Swine",
+        phases: [
+          { weeks: [0,4], label: "Weaning (0–4 wks)", title: "Piglet Care",
+            tasks: ["Maintain farrowing house at 28–32°C for piglets", "Ensure each piglet suckles within 2 hours of birth",
+                    "Clip needle teeth", "Iron injection Day 3 to prevent anaemia", "Castrate male piglets at 5–7 days if needed"],
+            feed_per_bird_g: null, alert: "⚠ Scour (diarrhoea) is major killer in first 2 weeks. Keep pen dry and warm." },
+          { weeks: [5,12], label: "Grower (5–12 wks)", title: "Growing Phase",
+            tasks: ["Starter creep feed from Day 7 onwards", "Deworm at 6 weeks", "Vaccinate as per local schedule",
+                    "Target 250–300g/day weight gain", "Monitor for respiratory disease"],
+            feed_per_bird_g: null, alert: null },
+          { weeks: [13,24], label: "Finisher (13–24 wks)", title: "Finishing for Market",
+            tasks: ["Switch to finisher ration at 50kg bodyweight", "Target 500–700g/day gain", "Maintain pen hygiene daily",
+                    "Weigh weekly to track progress", "Plan market sale at 90–100kg liveweight"],
+            feed_per_bird_g: null, alert: "🔥 Overcrowding reduces growth rate by 10–20%. Maintain 0.65m² per pig minimum." },
+        ]
+      },
+      cattle: {
+        label: "Cattle",
+        phases: [
+          { weeks: [0,4], label: "Calf (0–4 wks)", title: "Colostrum & Early Nutrition",
+            tasks: ["Feed colostrum within 2 hours of birth (min 2L)", "Watch for scours — treat promptly with electrolytes",
+                    "Ear tag and record birth weight", "Vaccinate against brucellosis if breeding herd", "Begin calf starter pellets at 1 week"],
+            feed_per_bird_g: null, alert: "⚠ Failure to get colostrum in first 6 hours leads to very high mortality." },
+          { weeks: [5,26], label: "Growing", title: "Growth & Weaning",
+            tasks: ["Wean at 3–4 months (90–100kg)", "Supplement with calf starter + hay", "Deworm at 6 weeks then monthly",
+                    "Monitor for pneumonia — treat early", "Record monthly weight gains"],
+            feed_per_bird_g: null, alert: null },
+          { weeks: [27,100], label: "Finishing", title: "Feedlot / Market Prep",
+            tasks: ["High-energy ration for finishing (grain + silage)", "Target 0.8–1.2kg/day weight gain", "Weigh monthly",
+                    "Arrange veterinary check before sale", "Document health records for buyer"],
+            feed_per_bird_g: null, alert: null },
+        ]
+      },
+    };
+
+    var guideData = GUIDES[animalType] || null;
+    var ageWeeks = ageMonths * 4;
+
+    function getCurrentPhase(phases) {
+      for (var i = 0; i < phases.length; i++) {
+        var p = phases[i];
+        if (ageWeeks >= p.weeks[0] && ageWeeks <= p.weeks[1]) return i;
+      }
+      return phases.length - 1;
+    }
+
+    function renderGuide() {
+      var container = document.getElementById('livestock-guide-content');
+      if (!container) return;
+      if (!guideData) {
+        container.innerHTML = '<p class="text-muted small">No specific guide available for this animal type. Record health events and feed costs using the form below.</p>';
+        return;
+      }
+
+      var phases = guideData.phases;
+      var currentIdx = getCurrentPhase(phases);
+      var cp = phases[currentIdx];
+      var totalFeedDay = cp.feed_per_bird_g ? (cp.feed_per_bird_g * batchCount / 1000).toFixed(1) : null;
+
+      var html = '<div class="ls-guide-banner">' +
+        '<div style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#1d4ed8;margin-bottom:4px">📍 Current Phase — Age ' + ageMonths + ' months</div>' +
+        '<div style="font-weight:800;font-size:1rem;color:#1e3a5f">' + cp.title + '</div>' +
+        (totalFeedDay ? '<div style="font-size:.82rem;color:#2563eb;margin-top:6px">🍽 Estimated daily feed: <strong>' + totalFeedDay + ' kg/day</strong> for ' + batchCount + ' birds</div>' : '') +
+        '</div>';
+
+      html += '<div class="ls-timeline">';
+      for (var i = 0; i < phases.length; i++) {
+        var phase = phases[i];
+        var isCurrent = (i === currentIdx);
+        html += '<div class="ls-phase' + (isCurrent ? ' current' : '') + '">' +
+          '<div class="ls-phase-dot"></div>' +
+          '<div class="ls-phase-week">' + phase.label + (isCurrent ? ' ← NOW' : '') + '</div>' +
+          '<div class="ls-phase-title">' + phase.title + '</div>' +
+          '<ul class="ls-phase-list">' +
+          phase.tasks.map(function(t){ return '<li>' + t + '</li>'; }).join('') +
+          '</ul>' +
+          (phase.alert ? '<div class="ls-alert-box">' + phase.alert + '</div>' : '') +
+          '</div>';
+      }
+      html += '</div>';
+
+      // Vaccination reminder
+      html += '<div style="background:#f0fdf4;border:1px solid #86efac;border-radius:10px;padding:12px 14px;margin-top:14px">' +
+        '<div style="font-weight:700;font-size:.82rem;color:#166534;margin-bottom:6px">💉 Vaccination Reminder</div>' +
+        '<div style="font-size:.8rem;color:#15803d">' +
+        (animalType === 'chicken' ? 'Newcastle Day 7 (eye drop), Gumboro Day 21, Newcastle Booster Day 28' :
+         animalType === 'pig'     ? 'Swine Fever at 6–8 weeks, Foot & Mouth every 6 months' :
+         animalType === 'cattle'  ? 'FMD every 6 months, BQ (Black Quarter) annually, ECF vaccine if applicable' :
+         'Check with local veterinarian for recommended vaccination schedule.') +
+        '</div></div>';
+
+      container.innerHTML = html;
+    }
+
+    window.toggleLivestockGuide = function() {
+      var body = document.getElementById('livestock-guide-body');
+      var btn  = document.getElementById('livestock-guide-toggle');
+      var show = body.style.display === 'none';
+      body.style.display = show ? 'block' : 'none';
+      btn.textContent = show ? 'Hide Guide' : 'Show Guide';
+      if (show) renderGuide();
+    };
+  })();
+  </script>
+
+  <form method="post" enctype="multipart/form-data" class="mb-4">
+    {% csrf_token %}
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header bg-light fw-bold">Identity &amp; classification</div>
+      <div class="card-body row g-3">
+        <div class="col-md-6">
+          <label class="form-label">Batch name *</label>
+          <input class="form-control" name="name" value="{{ batch.name }}" required>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Species *</label>
+          <select class="form-select" name="animal_type" id="id_animal_type" required>
+            {% for v, l in animal_types %}
+            <option value="{{ v }}" {% if batch.animal_type == v %}selected{% endif %}>{{ l }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Subtype *</label>
+          <select class="form-select" name="animal_subtype" id="id_animal_subtype">
+            {% for v, l in subtype_choices %}
+            <option value="{{ v }}" {% if batch.animal_subtype == v %}selected{% endif %}>{{ l }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-12">
+          <label class="form-label">Breed / strain (optional)</label>
+          <input class="form-control" name="breed_text" value="{{ batch.breed_text }}" placeholder="e.g. Landrace, local Sasso, etc.">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Gender profile</label>
+          <select class="form-select" name="gender">
+            {% for v, l in genders %}
+            <option value="{{ v }}" {% if batch.gender == v %}selected{% endif %}>{{ l }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Age (months)</label>
+          <input class="form-control" type="number" name="age_months" min="0" value="{{ batch.age_months|default:'' }}">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Farm location</label>
+          <select class="form-select" name="location_id">
+            <option value="">—</option>
+            {% for loc in locations %}
+            <option value="{{ loc.pk }}" {% if batch.location_id == loc.pk %}selected{% endif %}>{{ loc.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header bg-light fw-bold">Health &amp; production signals</div>
+      <div class="card-body row g-3">
+        <div class="col-md-6">
+          <label class="form-label">Health</label>
+          <select class="form-select" name="health_status">
+            {% for v, l in health_statuses %}
+            <option value="{{ v }}" {% if batch.health_status == v %}selected{% endif %}>{{ l }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Vaccination</label>
+          <select class="form-select" name="vaccination_status">
+            {% for v, l in vaccination_statuses %}
+            <option value="{{ v }}" {% if batch.vaccination_status == v %}selected{% endif %}>{{ l }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Feed / growth stage</label>
+          <input class="form-control" name="feed_growth_stage" value="{{ batch.feed_growth_stage }}" placeholder="Starter, grower…">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Egg production (layers)</label>
+          <input class="form-control" name="egg_production_status" value="{{ batch.egg_production_status }}" placeholder="Crates/week">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Dairy output note</label>
+          <input class="form-control" name="dairy_output_note" value="{{ batch.dairy_output_note }}" placeholder="Litres/day">
+        </div>
+      </div>
+    </div>
+
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header bg-light fw-bold">Pricing &amp; marketplace readiness</div>
+      <div class="card-body row g-3">
+        <div class="col-md-4">
+          <label class="form-label">Cost per head (MWK)</label>
+          <input class="form-control" name="cost_basis_per_head_mwk" inputmode="decimal"
+                 value="{{ batch.cost_basis_per_head_mwk|default:'' }}">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Expected sale price / head (MWK)</label>
+          <input class="form-control" name="expected_sale_price_mwk" inputmode="decimal"
+                 value="{{ batch.expected_sale_price_mwk|default:'' }}">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Availability</label>
+          <select class="form-select" name="sale_availability">
+            {% for v, l in sale_availability_choices %}
+            <option value="{{ v }}" {% if batch.sale_availability == v %}selected{% endif %}>{{ l }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-12">
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="is_featured_listing" id="feat" {% if batch.is_featured_listing %}checked{% endif %}>
+            <label class="form-check-label" for="feat">Feature this line for marketplace metadata</label>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header bg-light fw-bold">Valuation (optional)</div>
+      <div class="card-body row g-3">
+        <div class="col-12">
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="valuation_enabled" id="val_on" {% if batch.valuation_enabled %}checked{% endif %}>
+            <label class="form-check-label" for="val_on">Enable valuation estimates</label>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Avg weight (kg)</label>
+          <input class="form-control" name="avg_weight_kg" value="{{ batch.avg_weight_kg|default:'' }}">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Price per kg (MWK)</label>
+          <input class="form-control" name="price_per_kg" value="{{ batch.price_per_kg_mwk|default:'' }}">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Price per animal (MWK)</label>
+          <input class="form-control" name="price_per_animal" value="{{ batch.price_per_animal_mwk|default:'' }}">
+        </div>
+      </div>
+    </div>
+
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header bg-light fw-bold">Photos</div>
+      <div class="card-body row g-3">
+        <div class="col-md-6">
+          <label class="form-label">Primary image</label>
+          {% if batch.primary_image %}
+          {% with primary_url=batch.primary_image|safe_media_url %}
+          {% if primary_url %}
+          <div class="mb-2"><img src="{{ primary_url }}" alt="" class="rounded border" style="max-height:120px;"></div>
+          {% endif %}
+          {% endwith %}
+          {% endif %}
+          <input class="form-control" type="file" name="primary_image" accept="image/*">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Notes</label>
+          <textarea class="form-control" name="notes" rows="4">{{ batch.notes }}</textarea>
+        </div>
+      </div>
+    </div>
+
+    <div class="d-grid gap-2 d-md-flex">
+      <button type="submit" class="btn btn-primary btn-lg rounded-pill px-4">Save details</button>
+      <a href="/verticals/farm/livestock/" class="btn btn-outline-secondary rounded-pill">Back to list</a>
+    </div>
+  </form>
+
+  {% if is_manager %}
+  <div class="card border-0 shadow-sm mb-4 border-primary border-opacity-25">
+    <div class="card-header bg-primary text-white fw-bold">Marketplace</div>
+    <div class="card-body d-flex flex-wrap gap-2 align-items-center">
+      <form method="post" class="d-inline">
+        {% csrf_token %}
+        <input type="hidden" name="_action" value="publish_listing">
+        <button type="submit" class="btn btn-light text-primary fw-bold rounded-pill">Publish / sync listing</button>
+      </form>
+      <form method="post" class="d-inline">
+        {% csrf_token %}
+        <input type="hidden" name="_action" value="unpublish_listing">
+        <button type="submit" class="btn btn-outline-light border rounded-pill text-white">Take offline</button>
+      </form>
+      <span class="text-white-50 small ms-md-2">Uses primary + gallery photos. Buyers enquire via public marketplace.</span>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm mb-4">
+    <div class="card-header fw-bold">Gallery</div>
+    <div class="card-body">
+      <div class="row g-2 mb-3">
+        {% for gi in batch.gallery_images.all %}
+        {% with gallery_url=gi.image|safe_media_url %}
+        {% if gallery_url %}
+        <div class="col-6 col-md-3">
+          <img src="{{ gallery_url }}" class="img-fluid rounded border" alt="">
+        </div>
+        {% endif %}
+        {% endwith %}
+        {% empty %}
+        <p class="text-muted small mb-0">No extra photos yet.</p>
+        {% endfor %}
+      </div>
+      <form method="post" enctype="multipart/form-data" class="row g-2 align-items-end">
+        {% csrf_token %}
+        <input type="hidden" name="_action" value="add_gallery">
+        <div class="col-md-6">
+          <label class="form-label small">Add gallery image</label>
+          <input type="file" name="gallery_image" class="form-control" accept="image/*" required>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label small">Caption (optional)</label>
+          <input type="text" name="caption" class="form-control" maxlength="200">
+        </div>
+        <div class="col-md-2">
+          <button type="submit" class="btn btn-outline-primary w-100">Upload</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+
+<script>
+(function(){
+  var map = {{ subtype_map_json|safe }};
+  var labels = {{ subtype_labels_json|safe }};
+  var typeSel = document.getElementById('id_animal_type');
+  var subSel = document.getElementById('id_animal_subtype');
+  var current = "{{ batch.animal_subtype|escapejs }}";
+  function rebuild() {
+    var t = typeSel.value;
+    var allowed = map[t] || [];
+    var keep = subSel.value;
+    subSel.innerHTML = '';
+    allowed.forEach(function(code){
+      var o = document.createElement('option');
+      o.value = code;
+      o.textContent = labels[code] || code;
+      if (code === current || code === keep) { o.selected = true; }
+      subSel.appendChild(o);
+    });
+  }
+  typeSel.addEventListener('change', function(){ current = ''; rebuild(); });
+  rebuild();
+})();
+</script>
+{% endblock %}

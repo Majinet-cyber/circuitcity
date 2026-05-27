@@ -1,0 +1,166 @@
+/**
+ * Pricing Intelligence Styles
+ * ============================
+ * Visual feedback for real-time price validation.
+ * Works across all verticals for consistent UX.
+ */
+
+/* Container for feedback messages */
+.pricing-feedback {
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  display: none; /* Hidden by default */
+  animation: fadeIn 0.2s ease-in;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Severity-based styling */
+.pricing-feedback-error {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #991b1b;
+}
+
+.pricing-feedback-warning {
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  color: #92400e;
+}
+
+.pricing-feedback-success {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  color: #166534;
+}
+
+.pricing-feedback-info {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1e40af;
+}
+
+/* Input field states */
+.input-error {
+  border-color: #f87171 !important;
+  box-shadow: 0 0 0 3px rgba(248, 113, 113, 0.15) !important;
+}
+
+.input-warning {
+  border-color: #fbbf24 !important;
+  box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.15) !important;
+}
+
+.input-success {
+  border-color: #10b981 !important;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15) !important;
+}
+
+/* Warnings section */
+.pricing-warnings {
+  margin-bottom: 0.75rem;
+}
+
+.pricing-warnings p {
+  margin: 0.25rem 0;
+  font-weight: 500;
+}
+
+.pricing-warnings p:first-child {
+  margin-top: 0;
+}
+
+.pricing-warnings p:last-child {
+  margin-bottom: 0;
+}
+
+/* Suggestions section */
+.pricing-suggestions {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.pricing-suggestions p {
+  margin: 0 0 0.5rem 0;
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: #64748b;
+}
+
+.pricing-suggestion-btn {
+  appearance: none;
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 0.5rem 1rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-right: 0.5rem;
+  margin-bottom: 0.5rem;
+  display: inline-block;
+}
+
+.pricing-suggestion-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+  background: linear-gradient(135deg, #2563eb, #1e40af);
+}
+
+.pricing-suggestion-btn:active {
+  transform: translateY(0);
+}
+
+/* Positive feedback */
+.pricing-positive-feedback {
+  font-weight: 600;
+  color: #16a34a;
+  margin-top: 0.5rem;
+}
+
+/* Mobile responsive */
+@media (max-width: 640px) {
+  .pricing-feedback {
+    font-size: 0.85rem;
+    padding: 0.625rem;
+  }
+  
+  .pricing-suggestion-btn {
+    font-size: 0.8rem;
+    padding: 0.4rem 0.8rem;
+  }
+}
+
+/* Integration with existing CircuitCity styles */
+.field.pricing-intelligence-field.has-error {
+  border-color: #f87171;
+}
+
+.field.pricing-intelligence-field.has-warning {
+  border-color: #fbbf24;
+}
+
+.field.pricing-intelligence-field.has-success {
+  border-color: #10b981;
+}
+
+/* PHASE 1: Dark mode removed - light theme only */
+    color: #86efac;
+  }
+  
+  .pricing-feedback-info {
+    background: #1e3a8a;
+    border-color: #1e40af;
+    color: #93c5fd;
+  }
+}
+

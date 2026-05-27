@@ -1,0 +1,490 @@
+{% comment %}
+Reusable Analytics Filter Offcanvas Component
+Usage: {% include "partials/analytics_filter_offcanvas.html" %}
+{% endcomment %}
+
+<!-- Single Filter Button -->
+<div class="glass-card mb-4" style="padding: 16px;">
+  <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;">
+    <div style="display: flex; align-items: center; gap: 12px;">
+      <button type="button" id="filterToggleBtn" class="filter-main-btn">
+        <i class="bi bi-funnel"></i> Filters
+        <span id="filterBadge" class="filter-badge" style="display: none;">0</span>
+      </button>
+      <span id="filterSummary" class="filter-summary">{{ date_params.active_range|default:"All time" }}</span>
+    </div>
+    <form method="get" style="display: inline;">
+      {% for key, value in request.GET.items %}
+        {% if key != 'export' %}
+        <input type="hidden" name="{{ key }}" value="{{ value }}">
+        {% endif %}
+      {% endfor %}
+      <button type="submit" name="export" value="csv" class="btn-export">
+        <i class="bi bi-download"></i> Export CSV
+      </button>
+    </form>
+  </div>
+</div>
+
+<!-- Filter Offcanvas/Modal -->
+<div id="filterOffcanvas" class="filter-offcanvas">
+  <div class="filter-offcanvas-content">
+    <div class="filter-offcanvas-header">
+      <h3><i class="bi bi-funnel"></i> Filters</h3>
+      <button type="button" id="filterCloseBtn" class="filter-close-btn" aria-label="Close filters">
+        <i class="bi bi-x-lg"></i>
+      </button>
+    </div>
+    
+    <form method="get" id="analyticsFilterForm" class="filter-offcanvas-body">
+      <!-- Date Range Presets -->
+      <div class="filter-section">
+        <label class="filter-section-label">Date Range</label>
+        <div class="filter-pills-vertical">
+          <button type="button" class="filter-pill-option {% if date_params.active_range == 'today' %}active{% endif %}" data-preset="today">
+            Today
+          </button>
+          <button type="button" class="filter-pill-option {% if date_params.active_range == 'yesterday' %}active{% endif %}" data-preset="yesterday">
+            Yesterday
+          </button>
+          <button type="button" class="filter-pill-option {% if date_params.active_range == 'last_7_days' %}active{% endif %}" data-preset="last_7_days">
+            Last 7 Days
+          </button>
+          <button type="button" class="filter-pill-option {% if date_params.active_range == 'last_30_days' %}active{% endif %}" data-preset="last_30_days">
+            Last 30 Days
+          </button>
+          <button type="button" class="filter-pill-option {% if date_params.active_range == 'this_month' %}active{% endif %}" data-preset="this_month">
+            This Month
+          </button>
+          <button type="button" class="filter-pill-option {% if date_params.active_range == 'last_month' %}active{% endif %}" data-preset="last_month">
+            Last Month
+          </button>
+          <button type="button" class="filter-pill-option {% if date_params.active_range == 'custom' %}active{% endif %}" data-preset="custom">
+            Custom Range
+          </button>
+        </div>
+        <input type="hidden" name="preset" id="presetInput" value="{{ date_params.active_range }}">
+        
+        <div id="customDateRange" style="{% if date_params.active_range != 'custom' %}display: none;{% endif %} margin-top: 12px;">
+          <div style="display: flex; gap: 8px; flex-direction: column;">
+            <input type="date" name="start" value="{{ date_params.start_date|date:'Y-m-d' }}" class="filter-input">
+            <span style="text-align: center; color: #64748b; font-size: 0.875rem;">to</span>
+            <input type="date" name="end" value="{{ date_params.end_date|date:'Y-m-d' }}" class="filter-input">
+          </div>
+        </div>
+      </div>
+      
+      <!-- Location Filter -->
+      {% if locations %}
+      <div class="filter-section">
+        <label class="filter-section-label">Location</label>
+        <select name="location" class="filter-input">
+          <option value="">All locations</option>
+          {% for loc in locations %}
+          <option value="{{ loc.id }}" {% if selected_location and selected_location.id == loc.id %}selected{% endif %}>{{ loc.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% endif %}
+      
+      <!-- Staff Filter -->
+      {% if staff_list %}
+      <div class="filter-section">
+        <label class="filter-section-label">{% if vertical == 'gym' %}Trainer{% elif vertical == 'pharmacy' %}Cashier{% else %}Agent{% endif %}</label>
+        <select name="staff_id" class="filter-input">
+          <option value="">All staff</option>
+          {% for staff in staff_list %}
+          <option value="{{ staff.id }}" {% if selected_staff and selected_staff.id == staff.id %}selected{% endif %}>
+            {{ staff.user.get_full_name|default:staff.user.username }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      {% endif %}
+      
+      <!-- Payment Method Filter -->
+      <div class="filter-section">
+        <label class="filter-section-label">Payment Method</label>
+        <select name="payment_method" class="filter-input">
+          <option value="">All methods</option>
+          <option value="CASH" {% if payment_mode == 'CASH' %}selected{% endif %}>Cash</option>
+          <option value="BANK" {% if payment_mode == 'BANK' %}selected{% endif %}>Bank</option>
+          <option value="MOBILE_MONEY" {% if payment_mode == 'MOBILE_MONEY' %}selected{% endif %}>Mobile Money</option>
+          <option value="CREDIT" {% if payment_mode == 'CREDIT' %}selected{% endif %}>Credit</option>
+        </select>
+      </div>
+      
+      <!-- Search Query -->
+      <div class="filter-section">
+        <label class="filter-section-label">Search</label>
+        <input type="text" name="q" value="{{ search_query }}" placeholder="Product, customer, IMEI..." class="filter-input">
+      </div>
+      
+      <!-- Preserve other filters -->
+      {% for section in selected_sections %}
+      <input type="hidden" name="sections" value="{{ section }}">
+      {% endfor %}
+      
+      <div class="filter-offcanvas-footer">
+        <button type="button" id="filterResetBtn" class="btn-filter-reset">
+          <i class="bi bi-arrow-counterclockwise"></i> Reset
+        </button>
+        <button type="submit" class="btn-filter-apply">
+          <i class="bi bi-check-lg"></i> Apply Filters
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+<div id="filterBackdrop" class="filter-backdrop"></div>
+
+<style>
+  /* Single Filter Button */
+  .filter-main-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+    color: #fff;
+    border: none;
+    border-radius: 12px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+  }
+  
+  .filter-main-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
+  }
+  
+  .filter-main-btn:active {
+    transform: translateY(0);
+  }
+  
+  .filter-badge {
+    background: rgba(255, 255, 255, 0.3);
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 12px;
+    font-weight: 700;
+  }
+  
+  .filter-summary {
+    color: #64748b;
+    font-size: 14px;
+    font-weight: 500;
+  }
+  
+  .btn-export {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 16px;
+    background: #10b981;
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  
+  .btn-export:hover {
+    background: #059669;
+  }
+  
+  /* Filter Offcanvas */
+  .filter-offcanvas {
+    position: fixed;
+    top: 0;
+    right: -100%;
+    width: 100%;
+    max-width: 400px;
+    height: 100vh;
+    background: #fff;
+    box-shadow: -4px 0 24px rgba(0, 0, 0, 0.15);
+    z-index: 1050;
+    transition: right 0.3s ease;
+    overflow-y: auto;
+  }
+  
+  .filter-offcanvas.show {
+    right: 0;
+  }
+  
+  .filter-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 1040;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+  }
+  
+  .filter-backdrop.show {
+    opacity: 1;
+    visibility: visible;
+  }
+  
+  .filter-offcanvas-content {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+  }
+  
+  .filter-offcanvas-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px;
+    border-bottom: 1px solid #e2e8f0;
+    background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+  }
+  
+  .filter-offcanvas-header h3 {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #0f172a;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  
+  .filter-close-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    background: transparent;
+    border: none;
+    color: #64748b;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    transition: all 0.2s;
+  }
+  
+  .filter-close-btn:hover {
+    background: #e2e8f0;
+    color: #0f172a;
+  }
+  
+  .filter-offcanvas-body {
+    flex: 1;
+    padding: 20px;
+    overflow-y: auto;
+  }
+  
+  .filter-section {
+    margin-bottom: 24px;
+  }
+  
+  .filter-section-label {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    color: #0f172a;
+    margin-bottom: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  
+  .filter-pills-vertical {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .filter-pill-option {
+    padding: 12px 16px;
+    border: 2px solid #e2e8f0;
+    background: #fff;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 500;
+    color: #475569;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: left;
+  }
+  
+  .filter-pill-option:hover {
+    background: #f8fafc;
+    border-color: #cbd5e1;
+  }
+  
+  .filter-pill-option.active {
+    background: linear-gradient(135deg, #dbeafe, #e0e7ff);
+    border-color: #3b82f6;
+    color: #1e40af;
+    font-weight: 600;
+  }
+  
+  .filter-input {
+    width: 100%;
+    padding: 12px 14px;
+    border: 2px solid #e2e8f0;
+    border-radius: 10px;
+    font-size: 14px;
+    background: #fff;
+    transition: all 0.2s;
+  }
+  
+  .filter-input:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  }
+  
+  .filter-offcanvas-footer {
+    padding: 20px;
+    border-top: 1px solid #e2e8f0;
+    background: #f8fafc;
+    display: flex;
+    gap: 12px;
+  }
+  
+  .btn-filter-reset {
+    flex: 1;
+    padding: 12px 20px;
+    background: #fff;
+    color: #64748b;
+    border: 2px solid #e2e8f0;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+  }
+  
+  .btn-filter-reset:hover {
+    background: #f1f5f9;
+    border-color: #cbd5e1;
+  }
+  
+  .btn-filter-apply {
+    flex: 2;
+    padding: 12px 20px;
+    background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+  }
+  
+  .btn-filter-apply:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
+  }
+  
+  .btn-filter-apply:active {
+    transform: translateY(0);
+  }
+  
+  /* Mobile Responsive */
+  @media (max-width: 768px) {
+    .filter-offcanvas {
+      max-width: 100%;
+    }
+  }
+</style>
+
+<script>
+  // Filter Offcanvas functionality
+  (function() {
+    const filterBtn = document.getElementById('filterToggleBtn');
+    const filterOffcanvas = document.getElementById('filterOffcanvas');
+    const filterBackdrop = document.getElementById('filterBackdrop');
+    const filterCloseBtn = document.getElementById('filterCloseBtn');
+    const filterResetBtn = document.getElementById('filterResetBtn');
+    const presetInput = document.getElementById('presetInput');
+    const customDateRange = document.getElementById('customDateRange');
+    
+    function openFilter() {
+      if (filterOffcanvas && filterBackdrop) {
+        filterOffcanvas.classList.add('show');
+        filterBackdrop.classList.add('show');
+        document.body.style.overflow = 'hidden';
+      }
+    }
+    
+    function closeFilter() {
+      if (filterOffcanvas && filterBackdrop) {
+        filterOffcanvas.classList.remove('show');
+        filterBackdrop.classList.remove('show');
+        document.body.style.overflow = '';
+      }
+    }
+    
+    if (filterBtn) {
+      filterBtn.addEventListener('click', openFilter);
+    }
+    
+    if (filterCloseBtn) {
+      filterCloseBtn.addEventListener('click', closeFilter);
+    }
+    
+    if (filterBackdrop) {
+      filterBackdrop.addEventListener('click', closeFilter);
+    }
+    
+    // Handle preset date range buttons
+    document.querySelectorAll('.filter-pill-option').forEach(btn => {
+      btn.addEventListener('click', function() {
+        const preset = this.getAttribute('data-preset');
+        
+        // Update active state
+        document.querySelectorAll('.filter-pill-option').forEach(b => b.classList.remove('active'));
+        this.classList.add('active');
+        
+        // Update hidden input
+        if (presetInput) {
+          presetInput.value = preset;
+        }
+        
+        // Show/hide custom date range
+        if (customDateRange) {
+          customDateRange.style.display = preset === 'custom' ? 'block' : 'none';
+        }
+      });
+    });
+    
+    // Reset filters
+    if (filterResetBtn) {
+      filterResetBtn.addEventListener('click', function() {
+        window.location.href = window.location.pathname;
+      });
+    }
+    
+    // Close on Escape key
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape' && filterOffcanvas && filterOffcanvas.classList.contains('show')) {
+        closeFilter();
+      }
+    });
+  })();
+</script>
+

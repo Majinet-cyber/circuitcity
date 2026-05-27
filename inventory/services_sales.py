@@ -14,6 +14,7 @@ from .models import InventoryItem, Location
 
 # ---- helpers --------------------------------------------------------------
 
+
 def _digits_only(s: str) -> str:
     return "".join(ch for ch in (s or "") if ch.isdigit())
 
@@ -65,15 +66,17 @@ def _is_soldish(item: Any) -> bool:
     except Exception:
         qty_val = 0
 
-    return any([
-        bool(getattr(item, "sold_at", None)),
-        bool(getattr(item, "is_sold", False)),
-        status_val in {"sold", "completed", "closed"},
-        (hasattr(item, "in_stock") and getattr(item, "in_stock") is False),
-        (hasattr(item, "available") and getattr(item, "available") is False),
-        (hasattr(item, "availability") and not getattr(item, "availability")),
-        qty_val <= 0,
-    ])
+    return any(
+        [
+            bool(getattr(item, "sold_at", None)),
+            bool(getattr(item, "is_sold", False)),
+            status_val in {"sold", "completed", "closed"},
+            (hasattr(item, "in_stock") and getattr(item, "in_stock") is False),
+            (hasattr(item, "available") and getattr(item, "available") is False),
+            (hasattr(item, "availability") and not getattr(item, "availability")),
+            qty_val <= 0,
+        ]
+    )
 
 
 def _product_display(item: InventoryItem) -> Optional[str]:
@@ -102,6 +105,7 @@ class SaleResult:
 
 # ---- single source of truth ----------------------------------------------
 
+
 @transaction.atomic
 def mark_item_sold(
     request,
@@ -127,8 +131,7 @@ def mark_item_sold(
 
     # Row-level lock to serialize concurrent sells of the same IMEI
     qs = (
-        InventoryItem.objects
-        .select_for_update()
+        InventoryItem.objects.select_for_update()
         .select_related("product", "current_location")
         .filter(business=biz, imei=imei)
     )
@@ -145,8 +148,11 @@ def mark_item_sold(
 
     if _is_soldish(item) or cur_status.strip().casefold() == sold_code.strip().casefold():
         return SaleResult(
-            False, "already_sold", "This IMEI is already marked as SOLD.",
-            item_id=item.id, imei=item.imei,
+            False,
+            "already_sold",
+            "This IMEI is already marked as SOLD.",
+            item_id=item.id,
+            imei=item.imei,
             product=_product_display(item),
             location=(getattr(getattr(item, "current_location", None), "name", None)),
             sold_at=(getattr(item, "sold_at", None) or None) and item.sold_at.isoformat(),
@@ -225,7 +231,9 @@ def mark_item_sold(
         loc_name = getattr(getattr(item, "current_location", None), "name", None)
 
     return SaleResult(
-        True, "ok", "Item marked as SOLD.",
+        True,
+        "ok",
+        "Item marked as SOLD.",
         item_id=item.id,
         imei=item.imei,
         product=_product_display(item),

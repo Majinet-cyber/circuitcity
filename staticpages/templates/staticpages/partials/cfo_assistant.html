@@ -2,7 +2,8 @@
 <!-- CFO Assistant Card - In-layout version -->
 <div class="cfo-assistant-card">
   <div class="cfo-avatar">
-    <img src="{% static 'img/cfo_'|add:cfo_mood|add:'.gif' %}" alt="CFO" class="avatar-img">
+    <img src="{% static 'img/cfo_'|add:cfo_mood|add:'.gif' %}" alt="CFO" class="avatar-img"
+         onerror="this.onerror=null;this.src='{% static 'img/cfo_neutral.gif' %}'">
   </div>
   <div class="cfo-content">
     <h4 class="cfo-title">CFO Assistant</h4>

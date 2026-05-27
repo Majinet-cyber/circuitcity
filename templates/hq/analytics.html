@@ -1,0 +1,1422 @@
+{% extends "hq/base_hq.html" %}
+{% load static %}
+{% load money %}
+
+{% block title %}HQ Analytics — Command Center{% endblock %}
+
+{% block extra_css %}
+<style>
+/* ============================================================
+   ANALYTICS PAGE — PREMIUM COMMAND CENTER STYLES
+   ============================================================ */
+
+/* Page header */
+.analytics-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.75rem;
+  flex-wrap: wrap;
+}
+.analytics-header-text h1 {
+  font-size: 1.65rem;
+  font-weight: 800;
+  color: #0f172a;
+  margin: 0 0 4px;
+  letter-spacing: -0.3px;
+}
+.analytics-header-text p {
+  font-size: 0.875rem;
+  color: #64748b;
+  margin: 0;
+}
+.analytics-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* ---- Filter bar ---- */
+.analytics-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 1.5rem;
+  padding: 14px 18px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+}
+.filter-preset-group {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  flex: 1;
+}
+.filter-preset-btn {
+  padding: 7px 14px;
+  border: 1.5px solid #e2e8f0;
+  background: #f8fafc;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.18s;
+  white-space: nowrap;
+}
+.filter-preset-btn:hover {
+  border-color: #a5b4fc;
+  background: #eef2ff;
+  color: #3730a3;
+}
+.filter-preset-btn.active {
+  border-color: #6366f1;
+  background: linear-gradient(135deg, #eef2ff, #e0e7ff);
+  color: #4338ca;
+  font-weight: 700;
+}
+.filter-advanced-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border: 1.5px solid #e2e8f0;
+  background: #fff;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.filter-advanced-btn:hover {
+  border-color: #6366f1;
+  color: #4338ca;
+  background: #f8fafc;
+}
+.filter-date-label {
+  font-size: 12.5px;
+  color: #64748b;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+/* ---- KPI Grid ---- */
+.kpi-command-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 1.75rem;
+}
+.kpi-cmd-card {
+  background: #fff;
+  border: 1px solid #e8ecf2;
+  border-radius: 16px;
+  padding: 20px 20px 18px;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(15,23,42,0.05);
+  transition: box-shadow 0.2s, transform 0.2s;
+}
+.kpi-cmd-card:hover {
+  box-shadow: 0 8px 24px rgba(15,23,42,0.10);
+  transform: translateY(-2px);
+}
+.kpi-cmd-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  border-radius: 16px 16px 0 0;
+}
+.kpi-cmd-card.accent-blue::before  { background: linear-gradient(90deg, #3b82f6, #6366f1); }
+.kpi-cmd-card.accent-green::before { background: linear-gradient(90deg, #10b981, #059669); }
+.kpi-cmd-card.accent-purple::before{ background: linear-gradient(90deg, #8b5cf6, #6366f1); }
+.kpi-cmd-card.accent-amber::before { background: linear-gradient(90deg, #f59e0b, #f97316); }
+.kpi-cmd-card.accent-red::before   { background: linear-gradient(90deg, #ef4444, #dc2626); }
+.kpi-cmd-card.accent-sky::before   { background: linear-gradient(90deg, #0ea5e9, #3b82f6); }
+.kpi-cmd-card.accent-rose::before  { background: linear-gradient(90deg, #f43f5e, #e11d48); }
+.kpi-cmd-card.accent-teal::before  { background: linear-gradient(90deg, #14b8a6, #0d9488); }
+.kpi-cmd-card.accent-indigo::before{ background: linear-gradient(90deg, #6366f1, #4f46e5); }
+.kpi-cmd-card.accent-lime::before  { background: linear-gradient(90deg, #84cc16, #65a30d); }
+
+.kpi-cmd-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  margin-bottom: 12px;
+  flex-shrink: 0;
+}
+.kpi-cmd-icon.bg-blue   { background: #dbeafe; color: #2563eb; }
+.kpi-cmd-icon.bg-green  { background: #d1fae5; color: #059669; }
+.kpi-cmd-icon.bg-purple { background: #ede9fe; color: #7c3aed; }
+.kpi-cmd-icon.bg-amber  { background: #fef3c7; color: #d97706; }
+.kpi-cmd-icon.bg-red    { background: #fee2e2; color: #dc2626; }
+.kpi-cmd-icon.bg-sky    { background: #e0f2fe; color: #0284c7; }
+.kpi-cmd-icon.bg-rose   { background: #ffe4e6; color: #e11d48; }
+.kpi-cmd-icon.bg-teal   { background: #ccfbf1; color: #0d9488; }
+.kpi-cmd-icon.bg-indigo { background: #e0e7ff; color: #4338ca; }
+.kpi-cmd-icon.bg-lime   { background: #ecfccb; color: #65a30d; }
+
+.kpi-cmd-label {
+  font-size: 11.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.7px;
+  color: #94a3b8;
+  margin-bottom: 6px;
+}
+.kpi-cmd-value {
+  font-size: 1.55rem;
+  font-weight: 800;
+  color: #0f172a;
+  line-height: 1.1;
+  margin-bottom: 8px;
+  letter-spacing: -0.5px;
+}
+.kpi-cmd-value.demo-value {
+  color: #64748b;
+}
+.kpi-cmd-trend {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 6px;
+}
+.kpi-cmd-trend.up {
+  background: #dcfce7;
+  color: #16a34a;
+}
+.kpi-cmd-trend.down {
+  background: #fee2e2;
+  color: #dc2626;
+}
+.kpi-cmd-trend.neutral {
+  background: #f1f5f9;
+  color: #64748b;
+}
+.kpi-cmd-demo-badge {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #94a3b8;
+  background: #f1f5f9;
+  padding: 2px 6px;
+  border-radius: 4px;
+  letter-spacing: 0.3px;
+}
+
+/* ---- Charts Grid ---- */
+.analytics-charts-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin-bottom: 1.75rem;
+}
+.analytics-charts-grid.single-col {
+  grid-template-columns: 1fr;
+}
+.analytics-charts-grid.three-col {
+  grid-template-columns: 2fr 1fr 1fr;
+}
+
+@media (max-width: 1100px) {
+  .analytics-charts-grid,
+  .analytics-charts-grid.three-col {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+@media (max-width: 768px) {
+  .analytics-charts-grid,
+  .analytics-charts-grid.three-col {
+    grid-template-columns: 1fr;
+  }
+  .kpi-command-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+@media (max-width: 480px) {
+  .kpi-command-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---- Chart Card ---- */
+.chart-card {
+  background: #fff;
+  border: 1px solid #e8ecf2;
+  border-radius: 16px;
+  box-shadow: 0 2px 8px rgba(15,23,42,0.05);
+  overflow: hidden;
+}
+.chart-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 20px 14px;
+  border-bottom: 1px solid #f1f5f9;
+}
+.chart-card-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #0f172a;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.chart-card-subtitle {
+  font-size: 12px;
+  color: #64748b;
+  margin-top: 2px;
+}
+.chart-card-body {
+  padding: 16px 20px 20px;
+  position: relative;
+}
+.chart-canvas-wrap {
+  position: relative;
+  height: 220px;
+}
+.chart-canvas-wrap.tall {
+  height: 280px;
+}
+.chart-canvas-wrap.short {
+  height: 180px;
+}
+
+/* ---- Insights ---- */
+.insights-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 14px;
+  margin-bottom: 1.75rem;
+}
+.insight-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: #fff;
+  border: 1px solid #e8ecf2;
+  border-radius: 14px;
+  padding: 16px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+  transition: box-shadow 0.2s;
+}
+.insight-card:hover {
+  box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+}
+.insight-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.15rem;
+  flex-shrink: 0;
+}
+.insight-icon.positive { background: #d1fae5; color: #059669; }
+.insight-icon.warning  { background: #fef3c7; color: #d97706; }
+.insight-icon.info     { background: #dbeafe; color: #2563eb; }
+.insight-icon.alert    { background: #fee2e2; color: #dc2626; }
+.insight-text strong {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #0f172a;
+  margin-bottom: 3px;
+}
+.insight-text span {
+  font-size: 12.5px;
+  color: #64748b;
+  line-height: 1.4;
+}
+
+/* ---- Tables ---- */
+.analytics-table-card {
+  background: #fff;
+  border: 1px solid #e8ecf2;
+  border-radius: 16px;
+  box-shadow: 0 2px 8px rgba(15,23,42,0.05);
+  overflow: hidden;
+  margin-bottom: 1.75rem;
+}
+.analytics-table-card .chart-card-header {
+  background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+}
+.premium-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.premium-table th {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: #94a3b8;
+  padding: 10px 16px;
+  border-bottom: 1px solid #f1f5f9;
+  text-align: left;
+  background: #fafbfc;
+}
+.premium-table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid #f8fafc;
+  font-size: 13.5px;
+  color: #374151;
+  vertical-align: middle;
+}
+.premium-table tr:last-child td {
+  border-bottom: none;
+}
+.premium-table tr:hover td {
+  background: #f8fafc;
+}
+.premium-table .rank-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  background: #f1f5f9;
+  color: #64748b;
+}
+.premium-table .rank-badge.gold   { background: #fef3c7; color: #b45309; }
+.premium-table .rank-badge.silver { background: #f1f5f9; color: #475569; }
+.premium-table .rank-badge.bronze { background: #ffedd5; color: #c2410c; }
+.revenue-bar-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.revenue-bar {
+  height: 6px;
+  border-radius: 3px;
+  background: linear-gradient(90deg, #6366f1, #8b5cf6);
+  min-width: 4px;
+  flex-shrink: 0;
+}
+
+/* ---- Section label ---- */
+.section-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #94a3b8;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.section-label::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: #f1f5f9;
+}
+
+/* ---- Filter Offcanvas ---- */
+.filter-offcanvas {
+  position: fixed;
+  top: 0;
+  right: -100%;
+  width: 100%;
+  max-width: 380px;
+  height: 100vh;
+  background: #fff;
+  box-shadow: -8px 0 32px rgba(15,23,42,0.12);
+  z-index: 1060;
+  transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow-y: auto;
+}
+.filter-offcanvas.show { right: 0; }
+.filter-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15,23,42,0.4);
+  z-index: 1055;
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.3s;
+  backdrop-filter: blur(2px);
+}
+.filter-backdrop.show { opacity: 1; visibility: visible; }
+.filter-offcanvas-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 22px 22px 18px;
+  border-bottom: 1px solid #f1f5f9;
+  background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+}
+.filter-offcanvas-header h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: #0f172a;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.filter-close-btn {
+  width: 34px; height: 34px;
+  border-radius: 8px;
+  background: transparent;
+  border: none;
+  color: #64748b;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  transition: all 0.2s;
+}
+.filter-close-btn:hover { background: #e2e8f0; color: #0f172a; }
+.filter-offcanvas-body { padding: 20px; }
+.filter-section { margin-bottom: 22px; }
+.filter-section-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  color: #374151;
+  margin-bottom: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+}
+.filter-pills-vertical { display: flex; flex-direction: column; gap: 6px; }
+.filter-pill-option {
+  padding: 11px 14px;
+  border: 1.5px solid #e2e8f0;
+  background: #fff;
+  border-radius: 10px;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.18s;
+  text-align: left;
+}
+.filter-pill-option:hover { background: #f8fafc; border-color: #c7d2fe; color: #3730a3; }
+.filter-pill-option.active {
+  background: linear-gradient(135deg, #eef2ff, #e0e7ff);
+  border-color: #6366f1;
+  color: #4338ca;
+  font-weight: 700;
+}
+.filter-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 10px;
+  font-size: 13.5px;
+  background: #fff;
+  color: #374151;
+  transition: all 0.2s;
+}
+.filter-input:focus { outline: none; border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99,102,241,0.1); }
+.filter-offcanvas-footer {
+  padding: 18px 22px;
+  border-top: 1px solid #f1f5f9;
+  background: #f8fafc;
+  display: flex;
+  gap: 10px;
+}
+.btn-filter-reset {
+  flex: 1;
+  padding: 11px 16px;
+  background: #fff;
+  color: #64748b;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 10px;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: all 0.2s;
+}
+.btn-filter-reset:hover { background: #f1f5f9; border-color: #cbd5e1; }
+.btn-filter-apply {
+  flex: 2;
+  padding: 11px 16px;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  font-size: 13.5px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  box-shadow: 0 4px 12px rgba(99,102,241,0.3);
+  transition: all 0.2s;
+}
+.btn-filter-apply:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(99,102,241,0.4); }
+
+/* ---- Empty / awaiting state ---- */
+.awaiting-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  text-align: center;
+  color: #94a3b8;
+}
+.awaiting-state i { font-size: 2.5rem; margin-bottom: 12px; opacity: 0.5; }
+.awaiting-state p { font-size: 13px; margin: 0; }
+</style>
+{% endblock %}
+
+{% block content %}
+{% load static %}
+
+
+{% with revenue_trend=analytics_data.series.revenue_trend sales_trend=analytics_data.series.sales_count_trend profit_trend=analytics_data.series.profit_trend cash_mix=analytics_data.breakdowns.cash_mix vertical_mix=analytics_data.breakdowns.vertical_mix top_biz=analytics_data.top_lists.top_businesses top_agents=analytics_data.top_lists.top_agents kpis=analytics_data.kpis %}
+
+<!-- ===================== PAGE HEADER ===================== -->
+<div class="analytics-header">
+  <div class="analytics-header-text">
+    <h1><i class="bi bi-graph-up-arrow" style="color:#6366f1;margin-right:8px;font-size:1.4rem;"></i>Analytics Command Center</h1>
+    <p>{{ start_date|date:"M d, Y" }} &rarr; {{ end_date|date:"M d, Y" }}
+      {% if selected_vertical %}&nbsp;&middot;&nbsp;<span style="color:#6366f1;font-weight:600;">{{ selected_vertical|title }}</span>{% endif %}
+      {% if selected_business_id %}&nbsp;&middot;&nbsp;<span style="color:#6366f1;font-weight:600;">Single Business</span>{% endif %}
+    </p>
+  </div>
+  <div class="analytics-header-actions">
+    <button type="button" id="filterToggleBtn" class="filter-advanced-btn">
+      <i class="bi bi-sliders2"></i> Filters
+    </button>
+  </div>
+</div>
+
+<!-- ===================== FILTER PRESET BAR ===================== -->
+<form method="get" id="hqFilterQuickForm">
+  <input type="hidden" name="preset" id="quickPresetInput" value="{{ preset }}">
+  <input type="hidden" name="business_id" value="{{ selected_business_id|default:'' }}">
+  <input type="hidden" name="vertical" value="{{ selected_vertical|default:'' }}">
+  <input type="hidden" name="location_id" value="{{ selected_location_id|default:'' }}">
+  <div class="analytics-filter-bar">
+    <div class="filter-preset-group">
+      <button type="button" class="filter-preset-btn {% if not preset or preset == 'last_30d' %}active{% endif %}" data-preset="last_30d">Last 30 Days</button>
+      <button type="button" class="filter-preset-btn {% if preset == 'today' %}active{% endif %}" data-preset="today">Today</button>
+      <button type="button" class="filter-preset-btn {% if preset == 'yesterday' %}active{% endif %}" data-preset="yesterday">Yesterday</button>
+      <button type="button" class="filter-preset-btn {% if preset == 'last_7d' %}active{% endif %}" data-preset="last_7d">Last 7 Days</button>
+      <button type="button" class="filter-preset-btn {% if preset == 'this_month' %}active{% endif %}" data-preset="this_month">This Month</button>
+      <button type="button" class="filter-preset-btn {% if preset == 'last_month' %}active{% endif %}" data-preset="last_month">Last Month</button>
+      <button type="button" class="filter-preset-btn {% if preset == 'all_time' %}active{% endif %}" data-preset="all_time">All Time</button>
+    </div>
+    <span class="filter-date-label"><i class="bi bi-calendar3" style="margin-right:4px;"></i>{{ start_date|date:"M d" }} – {{ end_date|date:"M d, Y" }}</span>
+  </div>
+</form>
+
+<!-- ===================== KPI COMMAND CARDS ===================== -->
+<div class="kpi-command-grid" id="kpiGrid">
+
+
+  <div class="kpi-cmd-card accent-blue" id="kpiRevenue">
+    <div class="kpi-cmd-icon bg-blue"><i class="bi bi-currency-dollar"></i></div>
+    <div class="kpi-cmd-label">Total Revenue</div>
+    <div class="kpi-cmd-value" id="valRevenue">
+      {% if kpis.revenue %}{{ kpis.revenue|floatformat:0|format_mwk }}{% else %}<span class="demo-value">MWK 12.4M</span>{% endif %}
+    </div>
+    {% if kpis.revenue %}<span class="kpi-cmd-trend up"><i class="bi bi-arrow-up-short"></i>Live</span>
+    {% else %}<span class="kpi-cmd-trend neutral"><i class="bi bi-clock"></i>Awaiting data</span>{% endif %}
+    {% if not kpis.revenue %}<span class="kpi-cmd-demo-badge">DEMO</span>{% endif %}
+  </div>
+
+
+  <div class="kpi-cmd-card accent-green" id="kpiSales">
+    <div class="kpi-cmd-icon bg-green"><i class="bi bi-bag-check"></i></div>
+    <div class="kpi-cmd-label">Total Sales</div>
+    <div class="kpi-cmd-value" id="valSales">
+      {% if kpis.sales_count %}{{ kpis.sales_count }}{% else %}<span class="demo-value">3,842</span>{% endif %}
+    </div>
+    {% if kpis.sales_count %}<span class="kpi-cmd-trend up"><i class="bi bi-arrow-up-short"></i>Live</span>
+    {% else %}<span class="kpi-cmd-trend neutral"><i class="bi bi-clock"></i>Awaiting data</span>{% endif %}
+    {% if not kpis.sales_count %}<span class="kpi-cmd-demo-badge">DEMO</span>{% endif %}
+  </div>
+
+
+  <div class="kpi-cmd-card accent-purple" id="kpiProfit">
+    <div class="kpi-cmd-icon bg-purple"><i class="bi bi-graph-up"></i></div>
+    <div class="kpi-cmd-label">Total Profit</div>
+    <div class="kpi-cmd-value" id="valProfit">
+      {% if kpis.profit %}{{ kpis.profit|floatformat:0|format_mwk }}{% else %}<span class="demo-value">MWK 3.1M</span>{% endif %}
+    </div>
+    {% if kpis.profit %}<span class="kpi-cmd-trend up"><i class="bi bi-arrow-up-short"></i>Live</span>
+    {% else %}<span class="kpi-cmd-trend neutral"><i class="bi bi-clock"></i>Awaiting data</span>{% endif %}
+    {% if not kpis.profit %}<span class="kpi-cmd-demo-badge">DEMO</span>{% endif %}
+  </div>
+
+
+  <div class="kpi-cmd-card accent-sky" id="kpiBiz">
+    <div class="kpi-cmd-icon bg-sky"><i class="bi bi-buildings"></i></div>
+    <div class="kpi-cmd-label">Active Businesses</div>
+    <div class="kpi-cmd-value" id="valBiz">
+      {% if kpis.total_businesses %}{{ kpis.total_businesses }}{% else %}<span class="demo-value">47</span>{% endif %}
+    </div>
+    {% if kpis.total_businesses %}<span class="kpi-cmd-trend up"><i class="bi bi-arrow-up-short"></i>Live</span>
+    {% else %}<span class="kpi-cmd-trend neutral"><i class="bi bi-clock"></i>Awaiting data</span>{% endif %}
+    {% if not kpis.total_businesses %}<span class="kpi-cmd-demo-badge">DEMO</span>{% endif %}
+  </div>
+
+
+  <div class="kpi-cmd-card accent-indigo" id="kpiMRR">
+    <div class="kpi-cmd-icon bg-indigo"><i class="bi bi-repeat"></i></div>
+    <div class="kpi-cmd-label">MRR</div>
+    <div class="kpi-cmd-value" id="valMRR">
+      {% if billing_kpis.mrr %}{{ billing_kpis.mrr|floatformat:0|format_mwk }}{% else %}<span class="demo-value">MWK 1.2M</span>{% endif %}
+    </div>
+    {% if billing_kpis.mrr %}<span class="kpi-cmd-trend up"><i class="bi bi-arrow-up-short"></i>Live</span>
+    {% else %}<span class="kpi-cmd-trend neutral"><i class="bi bi-clock"></i>Awaiting data</span>{% endif %}
+    {% if not billing_kpis.mrr %}<span class="kpi-cmd-demo-badge">DEMO</span>{% endif %}
+  </div>
+
+
+  <div class="kpi-cmd-card accent-teal" id="kpiSubs">
+    <div class="kpi-cmd-icon bg-teal"><i class="bi bi-shield-check"></i></div>
+    <div class="kpi-cmd-label">Active Subscriptions</div>
+    <div class="kpi-cmd-value" id="valSubs">
+      {% if billing_kpis.active_subscriptions %}{{ billing_kpis.active_subscriptions }}{% else %}<span class="demo-value">38</span>{% endif %}
+    </div>
+    {% if billing_kpis.trialing_subscriptions %}
+    <span class="kpi-cmd-trend neutral"><i class="bi bi-clock-history"></i> +{{ billing_kpis.trialing_subscriptions }} trialing</span>
+    {% elif billing_kpis.active_subscriptions %}<span class="kpi-cmd-trend up"><i class="bi bi-arrow-up-short"></i>Live</span>
+    {% else %}<span class="kpi-cmd-trend neutral"><i class="bi bi-clock"></i>Awaiting data</span>{% endif %}
+    {% if not billing_kpis.active_subscriptions %}<span class="kpi-cmd-demo-badge">DEMO</span>{% endif %}
+  </div>
+
+
+  <div class="kpi-cmd-card accent-lime" id="kpiCollect">
+    <div class="kpi-cmd-icon bg-lime"><i class="bi bi-percent"></i></div>
+    <div class="kpi-cmd-label">Collections Rate</div>
+    <div class="kpi-cmd-value" id="valCollect">
+      {% if billing_kpis.collections_rate %}{{ billing_kpis.collections_rate }}%{% else %}<span class="demo-value">87.4%</span>{% endif %}
+    </div>
+    {% if billing_kpis.collections_rate >= 80 %}<span class="kpi-cmd-trend up"><i class="bi bi-arrow-up-short"></i>Healthy</span>
+    {% elif billing_kpis.collections_rate > 0 %}<span class="kpi-cmd-trend down"><i class="bi bi-arrow-down-short"></i>Below target</span>
+    {% else %}<span class="kpi-cmd-trend neutral"><i class="bi bi-clock"></i>Awaiting data</span>{% endif %}
+    {% if not billing_kpis.collections_rate %}<span class="kpi-cmd-demo-badge">DEMO</span>{% endif %}
+  </div>
+
+
+  <div class="kpi-cmd-card accent-amber" id="kpiInvoices">
+    <div class="kpi-cmd-icon bg-amber"><i class="bi bi-receipt"></i></div>
+    <div class="kpi-cmd-label">Open Invoices</div>
+    <div class="kpi-cmd-value" id="valInvoices">
+      {% if billing_kpis.open_invoices %}{{ billing_kpis.open_invoices }}{% else %}<span class="demo-value">12</span>{% endif %}
+    </div>
+    {% if billing_kpis.outstanding_amount %}
+    <span class="kpi-cmd-trend down"><i class="bi bi-exclamation-circle"></i>{{ billing_kpis.outstanding_amount|floatformat:0|format_mwk }} outstanding</span>
+    {% elif billing_kpis.open_invoices == 0 %}<span class="kpi-cmd-trend neutral"><i class="bi bi-clock"></i>Awaiting data</span>
+    {% else %}<span class="kpi-cmd-trend neutral"><i class="bi bi-check-circle"></i>All clear</span>{% endif %}
+    {% if not billing_kpis.open_invoices %}<span class="kpi-cmd-demo-badge">DEMO</span>{% endif %}
+  </div>
+
+
+  <div class="kpi-cmd-card accent-rose" id="kpiChurn">
+    <div class="kpi-cmd-icon bg-rose"><i class="bi bi-exclamation-triangle"></i></div>
+    <div class="kpi-cmd-label">Churn Risk</div>
+    <div class="kpi-cmd-value" id="valChurn">
+      {% if billing_kpis.churn_risk %}{{ billing_kpis.churn_risk }}{% else %}<span class="demo-value">3</span>{% endif %}
+    </div>
+    {% if billing_kpis.churn_risk > 5 %}<span class="kpi-cmd-trend down"><i class="bi bi-arrow-down-short"></i>Needs attention</span>
+    {% elif billing_kpis.churn_risk > 0 %}<span class="kpi-cmd-trend neutral"><i class="bi bi-dash"></i>Monitor</span>
+    {% else %}<span class="kpi-cmd-trend neutral"><i class="bi bi-clock"></i>Awaiting data</span>{% endif %}
+    {% if not billing_kpis.churn_risk %}<span class="kpi-cmd-demo-badge">DEMO</span>{% endif %}
+  </div>
+
+
+  <div class="kpi-cmd-card accent-amber" id="kpiAgents">
+    <div class="kpi-cmd-icon bg-amber"><i class="bi bi-person-badge"></i></div>
+    <div class="kpi-cmd-label">Active Agents</div>
+    <div class="kpi-cmd-value" id="valAgents">
+      {% if kpis.total_agents %}{{ kpis.total_agents }}{% else %}<span class="demo-value">124</span>{% endif %}
+    </div>
+    {% if kpis.total_agents %}<span class="kpi-cmd-trend up"><i class="bi bi-arrow-up-short"></i>Live</span>
+    {% else %}<span class="kpi-cmd-trend neutral"><i class="bi bi-clock"></i>Awaiting data</span>{% endif %}
+    {% if not kpis.total_agents %}<span class="kpi-cmd-demo-badge">DEMO</span>{% endif %}
+  </div>
+
+</div><!-- /.kpi-command-grid -->
+
+
+<!-- ===================== CHARTS — ROW 1 ===================== -->
+<p class="section-label">Revenue &amp; Sales Performance</p>
+<div class="analytics-charts-grid mb-0" style="margin-bottom: 20px;">
+
+  <!-- Revenue Trend -->
+  <div class="chart-card">
+    <div class="chart-card-header">
+      <div>
+        <div class="chart-card-title"><i class="bi bi-graph-up" style="color:#6366f1;"></i> Revenue Trend</div>
+        <div class="chart-card-subtitle">Daily revenue over selected period</div>
+      </div>
+    </div>
+    <div class="chart-card-body">
+      <div class="chart-canvas-wrap">
+        <canvas id="chartRevenueTrend"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sales by Vertical -->
+  <div class="chart-card">
+    <div class="chart-card-header">
+      <div>
+        <div class="chart-card-title"><i class="bi bi-bar-chart-line" style="color:#10b981;"></i> Revenue by Vertical</div>
+        <div class="chart-card-subtitle">Distribution across business categories</div>
+      </div>
+    </div>
+    <div class="chart-card-body">
+      <div class="chart-canvas-wrap">
+        <canvas id="chartVerticalMix"></canvas>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ===================== CHARTS — ROW 2 ===================== -->
+<div class="analytics-charts-grid mb-0" style="margin-bottom: 20px;">
+
+  <!-- Payment Mode Distribution -->
+  <div class="chart-card">
+    <div class="chart-card-header">
+      <div>
+        <div class="chart-card-title"><i class="bi bi-credit-card-2-front" style="color:#f59e0b;"></i> Payment Mode Distribution</div>
+        <div class="chart-card-subtitle">Sales breakdown by payment method</div>
+      </div>
+    </div>
+    <div class="chart-card-body" style="display:flex;align-items:center;gap:24px;flex-wrap:wrap;">
+      <div style="position:relative;width:180px;height:180px;flex-shrink:0;margin:auto;">
+        <canvas id="chartPaymentMix"></canvas>
+      </div>
+      <div id="paymentLegend" style="flex:1;min-width:140px;"></div>
+    </div>
+  </div>
+
+  <!-- Profit Trend -->
+  <div class="chart-card">
+    <div class="chart-card-header">
+      <div>
+        <div class="chart-card-title"><i class="bi bi-graph-up-arrow" style="color:#8b5cf6;"></i> Profit Trend</div>
+        <div class="chart-card-subtitle">Daily profit over selected period</div>
+      </div>
+    </div>
+    <div class="chart-card-body">
+      <div class="chart-canvas-wrap">
+        <canvas id="chartProfitTrend"></canvas>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+
+<!-- ===================== SMART INSIGHTS ===================== -->
+<p class="section-label">Platform Intelligence</p>
+<div class="insights-grid" id="insightsGrid">
+  <!-- Populated by JS based on live or demo data -->
+</div>
+
+
+<!-- ===================== TOP TABLES — ROW ===================== -->
+<p class="section-label">Performance Leaders</p>
+<div class="analytics-charts-grid">
+
+  <!-- Top Businesses -->
+  <div class="analytics-table-card">
+    <div class="chart-card-header">
+      <div>
+        <div class="chart-card-title"><i class="bi bi-trophy" style="color:#f59e0b;"></i> Top Performing Businesses</div>
+        <div class="chart-card-subtitle">By revenue in selected period</div>
+      </div>
+    </div>
+    <div style="overflow-x:auto;">
+      <table class="premium-table" id="topBizTable">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Business</th>
+            <th>Revenue</th>
+            <th>Sales</th>
+          </tr>
+        </thead>
+        <tbody id="topBizTbody">
+          {% for b in top_biz %}
+          <tr>
+            <td>
+              <span class="rank-badge {% if forloop.counter == 1 %}gold{% elif forloop.counter == 2 %}silver{% elif forloop.counter == 3 %}bronze{% endif %}">{{ forloop.counter }}</span>
+            </td>
+            <td><strong>{{ b.name }}</strong></td>
+            <td>
+              <div class="revenue-bar-wrap">
+                <span style="font-weight:600;font-size:13px;">{{ b.revenue|floatformat:0|format_mwk }}</span>
+              </div>
+            </td>
+            <td><span style="color:#64748b;">{{ b.sales_count }}</span></td>
+          </tr>
+          {% empty %}
+          <tr id="topBizDemoRow"><td colspan="4" style="padding:0;"></td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Top Agents -->
+  <div class="analytics-table-card">
+    <div class="chart-card-header">
+      <div>
+        <div class="chart-card-title"><i class="bi bi-star" style="color:#6366f1;"></i> Most Active Agents</div>
+        <div class="chart-card-subtitle">By sales revenue in selected period</div>
+      </div>
+    </div>
+    <div style="overflow-x:auto;">
+      <table class="premium-table" id="topAgentsTable">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Agent</th>
+            <th>Revenue</th>
+            <th>Sales</th>
+          </tr>
+        </thead>
+        <tbody id="topAgentsTbody">
+          {% for a in top_agents %}
+          <tr>
+            <td>
+              <span class="rank-badge {% if forloop.counter == 1 %}gold{% elif forloop.counter == 2 %}silver{% elif forloop.counter == 3 %}bronze{% endif %}">{{ forloop.counter }}</span>
+            </td>
+            <td><strong>{{ a.name }}</strong></td>
+            <td>
+              <div class="revenue-bar-wrap">
+                <span style="font-weight:600;font-size:13px;">{{ a.revenue|floatformat:0|format_mwk }}</span>
+              </div>
+            </td>
+            <td><span style="color:#64748b;">{{ a.sales_count }}</span></td>
+          </tr>
+          {% empty %}
+          <tr id="topAgentsDemoRow"><td colspan="4" style="padding:0;"></td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+
+<!-- ===================== FILTER OFFCANVAS ===================== -->
+<div id="filterOffcanvas" class="filter-offcanvas">
+  <div class="filter-offcanvas-header">
+    <h3><i class="bi bi-sliders2"></i> Advanced Filters</h3>
+    <button type="button" id="filterCloseBtn" class="filter-close-btn" aria-label="Close"><i class="bi bi-x-lg"></i></button>
+  </div>
+  <form method="get" id="hqFilterForm" class="filter-offcanvas-body">
+    <!-- Date Range Presets -->
+    <div class="filter-section">
+      <label class="filter-section-label">Date Range</label>
+      <div class="filter-pills-vertical">
+        <button type="button" class="filter-pill-option {% if preset == 'today' %}active{% endif %}" data-preset="today">Today</button>
+        <button type="button" class="filter-pill-option {% if preset == 'yesterday' %}active{% endif %}" data-preset="yesterday">Yesterday</button>
+        <button type="button" class="filter-pill-option {% if preset == 'last_7d' %}active{% endif %}" data-preset="last_7d">Last 7 Days</button>
+        <button type="button" class="filter-pill-option {% if not preset or preset == 'last_30d' %}active{% endif %}" data-preset="last_30d">Last 30 Days</button>
+        <button type="button" class="filter-pill-option {% if preset == 'this_month' %}active{% endif %}" data-preset="this_month">This Month</button>
+        <button type="button" class="filter-pill-option {% if preset == 'last_month' %}active{% endif %}" data-preset="last_month">Last Month</button>
+        <button type="button" class="filter-pill-option {% if preset == 'all_time' %}active{% endif %}" data-preset="all_time">All Time</button>
+        <button type="button" class="filter-pill-option {% if preset == 'custom' %}active{% endif %}" data-preset="custom">Custom Range</button>
+      </div>
+      <input type="hidden" name="preset" id="presetInput" value="{{ preset }}">
+      <div id="customDateRange" style="{% if preset != 'custom' %}display:none;{% endif %} margin-top:12px;">
+        <div style="display:flex;gap:8px;flex-direction:column;">
+          <input type="date" name="start" value="{{ start_date|date:'Y-m-d' }}" class="filter-input">
+          <span style="text-align:center;color:#64748b;font-size:0.8rem;">to</span>
+          <input type="date" name="end" value="{{ end_date|date:'Y-m-d' }}" class="filter-input">
+        </div>
+      </div>
+    </div>
+    <!-- Business Filter -->
+    <div class="filter-section">
+      <label class="filter-section-label">Business</label>
+      <select name="business_id" class="filter-input">
+        <option value="">All businesses</option>
+        {% for biz in all_businesses %}
+        <option value="{{ biz.id }}" {% if selected_business_id == biz.id %}selected{% endif %}>{{ biz.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <!-- Vertical Filter -->
+    <div class="filter-section">
+      <label class="filter-section-label">Vertical</label>
+      <select name="vertical" class="filter-input">
+        <option value="">All verticals</option>
+        {% for code, name in vertical_options %}
+        <option value="{{ code }}" {% if selected_vertical == code %}selected{% endif %}>{{ name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    {% if all_locations %}
+    <div class="filter-section">
+      <label class="filter-section-label">Location</label>
+      <select name="location_id" class="filter-input">
+        <option value="">All locations</option>
+        {% for loc in all_locations %}
+        <option value="{{ loc.id }}" {% if selected_location_id == loc.id %}selected{% endif %}>{{ loc.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    {% endif %}
+    <div class="filter-offcanvas-footer" style="margin: 0 -20px -20px; position:sticky;bottom:0;">
+      <button type="button" id="filterResetBtn" class="btn-filter-reset"><i class="bi bi-arrow-counterclockwise"></i> Reset</button>
+      <button type="submit" class="btn-filter-apply"><i class="bi bi-check-lg"></i> Apply Filters</button>
+    </div>
+  </form>
+</div>
+<div id="filterBackdrop" class="filter-backdrop"></div>
+
+{% endwith %}
+{% endblock %}
+
+
+{% block extra_js %}
+<script src="{% static 'vendor/chartjs/chart.umd.min.js' %}"></script>
+<script>
+(function() {
+  'use strict';
+
+  /* =====================================================
+     DEMO DATA (shown when live data is all zeros)
+     ===================================================== */
+  const DEMO_DAYS = 30;
+  function makeDemoDailyRevenue() {
+    const data = [];
+    const base = 380000;
+    for (let i = DEMO_DAYS - 1; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const label = (d.getMonth()+1).toString().padStart(2,'0') + '/' + d.getDate().toString().padStart(2,'0');
+      const v = base + (Math.random() - 0.3) * base * 0.8 + (Math.sin(i * 0.4) * base * 0.3);
+      data.push({ date_short: label, revenue: Math.max(50000, Math.round(v)) });
+    }
+    return data;
+  }
+  function makeDemoDailyProfit(revData) {
+    return revData.map(d => ({ date_short: d.date_short, profit: Math.round(d.revenue * (0.22 + Math.random() * 0.08)) }));
+  }
+
+  const DEMO_REVENUE_TREND  = makeDemoDailyRevenue();
+  const DEMO_PROFIT_TREND   = makeDemoDailyProfit(DEMO_REVENUE_TREND);
+
+  const DEMO_VERTICAL_MIX = [
+    { vertical: 'Retail',    revenue: 4800000, percentage: 38 },
+    { vertical: 'Energy',    revenue: 3700000, percentage: 29 },
+    { vertical: 'Phones',    revenue: 2300000, percentage: 18 },
+    { vertical: 'Pharmacy',  revenue: 900000,  percentage: 7  },
+    { vertical: 'Gym',       revenue: 1000000, percentage: 8  },
+  ];
+
+  const DEMO_PAYMENT_MIX = [
+    { method_display: 'Mobile Money', amount: 5800000, percentage: 47 },
+    { method_display: 'Cash',         amount: 3900000, percentage: 31 },
+    { method_display: 'Card',         amount: 2100000, percentage: 17 },
+    { method_display: 'Bank Transfer',amount:  600000, percentage: 5  },
+  ];
+
+  const DEMO_TOP_BIZ = [
+    { name: 'Sunrise Electronics',  revenue: 2400000, sales_count: 312 },
+    { name: 'City Pharmacy',        revenue: 1800000, sales_count: 245 },
+    { name: 'Blantyre Liquor Hub',  revenue: 1350000, sales_count: 189 },
+    { name: 'FitZone Gym',          revenue:  980000, sales_count: 143 },
+    { name: 'Power & Light Energy', revenue:  760000, sales_count: 98  },
+  ];
+
+  const DEMO_TOP_AGENTS = [
+    { name: 'Chisomo Banda',    revenue: 1200000, sales_count: 148 },
+    { name: 'Tadala Phiri',     revenue:  980000, sales_count: 121 },
+    { name: 'Mavuto Mwale',     revenue:  870000, sales_count: 108 },
+    { name: 'Grace Tembo',      revenue:  720000, sales_count: 94  },
+    { name: 'Patrick Kumwenda', revenue:  610000, sales_count: 79  },
+  ];
+
+  /* =====================================================
+     LOAD LIVE DATA
+     ===================================================== */
+  const LIVE_REVENUE_TREND  = {{ analytics_data.series.revenue_trend|default:"[]"|safe }};
+  const LIVE_PROFIT_TREND   = {{ analytics_data.series.profit_trend|default:"[]"|safe }};
+  const LIVE_VERTICAL_MIX   = {{ analytics_data.breakdowns.vertical_mix|default:"[]"|safe }};
+  const LIVE_PAYMENT_MIX    = {{ analytics_data.breakdowns.cash_mix|default:"[]"|safe }};
+  const LIVE_TOP_BIZ        = {{ analytics_data.top_lists.top_businesses|default:"[]"|safe }};
+  const LIVE_TOP_AGENTS     = {{ analytics_data.top_lists.top_agents|default:"[]"|safe }};
+
+  const hasRevenue  = LIVE_REVENUE_TREND.some(d => d.revenue > 0);
+  const hasProfit   = LIVE_PROFIT_TREND.some(d => d.profit > 0);
+  const hasVertical = LIVE_VERTICAL_MIX.some(d => d.revenue > 0);
+  const hasPayment  = LIVE_PAYMENT_MIX.some(d => d.amount > 0);
+  const hasBiz      = LIVE_TOP_BIZ.length > 0;
+  const hasAgents   = LIVE_TOP_AGENTS.length > 0;
+
+  const revData     = hasRevenue  ? LIVE_REVENUE_TREND : DEMO_REVENUE_TREND;
+  const profitData  = hasProfit   ? LIVE_PROFIT_TREND  : DEMO_PROFIT_TREND;
+  const vertData    = hasVertical ? LIVE_VERTICAL_MIX  : DEMO_VERTICAL_MIX;
+  const payData     = hasPayment  ? LIVE_PAYMENT_MIX   : DEMO_PAYMENT_MIX;
+  const bizData     = hasBiz      ? LIVE_TOP_BIZ       : DEMO_TOP_BIZ;
+  const agentsData  = hasAgents   ? LIVE_TOP_AGENTS    : DEMO_TOP_AGENTS;
+
+  const isUsingDemo = !hasRevenue;
+
+  /* =====================================================
+     CHART HELPERS
+     ===================================================== */
+  function fmt(v) {
+    if (v >= 1000000) return 'MWK ' + (v/1000000).toFixed(1) + 'M';
+    if (v >= 1000)    return 'MWK ' + (v/1000).toFixed(0) + 'K';
+    return 'MWK ' + v.toFixed(0);
+  }
+
+  const CHART_COLORS = ['#6366f1','#10b981','#f59e0b','#ef4444','#0ea5e9','#8b5cf6','#14b8a6','#f43f5e'];
+
+  Chart.defaults.font.family = "'Inter', 'Segoe UI', system-ui, sans-serif";
+  Chart.defaults.color = '#64748b';
+
+  /* =====================================================
+     CHART 1: Revenue Trend (Line)
+     ===================================================== */
+  (function() {
+    const ctx = document.getElementById('chartRevenueTrend');
+    if (!ctx) return;
+    const labels = revData.map(d => d.date_short);
+    const values = revData.map(d => d.revenue);
+    new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [{
+          label: 'Revenue',
+          data: values,
+          borderColor: '#6366f1',
+          backgroundColor: 'rgba(99,102,241,0.08)',
+          borderWidth: 2.5,
+          pointRadius: values.length > 14 ? 0 : 3,
+          pointHoverRadius: 5,
+          tension: 0.4,
+          fill: true,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: ctx => ' ' + fmt(ctx.parsed.y),
+            }
+          }
+        },
+        scales: {
+          x: { grid: { display: false }, ticks: { maxRotation: 0, maxTicksLimit: 7, font: { size: 11 } } },
+          y: { grid: { color: 'rgba(0,0,0,0.04)' }, ticks: { callback: v => fmt(v), font: { size: 11 } }, border: { display: false } }
+        }
+      }
+    });
+  })();
+
+  /* =====================================================
+     CHART 2: Revenue by Vertical (Horizontal Bar)
+     ===================================================== */
+  (function() {
+    const ctx = document.getElementById('chartVerticalMix');
+    if (!ctx) return;
+    const labels = vertData.map(d => d.vertical || 'Unknown');
+    const values = vertData.map(d => d.revenue);
+    new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [{
+          label: 'Revenue',
+          data: values,
+          backgroundColor: CHART_COLORS.map(c => c + 'cc'),
+          borderColor:      CHART_COLORS,
+          borderWidth: 1.5,
+          borderRadius: 6,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        indexAxis: 'y',
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: ctx => ' ' + fmt(ctx.parsed.x) } }
+        },
+        scales: {
+          x: { grid: { color: 'rgba(0,0,0,0.04)' }, ticks: { callback: v => fmt(v), font: { size: 11 } }, border: { display: false } },
+          y: { grid: { display: false }, ticks: { font: { size: 12, weight: '500' } } }
+        }
+      }
+    });
+  })();
+
+  /* =====================================================
+     CHART 3: Payment Mode Distribution (Doughnut)
+     ===================================================== */
+  (function() {
+    const ctx = document.getElementById('chartPaymentMix');
+    if (!ctx) return;
+    const labels = payData.map(d => d.method_display || d.method || 'Other');
+    const values = payData.map(d => d.amount);
+    new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels,
+        datasets: [{
+          data: values,
+          backgroundColor: CHART_COLORS.map(c => c + 'e0'),
+          borderColor: '#fff',
+          borderWidth: 2,
+          hoverOffset: 6,
+        }]
+      },
+      options: {
+        responsive: false,
+        cutout: '65%',
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: ctx => ' ' + fmt(ctx.parsed) + ' (' + payData[ctx.dataIndex].percentage.toFixed(1) + '%)' } }
+        }
+      }
+    });
+
+    // Custom legend
+    const legend = document.getElementById('paymentLegend');
+    if (legend) {
+      legend.innerHTML = payData.map((d, i) =>
+        `<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+          <span style="width:10px;height:10px;border-radius:3px;background:${CHART_COLORS[i]};flex-shrink:0;display:inline-block;"></span>
+          <span style="font-size:12.5px;color:#374151;font-weight:500;">${d.method_display || d.method || 'Other'}</span>
+          <span style="margin-left:auto;font-size:12px;color:#64748b;">${d.percentage ? d.percentage.toFixed(1) : 0}%</span>
+        </div>`
+      ).join('');
+    }
+  })();
+
+  /* =====================================================
+     CHART 4: Profit Trend (Line)
+     ===================================================== */
+  (function() {
+    const ctx = document.getElementById('chartProfitTrend');
+    if (!ctx) return;
+    const labels = profitData.map(d => d.date_short);
+    const values = profitData.map(d => d.profit);
+    new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [{
+          label: 'Profit',
+          data: values,
+          borderColor: '#8b5cf6',
+          backgroundColor: 'rgba(139,92,246,0.07)',
+          borderWidth: 2.5,
+          pointRadius: values.length > 14 ? 0 : 3,
+          pointHoverRadius: 5,
+          tension: 0.4,
+          fill: true,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: ctx => ' ' + fmt(ctx.parsed.y) } }
+        },
+        scales: {
+          x: { grid: { display: false }, ticks: { maxRotation: 0, maxTicksLimit: 7, font: { size: 11 } } },
+          y: { grid: { color: 'rgba(0,0,0,0.04)' }, ticks: { callback: v => fmt(v), font: { size: 11 } }, border: { display: false } }
+        }
+      }
+    });
+  })();
+
+  /* =====================================================
+     TOP TABLES — Demo fallback
+     ===================================================== */
+  function rankClass(i) {
+    return i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : '';
+  }
+
+  if (!hasBiz) {
+    const tbody = document.getElementById('topBizTbody');
+    if (tbody) {
+      tbody.innerHTML = bizData.map((b, i) =>
+        `<tr>
+          <td><span class="rank-badge ${rankClass(i)}">${i+1}</span></td>
+          <td><strong>${b.name}</strong></td>
+          <td><span style="font-weight:600;font-size:13px;">MWK ${(b.revenue/1000000).toFixed(2)}M</span></td>
+          <td><span style="color:#64748b;">${b.sales_count}</span></td>
+        </tr>`
+      ).join('') + `<tr><td colspan="4" style="text-align:center;padding:8px;font-size:11px;color:#94a3b8;background:#fafafa;">Demo data — awaiting live sales</td></tr>`;
+    }
+  }
+
+  if (!hasAgents) {
+    const tbody = document.getElementById('topAgentsTbody');
+    if (tbody) {
+      tbody.innerHTML = agentsData.map((a, i) =>
+        `<tr>
+          <td><span class="rank-badge ${rankClass(i)}">${i+1}</span></td>
+          <td><strong>${a.name}</strong></td>
+          <td><span style="font-weight:600;font-size:13px;">MWK ${(a.revenue/1000000).toFixed(2)}M</span></td>
+          <td><span style="color:#64748b;">${a.sales_count}</span></td>
+        </tr>`
+      ).join('') + `<tr><td colspan="4" style="text-align:center;padding:8px;font-size:11px;color:#94a3b8;background:#fafafa;">Demo data — awaiting live sales</td></tr>`;
+    }
+  }
+
+  /* =====================================================
+     SMART INSIGHTS
+     ===================================================== */
+  (function() {
+    const grid = document.getElementById('insightsGrid');
+    if (!grid) return;
+
+    const insights = [];
+
+    if (isUsingDemo) {
+      insights.push({ type: 'info',     icon: 'bi-info-circle',          title: 'Demo Mode Active', body: 'Charts and tables show illustrative data. Real data will appear as transactions are recorded.' });
+      insights.push({ type: 'positive', icon: 'bi-lightning-charge',     title: 'Retail + Energy Leading', body: 'Retail & Energy verticals are driving 67% of platform revenue based on demo projections.' });
+      insights.push({ type: 'warning',  icon: 'bi-exclamation-circle',   title: 'Mobile Money Dominant', body: 'Mobile money represents 47% of total payments — the leading channel across all businesses.' });
+      insights.push({ type: 'info',     icon: 'bi-person-check',         title: 'Agent Performance', body: 'Top 5 agents collectively drive 38% of total sales volume — consider recognition program.' });
+    } else {
+      const totalRev = revData.reduce((s, d) => s + d.revenue, 0);
+      // Collections insight
+      {% if billing_kpis.collections_rate %}
+      const rate = {{ billing_kpis.collections_rate }};
+      if (rate >= 85) {
+        insights.push({ type: 'positive', icon: 'bi-check-circle', title: 'Strong Collections', body: `Collections rate is ${rate}% — above the 85% target. Excellent payment recovery performance.` });
+      } else if (rate >= 70) {
+        insights.push({ type: 'warning', icon: 'bi-exclamation-triangle', title: 'Collections Below Target', body: `Collections at ${rate}%. Focus recovery efforts on overdue invoices to reach the 85% target.` });
+      } else {
+        insights.push({ type: 'alert', icon: 'bi-exclamation-circle-fill', title: 'Collections Alert', body: `Collections rate at ${rate}% — significantly below target. Immediate follow-up on outstanding invoices recommended.` });
+      }
+      {% endif %}
+
+      // Churn risk
+      {% if billing_kpis.churn_risk %}
+      const churn = {{ billing_kpis.churn_risk }};
+      if (churn > 0) {
+        insights.push({ type: 'warning', icon: 'bi-exclamation-triangle', title: `${churn} Account${churn > 1 ? 's' : ''} at Churn Risk`, body: `${churn} business subscription${churn > 1 ? 's are' : ' is'} past due or suspended. Proactive outreach recommended.` });
+      }
+      {% endif %}
+
+      // Top vertical
+      if (vertData.length > 0 && hasVertical) {
+        const top = vertData[0];
+        insights.push({ type: 'positive', icon: 'bi-bar-chart-fill', title: `${top.vertical} Leading`, body: `${top.vertical} drives ${top.percentage ? top.percentage.toFixed(0) : '?'}% of platform revenue — the strongest vertical this period.` });
+      }
+
+      // Payment mode
+      if (payData.length > 0 && hasPayment) {
+        const topPay = payData[0];
+        insights.push({ type: 'info', icon: 'bi-credit-card-2-front', title: `${topPay.method_display} Dominant`, body: `${topPay.method_display} accounts for ${topPay.percentage ? topPay.percentage.toFixed(0) : '?'}% of all payments — consider promoting for lower transaction costs.` });
+      }
+    }
+
+    if (insights.length === 0) {
+      insights.push({ type: 'info', icon: 'bi-cloud-upload', title: 'Awaiting Live Data', body: 'Insights will appear automatically once real transactions and subscriptions are recorded on the platform.' });
+    }
+
+    grid.innerHTML = insights.map(ins =>
+      `<div class="insight-card">
+        <div class="insight-icon ${ins.type}"><i class="bi ${ins.icon}"></i></div>
+        <div class="insight-text">
+          <strong>${ins.title}</strong>
+          <span>${ins.body}</span>
+        </div>
+      </div>`
+    ).join('');
+  })();
+
+  /* =====================================================
+     FILTER LOGIC
+     ===================================================== */
+
+  // Quick preset bar (top)
+  document.querySelectorAll('.filter-preset-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+      const preset = this.dataset.preset;
+      const input = document.getElementById('quickPresetInput');
+      if (input) { input.value = preset; }
+      document.getElementById('hqFilterQuickForm').submit();
+    });
+  });
+
+  // Offcanvas open/close
+  const filterOffcanvas = document.getElementById('filterOffcanvas');
+  const filterBackdrop  = document.getElementById('filterBackdrop');
+  const filterToggleBtn = document.getElementById('filterToggleBtn');
+  const filterCloseBtn  = document.getElementById('filterCloseBtn');
+  const filterResetBtn  = document.getElementById('filterResetBtn');
+  const presetInput     = document.getElementById('presetInput');
+  const customDateRange = document.getElementById('customDateRange');
+
+  function openFilter() {
+    filterOffcanvas && filterOffcanvas.classList.add('show');
+    filterBackdrop  && filterBackdrop.classList.add('show');
+    document.body.style.overflow = 'hidden';
+  }
+  function closeFilter() {
+    filterOffcanvas && filterOffcanvas.classList.remove('show');
+    filterBackdrop  && filterBackdrop.classList.remove('show');
+    document.body.style.overflow = '';
+  }
+
+  filterToggleBtn && filterToggleBtn.addEventListener('click', openFilter);
+  filterCloseBtn  && filterCloseBtn.addEventListener('click', closeFilter);
+  filterBackdrop  && filterBackdrop.addEventListener('click', closeFilter);
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeFilter(); });
+
+  // Offcanvas preset pills
+  document.querySelectorAll('.filter-pill-option').forEach(btn => {
+    btn.addEventListener('click', function() {
+      const p = this.dataset.preset;
+      document.querySelectorAll('.filter-pill-option').forEach(b => b.classList.remove('active'));
+      this.classList.add('active');
+      if (presetInput) presetInput.value = p;
+      if (customDateRange) customDateRange.style.display = p === 'custom' ? 'block' : 'none';
+    });
+  });
+
+  filterResetBtn && filterResetBtn.addEventListener('click', () => { window.location.href = window.location.pathname; });
+
+})();
+</script>
+{% endblock %}

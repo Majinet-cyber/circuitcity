@@ -7,5 +7,3 @@ can trigger AppRegistryNotReady during Django startup. Django will discover
 models automatically from models.py / models_*.py files.
 """
 # Intentionally empty on purpose.
-
-

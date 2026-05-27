@@ -1,0 +1,202 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Sell · Groceries · {{ business.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+.sell-page { max-width: 900px; margin: 0 auto; padding: 20px 12px; }
+.product-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; margin-bottom: 24px; }
+.product-card {
+  border: 2px solid #e2e8f0; border-radius: 16px; padding: 16px 12px; text-align: center;
+  cursor: pointer; transition: all 0.18s ease; background: #fff; user-select: none;
+}
+.product-card:hover { border-color: #10b981; background: #f0fdf4; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(16,185,129,0.12); }
+.product-card.selected { border-color: #059669; background: #dcfce7; box-shadow: 0 4px 16px rgba(5,150,105,0.18); }
+.product-card.out-of-stock { opacity: 0.45; cursor: not-allowed; }
+.product-card .pname { font-weight: 700; font-size: 0.9rem; color: #0f172a; display: block; }
+.product-card .pprice { font-size: 0.82rem; color: #059669; font-weight: 700; }
+.product-card .pstock { font-size: 0.75rem; color: #64748b; }
+.sell-form { background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 20px; margin-bottom: 20px; display: none; }
+.sell-form.visible { display: block; }
+.margin-badge { display: inline-block; padding: 4px 10px; border-radius: 99px; font-size: 0.8rem; font-weight: 700; }
+.margin-good { background: #dcfce7; color: #15803d; }
+.margin-warn { background: #fef9c3; color: #854d0e; }
+.margin-bad { background: #fee2e2; color: #991b1b; }
+.search-bar { width: 100%; border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px 14px; font-size: 0.95rem; margin-bottom: 16px; outline: none; }
+.search-bar:focus { border-color: #10b981; box-shadow: 0 0 0 3px rgba(16,185,129,0.12); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="sell-page">
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
+    <a href="{% url 'groceries:dashboard' %}" style="color:#64748b;font-size:0.875rem;">&larr; Dashboard</a>
+    <h1 style="margin:0;font-size:1.5rem;font-weight:800;color:#0f172a;">🛒 Sell Groceries</h1>
+  </div>
+
+  {% if messages %}
+  <div style="margin-bottom:16px;">
+    {% for msg in messages %}
+    <div style="padding:12px 16px;border-radius:10px;margin-bottom:8px;
+      {% if msg.tags == 'success' %}background:#dcfce7;color:#15803d;border:1px solid #86efac;
+      {% else %}background:#fee2e2;color:#991b1b;border:1px solid #fca5a5;{% endif %}">
+      {{ msg }}
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {% if products %}
+  <!-- Search -->
+  <input type="text" class="search-bar" id="product-search" placeholder="🔍 Search products..." oninput="filterProducts(this.value)" data-testid="product-search">
+
+  <!-- Product Cards -->
+  <div class="product-grid" id="product-grid" data-testid="product-cards">
+    {% for product in products %}
+    <div class="product-card {% if product.quantity_in_stock == 0 %}out-of-stock{% endif %}"
+         onclick="selectProduct({{ product.id }}, '{{ product.name|escapejs }}', {{ product.selling_price|default:0 }}, {{ product.cost_price|default:0 }}, {{ product.quantity_in_stock }}, '{{ product.base_unit }}')"
+         data-product-name="{{ product.name|lower }}"
+         data-testid="product-card-{{ product.id }}"
+         id="card-{{ product.id }}">
+      <span class="pname">{{ product.name }}</span>
+      <span class="pprice">MK {{ product.selling_price|floatformat:0|intcomma }}</span>
+      <span class="pstock">{{ product.quantity_in_stock }} {{ product.base_unit }} in stock</span>
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- Sell Form (appears after selecting a product) -->
+  <div class="sell-form" id="sell-form" data-testid="sell-form">
+    <h3 id="selected-product-name" style="font-weight:800;color:#0f172a;margin:0 0 16px;"></h3>
+    <form method="post">
+      {% csrf_token %}
+      <input type="hidden" name="product_id" id="hidden-product-id">
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+        <div>
+          <label style="font-weight:600;font-size:0.875rem;color:#475569;display:block;margin-bottom:6px;">Quantity</label>
+          <input type="number" name="quantity" id="qty-input" class="form-control" value="1" min="1" oninput="updateMargin()" style="font-size:1.2rem;font-weight:700;text-align:center;">
+          <small id="stock-available" style="font-size:0.78rem;color:#64748b;display:block;margin-top:4px;"></small>
+        </div>
+        <div>
+          <label style="font-weight:600;font-size:0.875rem;color:#475569;display:block;margin-bottom:6px;">Sale Mode</label>
+          <select name="sale_mode" class="form-select">
+            <option value="retail">Retail</option>
+            <option value="wholesale">Wholesale</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Margin preview -->
+      <div id="margin-preview" style="background:#f8fafc;border-radius:10px;padding:12px;margin-bottom:16px;font-size:0.875rem;">
+        <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+          <span style="color:#64748b;">Unit Price:</span>
+          <strong id="preview-price">MK 0</strong>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+          <span style="color:#64748b;">Total Revenue:</span>
+          <strong id="preview-total">MK 0</strong>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+          <span style="color:#64748b;">Estimated Profit:</span>
+          <strong id="preview-profit">MK 0</strong>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <span style="color:#64748b;">Margin:</span>
+          <span id="preview-margin-badge" class="margin-badge margin-good">—</span>
+        </div>
+      </div>
+
+      <div style="margin-bottom:16px;">
+        <label style="font-weight:600;font-size:0.875rem;color:#475569;display:block;margin-bottom:6px;">Payment Method</label>
+        <select name="payment_method" class="form-select">
+          <option value="CASH">Cash</option>
+          <option value="MOBILE_MONEY">Mobile Money</option>
+          <option value="BANK">Bank Transfer</option>
+        </select>
+      </div>
+
+      <div style="margin-bottom:16px;">
+        <label style="font-weight:600;font-size:0.875rem;color:#475569;display:block;margin-bottom:6px;">Notes (optional)</label>
+        <input type="text" name="notes" class="form-control" placeholder="Customer name, order ref...">
+      </div>
+
+      <div style="display:flex;gap:10px;">
+        <button type="submit" class="btn btn-success" style="flex:1;font-weight:700;padding:12px;" data-testid="confirm-sale-btn">
+          ✅ Confirm Sale
+        </button>
+        <button type="button" class="btn btn-outline-secondary" onclick="clearSelection()" style="font-weight:600;">
+          Cancel
+        </button>
+      </div>
+    </form>
+  </div>
+
+  {% else %}
+  <div style="text-align:center;padding:60px 20px;background:#fff;border-radius:20px;border:2px dashed #e2e8f0;" data-testid="empty-products">
+    <span style="font-size:3rem;display:block;margin-bottom:16px;">📦</span>
+    <h3 style="color:#0f172a;margin:0 0 8px;font-weight:800;">No products in stock</h3>
+    <p style="color:#64748b;margin:0 0 24px;">Add stock first to start making sales.</p>
+    <a href="{% url 'groceries:stock_in' %}" class="btn btn-primary" style="font-weight:700;">Add Stock Now</a>
+  </div>
+  {% endif %}
+</div>
+
+<script>
+var _selectedPrice = 0;
+var _selectedCost = 0;
+var _selectedStock = 0;
+
+function selectProduct(id, name, price, cost, stock, unit) {
+  if (stock === 0) return;
+  document.querySelectorAll('.product-card').forEach(c => c.classList.remove('selected'));
+  var card = document.getElementById('card-' + id);
+  if (card) card.classList.add('selected');
+
+  _selectedPrice = price;
+  _selectedCost = cost;
+  _selectedStock = stock;
+
+  document.getElementById('hidden-product-id').value = id;
+  document.getElementById('selected-product-name').textContent = name;
+  document.getElementById('stock-available').textContent = 'Available: ' + stock + ' ' + unit;
+  document.getElementById('qty-input').max = stock;
+  document.getElementById('qty-input').value = 1;
+
+  var form = document.getElementById('sell-form');
+  form.classList.add('visible');
+  form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  updateMargin();
+}
+
+function updateMargin() {
+  var qty = parseInt(document.getElementById('qty-input').value) || 1;
+  var total = qty * _selectedPrice;
+  var totalCost = qty * _selectedCost;
+  var profit = total - totalCost;
+  var marginPct = total > 0 ? Math.round((profit / total) * 100) : 0;
+
+  document.getElementById('preview-price').textContent = 'MK ' + _selectedPrice.toLocaleString();
+  document.getElementById('preview-total').textContent = 'MK ' + total.toLocaleString();
+  document.getElementById('preview-profit').textContent = 'MK ' + profit.toLocaleString();
+
+  var badge = document.getElementById('preview-margin-badge');
+  badge.textContent = marginPct + '%';
+  badge.className = 'margin-badge ' + (marginPct >= 20 ? 'margin-good' : marginPct >= 5 ? 'margin-warn' : 'margin-bad');
+}
+
+function clearSelection() {
+  document.querySelectorAll('.product-card').forEach(c => c.classList.remove('selected'));
+  document.getElementById('sell-form').classList.remove('visible');
+}
+
+function filterProducts(query) {
+  query = query.toLowerCase();
+  document.querySelectorAll('.product-card').forEach(function(card) {
+    var name = card.getAttribute('data-product-name') || '';
+    card.style.display = (!query || name.includes(query)) ? '' : 'none';
+  });
+}
+</script>
+{% endblock %}

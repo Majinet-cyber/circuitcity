@@ -10,5 +10,3 @@ class SalesConfig(AppConfig):
     def ready(self):
         # Import signals to register handlers
         from . import signals  # noqa: F401
-
-

@@ -1,0 +1,48 @@
+📊 Weekly Sales Summary - {{ business_name }}
+{{ week_start }} - {{ week_end }}
+
+Summary
+-------
+Total Revenue: MK {{ total_revenue|floatformat:0|intcomma }}
+Total Profit: MK {{ total_profit|floatformat:0|intcomma }}
+Total Sales: {{ total_sales_count }}
+
+{% if top_products_by_revenue %}
+Top Products by Revenue
+-----------------------
+{% for product in top_products_by_revenue|slice:":10" %}
+{{ product.name }}: MK {{ product.revenue|floatformat:0|intcomma }} ({{ product.quantity }} units)
+{% endfor %}
+{% endif %}
+
+{% if top_products_by_quantity %}
+Top Products by Quantity
+-------------------------
+{% for product in top_products_by_quantity|slice:":10" %}
+{{ product.name }}: {{ product.quantity }} units (MK {{ product.revenue|floatformat:0|intcomma }})
+{% endfor %}
+{% endif %}
+
+{% if top_agents %}
+Top Agents
+----------
+{% for agent in top_agents|slice:":5" %}
+{{ agent.name }}: MK {{ agent.revenue|floatformat:0|intcomma }} ({{ agent.sales_count }} sales)
+{% endfor %}
+{% endif %}
+
+{% if highest_day %}
+Highest Selling Day: {{ highest_day }}{% if highest_day_revenue %} (MK {{ highest_day_revenue|floatformat:0|intcomma }}){% endif %}
+{% endif %}
+
+{% if tips %}
+💡 Tips for Next Week
+---------------------
+{% for tip in tips|slice:":3" %}
+• {{ tip }}
+{% endfor %}
+{% endif %}
+
+---
+This is an automated weekly summary. Please do not reply directly to this message.
+

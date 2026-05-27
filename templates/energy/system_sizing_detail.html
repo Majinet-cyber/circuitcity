@@ -1,0 +1,1084 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{{ run.title }} – System Sizing{% endblock %}
+
+{% block content %}
+<style>
+  .result-card{background:#fff;border-radius:16px;padding:1.3rem;border:1.5px solid #e2e8f0;height:100%;}
+  .result-val{font-size:1.8rem;font-weight:800;color:#0f172a;line-height:1.1;}
+  .result-label{font-size:.72rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-top:.25rem;}
+  .result-sub{font-size:.75rem;color:#94a3b8;}
+  .section-head{font-size:.85rem;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.04em;margin-bottom:.75rem;}
+  .rec-item{padding:.5rem .75rem;border-radius:10px;margin-bottom:.4rem;font-size:.85rem;}
+  .rec-ok{background:#f0fdf4;border:1px solid #bbf7d0;color:#166534;}
+  .rec-warn{background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;}
+  .load-row{display:flex;justify-content:space-between;padding:.4rem 0;border-bottom:1px solid #f1f5f9;font-size:.85rem;}
+  .load-row:last-child{border-bottom:none;}
+  .badge-objective{font-size:.7rem;padding:.2rem .55rem;border-radius:6px;background:#eef2ff;color:#4338ca;font-weight:600;}
+  .badge-arch{font-size:.7rem;padding:.2rem .55rem;border-radius:6px;background:#f0fdf4;color:#059669;font-weight:600;}
+  .en-kpi{background:#fff;border-radius:14px;border:1.5px solid #e2e8f0;padding:1rem;box-shadow:0 2px 8px rgba(15,23,42,.04);}
+</style>
+
+<div class="container-fluid py-4">
+  {# Header #}
+  <div class="d-flex align-items-start justify-content-between mb-4 flex-wrap gap-2">
+    <div>
+      <h4 class="fw-bold mb-1"><i class="bi bi-calculator me-2" style="color:#10b981;"></i>{{ run.title }}</h4>
+      <div class="d-flex align-items-center gap-2 flex-wrap">
+        <span class="text-muted small">v{{ run.version }} · {{ run.created_at|date:"M j, Y" }}</span>
+        <span class="badge-objective">{{ run.get_design_objective_display }}</span>
+        <span class="badge-arch">{{ run.get_system_architecture_display }}</span>
+        {% if run.customer_name %}<span class="text-muted small">· {{ run.customer_name }}</span>{% endif %}
+      </div>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+      <a href="{% url 'verticals:energy_sizing_list' %}" class="btn btn-outline-secondary btn-sm rounded-pill"><i class="bi bi-arrow-left me-1"></i>All Sizings</a>
+      <a href="{% url 'verticals:energy_sizing_recalculate' run.id %}" class="btn btn-outline-primary btn-sm rounded-pill"><i class="bi bi-arrow-clockwise me-1"></i>Recalculate</a>
+      <a href="{% url 'verticals:energy_sizing_clone' run.id %}" class="btn btn-outline-secondary btn-sm rounded-pill"><i class="bi bi-copy me-1"></i>Clone</a>
+      <a href="{% url 'verticals:energy_sizing_pdf' run.id %}" class="btn btn-success btn-sm rounded-pill"><i class="bi bi-file-earmark-pdf me-1"></i>Download PDF</a>
+    </div>
+  </div>
+
+  {% if messages %}{% for m in messages %}<div class="alert alert-{{ m.tags|default:'info' }} rounded-3 mb-3">{{ m }}</div>{% endfor %}{% endif %}
+
+  {# === PRIMARY RESULTS === #}
+  <div class="row g-3 mb-4">
+    <div class="col-6 col-md-3 col-lg-2">
+      <div class="result-card text-center" style="border-color:#10b981;">
+        <div class="result-val" style="color:#059669;">{{ run.total_daily_demand_kwh|default:"–"|floatformat:1 }}</div>
+        <div class="result-label">Daily Demand (kWh)</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3 col-lg-2">
+      <div class="result-card text-center" style="border-color:#f59e0b;">
+        <div class="result-val" style="color:#d97706;">{{ run.peak_load_w|default:"–"|floatformat:0 }}</div>
+        <div class="result-label">Peak Load (W)</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3 col-lg-2">
+      <div class="result-card text-center" style="border-color:#6366f1;">
+        <div class="result-val" style="color:#4f46e5;">{{ run.recommended_array_kw|default:"–"|floatformat:1 }}</div>
+        <div class="result-label">Solar Array (kW)</div>
+        <div class="result-sub">{{ run.recommended_panel_count|default:"0" }} panels</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3 col-lg-2">
+      <div class="result-card text-center" style="border-color:#8b5cf6;">
+        <div class="result-val" style="color:#7c3aed;">{{ run.recommended_battery_kwh|default:"–"|floatformat:1 }}</div>
+        <div class="result-label">Battery (kWh)</div>
+        <div class="result-sub">{{ run.usable_storage_kwh|default:"0"|floatformat:1 }} usable</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3 col-lg-2">
+      <div class="result-card text-center" style="border-color:#ef4444;">
+        <div class="result-val" style="color:#dc2626;">{{ run.recommended_inverter_kw|default:"–"|floatformat:0 }}</div>
+        <div class="result-label">Inverter (kW)</div>
+        <div class="result-sub">{{ run.inverter_loading_pct|default:"0"|floatformat:0 }}% loading</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3 col-lg-2">
+      <div class="result-card text-center" style="border-color:#22d3ee;">
+        <div class="result-val" style="color:#0891b2;">{{ run.estimated_runtime_hours|default:"–"|floatformat:1 }}</div>
+        <div class="result-label">Runtime (Hours)</div>
+        <div class="result-sub">at full load</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-4">
+    {# === ECONOMICS === #}
+    <div class="col-12 col-lg-6">
+      <div class="result-card">
+        <div class="section-head"><i class="bi bi-cash-coin me-2" style="color:#10b981;"></i>Cost & ROI</div>
+        <div class="row g-3">
+          <div class="col-6">
+            <div style="font-size:.72rem;color:#64748b;text-transform:uppercase;">Equipment CapEx</div>
+            <div style="font-size:1.2rem;font-weight:800;color:#0f172a;">{{ business.currency }} {{ run.estimated_capex|default:"0"|floatformat:0 }}</div>
+          </div>
+          <div class="col-6">
+            <div style="font-size:.72rem;color:#64748b;text-transform:uppercase;">Installation</div>
+            <div style="font-size:1.2rem;font-weight:800;color:#0f172a;">{{ business.currency }} {{ run.estimated_installation_cost|default:"0"|floatformat:0 }}</div>
+          </div>
+          <div class="col-6">
+            <div style="font-size:.72rem;color:#64748b;text-transform:uppercase;">Monthly Savings</div>
+            <div style="font-size:1.2rem;font-weight:800;color:#059669;">{{ business.currency }} {{ run.projected_monthly_savings|default:"0"|floatformat:0 }}</div>
+          </div>
+          <div class="col-6">
+            <div style="font-size:.72rem;color:#64748b;text-transform:uppercase;">Annual Savings</div>
+            <div style="font-size:1.2rem;font-weight:800;color:#059669;">{{ business.currency }} {{ run.projected_annual_savings|default:"0"|floatformat:0 }}</div>
+          </div>
+          <div class="col-4">
+            <div style="font-size:.72rem;color:#64748b;text-transform:uppercase;">Payback</div>
+            <div style="font-size:1.4rem;font-weight:800;color:#4f46e5;">{{ run.payback_years|default:"–"|floatformat:1 }}<small style="font-size:.7rem;"> yrs</small></div>
+          </div>
+          <div class="col-4">
+            <div style="font-size:.72rem;color:#64748b;text-transform:uppercase;">ROI</div>
+            <div style="font-size:1.4rem;font-weight:800;color:#059669;">{{ run.roi_pct|default:"–"|floatformat:0 }}%</div>
+          </div>
+          <div class="col-4">
+            <div style="font-size:.72rem;color:#64748b;text-transform:uppercase;">Cost/kWh</div>
+            <div style="font-size:1.4rem;font-weight:800;">{{ business.currency }} {{ run.cost_per_kwh|default:"–"|floatformat:0 }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {# === RECOMMENDATIONS === #}
+    <div class="col-12 col-lg-6">
+      <div class="result-card">
+        <div class="section-head"><i class="bi bi-lightbulb me-2" style="color:#f59e0b;"></i>Recommendations & Warnings</div>
+        {% if run.warnings %}
+          {% for w in run.warnings %}
+            <div class="rec-item rec-warn">⚠ {{ w }}</div>
+          {% endfor %}
+        {% endif %}
+        {% if run.recommendations %}
+          {% for r in run.recommendations %}
+            <div class="rec-item rec-ok">✓ {{ r }}</div>
+          {% endfor %}
+        {% endif %}
+        {% if not run.recommendations and not run.warnings %}
+          <div class="text-muted small text-center py-3">Add appliances and compute to see recommendations.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  {# === LOAD SCHEDULE === #}
+  <div class="result-card mt-4">
+    <div class="section-head"><i class="bi bi-lightning-charge me-2" style="color:#f59e0b;"></i>Load Schedule ({{ appliances|length }} appliances)</div>
+    {% if appliances %}
+      <div class="table-responsive">
+        <table class="table table-sm mb-0" style="font-size:.85rem;">
+          <thead style="background:#f8fafc;">
+            <tr>
+              <th>Appliance</th>
+              <th class="text-center">Qty</th>
+              <th class="text-end">Wattage</th>
+              <th class="text-end">Hrs/Day</th>
+              <th class="text-end">Daily Wh</th>
+              <th class="text-center">Priority</th>
+              <th class="text-center">Period</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for a in appliances %}
+              <tr>
+                <td class="fw-semibold">{{ a.name }}</td>
+                <td class="text-center">{{ a.quantity }}</td>
+                <td class="text-end">{{ a.wattage|floatformat:0 }} W</td>
+                <td class="text-end">{{ a.hours_per_day|floatformat:1 }}</td>
+                <td class="text-end fw-semibold">{{ a.adjusted_daily_wh|floatformat:0 }} Wh</td>
+                <td class="text-center"><span class="badge {% if a.priority == 'critical' %}bg-danger{% elif a.priority == 'high' %}bg-warning text-dark{% elif a.priority == 'medium' %}bg-info text-dark{% else %}bg-secondary{% endif %}" style="font-size:.68rem;">{{ a.get_priority_display }}</span></td>
+                <td class="text-center" style="font-size:.75rem;">{{ a.get_usage_period_display }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+          <tfoot style="border-top:2px solid #10b981;">
+            <tr class="fw-bold">
+              <td>Total</td>
+              <td></td>
+              <td class="text-end">{{ run.peak_load_w|default:"0"|floatformat:0 }} W</td>
+              <td></td>
+              <td class="text-end">{{ run.total_daily_demand_wh|default:"0"|floatformat:0 }} Wh</td>
+              <td></td>
+              <td></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    {% else %}
+      <div class="text-muted text-center py-3">No appliances in this sizing run.</div>
+    {% endif %}
+  </div>
+
+  {# === SURGE LOAD SUMMARY === #}
+  {% if run.surge_load_w %}
+  <div class="result-card mt-4" style="border-color:#f59e0b;">
+    <div class="section-head"><i class="bi bi-lightning-fill me-2" style="color:#f59e0b;"></i>Surge / Startup Load Analysis</div>
+    <div class="row g-3">
+      <div class="col-6 col-md-3 text-center">
+        <div style="font-size:1.5rem;font-weight:800;color:#d97706;">{{ run.peak_load_w|floatformat:0 }} W</div>
+        <div style="font-size:.72rem;color:#64748b;text-transform:uppercase;">Running Load</div>
+      </div>
+      <div class="col-6 col-md-3 text-center">
+        <div style="font-size:1.5rem;font-weight:800;color:#dc2626;">{{ run.surge_load_w|floatformat:0 }} W</div>
+        <div style="font-size:.72rem;color:#64748b;text-transform:uppercase;">Total Surge Load</div>
+        <div style="font-size:.7rem;color:#94a3b8;">worst-case start-up</div>
+      </div>
+      <div class="col-6 col-md-3 text-center">
+        <div style="font-size:1.5rem;font-weight:800;color:#4f46e5;">{{ run.recommended_inverter_kw|floatformat:0 }} kW</div>
+        <div style="font-size:.72rem;color:#64748b;text-transform:uppercase;">Inverter Capacity</div>
+        <div style="font-size:.7rem;color:#94a3b8;">handles surge headroom</div>
+      </div>
+      <div class="col-6 col-md-3 text-center">
+        <div style="font-size:1.5rem;font-weight:800;color:#059669;">{{ run.inverter_loading_pct|floatformat:0 }}%</div>
+        <div style="font-size:.72rem;color:#64748b;text-transform:uppercase;">Inverter Loading</div>
+        <div style="font-size:.7rem;color:{% if run.inverter_loading_pct >= 85 %}#dc2626{% elif run.inverter_loading_pct >= 70 %}#d97706{% else %}#059669{% endif %};">{% if run.inverter_loading_pct >= 85 %}⚠ High — consider upsizing{% elif run.inverter_loading_pct >= 70 %}Moderate{% else %}Healthy margin{% endif %}</div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  {# === SENSITIVITY ANALYSIS === #}
+  {% if run.sensitivity_summary %}
+  <div class="result-card mt-4" style="border-color:#6366f1;">
+    <div class="section-head"><i class="bi bi-graph-up-arrow me-2" style="color:#6366f1;"></i>Sensitivity Analysis</div>
+    <p style="font-size:.82rem;color:#64748b;margin-bottom:1rem;">How the project economics change under different assumptions (tariff, cost, sun hours).</p>
+    <div class="table-responsive">
+      <table class="table table-sm mb-0" style="font-size:.84rem;">
+        <thead style="background:#f8fafc;">
+          <tr>
+            <th>Scenario</th>
+            <th class="text-end">Payback</th>
+            <th class="text-end">NPV (MWK)</th>
+            <th class="text-end">ROI</th>
+            <th>Interpretation</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for scenario, data in run.sensitivity_summary.items %}
+          <tr>
+            <td><span class="badge {% if scenario == 'pessimistic' %}bg-danger{% elif scenario == 'optimistic' %}bg-success{% else %}bg-secondary{% endif %}" style="font-size:.7rem;text-transform:capitalize;">{{ scenario }}</span></td>
+            <td class="text-end fw-bold">{% if data.payback_years %}{{ data.payback_years|floatformat:1 }} yrs{% else %}—{% endif %}</td>
+            <td class="text-end fw-bold" style="color:{% if data.npv and data.npv > 0 %}#059669{% else %}#dc2626{% endif %};">{% if data.npv %}MWK {{ data.npv|floatformat:0 }}{% else %}—{% endif %}</td>
+            <td class="text-end fw-bold">{% if data.roi_pct %}{{ data.roi_pct|floatformat:0 }}%{% else %}—{% endif %}</td>
+            <td style="font-size:.75rem;color:#64748b;">{{ data.note|default:"" }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div style="font-size:.72rem;color:#94a3b8;margin-top:.5rem;">Pessimistic: −20% savings, +20% costs. Optimistic: +20% savings, −20% costs. NPV discounted over 25 years.</div>
+  </div>
+  {% endif %}
+
+  {# === TECHNICAL DIAGRAM === #}
+  {% if run.recommended_array_kw %}
+  <div class="result-card mt-4" id="tech-diagram-section" style="border-color:#10b981;">
+    <div class="d-flex align-items-center justify-content-between mb-2 flex-wrap gap-2">
+      <div class="section-head mb-0"><i class="bi bi-diagram-3 me-2" style="color:#10b981;"></i>Technical System Schematic</div>
+      <div class="d-flex gap-2">
+        <button onclick="printDiagram()" class="btn btn-outline-success btn-sm rounded-pill"><i class="bi bi-printer me-1"></i>Print Schematic</button>
+        <button onclick="document.getElementById('designRationale').classList.toggle('d-none')" class="btn btn-outline-secondary btn-sm rounded-pill"><i class="bi bi-lightbulb me-1"></i>Why this design?</button>
+      </div>
+    </div>
+    <p style="font-size:.8rem;color:#64748b;margin-bottom:1rem;">Professional wiring schematic based on sizing results. Not a certified electrical drawing — verify with a licensed electrician before installation.</p>
+    <div id="sysdiagram" style="overflow-x:auto;"></div>
+
+    {# Why this design? rationale panel #}
+    <div id="designRationale" class="d-none mt-3 p-3 rounded-3" style="background:#f0fdf4;border:1.5px solid #6ee7b7;">
+      <div style="font-weight:700;color:#064e3b;font-size:.9rem;margin-bottom:.75rem;">💡 Why this design?</div>
+      <div id="rationaleContent" style="font-size:.83rem;color:#065f46;line-height:1.7;"></div>
+    </div>
+  </div>
+  {% endif %}
+
+  {# === ENERGY SIMULATION PANEL === #}
+  {% if run.recommended_array_kw %}
+  <div class="result-card mt-4" id="simulation-section" style="border-color:#22d3ee;">
+    <div class="section-head"><i class="bi bi-play-circle me-2" style="color:#0891b2;"></i>Daily Energy Flow Simulation</div>
+    <p style="font-size:.8rem;color:#64748b;margin-bottom:.75rem;">
+      Drag the time slider to simulate solar generation, battery state, and energy flow throughout a typical day. 
+      Hover over the chart to see values. Alerts appear automatically when risk conditions are detected.
+    </p>
+
+    {# Time controls #}
+    <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:1rem;flex-wrap:wrap;">
+      <span style="font-size:.82rem;font-weight:700;color:#0f172a;">Time of Day:</span>
+      <input type="range" id="simSlider" min="0" max="1440" value="480" step="15" style="flex:1;min-width:200px;accent-color:#10b981;">
+      <span id="simTime" style="font-size:1.1rem;font-weight:800;color:#0891b2;min-width:4.5rem;font-feature-settings:'tnum';">08:00</span>
+      <button id="simPlayBtn" class="btn btn-sm rounded-pill" style="background:#10b981;color:#fff;font-size:.76rem;padding:.3rem .75rem;">▶ Play</button>
+    </div>
+
+    {# KPI row #}
+    <div class="row g-2 mb-3">
+      <div class="col-6 col-md">
+        <div class="en-kpi" style="border-color:#f59e0b;padding:.6rem .5rem;text-align:center;">
+          <div id="simSolarIcon" style="font-size:1.1rem;margin-bottom:.1rem;">🌙</div>
+          <div id="simSolar" style="font-size:1.3rem;font-weight:800;color:#d97706;">0 W</div>
+          <div style="font-size:.65rem;color:#64748b;text-transform:uppercase;letter-spacing:.04em;">Solar Output</div>
+        </div>
+      </div>
+      <div class="col-6 col-md">
+        <div class="en-kpi" style="border-color:#6366f1;padding:.6rem .5rem;text-align:center;">
+          <div style="font-size:1.1rem;margin-bottom:.1rem;">⚡</div>
+          <div id="simLoad" style="font-size:1.3rem;font-weight:800;color:#4f46e5;">0 W</div>
+          <div style="font-size:.65rem;color:#64748b;text-transform:uppercase;letter-spacing:.04em;">Load Demand</div>
+        </div>
+      </div>
+      <div class="col-6 col-md">
+        <div class="en-kpi" style="border-color:#10b981;padding:.6rem .5rem;text-align:center;">
+          <div id="simBatIcon" style="font-size:1.1rem;margin-bottom:.1rem;">🔋</div>
+          <div id="simBattery" style="font-size:1.3rem;font-weight:800;color:#059669;">70%</div>
+          <div style="font-size:.65rem;color:#64748b;text-transform:uppercase;letter-spacing:.04em;">Battery State</div>
+          <div id="simBatBar" style="height:4px;border-radius:2px;background:#e2e8f0;margin-top:.25rem;overflow:hidden;">
+            <div id="simBatFill" style="height:100%;width:70%;background:#10b981;border-radius:2px;transition:width .3s;"></div>
+          </div>
+        </div>
+      </div>
+      <div class="col-6 col-md">
+        <div class="en-kpi" style="border-color:#22d3ee;padding:.6rem .5rem;text-align:center;">
+          <div style="font-size:1.1rem;margin-bottom:.1rem;">🔁</div>
+          <div id="simNet" style="font-size:1.3rem;font-weight:800;color:#0891b2;">0 W</div>
+          <div style="font-size:.65rem;color:#64748b;text-transform:uppercase;letter-spacing:.04em;">Net Power</div>
+        </div>
+      </div>
+      <div class="col-6 col-md">
+        <div class="en-kpi" style="border-color:#ef4444;padding:.6rem .5rem;text-align:center;">
+          <div style="font-size:1.1rem;margin-bottom:.1rem;">🛡️</div>
+          <div id="simStatus" style="font-size:.95rem;font-weight:700;color:#059669;line-height:1.2;">OK</div>
+          <div style="font-size:.65rem;color:#64748b;text-transform:uppercase;letter-spacing:.04em;">System State</div>
+        </div>
+      </div>
+    </div>
+
+    {# Energy balance summary #}
+    <div id="simBalance" class="row g-2 mb-2" style="font-size:.8rem;">
+      <div class="col-4 text-center" style="color:#059669;"><span id="simServed">0</span> kWh served</div>
+      <div class="col-4 text-center" style="color:#dc2626;"><span id="simShortfall">0</span> kWh shortfall</div>
+      <div class="col-4 text-center" style="color:#d97706;"><span id="simSavedMWK">MWK 0</span> saved</div>
+    </div>
+
+    {# Chart #}
+    <div style="position:relative;height:180px;background:#f8fafc;border-radius:12px;border:1.5px solid #e2e8f0;overflow:hidden;">
+      <canvas id="simChart" style="width:100%;height:100%;"></canvas>
+      <div style="position:absolute;bottom:4px;left:50%;transform:translateX(-50%);font-size:.65rem;color:#94a3b8;">← Solar (amber) · Load (indigo) · Battery % (green) · 📍 Current Time Marker (cyan) →</div>
+    </div>
+
+    {# Warning messages #}
+    <div id="simWarning" style="display:none;border-radius:10px;padding:.6rem .85rem;margin-top:.6rem;font-size:.83rem;"></div>
+
+    {# Recommendation messages #}
+    <div id="simRecommendations" class="mt-2"></div>
+  </div>
+  {% endif %}
+
+  {% if run.notes or run.assumptions %}
+  <div class="result-card mt-4">
+    <div class="section-head">Notes & Assumptions</div>
+    {% if run.assumptions %}<p style="font-size:.88rem;"><strong>Assumptions:</strong> {{ run.assumptions }}</p>{% endif %}
+    {% if run.notes %}<p style="font-size:.88rem;">{{ run.notes }}</p>{% endif %}
+  </div>
+  {% endif %}
+
+  {# ===== QUOTATION BUILDER ===== #}
+  {% if run.recommended_array_kw %}
+  <div class="result-card mt-4" id="quotation-builder" style="border-color:#4f46e5;">
+    <div class="section-head" style="color:#4f46e5;"><i class="bi bi-file-earmark-text me-2"></i>Quotation Builder</div>
+    <p style="font-size:.85rem;color:#64748b;margin-bottom:1.25rem;">Derived from sizing run results. Adjust panel wattage to see component counts and estimated BOS items.</p>
+
+    <div class="row g-3 mb-3">
+      <div class="col-6 col-md-3">
+        <label style="font-size:.7rem;font-weight:700;text-transform:uppercase;color:#64748b;letter-spacing:.04em;">System Size</label>
+        <div style="font-size:1.5rem;font-weight:800;color:#4f46e5;">{{ run.recommended_array_kw|floatformat:1 }} kW</div>
+        <div style="font-size:.72rem;color:#94a3b8;">Solar array</div>
+      </div>
+      {% if run.recommended_inverter_kw %}
+      <div class="col-6 col-md-3">
+        <label style="font-size:.7rem;font-weight:700;text-transform:uppercase;color:#64748b;letter-spacing:.04em;">Inverter</label>
+        <div style="font-size:1.5rem;font-weight:800;color:#dc2626;">{{ run.recommended_inverter_kw|floatformat:0 }} kW</div>
+        <div style="font-size:.72rem;color:#94a3b8;">Recommended size</div>
+      </div>
+      {% endif %}
+      {% if run.recommended_battery_kwh %}
+      <div class="col-6 col-md-3">
+        <label style="font-size:.7rem;font-weight:700;text-transform:uppercase;color:#64748b;letter-spacing:.04em;">Battery Bank</label>
+        <div style="font-size:1.5rem;font-weight:800;color:#7c3aed;">{{ run.recommended_battery_kwh|floatformat:1 }} kWh</div>
+        <div style="font-size:.72rem;color:#94a3b8;">{{ run.usable_storage_kwh|default:"–"|floatformat:1 }} kWh usable</div>
+      </div>
+      {% endif %}
+      <div class="col-6 col-md-3">
+        <label style="font-size:.7rem;font-weight:700;text-transform:uppercase;color:#64748b;letter-spacing:.04em;">Panel Config</label>
+        <div style="font-size:1.5rem;font-weight:800;color:#059669;" id="qt-panel-count">{{ run.recommended_panel_count|default:"–" }}</div>
+        <div style="font-size:.72rem;color:#94a3b8;" id="qt-panel-note">panels ({{ run.panel_wattage|default:550 }}Wp each)</div>
+      </div>
+    </div>
+
+    <div class="row g-3 align-items-end mb-4">
+      <div class="col-sm-4">
+        <label style="font-size:.78rem;font-weight:600;color:#374151;">Panel wattage (Wp)</label>
+        <select id="qt-panel-wattage" class="form-select form-select-sm" style="border-radius:8px;">
+          <option value="250" {% if run.panel_wattage == 250 %}selected{% endif %}>250 Wp</option>
+          <option value="300" {% if run.panel_wattage == 300 %}selected{% endif %}>300 Wp</option>
+          <option value="350" {% if run.panel_wattage == 350 %}selected{% endif %}>350 Wp</option>
+          <option value="400" {% if run.panel_wattage == 400 %}selected{% endif %}>400 Wp</option>
+          <option value="450" {% if run.panel_wattage == 450 %}selected{% endif %}>450 Wp</option>
+          <option value="500" {% if run.panel_wattage == 500 %}selected{% endif %}>500 Wp</option>
+          <option value="550" {% if run.panel_wattage == 550 %}selected{% endif %}>550 Wp (common)</option>
+          <option value="600" {% if run.panel_wattage == 600 %}selected{% endif %}>600 Wp</option>
+        </select>
+      </div>
+      <div class="col-sm-4">
+        <label style="font-size:.78rem;font-weight:600;color:#374151;">Design margin</label>
+        <select id="qt-design-margin" class="form-select form-select-sm" style="border-radius:8px;">
+          <option value="1.0">No margin (exact sizing)</option>
+          <option value="1.1" selected>+10% (recommended)</option>
+          <option value="1.15">+15%</option>
+          <option value="1.2">+20%</option>
+          <option value="1.25">+25% (commercial)</option>
+        </select>
+      </div>
+      <div class="col-sm-4">
+        <button id="qt-recalc" class="btn btn-primary btn-sm w-100" style="border-radius:8px;">Recalculate</button>
+      </div>
+    </div>
+
+    <div style="background:#f8fafc;border-radius:12px;padding:1rem 1.25rem;" id="qt-line-items">
+      <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;color:#64748b;margin-bottom:.75rem;letter-spacing:.04em;">Quotation Line Items</div>
+      <table style="width:100%;font-size:.85rem;border-collapse:collapse;" id="qt-table">
+        <thead>
+          <tr style="border-bottom:1.5px solid #e2e8f0;">
+            <th style="text-align:left;padding:.35rem 0;color:#374151;">Item</th>
+            <th style="text-align:center;padding:.35rem 0;color:#374151;width:80px;">Qty</th>
+            <th style="text-align:left;padding:.35rem 0;color:#374151;">Specification</th>
+          </tr>
+        </thead>
+        <tbody id="qt-tbody">
+        </tbody>
+      </table>
+    </div>
+
+    <div style="margin-top:1rem;font-size:.75rem;color:#94a3b8;">
+      <i class="bi bi-info-circle me-1"></i>
+      Panel count and component quantities are estimates based on system sizing outputs. Actual BOS (Balance of System) items depend on site survey and installation design. Verify with your installation team before issuing a formal quotation.
+    </div>
+  </div>
+
+  <script>
+  (function () {
+    var arrayKw   = parseFloat('{{ run.recommended_array_kw|default:"0"|floatformat:3 }}') || 0;
+    var invKw     = parseFloat('{{ run.recommended_inverter_kw|default:"0"|floatformat:2 }}') || 0;
+    var batKwh    = parseFloat('{{ run.recommended_battery_kwh|default:"0"|floatformat:2 }}') || 0;
+    var batUsable = parseFloat('{{ run.usable_storage_kwh|default:"0"|floatformat:2 }}') || 0;
+
+    var panelWattageEl  = document.getElementById('qt-panel-wattage');
+    var marginEl        = document.getElementById('qt-design-margin');
+    var recalcBtn       = document.getElementById('qt-recalc');
+    var panelCountEl    = document.getElementById('qt-panel-count');
+    var panelNoteEl     = document.getElementById('qt-panel-note');
+    var tbody           = document.getElementById('qt-tbody');
+
+    function calcAndRender() {
+      var wp     = parseInt(panelWattageEl.value) || 400;
+      var margin = parseFloat(marginEl.value) || 1.1;
+      var adjKw  = arrayKw * margin;
+      var panelCount = adjKw > 0 ? Math.ceil((adjKw * 1000) / wp) : 0;
+
+      panelCountEl.textContent = panelCount;
+      panelNoteEl.textContent  = 'panels (' + wp + ' Wp each, ' + Math.round((margin - 1) * 100) + '% margin)';
+
+      var rows = [];
+      if (panelCount > 0) {
+        rows.push({ item: 'Solar Panels', qty: panelCount, spec: wp + ' Wp monocrystalline' });
+      }
+      if (invKw > 0) {
+        rows.push({ item: 'Inverter / Hybrid Inverter', qty: 1, spec: invKw.toFixed(0) + ' kW' });
+      }
+      if (batKwh > 0) {
+        var batUnits = Math.ceil(batKwh / 2.4);
+        rows.push({ item: 'Battery Bank', qty: batUnits, spec: batKwh.toFixed(1) + ' kWh total (' + batUsable.toFixed(1) + ' kWh usable)' });
+      }
+      if (panelCount > 0) {
+        var strings = Math.max(1, Math.ceil(panelCount / 10));
+        rows.push({ item: 'DC Isolator / Combiner Box', qty: strings, spec: 'per string' });
+        rows.push({ item: 'MC4 Connectors (pairs)', qty: panelCount * 2, spec: 'pair' });
+        rows.push({ item: 'DC Cable (m)', qty: Math.round(panelCount * 3.5), spec: '4mm² PV cable (estimate)' });
+        rows.push({ item: 'Mounting Structure', qty: panelCount, spec: 'panel mounts (roof / ground)' });
+      }
+      if (invKw > 0) {
+        rows.push({ item: 'AC Protection / MCB', qty: 1, spec: 'per inverter output' });
+      }
+      rows.push({ item: 'AC Cable (m)', qty: 20, spec: '6mm² (installation estimate)' });
+      rows.push({ item: 'Earthing Kit', qty: 1, spec: 'site-wide' });
+      rows.push({ item: 'Monitoring / Data Logger', qty: 1, spec: 'optional — per site requirements' });
+
+      tbody.innerHTML = rows.map(function (r) {
+        return '<tr style="border-bottom:1px solid #f1f5f9;">' +
+          '<td style="padding:.4rem 0;font-weight:600;">' + r.item + '</td>' +
+          '<td style="padding:.4rem 0;text-align:center;">' + r.qty + '</td>' +
+          '<td style="padding:.4rem 0;color:#64748b;">' + r.spec + '</td>' +
+          '</tr>';
+      }).join('');
+    }
+
+    recalcBtn.addEventListener('click', calcAndRender);
+    calcAndRender();
+  }());
+  </script>
+  {% endif %}
+
+</div>
+
+{# ===== TECHNICAL DIAGRAM JS ===== #}
+{% if run.recommended_array_kw %}
+<script>
+(function() {
+  var arrayKw  = {{ run.recommended_array_kw|floatformat:2 }};
+  var panels   = {{ run.recommended_panel_count|default:0 }};
+  var batKwh   = {{ run.recommended_battery_kwh|default:0|floatformat:2 }};
+  var batV     = {{ run.battery_voltage|default:48 }};
+  var invKw    = {{ run.recommended_inverter_kw|default:0|floatformat:2 }};
+  var ccA      = {{ run.recommended_charge_controller_a|default:0|floatformat:1 }};
+  var panelWp  = {{ run.panel_wattage|default:550 }};
+  var hasGen   = {{ run.has_generator|yesno:"true,false" }};
+  var genKva   = {{ run.recommended_generator_kva|default:0|floatformat:1 }};
+
+  // Determine series/parallel config based on voltage
+  var panelsPerString = batV >= 48 ? 4 : (batV >= 24 ? 2 : 1);
+  var strings = Math.max(1, Math.ceil(panels / panelsPerString));
+  var config = (panelsPerString > 1 && strings > 1) ? 'Series-Parallel'
+             : (panelsPerString > 1 ? 'Series' : 'Parallel');
+  var voc = panelsPerString * 37.5; // Approximate open-circuit voltage per panel ~37.5V
+  var dcCurrent = panels > 0 ? ((arrayKw * 1000) / (panelsPerString * 37.5)).toFixed(1) : 0;
+  var configExplain = config === 'Series-Parallel'
+    ? panelsPerString + ' panels/string × ' + strings + ' strings'
+    : config === 'Series'
+    ? panelsPerString + ' panels in series → ~' + Math.round(voc) + 'V Voc'
+    : 'Parallel — low voltage system';
+
+  function drawDiagram() {
+    var W = 960, H = 520;
+    var svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + W + ' ' + H
+            + '" style="width:100%;max-width:960px;font-family:Inter,system-ui,sans-serif;background:#f8fafc;border-radius:16px;">';
+
+    // Background gradient
+    svg += '<defs>';
+    svg += '<linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:#f8fafc"/><stop offset="100%" style="stop-color:#f1f5f9"/></linearGradient>';
+    svg += '<marker id="arrowDC" markerWidth="8" markerHeight="8" refX="4" refY="3" orient="auto"><polygon points="0 0, 6 3, 0 6" fill="#f59e0b"/></marker>';
+    svg += '<marker id="arrowAC" markerWidth="8" markerHeight="8" refX="4" refY="3" orient="auto"><polygon points="0 0, 6 3, 0 6" fill="#0ea5e9"/></marker>';
+    svg += '<marker id="arrowBat" markerWidth="8" markerHeight="8" refX="4" refY="3" orient="auto"><polygon points="0 0, 6 3, 0 6" fill="#6366f1"/></marker>';
+    svg += '<marker id="arrowGnd" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto"><polygon points="0 0, 5 3, 0 6" fill="#64748b"/></marker>';
+    svg += '</defs>';
+    svg += '<rect width="' + W + '" height="' + H + '" fill="url(#bgGrad)" rx="16"/>';
+
+    // Title bar
+    svg += '<rect x="0" y="0" width="' + W + '" height="52" fill="#0f172a" rx="16"/>';
+    svg += '<rect x="0" y="36" width="' + W + '" height="16" fill="#0f172a"/>';
+    svg += '<text x="16" y="22" font-size="13" font-weight="700" fill="#fff">SYSTEM SCHEMATIC — '
+         + arrayKw.toFixed(1) + ' kW PV  ·  ' + batKwh.toFixed(1) + ' kWh Battery  ·  '
+         + invKw.toFixed(0) + ' kW Inverter  ·  ' + batV + 'V System</text>';
+    svg += '<text x="16" y="42" font-size="10" fill="#94a3b8">Panel config: '
+         + config + '  (' + configExplain + ')  ·  Array DC: ~' + dcCurrent + ' A  ·  Auto-generated — verify with licensed electrician</text>';
+
+    // ── Helper: box with icon, title, subtitle, optional badge ──
+    function box(x, y, w, h, fill, stroke, icon, title, sub1, sub2) {
+      var cx = x + w/2;
+      var r = '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + h
+            + '" rx="10" fill="' + fill + '" stroke="' + stroke + '" stroke-width="2"/>';
+      var ty = sub1 ? (icon ? y+h/2-14 : y+h/2-8) : (icon ? y+h/2-10 : y+h/2+4);
+      if (icon) {
+        r += '<text x="' + cx + '" y="' + (ty) + '" text-anchor="middle" font-size="20">' + icon + '</text>';
+        ty += 17;
+      }
+      r += '<text x="' + cx + '" y="' + ty + '" text-anchor="middle" font-size="10" font-weight="700" fill="#0f172a">' + title + '</text>';
+      if (sub1) r += '<text x="' + cx + '" y="' + (ty+13) + '" text-anchor="middle" font-size="9" fill="#475569">' + sub1 + '</text>';
+      if (sub2) r += '<text x="' + cx + '" y="' + (ty+24) + '" text-anchor="middle" font-size="8" fill="#94a3b8">' + sub2 + '</text>';
+      return r;
+    }
+
+    // ── Helper: labelled wire ──
+    function wire(x1, y1, x2, y2, color, label, marker, dashed, thickness) {
+      var th = thickness || 2.5;
+      var dash = dashed ? 'stroke-dasharray="6,3"' : '';
+      var mEnd = marker ? 'marker-end="url(#' + marker + ')"' : '';
+      var r = '<line x1="' + x1 + '" y1="' + y1 + '" x2="' + x2 + '" y2="' + y2
+            + '" stroke="' + color + '" stroke-width="' + th + '" ' + dash + ' ' + mEnd + '/>';
+      if (label) {
+        var mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+        r += '<rect x="' + (mx-22) + '" y="' + (my-8) + '" width="44" height="14" fill="white" opacity="0.9" rx="3"/>';
+        r += '<text x="' + mx + '" y="' + (my+3) + '" text-anchor="middle" font-size="8" font-weight="600" fill="' + color + '">' + label + '</text>';
+      }
+      return r;
+    }
+
+    // ── Helper: protection device (circle with ×) ──
+    function fuse(x, y, label) {
+      return '<circle cx="' + x + '" cy="' + y + '" r="9" fill="#fff7ed" stroke="#f97316" stroke-width="1.5"/>'
+           + '<text x="' + x + '" y="' + (y+3) + '" text-anchor="middle" font-size="9" font-weight="700" fill="#ea580c">⊗</text>'
+           + (label ? '<text x="' + x + '" y="' + (y+18) + '" text-anchor="middle" font-size="8" fill="#64748b">' + label + '</text>' : '');
+    }
+
+    // ── Layout constants ──
+    var panelX=22,  panelY=72,  panelW=120, panelH=68;
+    var combX=190,  combY=84,   combW=76,   combH=40;
+    var dcFuseX=315, dcFuseY=104;
+    var ccX=340,    ccY=72,     ccW=110,    ccH=54;
+    var batX=340,   batY=190,   batW=110,   batH=70;
+    var invX=510,   invY=72,    invW=120,   invH=60;
+    var acdbX=690,  acdbY=72,   acdbW=100,  acdbH=60;
+    var loadX=690,  loadY=200,  loadW=100,  loadH=65;
+    var earthX=830, earthY=370, earthW=80,  earthH=38;
+    var genX=510,   genY=200,   genW=100,   genH=55;
+    var gridX=690,  gridY=320,  gridW=100,  gridH=50;
+
+    // ── Draw panel strings visually ──
+    var numStrings = Math.min(strings, 3);
+    for (var s = 0; s < numStrings; s++) {
+      var yOff = s * 22;
+      var pCount = (s < numStrings - 1) ? panelsPerString : (panels - panelsPerString * (numStrings - 1));
+      if (pCount <= 0) pCount = panelsPerString;
+      // Mini panel blocks
+      for (var p = 0; p < Math.min(pCount, 4); p++) {
+        svg += '<rect x="' + (panelX + p*27) + '" y="' + (panelY + 10 + yOff) + '" width="22" height="16" rx="2" fill="#fef9c3" stroke="#f59e0b" stroke-width="1.2"/>';
+        svg += '<line x1="' + (panelX + p*27 + 11) + '" y1="' + (panelY+10+yOff) + '" x2="' + (panelX+p*27+11) + '" y2="' + (panelY+26+yOff) + '" stroke="#f59e0b" stroke-width="0.8"/>';
+        svg += '<line x1="' + (panelX + p*27) + '" y1="' + (panelY+18+yOff) + '" x2="' + (panelX+p*27+22) + '" y2="' + (panelY+18+yOff) + '" stroke="#f59e0b" stroke-width="0.8"/>';
+      }
+      if (pCount > 4) svg += '<text x="' + (panelX+115) + '" y="' + (panelY+22+yOff) + '" font-size="8" fill="#f59e0b">+' + (pCount-4) + '</text>';
+    }
+    // Panel label box
+    svg += '<rect x="' + panelX + '" y="' + panelY + '" width="' + panelW + '" height="' + panelH + '" rx="10" fill="rgba(254,243,199,0.5)" stroke="#f59e0b" stroke-width="2"/>';
+    svg += '<text x="' + (panelX+panelW/2) + '" y="' + (panelY+panelH-14) + '" text-anchor="middle" font-size="10" font-weight="700" fill="#92400e">' + panels + '× ' + panelWp + 'Wp</text>';
+    svg += '<text x="' + (panelX+panelW/2) + '" y="' + (panelY+panelH-3) + '" text-anchor="middle" font-size="8" fill="#b45309">' + config + ' · ' + arrayKw.toFixed(1) + ' kW</text>';
+
+    // DC Combiner / String combiner
+    svg += box(combX, combY, combW, combH, '#fff7ed', '#f97316', null, 'Combiner Box', strings + ' string' + (strings>1?'s':''), 'Surge protection');
+
+    // DC Fuse/Breaker between combiner and CC
+    svg += fuse(dcFuseX, dcFuseY, 'DC MCB');
+
+    // Charge controller
+    svg += box(ccX, ccY, ccW, ccH, '#ecfdf5', '#10b981', null, 'MPPT Controller',
+               ccA.toFixed(0) + 'A · ' + batV + 'V', 'Charge control');
+
+    // Battery bank with visual cells
+    svg += '<rect x="' + batX + '" y="' + batY + '" width="' + batW + '" height="' + batH + '" rx="10" fill="#eef2ff" stroke="#6366f1" stroke-width="2"/>';
+    for (var b = 0; b < 3; b++) {
+      svg += '<rect x="' + (batX+8+b*34) + '" y="' + (batY+14) + '" width="26" height="28" rx="3" fill="#c7d2fe" stroke="#6366f1" stroke-width="1"/>';
+      svg += '<rect x="' + (batX+17+b*34) + '" y="' + (batY+10) + '" width="8" height="5" rx="1" fill="#6366f1"/>';
+    }
+    svg += '<text x="' + (batX+batW/2) + '" y="' + (batY+batH-14) + '" text-anchor="middle" font-size="10" font-weight="700" fill="#312e81">Battery Bank</text>';
+    svg += '<text x="' + (batX+batW/2) + '" y="' + (batY+batH-3) + '" text-anchor="middle" font-size="8" fill="#4338ca">' + batKwh.toFixed(1) + ' kWh · ' + batV + 'V</text>';
+
+    // Inverter/Hybrid
+    svg += box(invX, invY, invW, invH, '#fff1f2', '#ef4444', '⚡', 'Hybrid Inverter',
+               invKw.toFixed(0) + ' kW', 'DC→AC converter');
+
+    // AC Distribution Board
+    svg += box(acdbX, acdbY, acdbW, acdbH, '#f0f9ff', '#0ea5e9', null, 'AC Board',
+               'MCB Protection', 'Distribution');
+
+    // AC Loads
+    svg += box(loadX, loadY, loadW, loadH, '#f0fdf4', '#22c55e', '🏠', 'AC Loads',
+               'Appliances', 'Critical + non-critical');
+
+    // Earthing symbol
+    svg += '<rect x="' + earthX + '" y="' + earthY + '" width="' + earthW + '" height="' + earthH + '" rx="8" fill="#f1f5f9" stroke="#64748b" stroke-width="1.5"/>';
+    svg += '<text x="' + (earthX+earthW/2) + '" y="' + (earthY+14) + '" text-anchor="middle" font-size="16">⏚</text>';
+    svg += '<text x="' + (earthX+earthW/2) + '" y="' + (earthY+30) + '" text-anchor="middle" font-size="8" fill="#475569">Earth / GND</text>';
+
+    // Generator (if present)
+    if (hasGen) {
+      svg += box(genX, genY, genW, genH, '#fff7ed', '#ea580c', '🔌', 'Generator',
+                 genKva.toFixed(1) + ' kVA', 'AC backup');
+      svg += wire(genX+genW, genY+genH/2, acdbX, acdbY+acdbH/2+8, '#ea580c', 'AC backup', null, true, 2);
+    }
+
+    // Grid input (dashed — optional)
+    {% if run.has_grid_access %}
+    svg += box(gridX, gridY, gridW, gridH, '#fafafa', '#94a3b8', '🔌', 'Grid Input',
+               'Utility backup', 'dashed = optional');
+    svg += wire(gridX, gridY+gridH/2, acdbX+acdbW/2, acdbY+acdbH, '#94a3b8', 'Grid', null, true, 1.5);
+    {% endif %}
+
+    // ── Wires with arrows ──
+    // Panels → Combiner (DC, positive)
+    svg += wire(panelX+panelW, panelY+panelH/2, combX, combY+combH/2, '#f59e0b', '+DC', 'arrowDC', false, 3);
+    // Combiner → Fuse
+    svg += wire(combX+combW, combY+combH/2, dcFuseX-9, dcFuseY, '#f59e0b', null, null, false, 2.5);
+    // Fuse → CC
+    svg += wire(dcFuseX+9, dcFuseY, ccX, ccY+ccH/2, '#f59e0b', 'DC', 'arrowDC', false, 2.5);
+    // CC → Inverter DC bus
+    svg += wire(ccX+ccW, ccY+ccH/2, invX, invY+invH/3, '#ef4444', 'DC Bus', 'arrowDC', false, 2.5);
+    // CC → Battery (charging)
+    svg += wire(ccX+ccW/2, ccY+ccH, batX+batW/2, batY, '#6366f1', 'Charge', 'arrowBat', false, 2.5);
+    // Battery → Inverter DC
+    svg += wire(batX+batW, batY+batH/3, invX, invY+invH*2/3, '#6366f1', '', 'arrowBat', false, 2.5);
+    // Inverter → ACDB (AC out)
+    svg += wire(invX+invW, invY+invH/2, acdbX, acdbY+acdbH/2, '#0ea5e9', 'AC 230V', 'arrowAC', false, 3);
+    // ACDB → Loads
+    svg += wire(acdbX+acdbW/2, acdbY+acdbH, loadX+loadW/2, loadY, '#22c55e', 'AC Out', 'arrowAC', false, 2.5);
+
+    // Earthing connections (dashed grey)
+    svg += wire(batX+batW/2, batY+batH, batX+batW/2, earthY, '#64748b', null, null, true, 1.5);
+    svg += wire(invX+invW/2, invY+invH, invX+invW/2, earthY, '#64748b', null, null, true, 1.5);
+    svg += wire(invX+invW/2, earthY, earthX+earthW/2, earthY, '#64748b', 'GND', 'arrowGnd', true, 1.5);
+
+    // ── Current/voltage labels on key connections ──
+    svg += '<text x="' + (panelX+panelW+8) + '" y="' + (panelY+panelH/2-6) + '" font-size="8" fill="#b45309">Voc≈' + Math.round(voc) + 'V</text>';
+    svg += '<text x="' + (panelX+panelW+8) + '" y="' + (panelY+panelH/2+5) + '" font-size="8" fill="#b45309">Isc≈' + dcCurrent + 'A</text>';
+
+    // ── Legend ──
+    var ky = H - 30;
+    svg += '<rect x="10" y="' + (ky-14) + '" width="' + (W-20) + '" height="22" fill="white" opacity="0.6" rx="4"/>';
+    svg += '<text x="18" y="' + ky + '" font-size="8" font-weight="700" fill="#475569">Legend:</text>';
+    var legItems = [
+      {x:72,  color:'#f59e0b', label:'+ DC Wiring'},
+      {x:152, color:'#6366f1', label:'Battery Cable'},
+      {x:242, color:'#ef4444', label:'DC Bus'},
+      {x:310, color:'#0ea5e9', label:'AC 230V'},
+      {x:378, color:'#22c55e', label:'AC Load Output'},
+      {x:472, color:'#64748b', label:'Earth/GND (dashed)', dashed:true},
+      {x:582, color:'#ea580c', label:'Generator/Grid (optional)', dashed:true},
+    ];
+    legItems.forEach(function(li) {
+      var d = li.dashed ? 'stroke-dasharray="4,2"' : '';
+      svg += '<line x1="' + li.x + '" y1="' + (ky-3) + '" x2="' + (li.x+24) + '" y2="' + (ky-3) + '" stroke="' + li.color + '" stroke-width="2" ' + d + '/>';
+      svg += '<text x="' + (li.x+28) + '" y="' + ky + '" font-size="8" fill="#475569">' + li.label + '</text>';
+    });
+
+    svg += '</svg>';
+    document.getElementById('sysdiagram').innerHTML = svg;
+  }
+
+  // ── "Why this design?" rationale ──
+  function buildRationale() {
+    var el = document.getElementById('rationaleContent');
+    if (!el) return;
+    var panelVoltReason = batV >= 48 ? 'A 48V system reduces cable current for this load size, minimising wiring losses and heat. Higher voltage = lower current for the same power.'
+      : batV >= 24 ? 'A 24V system suits smaller loads. If the system grows above ~3 kW, consider upgrading to 48V to reduce cable sizing requirements.'
+      : '12V is only efficient for very small loads. Cable currents at this voltage cause significant losses — upgrade to 24V or 48V if load grows.';
+    var batReason = 'The ' + batKwh.toFixed(1) + ' kWh battery bank provides the requested autonomy. '
+      + 'Battery cost typically dominates CapEx for systems with long autonomy. If payback is a concern, reduce battery capacity and rely on daytime solar instead.';
+    var invReason = 'A ' + invKw.toFixed(0) + ' kW inverter was selected to handle the peak demand with headroom for surge currents '
+      + '(motors, pumps, and AC units draw 3–7× rated current at startup). '
+      + 'Over-sizing the inverter improves reliability and future expansion.';
+    var configReason = config === 'Series-Parallel'
+      ? 'Series-parallel configuration was chosen: ' + panelsPerString + ' panels in series raises voltage, multiple strings in parallel increase current. '
+        + 'This matches the ' + batV + 'V bus voltage while providing the full ' + arrayKw.toFixed(1) + ' kW array power.'
+      : config === 'Series'
+      ? panelsPerString + ' panels in series reach the required open-circuit voltage for the ' + batV + 'V charge controller. Fewer strings means simpler wiring.'
+      : 'Parallel connection used for this low-voltage system. All panels share the same voltage.';
+    var riskNote = 'Key risk: battery depletion during extended cloudy periods. Mitigate by reducing evening loads or adding a generator/grid backup. '
+      + 'Panel soiling in dusty/rainy seasons can reduce output by 10–25% — include cleaning in the maintenance schedule.';
+    var upgradePath = 'Upgrade path: add panels in the same string configuration to increase generation. '
+      + 'Add battery strings in parallel to extend autonomy. Inverter can typically support up to 150% of its rating in PV input.';
+    el.innerHTML = [
+      '<p><strong>Why this panel configuration?</strong><br>' + configReason + '</p>',
+      '<p><strong>Why this inverter size?</strong><br>' + invReason + '</p>',
+      '<p><strong>Why this battery capacity?</strong><br>' + batReason + '</p>',
+      '<p><strong>Why ' + batV + 'V system voltage?</strong><br>' + panelVoltReason + '</p>',
+      '<p><strong>Key risks:</strong><br>' + riskNote + '</p>',
+      '<p><strong>Upgrade path:</strong><br>' + upgradePath + '</p>',
+    ].join('');
+  }
+
+  function printDiagram() {
+    var w = window.open('', '_blank');
+    var svgContent = document.getElementById('sysdiagram').innerHTML;
+    var rationaleContent = document.getElementById('rationaleContent') ? document.getElementById('rationaleContent').innerHTML : '';
+    w.document.write('<html><head><title>System Schematic — Emajinet</title><style>body{font-family:Inter,sans-serif;margin:2rem;color:#0f172a;}h2{color:#065f46;}p{font-size:.9rem;line-height:1.6;margin:0.5rem 0 1rem;}strong{color:#0f172a;}</style></head><body>');
+    w.document.write('<h2>System Schematic</h2>');
+    w.document.write(svgContent);
+    if (rationaleContent) {
+      w.document.write('<div style="margin-top:2rem;padding:1.5rem;background:#f0fdf4;border-radius:12px;border:1px solid #6ee7b7;"><h3 style="color:#064e3b;margin-bottom:1rem;">Why this design?</h3>' + rationaleContent + '</div>');
+    }
+    w.document.write('</body></html>');
+    w.document.close();
+    w.print();
+  }
+
+  if (document.getElementById('sysdiagram')) {
+    drawDiagram();
+    buildRationale();
+  }
+  window.printDiagram = printDiagram;
+}());
+
+// ===== ENHANCED SIMULATION =====
+(function() {
+  var arrayKw   = {{ run.recommended_array_kw|floatformat:3 }};
+  var invKw     = {{ run.recommended_inverter_kw|default:0|floatformat:3 }};
+  var batKwh    = {{ run.recommended_battery_kwh|default:0|floatformat:3 }};
+  var batUsable = {{ run.usable_storage_kwh|default:0|floatformat:3 }};
+  var peakW     = {{ run.peak_load_w|default:0|floatformat:0 }};
+  var surgeW    = {{ run.surge_load_w|default:0|floatformat:0 }};
+  var TARIFF    = 185; // MWK/kWh
+
+  var slider    = document.getElementById('simSlider');
+  var simTime   = document.getElementById('simTime');
+  var simSolar  = document.getElementById('simSolar');
+  var simLoad   = document.getElementById('simLoad');
+  var simBatt   = document.getElementById('simBattery');
+  var simBatFill= document.getElementById('simBatFill');
+  var simBatIcon= document.getElementById('simBatIcon');
+  var simSolarIcon = document.getElementById('simSolarIcon');
+  var simNet    = document.getElementById('simNet');
+  var simStat   = document.getElementById('simStatus');
+  var simWarn   = document.getElementById('simWarning');
+  var simRecs   = document.getElementById('simRecommendations');
+  var simServed = document.getElementById('simServed');
+  var simShortfall = document.getElementById('simShortfall');
+  var simSavedMWK  = document.getElementById('simSavedMWK');
+  var canvas    = document.getElementById('simChart');
+  var playBtn   = document.getElementById('simPlayBtn');
+
+  if (!slider) return;
+
+  var playInterval = null;
+
+  // Solar profile: bell curve peaked at solar noon (~13:00)
+  function solarAtMinute(m) {
+    var h = m / 60;
+    if (h < 6.5 || h > 18.5) return 0;
+    var t = (h - 6.5) / (18.5 - 6.5);
+    var bell = Math.sin(t * Math.PI);
+    // Add slight cloud variation using a deterministic pseudo-random
+    var cloudFactor = 1 - 0.08 * Math.abs(Math.sin(m / 137));
+    return Math.max(0, bell * arrayKw * 1000 * 0.87 * cloudFactor);
+  }
+
+  // Load profile: realistic multi-segment curve
+  function loadAtMinute(m) {
+    var h = m / 60;
+    if (h >= 0   && h < 5)   return peakW * 0.10;  // deep night — standby
+    if (h >= 5   && h < 6.5) return peakW * 0.35;  // early morning ramp
+    if (h >= 6.5 && h < 8)   return peakW * 0.75;  // morning peak (kettle, toaster, etc.)
+    if (h >= 8   && h < 12)  return peakW * 0.45;  // mid-morning moderate
+    if (h >= 12  && h < 14)  return peakW * 0.55;  // midday (cooking)
+    if (h >= 14  && h < 17)  return peakW * 0.40;  // afternoon light
+    if (h >= 17  && h < 21)  return peakW * 0.95;  // evening peak (heaviest loads)
+    if (h >= 21  && h < 23)  return peakW * 0.55;  // late evening
+    return peakW * 0.12;
+  }
+
+  // Pre-compute 24-hour battery trace starting at 70%
+  var batTrace = [];
+  (function buildTrace() {
+    var batWh = batUsable * 1000 * 0.70;
+    var step = 15;
+    for (var t = 0; t <= 1440; t += step) {
+      batTrace.push(batWh);
+      var solar = solarAtMinute(t);
+      var load  = loadAtMinute(t);
+      var net   = (solar - load) * (step / 60);
+      batWh = Math.max(0, Math.min(batUsable * 1000, batWh + net));
+    }
+  })();
+
+  function batteryAt(m) {
+    var idx = Math.floor(m / 15);
+    return batTrace[Math.min(idx, batTrace.length - 1)];
+  }
+
+  // Compute daily energy balance summary
+  function computeBalance() {
+    var step = 15;
+    var served = 0, shortfall = 0;
+    for (var t = 0; t < 1440; t += step) {
+      var solar = solarAtMinute(t);
+      var load  = loadAtMinute(t);
+      var bat   = batteryAt(t);
+      var avail = solar + (bat > 0 ? Math.min(load, bat) : 0);
+      var s = Math.min(avail, load) * (step / 60);
+      var sf = Math.max(0, load - avail) * (step / 60);
+      served += s;
+      shortfall += sf;
+    }
+    return { served: (served / 1000).toFixed(2), shortfall: (shortfall / 1000).toFixed(2) };
+  }
+  var balance = computeBalance();
+  if (simServed)    simServed.textContent    = balance.served;
+  if (simShortfall) simShortfall.textContent = balance.shortfall;
+  var mwkSaved = Math.round(parseFloat(balance.served) * TARIFF);
+  if (simSavedMWK)  simSavedMWK.textContent  = 'MWK ' + mwkSaved.toLocaleString();
+
+  function update() {
+    var m = parseInt(slider.value);
+    var h = Math.floor(m / 60);
+    var min = m % 60;
+    simTime.textContent = (h < 10 ? '0'+h : h) + ':' + (min < 10 ? '0'+min : min);
+
+    var solar  = solarAtMinute(m);
+    var load   = loadAtMinute(m);
+    var batWh  = batteryAt(m);
+    var batPct = batUsable > 0 ? Math.round((batWh / (batUsable * 1000)) * 100) : 0;
+    var net    = solar - load;
+
+    // Update solar icon (day/night)
+    if (simSolarIcon) {
+      simSolarIcon.textContent = h >= 6.5 && h <= 18.5 ? (solar > peakW * 0.3 ? '☀️' : '⛅') : '🌙';
+    }
+
+    simSolar.textContent = (solar >= 1000 ? (solar/1000).toFixed(1)+' kW' : Math.round(solar)+' W');
+    simLoad.textContent  = (load >= 1000  ? (load/1000).toFixed(1)+' kW'  : Math.round(load)+' W');
+    simBatt.textContent  = batPct + '%';
+    simNet.textContent   = (net >= 0 ? '+' : '') + (net >= 1000 || net <= -1000 ? (net/1000).toFixed(1)+' kW' : Math.round(net)+' W');
+    simNet.style.color   = net >= 0 ? '#059669' : '#dc2626';
+
+    // Battery fill bar
+    var batColor = batPct < 15 ? '#ef4444' : batPct < 35 ? '#f97316' : batPct < 60 ? '#f59e0b' : '#10b981';
+    simBatt.style.color = batColor;
+    if (simBatFill) { simBatFill.style.width = batPct + '%'; simBatFill.style.background = batColor; }
+    if (simBatIcon) {
+      simBatIcon.textContent = batPct >= 70 ? '🔋' : batPct >= 40 ? '🪫' : '⚡';
+    }
+
+    // Status and warnings
+    var warnings = [];
+    var recs = [];
+    var status = '✅ Normal', statColor = '#059669';
+
+    if (batWh <= 50 && solar < load) {
+      status = '🔴 BLACKOUT RISK';
+      statColor = '#dc2626';
+      warnings.push('<strong>⚠ Battery depleted — blackout risk at ' + simTime.textContent + '!</strong> Unless grid/generator backup is active, loads will be interrupted.');
+    } else if (batPct < 20) {
+      status = '🟠 Low Battery';
+      statColor = '#f97316';
+      warnings.push('🪫 Battery below 20% at ' + simTime.textContent + '. Evening loads may cause blackout. Reduce non-critical loads or activate backup.');
+    } else if (load > invKw * 1000 * 0.88) {
+      status = '🟡 Inverter Stressed';
+      statColor = '#d97706';
+      warnings.push('⚠ Load (' + Math.round(load) + ' W) is approaching inverter comfort zone (' + (invKw*1000*0.88).toFixed(0) + ' W). Peak demand may cause tripping.');
+    } else if (solar > load * 1.4 && batPct > 95) {
+      status = '⚡ Exporting Surplus';
+      statColor = '#6366f1';
+      recs.push('☀️ Solar surplus! Consider connecting a water heater or other resistive loads to absorb excess generation during peak sun hours.');
+    } else if (h >= 6.5 && h <= 18.5 && solar < load * 0.3) {
+      status = '⛅ Low Generation';
+      statColor = '#d97706';
+    }
+
+    simStat.textContent = status;
+    simStat.style.color = statColor;
+
+    // Blackout prediction
+    if (batPct > 20 && h < 22) {
+      var depletionHr = null;
+      for (var fwd = m; fwd <= 1440; fwd += 15) {
+        var fi = Math.floor(fwd / 15);
+        var fbat = batTrace[Math.min(fi, batTrace.length-1)];
+        var fpct = batUsable > 0 ? Math.round((fbat/(batUsable*1000))*100) : 0;
+        if (fpct <= 0 && fwd > m + 60) { depletionHr = fwd; break; }
+      }
+      if (depletionHr !== null) {
+        var dh = Math.floor(depletionHr/60), dm = depletionHr % 60;
+        recs.push('📉 At ' + (dh<10?'0'+dh:dh) + ':' + (dm<10?'0'+dm:dm)
+          + ' battery is projected to reach 0%. Expect blackout unless backup source or load reduction applied.');
+      }
+    }
+
+    // Solar vs load insight
+    if (h >= 10 && h <= 15 && solar > load) {
+      recs.push('🌞 Solar covers daytime demand. This is the ideal window to run high-consumption appliances (washing, ironing, water heating).');
+    }
+    if (h >= 17 && h <= 21) {
+      recs.push('🌆 Evening peak — solar output dropping. Battery is supplying the deficit. Reduce non-critical loads to extend battery runtime.');
+    }
+
+    // Display warnings and recommendations
+    if (warnings.length) {
+      simWarn.style.display = '';
+      simWarn.style.background = statColor === '#dc2626' ? '#fff1f2' : '#fff7ed';
+      simWarn.style.border = '1.5px solid ' + (statColor === '#dc2626' ? '#fca5a5' : '#fed7aa');
+      simWarn.style.color = statColor;
+      simWarn.innerHTML = warnings.join('<br>');
+    } else {
+      simWarn.style.display = 'none';
+    }
+
+    if (simRecs) {
+      if (recs.length) {
+        simRecs.innerHTML = recs.map(function(r) {
+          return '<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:.35rem .7rem;margin-bottom:.3rem;font-size:.79rem;color:#1e40af;">' + r + '</div>';
+        }).join('');
+      } else {
+        simRecs.innerHTML = '';
+      }
+    }
+
+    if (canvas && canvas.getContext) drawSimChart(m);
+  }
+
+  function drawSimChart(currentMin) {
+    var dpr = window.devicePixelRatio || 1;
+    canvas.width  = canvas.offsetWidth * dpr;
+    canvas.height = canvas.offsetHeight * dpr;
+    var ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr);
+    var W = canvas.offsetWidth, H = canvas.offsetHeight;
+    ctx.clearRect(0, 0, W, H);
+
+    var maxW = Math.max(arrayKw * 1000 * 0.9, peakW, 500);
+    var steps = [];
+    for (var t = 0; t <= 1440; t += 15) {
+      steps.push({ t:t, s:solarAtMinute(t), l:loadAtMinute(t), b: batTrace[Math.floor(t/15)] / (batUsable*1000||1) * 100 });
+    }
+
+    function xPos(t) { return (t / 1440) * (W - 4) + 2; }
+    function yPow(v) { return H - (Math.min(v, maxW) / maxW) * (H - 22) - 12; }
+    function yBat(p) { return H - (p / 100) * (H - 22) - 12; }
+
+    // Night shading
+    ctx.fillStyle = 'rgba(15,23,42,0.04)';
+    ctx.fillRect(0, 0, xPos(6.5*60), H);
+    ctx.fillRect(xPos(18.5*60), 0, W - xPos(18.5*60), H);
+
+    // Solar fill
+    ctx.beginPath();
+    ctx.moveTo(xPos(0), H);
+    steps.forEach(function(p) { ctx.lineTo(xPos(p.t), yPow(p.s)); });
+    ctx.lineTo(W, H); ctx.closePath();
+    ctx.fillStyle = 'rgba(245,158,11,0.13)';
+    ctx.fill();
+
+    // Solar line
+    ctx.beginPath();
+    steps.forEach(function(p,i) { i===0?ctx.moveTo(xPos(p.t),yPow(p.s)):ctx.lineTo(xPos(p.t),yPow(p.s)); });
+    ctx.strokeStyle = '#f59e0b'; ctx.lineWidth = 2; ctx.setLineDash([]); ctx.stroke();
+
+    // Load line
+    ctx.beginPath();
+    steps.forEach(function(p,i) { i===0?ctx.moveTo(xPos(p.t),yPow(p.l)):ctx.lineTo(xPos(p.t),yPow(p.l)); });
+    ctx.strokeStyle = '#6366f1'; ctx.lineWidth = 2; ctx.stroke();
+
+    // Battery % line (dashed green)
+    ctx.beginPath();
+    steps.forEach(function(p,i) { i===0?ctx.moveTo(xPos(p.t),yBat(p.b)):ctx.lineTo(xPos(p.t),yBat(p.b)); });
+    ctx.strokeStyle = '#10b981'; ctx.lineWidth = 1.5; ctx.setLineDash([4,3]); ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Time cursor
+    var cx = xPos(currentMin);
+    ctx.beginPath();
+    ctx.moveTo(cx, 0); ctx.lineTo(cx, H);
+    ctx.strokeStyle = '#0891b2'; ctx.lineWidth = 1.5; ctx.setLineDash([4,3]); ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Hour labels
+    ctx.fillStyle = '#94a3b8'; ctx.font = '8px Inter,sans-serif';
+    for (var hh = 0; hh <= 24; hh += 3) {
+      ctx.fillText(hh + ':00', xPos(hh*60) - 8, H - 1);
+    }
+  }
+
+  // Play animation
+  if (playBtn) {
+    playBtn.addEventListener('click', function() {
+      if (playInterval) {
+        clearInterval(playInterval);
+        playInterval = null;
+        playBtn.textContent = '▶ Play';
+        playBtn.style.background = '#10b981';
+      } else {
+        playBtn.textContent = '⏸ Pause';
+        playBtn.style.background = '#6366f1';
+        playInterval = setInterval(function() {
+          var v = parseInt(slider.value) + 15;
+          if (v > 1440) v = 0;
+          slider.value = v;
+          update();
+        }, 80);
+      }
+    });
+  }
+
+  slider.addEventListener('input', update);
+  update();
+}());
+</script>
+{% endif %}
+
+{% endblock %}

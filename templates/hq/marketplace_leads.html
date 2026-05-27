@@ -1,0 +1,178 @@
+{% extends "hq/base_hq.html" %}
+{% load humanize %}
+
+{% block title %}Marketplace Lead Conversions - HQ{% endblock %}
+{% block topbar_title %}Marketplace Lead Conversions{% endblock %}
+
+{% block content %}
+<style>
+  .lead-page{padding:24px clamp(14px,3vw,30px) 46px;background:linear-gradient(135deg,#ecfdf5 0%,#fff 48%,#f8fafc 100%);border-radius:26px;}
+  .lead-header{display:flex;justify-content:space-between;gap:1rem;align-items:flex-start;flex-wrap:wrap;margin-bottom:1.15rem;}
+  .lead-header h1{font-size:clamp(1.55rem,3vw,2.15rem);font-weight:950;color:#0f172a;margin:0;letter-spacing:-.02em;}
+  .lead-header p{color:#64748b;margin:.35rem 0 0;max-width:760px;}
+  .kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:1rem;}
+  .kpi{background:rgba(255,255,255,.94);border:1px solid #bbf7d0;border-radius:18px;padding:16px;box-shadow:0 14px 36px rgba(5,150,105,.07);}
+  .kpi .label{font-size:.7rem;text-transform:uppercase;letter-spacing:.06em;color:#64748b;font-weight:900;}
+  .kpi .value{font-size:1.45rem;font-weight:950;color:#0f172a;margin-top:.2rem;letter-spacing:-.02em;}
+  .kpi.money .value{color:#059669;}
+  .filters{background:#fff;border:1px solid #bbf7d0;border-radius:18px;padding:16px;display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:1rem;box-shadow:0 10px 28px rgba(15,23,42,.05);}
+  .lead-page .split-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;margin-bottom:1rem;align-items:stretch;}
+  .lead-page .panel{position:static!important;inset:auto!important;float:none!important;transform:none!important;background:#fff;border:1px solid #bbf7d0;border-radius:16px;padding:16px;box-shadow:0 10px 28px rgba(5,150,105,.06);min-width:0;}
+  .lead-page .panel h3{font-size:.88rem;text-transform:uppercase;letter-spacing:.06em;color:#64748b;font-weight:900;margin:0 0 .75rem;}
+  .mini-row{display:flex;justify-content:space-between;gap:1rem;border-bottom:1px solid #f1f5f9;padding:.42rem 0;font-size:.88rem;}
+  .mini-row:last-child{border-bottom:0;}
+  .table-card{background:#fff;border:1px solid #bbf7d0;border-radius:18px;overflow:hidden;box-shadow:0 18px 44px rgba(5,150,105,.07);}
+  .table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+  table{width:100%;min-width:1120px;border-collapse:collapse;}
+  th,td{padding:.78rem;border-bottom:1px solid #e2e8f0;vertical-align:top;font-size:.86rem;}
+  th{background:#ecfdf5;color:#047857;text-transform:uppercase;letter-spacing:.05em;font-size:.7rem;position:sticky;top:0;z-index:2;}
+  .badge-soft{display:inline-flex;padding:.25rem .55rem;border-radius:999px;font-weight:900;font-size:.72rem;}
+  .source-badge,.commission-badge{display:inline-flex;padding:.25rem .55rem;border-radius:999px;background:#d1fae5;color:#065f46;font-weight:900;font-size:.72rem;}
+  .commission-paid{background:#dcfce7;color:#166534}.commission-due{background:#fef3c7;color:#92400e}.commission-waived{background:#f1f5f9;color:#475569}.commission-pending{background:#d1fae5;color:#047857}
+  .status-new{background:#d1fae5;color:#047857;}
+  .status-contacted,.status-negotiating{background:#fef3c7;color:#92400e;}
+  .status-won{background:#dcfce7;color:#166534;}
+  .status-lost,.status-invalid{background:#fee2e2;color:#991b1b;}
+  @media(max-width:768px){
+    .lead-page{padding:12px;border-radius:16px;overflow:visible;}
+    .lead-header{display:block;}
+    .kpi-grid{grid-template-columns:1fr 1fr;gap:10px;}
+    .kpi{padding:12px;border-radius:14px;}
+    .kpi .value{font-size:1.05rem;overflow-wrap:anywhere;}
+    .filters{grid-template-columns:1fr;}
+    .lead-page .split-grid{display:grid;grid-template-columns:1fr;gap:10px;}
+    .lead-page .panel{width:100%;max-width:100%;display:block;}
+    .mini-row{align-items:flex-start;overflow-wrap:anywhere;}
+    .table-card{max-width:100%;}
+  }
+  @media(max-width:420px){.kpi-grid{grid-template-columns:1fr;}}
+</style>
+
+<div class="lead-page">
+  <div class="lead-header">
+    <div>
+      <h1><i class="bi bi-shop-window text-primary"></i> Marketplace Lead Conversions</h1>
+      <p>Track lead volume, seller conversions, confirmed GMV, and Emajinet success fees.</p>
+    </div>
+  </div>
+
+  <div class="kpi-grid">
+    <div class="kpi"><div class="label">Total Leads</div><div class="value">{{ metrics.total }}</div></div>
+    <div class="kpi"><div class="label">New Leads</div><div class="value">{{ metrics.new }}</div></div>
+    <div class="kpi"><div class="label">Contacted</div><div class="value">{{ metrics.contacted }}</div></div>
+    <div class="kpi"><div class="label">Won Leads</div><div class="value">{{ metrics.won }}</div></div>
+    <div class="kpi"><div class="label">Lost Leads</div><div class="value">{{ metrics.lost }}</div></div>
+    <div class="kpi"><div class="label">Conversion Rate</div><div class="value">{{ metrics.conversion_rate }}%</div></div>
+    <div class="kpi money"><div class="label">Confirmed GMV</div><div class="value">MWK {{ metrics.gmv|floatformat:0|intcomma }}</div></div>
+    <div class="kpi money"><div class="label">Commission Due</div><div class="value">MWK {{ metrics.commission_due|floatformat:0|intcomma }}</div></div>
+    <div class="kpi money"><div class="label">Commission Paid</div><div class="value">MWK {{ metrics.commission_paid|floatformat:0|intcomma }}</div></div>
+    <div class="kpi money"><div class="label">Commission Pending</div><div class="value">MWK {{ metrics.commission_pending|floatformat:0|intcomma }}</div></div>
+    <div class="kpi money"><div class="label">Commission Waived</div><div class="value">MWK {{ metrics.commission_waived|floatformat:0|intcomma }}</div></div>
+    <div class="kpi"><div class="label">Marketplace Orders</div><div class="value">{{ order_metrics.total }}</div></div>
+    <div class="kpi"><div class="label">Paid Orders</div><div class="value">{{ order_metrics.paid }}</div></div>
+    <div class="kpi"><div class="label">Pending Orders</div><div class="value">{{ order_metrics.pending }}</div></div>
+    <div class="kpi"><div class="label">Failed Orders</div><div class="value">{{ order_metrics.failed }}</div></div>
+    <div class="kpi money"><div class="label">Checkout GMV</div><div class="value">MWK {{ order_metrics.gmv|floatformat:0|intcomma }}</div></div>
+    <div class="kpi money"><div class="label">Checkout Platform Fee</div><div class="value">MWK {{ order_metrics.platform_commission|floatformat:0|intcomma }}</div></div>
+    <div class="kpi money"><div class="label">Seller Earnings Payable</div><div class="value">MWK {{ order_metrics.seller_earnings|floatformat:0|intcomma }}</div></div>
+  </div>
+
+  <form method="get" class="filters">
+    <input type="date" name="date_from" class="form-control" value="{{ filters.date_from }}">
+    <input type="date" name="date_to" class="form-control" value="{{ filters.date_to }}">
+    <select name="seller_business" class="form-select">
+      <option value="">All sellers</option>
+      {% for seller in sellers %}<option value="{{ seller.id }}" {% if filters.seller_business == seller.id|stringformat:"s" %}selected{% endif %}>{{ seller.name }}</option>{% endfor %}
+    </select>
+    <select name="vertical" class="form-select">
+      <option value="">All verticals</option>
+      {% for vertical in verticals %}<option value="{{ vertical }}" {% if filters.vertical == vertical %}selected{% endif %}>{{ vertical|title }}</option>{% endfor %}
+    </select>
+    <select name="status" class="form-select">
+      <option value="">All statuses</option>
+      {% for value,label in lead_statuses %}<option value="{{ value }}" {% if filters.status == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+    </select>
+    <select name="commission_status" class="form-select">
+      <option value="">All commission</option>
+      {% for value,label in commission_statuses %}<option value="{{ value }}" {% if filters.commission_status == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+    </select>
+    <select name="source_type" class="form-select">
+      <option value="">All sources</option>
+      {% for value,label in source_types %}<option value="{{ value }}" {% if filters.source_type == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+    </select>
+    <button class="btn btn-primary">Filter</button>
+  </form>
+
+  <div class="split-grid">
+    <div class="panel">
+      <h3>Leads by Vertical</h3>
+      {% for row in by_vertical %}<div class="mini-row"><span>{{ row.listing__vertical|default:"Unknown"|title }}</span><strong>{{ row.count }}</strong></div>{% empty %}<div class="text-muted">No data</div>{% endfor %}
+    </div>
+    <div class="panel">
+      <h3>Leads by Business</h3>
+      {% for row in by_business %}<div class="mini-row"><span>{{ row.seller_business__name|default:"Unknown" }}</span><strong>{{ row.count }}</strong></div>{% empty %}<div class="text-muted">No data</div>{% endfor %}
+    </div>
+    <div class="panel">
+      <h3>Leads by Source</h3>
+      {% for row in by_source %}<div class="mini-row"><span>{{ row.source_type|default:"Unknown" }}</span><strong>{{ row.count }}</strong></div>{% empty %}<div class="text-muted">No data</div>{% endfor %}
+    </div>
+    <div class="panel">
+      <h3>Top Sellers by GMV</h3>
+      {% for row in top_sellers_gmv %}<div class="mini-row"><span>{{ row.seller_business__name|default:"Unassigned" }}</span><strong>MWK {{ row.gmv|default:0|floatformat:0|intcomma }}</strong></div>{% empty %}<div class="text-muted">No won leads yet</div>{% endfor %}
+    </div>
+    <div class="panel">
+      <h3>Recent Won Leads</h3>
+      {% for lead in recent_won %}<div class="mini-row"><span>{{ lead.listing.title|truncatechars:28 }}</span><strong>MWK {{ lead.deal_amount|default:0|floatformat:0|intcomma }}</strong></div>{% empty %}<div class="text-muted">No recent wins</div>{% endfor %}
+    </div>
+    <div class="panel">
+      <h3>Orders by Vertical</h3>
+      {% for row in orders_by_vertical %}<div class="mini-row"><span>{{ row.listing__vertical|default:"Unknown"|title }}</span><strong>MWK {{ row.total|default:0|floatformat:0|intcomma }}</strong></div>{% empty %}<div class="text-muted">No paid orders yet</div>{% endfor %}
+    </div>
+    <div class="panel">
+      <h3>Recent Paid Orders</h3>
+      {% for order in recent_paid_orders %}<div class="mini-row"><span>{{ order.seller_business.name }} - {{ order.listing.title|truncatechars:24 }}</span><strong>MWK {{ order.total_amount|floatformat:0|intcomma }}</strong></div>{% empty %}<div class="text-muted">No paid orders yet</div>{% endfor %}
+    </div>
+  </div>
+
+  <div class="table-card">
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Seller business</th>
+            <th>Listing</th>
+            <th>Customer</th>
+            <th>Source</th>
+            <th>Status</th>
+            <th>Deal amount</th>
+            <th>Commission %</th>
+            <th>Commission amount</th>
+            <th>Commission status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for lead in page_obj %}
+          <tr>
+            <td>{{ lead.created_at|date:"d M Y H:i" }}</td>
+            <td>{{ lead.seller_business.name|default:"Unassigned" }}</td>
+            <td>{{ lead.listing.title }}</td>
+            <td>{{ lead.customer_name|default:"Unknown" }}</td>
+            <td><span class="source-badge">{{ lead.get_source_type_display }}</span></td>
+            <td><span class="badge-soft status-{{ lead.status }}">{{ lead.get_status_display }}</span></td>
+            <td>{% if lead.deal_amount %}MWK {{ lead.deal_amount|floatformat:0|intcomma }}{% else %}-{% endif %}</td>
+            <td>{{ lead.commission_percentage|floatformat:2 }}%</td>
+            <td>MWK {{ lead.commission_amount|default:0|floatformat:0|intcomma }}</td>
+            <td><span class="commission-badge commission-{{ lead.commission_status }}">{{ lead.get_commission_status_display }}</span></td>
+            <td><a href="{% url 'hq:marketplace_lead_detail' lead.pk %}" class="btn btn-sm btn-outline-primary">View</a></td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="11" class="text-center text-muted py-4">No marketplace leads found.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

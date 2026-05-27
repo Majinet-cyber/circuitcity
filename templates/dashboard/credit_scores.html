@@ -1,0 +1,317 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Business Credit Score - {{ business.name }}{% endblock %}
+
+{% block content %}
+<style>
+  .bc-page {
+    max-width: 1120px;
+    margin: 0 auto;
+    padding: 0 1rem 3rem;
+    color: #0f172a;
+  }
+  .bc-hero {
+    background:
+      linear-gradient(135deg, rgba(236, 253, 245, .92), rgba(255,255,255,.86)),
+      radial-gradient(circle at top right, rgba(16,185,129,.18), transparent 34rem);
+    border: 1px solid rgba(187,247,208,.9);
+    border-radius: 24px;
+    box-shadow: 0 20px 60px rgba(15, 23, 42, .08);
+    padding: clamp(1.25rem, 3vw, 2rem);
+    display: grid;
+    grid-template-columns: 180px minmax(0, 1fr);
+    gap: 1.5rem;
+    align-items: center;
+    margin-bottom: 1.25rem;
+  }
+  .bc-score-ring {
+    width: 156px;
+    height: 156px;
+    position: relative;
+    display: grid;
+    place-items: center;
+  }
+  .bc-score-ring svg {
+    position: absolute;
+    inset: 0;
+    transform: rotate(-90deg);
+  }
+  .bc-score-num {
+    font-size: 2.45rem;
+    line-height: 1;
+    font-weight: 900;
+  }
+  .bc-score-denom {
+    color: #64748b;
+    font-size: .78rem;
+    font-weight: 800;
+  }
+  .bc-eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: .35rem;
+    border: 1px solid #bbf7d0;
+    background: rgba(240,253,244,.85);
+    color: #047857;
+    border-radius: 999px;
+    padding: .35rem .75rem;
+    font-size: .75rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+  }
+  .bc-title {
+    font-size: clamp(1.65rem, 3vw, 2.25rem);
+    font-weight: 900;
+    letter-spacing: 0;
+    margin: .8rem 0 .45rem;
+  }
+  .bc-sub {
+    color: #475569;
+    max-width: 760px;
+    margin: 0;
+  }
+  .bc-label {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    padding: .38rem .85rem;
+    font-size: .82rem;
+    font-weight: 900;
+    margin-top: 1rem;
+  }
+  .bc-label.green { background:#dcfce7; color:#166534; }
+  .bc-label.amber { background:#fef3c7; color:#92400e; }
+  .bc-label.orange { background:#ffedd5; color:#9a3412; }
+  .bc-label.red { background:#fee2e2; color:#991b1b; }
+  .bc-label.gray { background:#f1f5f9; color:#64748b; }
+  .bc-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.25rem;
+  }
+  .bc-card {
+    background: rgba(255,255,255,.82);
+    border: 1px solid rgba(226,232,240,.9);
+    border-radius: 18px;
+    box-shadow: 0 12px 34px rgba(15, 23, 42, .06);
+    padding: 1.15rem;
+    backdrop-filter: blur(14px);
+  }
+  .bc-card-title {
+    font-size: .77rem;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: #64748b;
+    font-weight: 900;
+    margin-bottom: .45rem;
+  }
+  .bc-card-value {
+    font-size: 1.35rem;
+    font-weight: 900;
+  }
+  .bc-section-title {
+    font-size: 1.05rem;
+    font-weight: 900;
+    margin: 1.35rem 0 .85rem;
+  }
+  .bc-components {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1rem;
+  }
+  .bc-component-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    align-items: start;
+    margin-bottom: .55rem;
+  }
+  .bc-component-name {
+    font-weight: 900;
+    font-size: .92rem;
+  }
+  .bc-component-score {
+    font-weight: 900;
+    color: #059669;
+    white-space: nowrap;
+  }
+  .bc-progress {
+    height: 8px;
+    border-radius: 999px;
+    background: #e2e8f0;
+    overflow: hidden;
+    margin: .55rem 0 .65rem;
+  }
+  .bc-progress > span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, #059669, #34d399);
+  }
+  .bc-muted {
+    color: #64748b;
+    font-size: .86rem;
+    line-height: 1.5;
+  }
+  .bc-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: .7rem;
+  }
+  .bc-list li {
+    display: flex;
+    gap: .65rem;
+    color: #334155;
+    font-size: .92rem;
+  }
+  .bc-list i {
+    color: #059669;
+    margin-top: .12rem;
+  }
+  .bc-empty {
+    text-align: center;
+    padding: 2rem;
+  }
+  @media (max-width: 720px) {
+    .bc-hero { grid-template-columns: 1fr; }
+    .bc-score-ring { margin: 0 auto; }
+  }
+</style>
+
+<div class="bc-page">
+  <nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb mb-0" style="font-size:.85rem;">
+      <li class="breadcrumb-item"><a href="{% url 'dashboard:home' %}">Dashboard</a></li>
+      <li class="breadcrumb-item active">Business Credit Score</li>
+    </ol>
+  </nav>
+
+  <section class="bc-hero">
+    <div class="bc-score-ring">
+      <svg width="156" height="156" viewBox="0 0 156 156" aria-hidden="true">
+        <circle cx="78" cy="78" r="64" fill="none" stroke="#d1fae5" stroke-width="13"></circle>
+        <circle id="businessCreditArc" cx="78" cy="78" r="64" fill="none"
+          stroke="{% if credit.status_color == 'green' %}#059669{% elif credit.status_color == 'amber' %}#d97706{% elif credit.status_color == 'orange' %}#ea580c{% elif credit.status_color == 'red' %}#dc2626{% else %}#94a3b8{% endif %}"
+          stroke-width="13" stroke-linecap="round" stroke-dasharray="0 402"
+          data-score="{{ credit.score|default:0 }}"></circle>
+      </svg>
+      <div style="text-align:center;">
+        <div class="bc-score-num">{{ credit.score|default:"--" }}</div>
+        <div class="bc-score-denom">/100</div>
+      </div>
+    </div>
+    <div>
+      <span class="bc-eyebrow"><i class="bi bi-shield-check"></i> Lender-ready business profile</span>
+      <h1 class="bc-title">Business Credit Score</h1>
+      <p class="bc-sub">
+        Evaluates {{ business.name }} for credit, supplier financing, bank review, investor diligence,
+        and partner readiness using business-level operating data.
+      </p>
+      <span class="bc-label {{ credit.status_color }}">{{ credit.label }}</span>
+    </div>
+  </section>
+
+  {% if credit.is_onboarding %}
+    <div class="bc-card bc-empty">
+      <h2 class="bc-section-title" style="margin-top:0;">No lender-ready score yet</h2>
+      <p class="bc-muted">
+        Record sales, stock, costs, and payment activity to build a consent-based business credit profile.
+      </p>
+      <a href="{% url 'dashboard:home' %}" class="btn btn-primary rounded-pill mt-2">Go to Dashboard</a>
+    </div>
+  {% else %}
+    <div class="bc-grid">
+      <div class="bc-card">
+        <div class="bc-card-title">Financing Readiness</div>
+        <div class="bc-card-value">{{ credit.financing_readiness_title }}</div>
+        <p class="bc-muted mb-0 mt-2">{{ credit.financing_readiness }}</p>
+      </div>
+      <div class="bc-card">
+        <div class="bc-card-title">Recommended Credit Limit</div>
+        {% if credit.recommended_credit_limit_range %}
+          <div class="bc-card-value">
+            MWK {{ credit.recommended_credit_limit_range.low|floatformat:0 }}
+            - {{ credit.recommended_credit_limit_range.high|floatformat:0 }}
+          </div>
+          <p class="bc-muted mb-0 mt-2">{{ credit.recommended_credit_limit_range.basis }}</p>
+        {% else %}
+          <div class="bc-card-value">Not recommended yet</div>
+          <p class="bc-muted mb-0 mt-2">More revenue history is needed before suggesting a limit.</p>
+        {% endif %}
+      </div>
+      <div class="bc-card">
+        <div class="bc-card-title">Average Monthly Revenue</div>
+        <div class="bc-card-value">MWK {{ credit.summary.avg_monthly_revenue|floatformat:0 }}</div>
+        <p class="bc-muted mb-0 mt-2">Based on recent recorded sales.</p>
+      </div>
+      <div class="bc-card">
+        <div class="bc-card-title">Recurring Obligations</div>
+        <div class="bc-card-value">MWK {{ credit.summary.monthly_recurring_obligations|floatformat:0 }}</div>
+        <p class="bc-muted mb-0 mt-2">Monthly equivalent of active recurring costs.</p>
+      </div>
+    </div>
+
+    <div class="bc-grid">
+      <div class="bc-card">
+        <h2 class="bc-section-title" style="margin-top:0;">Reasons For Score</h2>
+        <ul class="bc-list">
+          {% for reason in credit.reasons %}
+            <li><i class="bi bi-check-circle-fill"></i><span>{{ reason }}</span></li>
+          {% empty %}
+            <li><i class="bi bi-info-circle-fill"></i><span>Keep recording data to strengthen score explainability.</span></li>
+          {% endfor %}
+        </ul>
+      </div>
+      <div class="bc-card">
+        <h2 class="bc-section-title" style="margin-top:0;">Improvement Recommendations</h2>
+        <ul class="bc-list">
+          {% for rec in credit.recommendations %}
+            <li><i class="bi bi-arrow-right-circle-fill"></i><span>{{ rec }}</span></li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+
+    <h2 class="bc-section-title">Score Factors</h2>
+    <div class="bc-components">
+      {% for key, comp in credit.components.items %}
+        <div class="bc-card">
+          <div class="bc-component-head">
+            <div>
+              <div class="bc-component-name">{{ key|title }}</div>
+              <div class="bc-muted">{{ comp.label }}</div>
+            </div>
+            <div class="bc-component-score">{% if comp.score is not None %}{{ comp.score }}/100{% else %}--{% endif %}</div>
+          </div>
+          <div class="bc-progress"><span style="width: {{ comp.score|default:0 }}%;"></span></div>
+          <p class="bc-muted mb-0">{{ comp.explanation }}</p>
+        </div>
+      {% endfor %}
+    </div>
+
+    <div class="bc-card mt-4">
+      <div class="bc-card-title">Export / Share Readiness</div>
+      <p class="bc-muted mb-0">
+        This is a consent-based business credit profile for {{ business.name }}. It is suitable for
+        internal review and can support lender, bank, supplier, investor, or partner discussions when
+        the business chooses to share it.
+      </p>
+    </div>
+  {% endif %}
+</div>
+
+<script>
+(function() {
+  var arc = document.getElementById('businessCreditArc');
+  if (!arc) return;
+  var score = parseInt(arc.getAttribute('data-score') || '0', 10);
+  var circumference = 402;
+  arc.setAttribute('stroke-dasharray', Math.round(score * circumference / 100) + ' ' + circumference);
+})();
+</script>
+{% endblock %}

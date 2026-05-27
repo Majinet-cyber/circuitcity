@@ -1,10 +1,11 @@
 {% extends "hq/base_hq.html" %}
 {% load static %}
+{% load hq_extras %}
 
 {% block title %}Merchant Contracts - HQ{% endblock %}
 
 {% block content %}
-<div class="container-fluid px-3 px-md-4 py-4">
+<div class="px-3 px-md-4 py-4">
   <!-- Header -->
   <div class="row mb-4">
     <div class="col-12">
@@ -102,13 +103,19 @@
                 </td>
                 <td>
                   {% if item.has_contract %}
-                    <span class="badge bg-success">
-                      <i class="bi bi-check-circle me-1"></i>Signed
-                    </span>
+                    {% if item.contract.is_signed %}
+                      <span class="badge bg-success"><i class="bi bi-check-circle-fill me-1"></i>E-Signed</span>
+                    {% elif item.contract.status == 'sent' %}
+                      <span class="badge bg-primary"><i class="bi bi-send-fill me-1"></i>Sent</span>
+                    {% elif item.contract.status == 'viewed' %}
+                      <span class="badge bg-warning text-dark"><i class="bi bi-eye-fill me-1"></i>Viewed</span>
+                    {% elif item.contract.status == 'void' %}
+                      <span class="badge bg-danger"><i class="bi bi-x-circle-fill me-1"></i>Void</span>
+                    {% else %}
+                      <span class="badge bg-secondary"><i class="bi bi-file-earmark me-1"></i>Draft/Uploaded</span>
+                    {% endif %}
                   {% else %}
-                    <span class="badge bg-danger">
-                      <i class="bi bi-x-circle me-1"></i>Not Signed
-                    </span>
+                    <span class="badge bg-danger"><i class="bi bi-x-circle me-1"></i>No Contract</span>
                   {% endif %}
                 </td>
                 <td>
@@ -130,17 +137,30 @@
                   {% endif %}
                 </td>
                 <td>
-                  <div class="btn-group btn-group-sm" role="group">
+                  <div class="d-flex flex-wrap gap-1">
+                    <a href="{% url 'hq:generate_merchant_contract_pdf' item.business.id %}"
+                       class="btn btn-sm btn-outline-success"
+                       title="Generate contract PDF">
+                      <i class="bi bi-file-earmark-pdf"></i>
+                    </a>
                     {% if item.has_contract %}
-                      <a href="{% url 'hq:contract_download' item.contract.id %}" 
+                      <a href="{% url 'hq:contract_download' item.contract.id %}"
                          class="btn btn-sm btn-outline-primary"
-                         title="Download contract">
+                         title="Download PDF">
                         <i class="bi bi-download"></i>
                       </a>
+                      {% if item.contract.sign_token and not item.contract.is_signed %}
+                      <a href="{% url 'hq:contract_sign_portal' token=item.contract.sign_token %}"
+                         target="_blank"
+                         class="btn btn-sm btn-outline-warning"
+                         title="Open e-signature portal">
+                        <i class="bi bi-pen"></i>
+                      </a>
+                      {% endif %}
                     {% endif %}
-                    <a href="{% url 'hq:contracts_detail' item.business.id %}" 
+                    <a href="{% url 'hq:contracts_detail' item.business.id %}"
                        class="btn btn-sm btn-outline-secondary"
-                       title="{% if item.has_contract %}View/Replace{% else %}Upload{% endif %}">
+                       title="{% if item.has_contract %}Manage{% else %}Upload{% endif %}">
                       <i class="bi bi-{% if item.has_contract %}pencil{% else %}upload{% endif %}"></i>
                     </a>
                   </div>
@@ -164,7 +184,7 @@
           <ul class="pagination justify-content-center">
             {% if page_obj.has_previous %}
             <li class="page-item">
-              <a class="page-link" href="?page={{ page_obj.previous_page_number }}&status={{ status_filter }}&q={{ search_query }}">
+              <a class="page-link" href="?{% querystring request page=page_obj.previous_page_number %}">
                 <i class="bi bi-chevron-left"></i> Previous
               </a>
             </li>
@@ -178,7 +198,7 @@
             
             {% if page_obj.has_next %}
             <li class="page-item">
-              <a class="page-link" href="?page={{ page_obj.next_page_number }}&status={{ status_filter }}&q={{ search_query }}">
+              <a class="page-link" href="?{% querystring request page=page_obj.next_page_number %}">
                 Next <i class="bi bi-chevron-right"></i>
               </a>
             </li>

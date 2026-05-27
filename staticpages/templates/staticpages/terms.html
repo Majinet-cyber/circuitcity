@@ -4,7 +4,23 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Terms of Service - Emajinet</title>
+  <title>Terms of Service - Emajinet | Legal Information</title>
+  <meta name="description" content="Read Emajinet's Terms of Service, including our refund policy, subscription terms, and user responsibilities. Last updated December 2025.">
+  
+  <!-- Open Graph / Social Media -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Terms of Service - Emajinet">
+  <meta property="og:description" content="Read Emajinet's Terms of Service, including our refund policy and subscription terms.">
+  <meta property="og:site_name" content="Emajinet">
+  
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Terms of Service - Emajinet">
+  <meta name="twitter:description" content="Read Emajinet's Terms of Service, including our refund policy and subscription terms.">
+  
+  <!-- SEO: Canonical URL -->
+  <link rel="canonical" href="https://www.emajinet.africa{{ request.path }}">
+  
   <link rel="icon" href="{% static 'favicon.ico' %}">
   <style>
     :root {
@@ -197,6 +213,36 @@
       as explicitly stated in these Terms.
     </p>
 
+    <h2 id="refund-policy">5.1. Refund Policy</h2>
+    <p>
+      <strong>30-Day Money-Back Guarantee:</strong> We offer a 30-day money-back guarantee for first-time 
+      subscriptions only. If you are not satisfied with Emajinet within the first 30 days of your initial 
+      subscription, you may request a full refund of your subscription fee.
+    </p>
+    <p>
+      <strong>Refund Eligibility:</strong> To be eligible for a refund:
+    </p>
+    <ul>
+      <li>You must be a first-time subscriber (not a returning customer)</li>
+      <li>Your refund request must be made within 30 days of your initial subscription date</li>
+      <li>You must not have violated these Terms of Service or engaged in any fraudulent activity</li>
+    </ul>
+    <p>
+      <strong>Non-Refundable Items:</strong> The following are not eligible for refunds:
+    </p>
+    <ul>
+      <li>Subscriptions renewed after the initial 30-day period</li>
+      <li>Usage fees, transaction fees, or other service charges</li>
+      <li>Subscriptions terminated due to Terms of Service violations</li>
+      <li>Refunds requested after 30 days from the initial subscription date</li>
+    </ul>
+    <p>
+      <strong>How to Request a Refund:</strong> To request a refund, please contact us at 
+      <a href="mailto:{{ SUPPORT_EMAIL|default:'support@emajinet.africa' }}">{{ SUPPORT_EMAIL|default:'support@emajinet.africa' }}</a> with your account details and 
+      reason for the refund request. Refunds will be processed within 5-10 business days to your 
+      original payment method.
+    </p>
+
     <h2>6. Multi-Tenant Environment</h2>
     <p>
       Our Service operates in a multi-tenant environment. Your business data is logically separated 
@@ -248,6 +294,19 @@
       Email: <a href="mailto:legal@emajinet.com">legal@emajinet.com</a>
     </p>
   </div>
+
+  <!-- Footer -->
+  <footer class="footer" style="padding: 2rem; background: var(--text-primary); color: var(--white); text-align: center; margin-top: 4rem;">
+    <p style="opacity: 0.8; margin-bottom: 1rem;">&copy; {% now "Y" %} Emajinet. All rights reserved.</p>
+    <div style="display: flex; gap: 2rem; justify-content: center; flex-wrap: wrap;">
+      <a href="{% url 'staticpages:pricing' %}" style="color: rgba(255,255,255,0.7); text-decoration: none; font-size: 0.9rem;">Pricing</a>
+      <a href="{% url 'staticpages:about' %}" style="color: rgba(255,255,255,0.7); text-decoration: none; font-size: 0.9rem;">About</a>
+      <a href="{% url 'staticpages:contact' %}" style="color: rgba(255,255,255,0.7); text-decoration: none; font-size: 0.9rem;">Contact</a>
+      <a href="{% url 'staticpages:terms' %}" style="color: rgba(255,255,255,0.7); text-decoration: none; font-size: 0.9rem;">Terms</a>
+      <a href="{% url 'staticpages:privacy' %}" style="color: rgba(255,255,255,0.7); text-decoration: none; font-size: 0.9rem;">Privacy</a>
+      <a href="{% url 'staticpages:terms' %}#refund-policy" style="color: rgba(255,255,255,0.7); text-decoration: none; font-size: 0.9rem;">Refund Policy</a>
+    </div>
+  </footer>
 </body>
 </html>
 

@@ -30,10 +30,7 @@ def compute_stock_header(request, Model) -> Dict[str, Decimal | int]:
     manager = getattr(Model, "_base_manager", Model.objects)
     qs = manager.all()
 
-    biz_id = (
-        getattr(request, "business_id", None)
-        or getattr(getattr(request, "business", None), "id", None)
-    )
+    biz_id = getattr(request, "business_id", None) or getattr(getattr(request, "business", None), "id", None)
     if biz_id:
         if hasf("business_id"):
             qs = qs.filter(business_id=biz_id)
@@ -76,17 +73,23 @@ def compute_stock_header(request, Model) -> Dict[str, Decimal | int]:
     instock_q = Q()
     added = False
     if hasf("sold_at"):
-        instock_q &= Q(sold_at__isnull=True); added = True
+        instock_q &= Q(sold_at__isnull=True)
+        added = True
     if hasf("status"):
-        instock_q &= ~Q(status__iexact="sold"); added = True
+        instock_q &= ~Q(status__iexact="sold")
+        added = True
     if hasf("is_sold"):
-        instock_q &= Q(is_sold=False); added = True
+        instock_q &= Q(is_sold=False)
+        added = True
     if hasf("in_stock"):
-        instock_q &= Q(in_stock=True); added = True
+        instock_q &= Q(in_stock=True)
+        added = True
     if hasf("quantity"):
-        instock_q &= Q(quantity__gt=0); added = True
+        instock_q &= Q(quantity__gt=0)
+        added = True
     if hasf("qty"):
-        instock_q &= Q(qty__gt=0); added = True
+        instock_q &= Q(qty__gt=0)
+        added = True
     if not added:
         instock_q = ~Q(pk__in=[])  # fallback: everything
 
@@ -100,5 +103,3 @@ def compute_stock_header(request, Model) -> Dict[str, Decimal | int]:
         "sum_order": sum_any(instock_qs, ("order_price", "order_cost", "cost_price", "purchase_price", "buy_price")),
         "sum_selling": sum_any(sold_qs, price_fields),
     }
-
-

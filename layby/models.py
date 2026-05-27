@@ -94,9 +94,9 @@ class LaybyOrder(models.Model):
             models.Index(fields=["status", "created_by"]),
         ]
         constraints = [
-            models.CheckConstraint(check=Q(term_months__gte=1) & Q(term_months__lte=12), name="layby_term_1_to_12"),
-            models.CheckConstraint(check=Q(total_price__gte=0), name="layby_total_price_nonneg"),
-            models.CheckConstraint(check=Q(deposit_amount__gte=0), name="layby_deposit_nonneg"),
+            models.CheckConstraint(condition=Q(term_months__gte=1) & Q(term_months__lte=12), name="layby_term_1_to_12"),
+            models.CheckConstraint(condition=Q(total_price__gte=0), name="layby_total_price_nonneg"),
+            models.CheckConstraint(condition=Q(deposit_amount__gte=0), name="layby_deposit_nonneg"),
         ]
 
     def __str__(self) -> str:  # pragma: no cover
@@ -106,9 +106,7 @@ class LaybyOrder(models.Model):
     @property
     def amount_paid(self) -> Decimal:
         extra = (
-            self.payments.aggregate(s=models.Sum("amount")).get("s")
-            if hasattr(self, "payments")
-            else None
+            self.payments.aggregate(s=models.Sum("amount")).get("s") if hasattr(self, "payments") else None
         ) or Decimal("0.00")
         return (self.deposit_amount or Decimal("0.00")) + extra
 
@@ -124,6 +122,7 @@ class LaybyPayment(models.Model):
     """
     Payments against a layby order.
     """
+
     order = models.ForeignKey(LaybyOrder, on_delete=models.CASCADE, related_name="payments")
     amount = models.DecimalField(max_digits=12, decimal_places=2)
     method = models.CharField(max_length=24, default="cash")
@@ -140,10 +139,8 @@ class LaybyPayment(models.Model):
             models.Index(fields=["order", "received_at"]),
         ]
         constraints = [
-            models.CheckConstraint(check=Q(amount__gt=0), name="layby_payment_amount_positive"),
+            models.CheckConstraint(condition=Q(amount__gt=0), name="layby_payment_amount_positive"),
         ]
 
     def __str__(self) -> str:  # pragma: no cover
         return f"{self.order.ref} Â· {self.amount}"
-
-

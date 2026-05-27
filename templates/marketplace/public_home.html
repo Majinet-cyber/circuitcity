@@ -1,0 +1,988 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Emajinet Marketplace – Discover Local Businesses Across Africa</title>
+<meta name="description" content="Discover quality products and services from verified local African businesses on Emajinet Marketplace. From phones to farms, find trusted sellers near you.">
+<link rel="icon" href="/static/favicon.ico">
+{% load static marketplace_media %}
+<style>
+  :root {
+    --primary: #059669;
+    --primary-dark: #047857;
+    --primary-light: #ecfdf5;
+    --primary-glow: rgba(5,150,105,.15);
+    --secondary: #10b981;
+    --accent: #0891b2;
+    --text-primary: #0f172a;
+    --text-secondary: #64748b;
+    --bg-light: #f8fafc;
+    --white: #ffffff;
+    --border: #e2e8f0;
+    --shadow: 0 4px 20px rgba(0,0,0,.07), 0 1px 4px rgba(0,0,0,.04);
+    --shadow-lg: 0 16px 48px rgba(0,0,0,.12), 0 4px 12px rgba(0,0,0,.06);
+    --shadow-sm: 0 2px 8px rgba(0,0,0,.05);
+    --shadow-brand: 0 8px 32px rgba(5,150,105,.2);
+    --radius-card: 18px;
+    --radius-btn: 100px;
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.6;
+    color: var(--text-primary);
+    background: var(--white);
+    overflow-x: hidden;
+  }
+
+  /* ── NAVBAR ── */
+  .mkt-navbar {
+    position: sticky; top:0; left:0; right:0; z-index:1000;
+    background: rgba(255,255,255,.95);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    box-shadow: 0 2px 16px rgba(0,0,0,.06);
+    border-bottom: 1px solid rgba(229,231,235,.8);
+  }
+  .mkt-navbar-inner {
+    max-width: 1280px; margin:0 auto;
+    padding: .9rem 2rem;
+    display: flex; justify-content:space-between; align-items:center;
+  }
+  .mkt-brand {
+    display:flex; align-items:center; gap:.6rem; text-decoration:none;
+  }
+  .mkt-brand-icon {
+    width:36px; height:36px;
+    background: linear-gradient(135deg,var(--primary),var(--primary-dark));
+    border-radius:10px; display:flex; align-items:center; justify-content:center;
+    color:#fff; box-shadow:0 4px 12px rgba(79,70,229,.35); flex-shrink:0;
+  }
+  .mkt-brand-name { font-size:1.15rem; font-weight:800; color:var(--primary); letter-spacing:-.01em; }
+  .mkt-brand-sub {
+    font-size:.7rem; font-weight:600; color:var(--text-secondary);
+    letter-spacing:.05em; text-transform:uppercase; margin-top:-3px;
+  }
+  .mkt-nav-actions { display:flex; gap:.75rem; align-items:center; }
+  .btn-nav-ghost {
+    font-size:.88rem; font-weight:600; color:var(--text-secondary);
+    background:transparent; border:1.5px solid var(--border);
+    border-radius:var(--radius-btn); padding:.45rem 1.1rem;
+    text-decoration:none; transition:all .2s ease;
+  }
+  .btn-nav-ghost:hover { border-color:var(--primary); color:var(--primary); background:rgba(79,70,229,.04); }
+  .btn-nav-cta {
+    font-size:.88rem; font-weight:700; color:#fff;
+    background: linear-gradient(135deg,rgba(79,70,229,.92),rgba(67,56,202,.97));
+    border:1px solid rgba(255,255,255,.2); border-radius:var(--radius-btn);
+    padding:.45rem 1.2rem; text-decoration:none; transition:all .2s ease;
+    box-shadow:0 4px 14px rgba(79,70,229,.4);
+  }
+  .btn-nav-cta:hover {
+    background:linear-gradient(135deg,var(--primary),var(--primary-dark));
+    transform:translateY(-1px); box-shadow:0 6px 20px rgba(79,70,229,.5);
+    color:#fff; text-decoration:none;
+  }
+
+  /* ── HERO ── */
+  .mkt-hero {
+    padding: 5.5rem 2rem 4.5rem;
+    background: linear-gradient(135deg,#f9fafb 0%,#e0e7ff 55%,#f0fdf4 100%);
+    position:relative; overflow:hidden; text-align:center;
+  }
+  .mkt-hero::before {
+    content:''; position:absolute; top:-40%; right:-15%;
+    width:700px; height:700px;
+    background:radial-gradient(circle,rgba(79,70,229,.07) 0%,transparent 70%);
+    border-radius:50%; pointer-events:none;
+  }
+  .mkt-hero::after {
+    content:''; position:absolute; bottom:-30%; left:-10%;
+    width:500px; height:500px;
+    background:radial-gradient(circle,rgba(16,185,129,.06) 0%,transparent 70%);
+    border-radius:50%; pointer-events:none;
+  }
+  .hero-inner { max-width:780px; margin:0 auto; position:relative; z-index:1; }
+  .hero-badge {
+    display:inline-flex; align-items:center; gap:.4rem;
+    font-size:.78rem; font-weight:700; color:var(--primary);
+    background:rgba(79,70,229,.08); border:1.5px solid rgba(79,70,229,.2);
+    border-radius:var(--radius-btn); padding:.3rem .95rem; margin-bottom:1.4rem;
+    letter-spacing:.06em; text-transform:uppercase;
+  }
+  .hero-title {
+    font-size:clamp(2.1rem,5.5vw,3.4rem); font-weight:800;
+    line-height:1.1; color:var(--text-primary);
+    margin-bottom:1.25rem; letter-spacing:-.02em;
+  }
+  .hero-title .highlight {
+    background:linear-gradient(135deg,var(--primary) 0%,var(--secondary) 100%);
+    -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text;
+  }
+  .hero-subtitle {
+    font-size:1.15rem; color:var(--text-secondary);
+    max-width:580px; margin:0 auto 2.25rem; line-height:1.75;
+  }
+
+  /* ── SEARCH ── */
+  .hero-search-wrap { max-width:580px; margin:0 auto 1.75rem; }
+  .hero-search-box {
+    display:flex; align-items:center;
+    background:var(--white); border:2px solid var(--border);
+    border-radius:var(--radius-btn);
+    padding:.35rem .35rem .35rem 1.15rem;
+    box-shadow:0 4px 20px rgba(0,0,0,.08); transition:all .2s ease;
+  }
+  .hero-search-box:focus-within {
+    border-color:var(--primary);
+    box-shadow:0 4px 20px rgba(79,70,229,.15),0 0 0 4px rgba(79,70,229,.08);
+  }
+  .hero-search-box .search-icon { color:var(--text-secondary); flex-shrink:0; margin-right:.2rem; }
+  .hero-search-box input {
+    border:none; outline:none; flex:1;
+    font-size:.97rem; padding:.45rem .7rem;
+    background:transparent; color:var(--text-primary); font-family:inherit;
+  }
+  .hero-search-box input::placeholder { color:var(--text-secondary); }
+  .hero-search-box .search-btn {
+    background:linear-gradient(135deg,var(--primary),var(--primary-dark));
+    color:#fff; border:none; border-radius:var(--radius-btn);
+    padding:.6rem 1.5rem; font-size:.9rem; font-weight:700;
+    cursor:pointer; flex-shrink:0; transition:all .2s ease;
+    box-shadow:0 4px 12px rgba(79,70,229,.35); font-family:inherit;
+  }
+  .hero-search-box .search-btn:hover { transform:translateY(-1px); box-shadow:0 6px 18px rgba(79,70,229,.5); }
+
+  /* ── TRUST BAND ── */
+  .trust-band {
+    background: var(--white);
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    padding: 2.25rem 2rem;
+  }
+  .trust-band-inner {
+    max-width: 1280px; margin: 0 auto;
+    display: grid;
+    grid-template-columns: repeat(4,1fr);
+    gap: 0;
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-card);
+    overflow: hidden;
+    box-shadow: var(--shadow-sm);
+  }
+  .trust-item {
+    padding: 1.5rem 1.75rem;
+    display: flex; align-items: flex-start; gap: 1rem;
+    border-right: 1px solid var(--border);
+    background: var(--white);
+    transition: background .2s ease;
+  }
+  .trust-item:last-child { border-right: none; }
+  .trust-item:hover { background: rgba(79,70,229,.025); }
+  .trust-item-icon {
+    width: 44px; height: 44px; flex-shrink: 0;
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .trust-item-icon.indigo { background: rgba(79,70,229,.1); color: var(--primary); }
+  .trust-item-icon.green  { background: rgba(16,185,129,.1); color: #059669; }
+  .trust-item-icon.amber  { background: rgba(245,158,11,.1); color: #d97706; }
+  .trust-item-icon.violet { background: rgba(124,58,237,.1); color: #7c3aed; }
+  .trust-item-body {}
+  .trust-item-value {
+    font-size: 1.3rem; font-weight: 800;
+    color: var(--text-primary); line-height: 1.1;
+    letter-spacing: -.02em; margin-bottom: .2rem;
+  }
+  .trust-item-label {
+    font-size: .8rem; font-weight: 600; color: var(--text-secondary);
+    line-height: 1.4;
+  }
+
+  /* ── CATEGORY STRIP ── */
+  .categories-section {
+    background: var(--bg-light);
+    padding: 3rem 2rem 3.5rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .categories-inner { max-width: 1280px; margin: 0 auto; }
+  .categories-header {
+    text-align: center; margin-bottom: 2rem;
+  }
+  .categories-eyebrow {
+    font-size: .73rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .09em; color: var(--primary); margin-bottom: .4rem;
+  }
+  .categories-title {
+    font-size: 1.6rem; font-weight: 800;
+    color: var(--text-primary); letter-spacing: -.02em; line-height: 1.15;
+  }
+  .categories-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+    gap: 1rem;
+  }
+  .cat-card {
+    background: var(--white);
+    border: 1.5px solid var(--border);
+    border-radius: 16px;
+    padding: 1.25rem 1rem 1.1rem;
+    text-decoration: none; color: inherit;
+    display: flex; flex-direction: column; align-items: flex-start; gap: .55rem;
+    transition: all .22s ease;
+    box-shadow: 0 1px 4px rgba(0,0,0,.04);
+    position: relative; overflow: hidden;
+  }
+  .cat-card::after {
+    content: '';
+    position: absolute; bottom: 0; left: 0; right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--cat-color-a, var(--primary)), var(--cat-color-b, var(--secondary)));
+    opacity: 0;
+    transition: opacity .22s ease;
+  }
+  .cat-card:hover {
+    border-color: transparent;
+    box-shadow: 0 8px 28px rgba(79,70,229,.13);
+    transform: translateY(-3px);
+    color: inherit; text-decoration: none;
+  }
+  .cat-card:hover::after { opacity: 1; }
+  .cat-icon {
+    width: 48px; height: 48px; border-radius: 13px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.55rem; flex-shrink: 0;
+  }
+  .cat-name {
+    font-size: .92rem; font-weight: 800;
+    color: var(--text-primary); line-height: 1.2;
+  }
+  .cat-desc {
+    font-size: .75rem; color: var(--text-secondary);
+    line-height: 1.45;
+  }
+  .cat-arrow {
+    margin-top: auto; padding-top: .35rem;
+    color: var(--text-secondary); font-size: .7rem; font-weight: 600;
+    display: flex; align-items: center; gap: .25rem;
+    transition: color .15s, gap .15s;
+  }
+  .cat-card:hover .cat-arrow { color: var(--primary); gap: .45rem; }
+
+  /* ── MAIN CONTENT ── */
+  .mkt-content { max-width:1280px; margin:0 auto; padding:3rem 2rem 4rem; }
+
+  /* ── FILTER BAR ── */
+  .filter-strip {
+    display:flex; gap:.5rem; flex-wrap:wrap; margin-bottom:2.5rem;
+    padding:1.1rem 1.25rem;
+    background:var(--white); border-radius:var(--radius-card);
+    border:1.5px solid var(--border); box-shadow:var(--shadow-sm);
+  }
+  .filter-chip {
+    display:inline-flex; align-items:center; gap:.3rem;
+    padding:.35rem .9rem; border-radius:var(--radius-btn);
+    border:1.5px solid var(--border); background:var(--bg-light);
+    font-size:.82rem; font-weight:600; cursor:pointer;
+    color:var(--text-secondary); text-decoration:none; transition:all .2s ease; font-family:inherit;
+  }
+  .filter-chip:hover { border-color:var(--primary); color:var(--primary); background:rgba(79,70,229,.06); transform:translateY(-1px); }
+  .filter-chip.active {
+    background:linear-gradient(135deg,var(--primary),var(--primary-dark));
+    border-color:var(--primary-dark); color:#fff;
+    box-shadow:0 4px 12px rgba(79,70,229,.35);
+  }
+
+  /* ── SECTION LABELS ── */
+  .section-eyebrow {
+    font-size:.75rem; font-weight:700; text-transform:uppercase;
+    letter-spacing:.08em; color:var(--primary); margin-bottom:.3rem;
+  }
+  .section-title {
+    font-size:1.5rem; font-weight:800;
+    color:var(--text-primary); letter-spacing:-.02em; line-height:1.2;
+  }
+  .section-header {
+    display:flex; align-items:center; justify-content:space-between;
+    margin-bottom:1.5rem; flex-wrap:wrap; gap:.75rem;
+  }
+
+  /* ── FEATURED BUSINESSES ── */
+  .biz-grid {
+    display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr));
+    gap:1rem; margin-bottom:3.5rem;
+  }
+  .biz-card {
+    background:var(--white); border:1.5px solid var(--border);
+    border-radius:var(--radius-card); padding:1.25rem .75rem;
+    text-decoration:none; color:inherit;
+    display:flex; flex-direction:column; align-items:center;
+    text-align:center; gap:.6rem; transition:all .25s ease; box-shadow:var(--shadow-sm);
+  }
+  .biz-card:hover { border-color:var(--primary); box-shadow:0 8px 28px rgba(79,70,229,.15); transform:translateY(-4px); color:inherit; text-decoration:none; }
+  .biz-card-icon { width:52px; height:52px; border-radius:14px; background:rgba(79,70,229,.08); display:flex; align-items:center; justify-content:center; font-size:1.6rem; flex-shrink:0; }
+  .biz-card-name { font-weight:700; color:var(--text-primary); font-size:.88rem; line-height:1.3; }
+  .biz-card-count { font-size:.73rem; color:var(--text-secondary); background:var(--bg-light); padding:.15rem .6rem; border-radius:999px; }
+
+  /* ── LISTINGS SECTION ── */
+  .listings-header-bar { display:flex; align-items:center; justify-content:space-between; margin-bottom:1.5rem; flex-wrap:wrap; gap:.75rem; }
+  .listings-count-badge {
+    display:inline-flex; align-items:center; font-size:.8rem; font-weight:600;
+    color:var(--text-secondary); background:var(--bg-light);
+    border:1.5px solid var(--border); border-radius:var(--radius-btn);
+    padding:.2rem .7rem; margin-left:.6rem;
+  }
+
+  /* ── LISTING CARDS (SHOWCASE QUALITY) ── */
+  .listings-grid {
+    display:grid;
+    grid-template-columns:repeat(auto-fill,minmax(240px,1fr));
+    gap:1.4rem;
+  }
+  .listing-card {
+    background:var(--white); border:1.5px solid var(--border);
+    border-radius:var(--radius-card); overflow:hidden;
+    transition:all .25s ease;
+    text-decoration:none; color:inherit;
+    display:flex; flex-direction:column;
+    box-shadow:0 2px 8px rgba(0,0,0,.06);
+    position:relative;
+  }
+  .listing-card:hover {
+    border-color:rgba(79,70,229,.35);
+    box-shadow:0 14px 40px rgba(79,70,229,.13);
+    transform:translateY(-5px);
+    color:inherit; text-decoration:none;
+  }
+  .listing-img-wrap { position:relative; flex-shrink:0; overflow:hidden; height:210px; background:var(--bg-light); }
+  .listing-img, .listing-video {
+    width:100%; height:100%; object-fit:cover; object-position:center;
+    background:var(--bg-light); display:block;
+    transition:transform .35s ease;
+  }
+  .listing-card:hover .listing-img { transform:scale(1.04); }
+  .listing-img-placeholder {
+    width:100%; height:100%;
+    background:linear-gradient(135deg,rgba(79,70,229,.07) 0%,rgba(16,185,129,.05) 100%);
+    display:flex; align-items:center; justify-content:center; font-size:3.5rem;
+    flex-shrink:0;
+  }
+  .listing-img-fallback { display:none; position:absolute; inset:0; }
+  .listing-img-wrap.media-failed .listing-img-fallback { display:flex; }
+  .listing-vertical-badge {
+    position:absolute; top:.65rem; left:.65rem;
+    font-size:.62rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em;
+    color:#fff; padding:.22rem .6rem; border-radius:999px;
+    background:rgba(31,41,55,.55); backdrop-filter:blur(6px);
+    -webkit-backdrop-filter:blur(6px);
+  }
+  .listing-body {
+    padding:1rem 1.1rem 1.2rem; flex:1;
+    display:flex; flex-direction:column; gap:.3rem;
+  }
+  .listing-biz-tag {
+    font-size:.67rem; font-weight:700;
+    text-transform:uppercase; letter-spacing:.06em; color:var(--primary);
+  }
+  .listing-title {
+    font-size:.94rem; font-weight:700; color:var(--text-primary);
+    line-height:1.35;
+    display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
+  }
+  .listing-location {
+    font-size:.72rem; color:var(--text-secondary);
+    display:flex; align-items:center; gap:.25rem; margin-top:.1rem;
+  }
+  .listing-footer {
+    display:flex; align-items:center; justify-content:space-between;
+    margin-top:auto; padding-top:.6rem;
+    border-top:1px solid var(--border);
+  }
+  .listing-price {
+    font-size:1.05rem; font-weight:800; color:var(--text-primary);
+  }
+  .listing-price-empty {
+    font-size:.8rem; color:var(--text-secondary);
+    display:flex; align-items:center; gap:.3rem;
+  }
+  .listing-view-cue {
+    font-size:.72rem; font-weight:700; color:var(--primary);
+    display:flex; align-items:center; gap:.2rem;
+    opacity:0; transform:translateX(-4px);
+    transition:all .2s ease;
+  }
+  .listing-card:hover .listing-view-cue { opacity:1; transform:translateX(0); }
+
+  /* ── EMPTY STATE (SHOWCASE QUALITY) ── */
+  .empty-state-wrap {
+    padding: 5.5rem 2rem;
+    text-align: center;
+    background: linear-gradient(135deg,rgba(79,70,229,.03) 0%,rgba(16,185,129,.025) 100%);
+    border-radius: var(--radius-card);
+    border: 1.5px solid rgba(79,70,229,.1);
+    box-shadow: 0 8px 32px rgba(79,70,229,.06);
+  }
+  .empty-icon-ring {
+    width: 96px; height: 96px;
+    background: linear-gradient(135deg,rgba(79,70,229,.1) 0%,rgba(16,185,129,.08) 100%);
+    border-radius: 28px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 2.8rem;
+    margin: 0 auto 1.75rem;
+    box-shadow: 0 8px 24px rgba(79,70,229,.12);
+  }
+  .empty-state-wrap h4 {
+    font-size: 1.5rem; font-weight: 800;
+    color: var(--text-primary); margin-bottom: .65rem;
+    letter-spacing: -.02em;
+  }
+  .empty-state-wrap p {
+    color: var(--text-secondary); font-size: .97rem;
+    max-width: 440px; margin: 0 auto 2rem; line-height: 1.7;
+  }
+  .empty-cta-row { display:flex; gap:1rem; justify-content:center; flex-wrap:wrap; }
+  .empty-features-row {
+    display: flex; gap: 1.5rem; justify-content: center; flex-wrap: wrap;
+    margin-top: 2.5rem; padding-top: 2rem;
+    border-top: 1px solid rgba(79,70,229,.1);
+  }
+  .empty-feature {
+    display: flex; align-items: center; gap: .4rem;
+    font-size: .8rem; font-weight: 600; color: var(--text-secondary);
+  }
+  .empty-feature svg { color: var(--secondary); }
+
+  /* ── BUTTONS ── */
+  .btn-premium {
+    display:inline-flex; align-items:center; gap:.4rem;
+    padding:.75rem 1.75rem; border-radius:var(--radius-btn);
+    font-size:.93rem; font-weight:700; text-decoration:none;
+    cursor:pointer; border:none; transition:all .25s ease; font-family:inherit;
+  }
+  .btn-premium-primary {
+    background:linear-gradient(135deg,var(--primary),var(--primary-dark));
+    color:#fff; box-shadow:0 4px 14px rgba(79,70,229,.4);
+  }
+  .btn-premium-primary:hover { transform:translateY(-2px); box-shadow:0 8px 24px rgba(79,70,229,.5); color:#fff; text-decoration:none; }
+  .btn-premium-outline {
+    background:var(--white); color:var(--primary); border:2px solid var(--primary);
+  }
+  .btn-premium-outline:hover { background:var(--primary); color:#fff; transform:translateY(-2px); text-decoration:none; }
+
+  /* ── PAGINATION ── */
+  .pager-wrap { display:flex; justify-content:center; gap:.5rem; margin-top:2.5rem; }
+  .pager-btn {
+    display:inline-flex; align-items:center; gap:.4rem;
+    padding:.55rem 1.2rem; border-radius:var(--radius-btn);
+    border:1.5px solid var(--border); background:var(--white);
+    color:var(--text-secondary); font-size:.86rem; font-weight:600;
+    text-decoration:none; transition:all .2s ease; box-shadow:var(--shadow-sm);
+  }
+  .pager-btn:hover { border-color:var(--primary); color:var(--primary); background:rgba(79,70,229,.04); transform:translateY(-1px); text-decoration:none; }
+
+  /* ── FOOTER ── */
+  .mkt-footer {
+    background:var(--text-primary); color:rgba(255,255,255,.85);
+    padding:3rem 2rem 2rem; margin-top:5rem;
+  }
+  .mkt-footer-inner { max-width:1280px; margin:0 auto; }
+  .footer-brand-row {
+    display:flex; align-items:center; justify-content:space-between;
+    flex-wrap:wrap; gap:1.5rem;
+    padding-bottom:2rem; border-bottom:1px solid rgba(255,255,255,.1); margin-bottom:2rem;
+  }
+  .footer-brand-name { font-size:1.1rem; font-weight:800; color:#fff; margin-bottom:.25rem; }
+  .footer-brand-tagline { font-size:.82rem; color:rgba(255,255,255,.5); }
+  .footer-links { display:flex; gap:1.5rem; flex-wrap:wrap; }
+  .footer-links a { color:rgba(255,255,255,.65); text-decoration:none; font-size:.85rem; font-weight:600; transition:color .2s; }
+  .footer-links a:hover { color:#fff; }
+  .footer-bottom { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:1rem; }
+  .footer-copy { font-size:.78rem; color:rgba(255,255,255,.4); }
+
+  /* ── RESPONSIVE ── */
+  @media (max-width:1024px) {
+    .trust-band-inner { grid-template-columns:repeat(2,1fr); }
+    .trust-item:nth-child(2) { border-right:none; }
+    .trust-item:nth-child(3) { border-top:1px solid var(--border); border-right:1px solid var(--border); }
+    .trust-item:nth-child(4) { border-top:1px solid var(--border); }
+    .categories-grid { grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); }
+  }
+  @media (max-width:768px) {
+    .mkt-navbar-inner { padding:.8rem 1.25rem; }
+    .mkt-hero { padding:4rem 1.25rem 3.5rem; }
+    .hero-subtitle { font-size:1rem; }
+    .trust-band { padding:1.5rem 1.25rem; }
+    .trust-band-inner { grid-template-columns:repeat(2,1fr); border-radius:14px; }
+    .trust-item { padding:1.1rem 1.25rem; }
+    .categories-section { padding:2.25rem 1.25rem 2.5rem; }
+    .categories-grid { grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:.8rem; }
+    .mkt-content { padding:2rem 1.25rem 3rem; }
+    .filter-strip { padding:.9rem 1rem; }
+    .listings-grid { grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:1rem; }
+    .biz-grid { grid-template-columns:repeat(auto-fill,minmax(110px,1fr)); gap:.75rem; }
+  }
+  @media (max-width:480px) {
+    .mkt-brand-sub { display:none; }
+    .hero-title { font-size:2rem; }
+    .hero-search-box .search-btn { padding:.55rem 1.1rem; font-size:.85rem; }
+    .trust-band-inner { grid-template-columns:1fr 1fr; border-radius:12px; }
+    .trust-item { padding:.9rem 1rem; }
+    .trust-item-value { font-size:1.1rem; }
+    .categories-grid { grid-template-columns:repeat(2,1fr); gap:.75rem; }
+    .listings-grid { grid-template-columns:repeat(2,1fr); gap:.75rem; }
+    .listing-img-wrap { height:160px; }
+    .biz-grid { grid-template-columns:repeat(3,1fr); }
+    .footer-brand-row { flex-direction:column; }
+    .footer-bottom { flex-direction:column; text-align:center; }
+    .empty-features-row { gap:1rem; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Navigation -->
+<nav class="mkt-navbar">
+  <div class="mkt-navbar-inner">
+    <a class="mkt-brand" href="/marketplace/">
+      <div class="mkt-brand-icon">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg>
+      </div>
+      <div>
+        <div class="mkt-brand-name">Emajinet</div>
+        <div class="mkt-brand-sub">Marketplace</div>
+      </div>
+    </a>
+    <div class="mkt-nav-actions">
+      <a href="{% url 'accounts:login' %}" class="btn-nav-ghost">Sign In</a>
+      <a href="{% url 'accounts:signup_manager' %}?source=marketplace" class="btn-nav-cta">List Your Business</a>
+    </div>
+  </div>
+</nav>
+
+<!-- Hero -->
+<section class="mkt-hero">
+  <div class="hero-inner">
+    <div class="hero-badge">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+      Africa's Business Marketplace
+    </div>
+    <h1 class="hero-title">
+      Discover <span class="highlight">Local Products</span><br>
+      &amp; Services
+    </h1>
+    <p class="hero-subtitle">
+      From farms &amp; phones to cars, fashion, gyms &amp; more — find trusted African businesses in one beautiful place.
+    </p>
+    <div class="hero-search-wrap">
+      <form class="hero-search-box" method="get">
+        <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" name="q" value="{{ search_q }}" placeholder="Search listings, businesses…" autocomplete="off">
+        {% if vertical_filter %}<input type="hidden" name="vertical" value="{{ vertical_filter }}">{% endif %}
+        <button type="submit" class="search-btn">Search</button>
+      </form>
+    </div>
+  </div>
+</section>
+
+<!-- ── TRUST BAND ── -->
+<section class="trust-band" data-testid="trust-band">
+  <div class="trust-band-inner">
+    <div class="trust-item">
+      <div class="trust-item-icon indigo">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      </div>
+      <div class="trust-item-body">
+        <div class="trust-item-value">Verified Sellers</div>
+        <div class="trust-item-label">Every business is KYC-checked &amp; accountable</div>
+      </div>
+    </div>
+    <div class="trust-item">
+      <div class="trust-item-icon green">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+      </div>
+      <div class="trust-item-body">
+        <div class="trust-item-value">9+ Verticals</div>
+        <div class="trust-item-label">Phones, farms, gyms, cars &amp; more categories</div>
+      </div>
+    </div>
+    <div class="trust-item">
+      <div class="trust-item-icon amber">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+      </div>
+      <div class="trust-item-body">
+        <div class="trust-item-value">Africa-First</div>
+        <div class="trust-item-label">Built for African SMEs, priced for African markets</div>
+      </div>
+    </div>
+    <div class="trust-item">
+      <div class="trust-item-icon violet">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+      </div>
+      <div class="trust-item-body">
+        <div class="trust-item-value">Mobile-Ready</div>
+        <div class="trust-item-label">Buy and sell from any device, anywhere in Africa</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── CATEGORIES STRIP ── -->
+<section class="categories-section" data-testid="categories-section">
+  <div class="categories-inner">
+    <div class="categories-header">
+      <div class="categories-eyebrow">Explore</div>
+      <div class="categories-title">Browse by Business Type</div>
+    </div>
+    <div class="categories-grid">
+
+      <a href="/marketplace/?vertical=phones" class="cat-card" style="--cat-color-a:#4f46e5;--cat-color-b:#7c3aed;">
+        <div class="cat-icon" style="background:rgba(79,70,229,.1);">📱</div>
+        <div class="cat-name">Phones &amp; Electronics</div>
+        <div class="cat-desc">Latest handsets, accessories &amp; gadgets</div>
+        <div class="cat-arrow">
+          Explore
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12,5 19,12 12,19"/></svg>
+        </div>
+      </a>
+
+      <a href="/marketplace/?vertical=clothing" class="cat-card" style="--cat-color-a:#ec4899;--cat-color-b:#f43f5e;">
+        <div class="cat-icon" style="background:rgba(236,72,153,.1);">👕</div>
+        <div class="cat-name">Fashion &amp; Clothing</div>
+        <div class="cat-desc">Apparel, shoes &amp; accessories</div>
+        <div class="cat-arrow">
+          Explore
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12,5 19,12 12,19"/></svg>
+        </div>
+      </a>
+
+      <a href="/marketplace/?vertical=farm" class="cat-card" style="--cat-color-a:#16a34a;--cat-color-b:#10b981;">
+        <div class="cat-icon" style="background:rgba(22,163,74,.1);">🌾</div>
+        <div class="cat-name">Farm &amp; Agriculture</div>
+        <div class="cat-desc">Fresh produce, livestock &amp; supplies</div>
+        <div class="cat-arrow">
+          Explore
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12,5 19,12 12,19"/></svg>
+        </div>
+      </a>
+
+      <a href="/marketplace/?vertical=gym" class="cat-card" style="--cat-color-a:#f97316;--cat-color-b:#ef4444;">
+        <div class="cat-icon" style="background:rgba(249,115,22,.1);">🏋️</div>
+        <div class="cat-name">Gym &amp; Fitness</div>
+        <div class="cat-desc">Memberships, classes &amp; equipment</div>
+        <div class="cat-arrow">
+          Explore
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12,5 19,12 12,19"/></svg>
+        </div>
+      </a>
+
+      <a href="/marketplace/?vertical=car_dealer" class="cat-card" style="--cat-color-a:#0ea5e9;--cat-color-b:#6366f1;">
+        <div class="cat-icon" style="background:rgba(14,165,233,.1);">🏎️</div>
+        <div class="cat-name">Cars for Sale</div>
+        <div class="cat-desc">New &amp; pre-owned vehicles</div>
+        <div class="cat-arrow">
+          Explore
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12,5 19,12 12,19"/></svg>
+        </div>
+      </a>
+
+      <a href="/marketplace/?vertical=car_hire" class="cat-card" style="--cat-color-a:#6366f1;--cat-color-b:#0ea5e9;">
+        <div class="cat-icon" style="background:rgba(99,102,241,.1);">🚗</div>
+        <div class="cat-name">Car Hire</div>
+        <div class="cat-desc">Daily &amp; long-term vehicle rental</div>
+        <div class="cat-arrow">
+          Explore
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12,5 19,12 12,19"/></svg>
+        </div>
+      </a>
+
+      <a href="/marketplace/?vertical=pharmacy" class="cat-card" style="--cat-color-a:#10b981;--cat-color-b:#06b6d4;">
+        <div class="cat-icon" style="background:rgba(16,185,129,.1);">💊</div>
+        <div class="cat-name">Pharmacy &amp; Health</div>
+        <div class="cat-desc">Medicine, wellness &amp; care products</div>
+        <div class="cat-arrow">
+          Explore
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12,5 19,12 12,19"/></svg>
+        </div>
+      </a>
+
+      <a href="/marketplace/?vertical=liquor" class="cat-card" style="--cat-color-a:#f59e0b;--cat-color-b:#d97706;">
+        <div class="cat-icon" style="background:rgba(245,158,11,.1);">🍺</div>
+        <div class="cat-name">Liquor &amp; Bar</div>
+        <div class="cat-desc">Spirits, beers, wines &amp; mixers</div>
+        <div class="cat-arrow">
+          Explore
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12,5 19,12 12,19"/></svg>
+        </div>
+      </a>
+
+      <a href="/marketplace/?vertical=hardware" class="cat-card" style="--cat-color-a:#64748b;--cat-color-b:#475569;">
+        <div class="cat-icon" style="background:rgba(100,116,139,.1);">🔧</div>
+        <div class="cat-name">Hardware &amp; Tools</div>
+        <div class="cat-desc">Building supplies &amp; equipment</div>
+        <div class="cat-arrow">
+          Explore
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12,5 19,12 12,19"/></svg>
+        </div>
+      </a>
+
+    </div>
+  </div>
+</section>
+
+<!-- Main content -->
+<main class="mkt-content">
+
+  <!-- Vertical filter chips -->
+  {% if available_verticals %}
+  <div class="filter-strip">
+    <a href="/marketplace/" class="filter-chip {% if not vertical_filter %}active{% endif %}">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+      All
+    </a>
+    {% for v in available_verticals %}
+      <a href="/marketplace/?vertical={{ v }}" class="filter-chip {% if vertical_filter == v %}active{% endif %}">
+        {% if v == "phones" %}📱
+        {% elif v == "liquor" %}🍺
+        {% elif v == "grocery" %}🛒
+        {% elif v == "clothing" %}👕
+        {% elif v == "gym" %}🏋️
+        {% elif v == "farm" %}🌾
+        {% elif v == "car_dealer" %}🏎️
+        {% elif v == "car_hire" %}🚗
+        {% elif v == "pharmacy" %}💊
+        {% elif v == "hardware" %}🔧
+        {% else %}📦{% endif %}
+        {% if v == "car_dealer" %}Car Dealer
+        {% elif v == "car_hire" %}Car Hire
+        {% else %}{{ v|capfirst }}{% endif %}
+      </a>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <!-- Featured Businesses -->
+  {% if featured_businesses and not search_q and not vertical_filter %}
+  <div class="section-header">
+    <div>
+      <div class="section-eyebrow">Top Businesses</div>
+      <div class="section-title">Featured on Marketplace</div>
+    </div>
+  </div>
+  <div class="biz-grid" style="margin-bottom:3.5rem;">
+    {% for biz in featured_businesses %}
+    <a href="/marketplace/{{ biz.slug }}/" class="biz-card">
+      {% with storefront=biz.safe_storefront %}
+      {% with store_logo=storefront.logo|safe_media_url business_logo=biz.logo|safe_media_url %}
+      {% if store_logo %}
+        <img src="{{ store_logo }}" alt="{{ storefront.display_name|default:biz.name }}" style="width:52px;height:52px;border-radius:14px;object-fit:cover;">
+      {% elif business_logo %}
+        <img src="{{ business_logo }}" alt="{{ biz.name }}" style="width:52px;height:52px;border-radius:14px;object-fit:cover;">
+      {% else %}
+        <div class="biz-card-icon">
+          {% if biz.business_kind == "phones" %}📱
+          {% elif biz.business_kind == "liquor" %}🍺
+          {% elif biz.business_kind == "car_dealer" %}🏎️
+          {% elif biz.business_kind == "farm" %}🌾
+          {% elif biz.business_kind == "clothing" %}👕
+          {% elif biz.business_kind == "gym" %}🏋️
+          {% elif biz.business_kind == "pharmacy" %}💊
+          {% else %}🏪{% endif %}
+        </div>
+      {% endif %}
+      {% endwith %}
+      <div class="biz-card-name">{{ storefront.display_name|default:biz.name }}</div>
+      {% endwith %}
+      <div class="biz-card-count">{{ biz.listing_count }} listing{{ biz.listing_count|pluralize }}</div>
+    </a>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <!-- Listings heading -->
+  <div class="listings-header-bar">
+    <div>
+      <div class="section-eyebrow">Browse</div>
+      <div class="section-title" style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;">
+        {% if search_q %}Results for "{{ search_q }}"
+        {% elif vertical_filter %}
+          {% if vertical_filter == "car_dealer" %}Car Dealer
+          {% elif vertical_filter == "car_hire" %}Car Hire
+          {% else %}{{ vertical_filter|capfirst }}{% endif %} Listings
+        {% else %}Latest Listings{% endif %}
+        <span class="listings-count-badge">{{ page_obj.paginator.count }}</span>
+      </div>
+    </div>
+    {% if vertical_filter or search_q %}
+    <a href="/marketplace/" class="filter-chip" style="align-self:flex-end;">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      Clear filter
+    </a>
+    {% endif %}
+  </div>
+
+  {% if page_obj.object_list %}
+  <div class="listings-grid">
+    {% for listing in page_obj %}
+    <a href="/marketplace/{{ listing.business.slug }}/{{ listing.listing_slug }}/" class="listing-card">
+      <div class="listing-img-wrap">
+        {% with media=listing|listing_card_media %}
+        {% if media.kind == "image" %}
+          <img src="{{ media.url }}" alt="{{ media.alt }}" class="listing-img" loading="lazy" decoding="async" onerror="this.parentElement.classList.add('media-failed');this.remove();">
+          <div class="listing-img-placeholder listing-img-fallback">{{ media.placeholder_icon }}</div>
+        {% elif media.kind == "video" %}
+          <video class="listing-video" muted playsinline preload="metadata" aria-label="{{ media.alt }}">
+            <source src="{{ media.url }}">
+          </video>
+        {% else %}
+          <div class="listing-img-placeholder">
+            {{ media.placeholder_icon }}
+          </div>
+        {% endif %}
+        {% endwith %}
+        {% if listing.vertical %}
+        <span class="listing-vertical-badge">
+          {% if listing.vertical == "car_dealer" %}Cars
+          {% elif listing.vertical == "car_hire" %}Car Hire
+          {% else %}{{ listing.vertical|capfirst }}{% endif %}
+        </span>
+        {% endif %}
+        {% if listing.verification_status == 'verified' %}
+        <span style="position:absolute;top:.6rem;left:.6rem;background:rgba(5,150,105,.9);color:#fff;font-size:.65rem;font-weight:800;padding:.2rem .55rem;border-radius:999px;letter-spacing:.03em;backdrop-filter:blur(4px);">✓ Verified</span>
+        {% endif %}
+      </div>
+      <div class="listing-body">
+        <div class="listing-biz-tag">{{ listing.business.name }}</div>
+        <div class="listing-title">{{ listing.title }}</div>
+        {% if listing.location_text %}
+          <div class="listing-location">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+            {{ listing.location_text }}
+          </div>
+        {% endif %}
+        <div class="listing-footer">
+          {% if listing.price %}
+            <div class="listing-price">{{ listing.business.currency }} {{ listing.price|floatformat:0 }}</div>
+          {% else %}
+            <div class="listing-price-empty">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+              Contact for price
+            </div>
+          {% endif %}
+          <div class="listing-view-cue">
+            View
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12,5 19,12 12,19"/></svg>
+          </div>
+        </div>
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+
+  <!-- List Your Business CTA -->
+  {% if not search_q and page_obj.number == 1 %}
+  <div style="background:linear-gradient(135deg,#ecfdf5 0%,#f0fdf4 100%);border:1.5px solid #bbf7d0;border-radius:20px;padding:2rem 2rem;margin:2.5rem 0;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1.25rem;">
+    <div>
+      <div style="font-size:.75rem;font-weight:800;text-transform:uppercase;letter-spacing:.07em;color:#059669;margin-bottom:.4rem;">For Merchants</div>
+      <div style="font-size:1.2rem;font-weight:900;color:#0f172a;margin-bottom:.35rem;">List Your Business on Emajinet Marketplace</div>
+      <div style="font-size:.875rem;color:#475569;max-width:480px;line-height:1.5;">
+        Reach customers across Africa. Get a verified storefront, accept payments, and grow with Emajinet's business tools.
+      </div>
+    </div>
+    <div style="display:flex;gap:.75rem;flex-wrap:wrap;align-items:center;">
+      <a href="{% url 'accounts:signup_manager' %}?source=marketplace_cta"
+         style="display:inline-flex;align-items:center;gap:.45rem;background:#059669;color:#fff;font-weight:700;font-size:.875rem;padding:.7rem 1.5rem;border-radius:999px;text-decoration:none;transition:background .15s;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        List Your Business Free
+      </a>
+      <span style="font-size:.78rem;color:#64748b;">30-day trial &middot; No credit card</span>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Pagination -->
+  {% if page_obj.has_other_pages %}
+  <div class="pager-wrap">
+    {% if page_obj.has_previous %}
+      <a class="pager-btn" href="?page={{ page_obj.previous_page_number }}{% if vertical_filter %}&amp;vertical={{ vertical_filter }}{% endif %}{% if search_q %}&amp;q={{ search_q }}{% endif %}">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12,19 5,12 12,5"/></svg>
+        Previous
+      </a>
+    {% endif %}
+    {% if page_obj.has_next %}
+      <a class="pager-btn" href="?page={{ page_obj.next_page_number }}{% if vertical_filter %}&amp;vertical={{ vertical_filter }}{% endif %}{% if search_q %}&amp;q={{ search_q }}{% endif %}">
+        Next
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12,5 19,12 12,19"/></svg>
+      </a>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% else %}
+  <!-- Empty state (showcase quality) -->
+  <div class="empty-state-wrap" data-testid="empty-state">
+    <div class="empty-icon-ring">
+      {% if search_q %}🔍{% elif vertical_filter %}📦{% else %}🛍️{% endif %}
+    </div>
+    {% if search_q %}
+      <h4>No results for "{{ search_q }}"</h4>
+      <p>Try a different search term or explore all business categories. New businesses join Emajinet Marketplace every week.</p>
+    {% elif vertical_filter %}
+      <h4>Be first in this category</h4>
+      <p>No listings yet — this is your opportunity to be the first in this space and reach customers across Africa.</p>
+    {% else %}
+      <h4>The marketplace is opening up</h4>
+      <p>You're early. Be among the first businesses on Emajinet Marketplace and build your customer base from the ground up.</p>
+    {% endif %}
+    <div class="empty-cta-row">
+      <a href="/marketplace/" class="btn-premium btn-premium-outline">Browse All</a>
+      <a href="{% url 'accounts:signup_manager' %}?source=marketplace" class="btn-premium btn-premium-primary">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        List Your Business
+      </a>
+    </div>
+    <div class="empty-features-row">
+      <div class="empty-feature">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22,4 12,14.01 9,11.01"/></svg>
+        Free to list
+      </div>
+      <div class="empty-feature">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22,4 12,14.01 9,11.01"/></svg>
+        Africa-wide reach
+      </div>
+      <div class="empty-feature">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22,4 12,14.01 9,11.01"/></svg>
+        Mobile-ready storefront
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+</main>
+
+<!-- Footer -->
+<footer class="mkt-footer">
+  <div class="mkt-footer-inner">
+    <div class="footer-brand-row">
+      <div>
+        <div class="footer-brand-name">Emajinet Marketplace</div>
+        <div class="footer-brand-tagline">Connecting African businesses with customers across the continent.</div>
+      </div>
+      <div class="footer-links">
+        <a href="/">Home</a>
+        <a href="{% url 'accounts:signup_manager' %}?source=marketplace">List Your Business</a>
+        <a href="{% url 'accounts:login' %}">Sign In</a>
+        <a href="/marketplace/">Marketplace</a>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <div class="footer-copy">&copy; Emajinet. Business OS for Africa.</div>
+      <div class="footer-copy">Built in Malawi 🇲🇼</div>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>

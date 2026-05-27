@@ -1,0 +1,644 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Energy Command Center – Live Monitoring – {{ business.name }}{% endblock %}
+
+{% block content %}
+<style>
+/* ============================================================
+   ENERGY COMMAND CENTER — Live Intelligence Monitor
+   Emajinet Flagship · Premium · Engineering-Grade
+   ============================================================ */
+:root {
+  --mc-green:  #059669;
+  --mc-blue:   #2563eb;
+  --mc-amber:  #d97706;
+  --mc-red:    #dc2626;
+  --mc-purple: #7c3aed;
+  --mc-teal:   #0891b2;
+  --mc-slate:  #0f172a;
+  --mc-muted:  #64748b;
+  --mc-border: #e2e8f0;
+  --mc-radius: 16px;
+}
+
+/* ── HERO COMMAND BAR ── */
+.mc-hero {
+  background: linear-gradient(135deg,#0f172a 0%,#064e3b 45%,#059669 100%);
+  border-radius: var(--mc-radius); padding: 1.5rem 1.75rem 1.25rem;
+  position: relative; overflow: hidden; margin-bottom: 1.5rem; color: #fff;
+}
+.mc-hero::before {
+  content: ''; position: absolute; top: -80px; right: -60px;
+  width: 280px; height: 280px;
+  background: radial-gradient(circle,rgba(16,185,129,.2) 0%,transparent 70%);
+}
+.mc-hero::after {
+  content: ''; position: absolute; bottom: -50px; left: 20%;
+  width: 240px; height: 240px;
+  background: radial-gradient(circle,rgba(37,99,235,.12) 0%,transparent 70%);
+}
+.mc-hero-inner { position: relative; z-index: 1; }
+.mc-eyebrow {
+  font-size: .65rem; font-weight: 700; letter-spacing: .15em;
+  text-transform: uppercase; color: rgba(255,255,255,.5); margin-bottom: .2rem;
+  display: flex; align-items: center; gap: .5rem;
+}
+.mc-hero h1 { font-size: 1.5rem; font-weight: 800; margin-bottom: .15rem; }
+.mc-hero-sub { font-size: .83rem; color: rgba(255,255,255,.6); }
+.mc-kpi-bar {
+  display: flex; gap: 1.5rem; flex-wrap: wrap; margin-top: 1rem;
+  padding-top: .75rem; border-top: 1px solid rgba(255,255,255,.1);
+}
+.mc-kpi-bar-item .val { font-size: 1.4rem; font-weight: 800; color: #fff; line-height: 1.1; }
+.mc-kpi-bar-item .lbl { font-size: .62rem; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: rgba(255,255,255,.5); margin-top: .08rem; }
+
+/* ── LIVE TICKER ── */
+.mc-ticker {
+  background: rgba(0,0,0,.6); border-radius: 8px; padding: .4rem .85rem;
+  font-size: .72rem; color: #e2e8f0; display: flex; align-items: center; gap: .6rem;
+  margin-top: .75rem; overflow: hidden; position: relative; z-index: 1;
+}
+.mc-ticker-label { color: #10b981; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; flex-shrink: 0; }
+.mc-ticker-scroll { overflow: hidden; white-space: nowrap; flex: 1; position: relative; }
+.mc-ticker-inner {
+  display: inline-block;
+  animation: ticker-scroll 30s linear infinite;
+}
+@keyframes ticker-scroll { 0%{transform:translateX(100%)} 100%{transform:translateX(-100%)} }
+
+/* ── STATUS STRIP ── */
+.mc-status-strip {
+  display: flex; gap: .6rem; flex-wrap: wrap; margin-bottom: 1.25rem;
+}
+.mc-status-pill {
+  display: flex; align-items: center; gap: .4rem;
+  background: #fff; border: 1.5px solid var(--mc-border); border-radius: 999px;
+  padding: .35rem .85rem; font-size: .78rem; font-weight: 600; color: #374151;
+  box-shadow: 0 1px 4px rgba(15,23,42,.05);
+}
+.mc-status-pill.ok    { border-color: #86efac; background: #f0fdf4; color: #166534; }
+.mc-status-pill.warn  { border-color: #fcd34d; background: #fefce8; color: #713f12; }
+.mc-status-pill.alert { border-color: #fca5a5; background: #fff1f2; color: #991b1b; }
+.mc-status-pill.pulse { border-color: #93c5fd; background: #eff6ff; color: #1e40af; }
+
+/* ── SITE INTELLIGENCE CARD ── */
+.mc-site-card {
+  background: #fff; border-radius: var(--mc-radius); border: 1.5px solid var(--mc-border);
+  box-shadow: 0 2px 12px rgba(15,23,42,.06); margin-bottom: 1.25rem;
+  overflow: hidden; transition: box-shadow .15s;
+}
+.mc-site-card:hover { box-shadow: 0 6px 24px rgba(15,23,42,.1); }
+.mc-site-card-critical { border-color: #fca5a5; box-shadow: 0 2px 12px rgba(220,38,38,.12); }
+.mc-site-card-warning  { border-color: #fcd34d; box-shadow: 0 2px 12px rgba(217,119,6,.1); }
+
+/* Card header */
+.mc-site-header {
+  padding: 1rem 1.25rem .75rem;
+  border-bottom: 1px solid #f1f5f9;
+  display: flex; align-items: flex-start; justify-content: space-between; gap: .75rem;
+  flex-wrap: wrap;
+}
+.mc-site-name { font-size: 1rem; font-weight: 800; color: var(--mc-slate); line-height: 1.2; }
+.mc-site-type { font-size: .72rem; font-weight: 600; color: var(--mc-muted); text-transform: uppercase; letter-spacing: .05em; margin-top: .12rem; }
+
+/* Status indicator */
+.mc-status-badge {
+  display: flex; align-items: center; gap: .3rem;
+  font-size: .72rem; font-weight: 700; padding: .25rem .65rem;
+  border-radius: 999px; flex-shrink: 0;
+}
+.mc-status-badge.online  { background: #f0fdf4; color: #166534; border: 1px solid #86efac; }
+.mc-status-badge.warning { background: #fefce8; color: #713f12; border: 1px solid #fde047; }
+.mc-status-badge.critical{ background: #fff1f2; color: #991b1b; border: 1px solid #fca5a5; }
+
+/* ── POWER FLOW ANIMATION ── */
+.mc-power-flow {
+  padding: 1rem 1.25rem .75rem;
+  background: #fafbff;
+  border-bottom: 1px solid #f1f5f9;
+}
+.flow-diagram {
+  display: flex; align-items: center; gap: 0; justify-content: center;
+  flex-wrap: nowrap; overflow-x: auto;
+}
+.flow-node {
+  background: #fff; border-radius: 12px; border: 1.5px solid #e2e8f0;
+  padding: .65rem .85rem; text-align: center; flex-shrink: 0; min-width: 80px;
+  position: relative;
+}
+.flow-node.solar   { border-color: #fde047; background: #fefce8; }
+.flow-node.battery { border-color: #86efac; background: #f0fdf4; }
+.flow-node.inverter{ border-color: #c4b5fd; background: #faf5ff; }
+.flow-node.grid    { border-color: #93c5fd; background: #eff6ff; }
+.flow-node.load    { border-color: #fca5a5; background: #fff1f2; }
+.flow-node-icon { font-size: 1.25rem; display: block; }
+.flow-node-val  { font-size: .82rem; font-weight: 800; color: var(--mc-slate); margin-top: .1rem; }
+.flow-node-lbl  { font-size: .62rem; font-weight: 700; color: var(--mc-muted); text-transform: uppercase; letter-spacing: .04em; }
+
+.flow-arrow {
+  flex-shrink: 0; display: flex; flex-direction: column; align-items: center;
+  gap: .15rem; margin: 0 .15rem;
+}
+.flow-arrow-line {
+  height: 3px; width: 36px; border-radius: 999px;
+  position: relative; overflow: hidden;
+}
+.flow-arrow-line::after {
+  content: ''; position: absolute; top: 0; left: -100%;
+  width: 60%; height: 100%; border-radius: 999px;
+  animation: flow-pulse 1.5s linear infinite;
+}
+.arrow-solar  .flow-arrow-line { background: #fde047; }
+.arrow-solar  .flow-arrow-line::after { background: #d97706; animation-duration: 1.2s; }
+.arrow-batt   .flow-arrow-line { background: #86efac; }
+.arrow-batt   .flow-arrow-line::after { background: #059669; animation-duration: 2s; }
+.arrow-grid   .flow-arrow-line { background: #93c5fd; }
+.arrow-grid   .flow-arrow-line::after { background: #2563eb; animation-duration: 2.5s; }
+.arrow-inactive .flow-arrow-line { background: #e2e8f0; }
+.arrow-inactive .flow-arrow-line::after { display: none; }
+.flow-arrow-head { font-size: .7rem; color: #94a3b8; }
+
+@keyframes flow-pulse {
+  0%   { left: -60%; }
+  100% { left: 120%; }
+}
+
+/* ── METRICS GRID ── */
+.mc-metrics {
+  padding: .75rem 1.25rem; display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: .75rem;
+}
+.mc-metric { text-align: center; padding: .4rem 0; }
+.mc-metric-val {
+  font-size: 1.2rem; font-weight: 800; color: var(--mc-slate); line-height: 1.1;
+}
+.mc-metric-lbl {
+  font-size: .63rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
+  color: var(--mc-muted); margin-top: .12rem;
+}
+.mc-metric-trend { font-size: .68rem; color: #94a3b8; margin-top: .05rem; }
+.mc-metric-val.green  { color: var(--mc-green); }
+.mc-metric-val.blue   { color: var(--mc-blue); }
+.mc-metric-val.amber  { color: var(--mc-amber); }
+.mc-metric-val.red    { color: var(--mc-red); }
+.mc-metric-val.purple { color: var(--mc-purple); }
+
+/* ── ASSET HEALTH ROW ── */
+.mc-assets-row {
+  padding: .6rem 1.25rem .85rem; border-top: 1px solid #f1f5f9;
+  display: flex; align-items: center; gap: .75rem; flex-wrap: wrap;
+}
+.mc-asset-chip {
+  display: flex; align-items: center; gap: .35rem; background: #f8fafc;
+  border: 1.5px solid #e2e8f0; border-radius: 8px; padding: .25rem .6rem;
+  font-size: .73rem; font-weight: 600; color: #374151;
+}
+.mc-asset-chip.degraded { background: #fff7ed; border-color: #fed7aa; color: #9a3412; }
+.mc-asset-chip.faulty   { background: #fff1f2; border-color: #fca5a5; color: #991b1b; }
+.mc-asset-chip.ok       { background: #f0fdf4; border-color: #bbf7d0; color: #166534; }
+.mc-asset-health {
+  flex: 1; min-width: 120px;
+}
+.mc-health-bar { height: 6px; background: #f1f5f9; border-radius: 999px; overflow: hidden; margin-top: .2rem; }
+.mc-health-fill { height: 100%; border-radius: 999px; }
+
+/* ── PREDICTION BADGE ── */
+.mc-predict {
+  background: linear-gradient(135deg,#faf5ff,#eff6ff);
+  border: 1.5px solid #ddd6fe; border-radius: 10px; padding: .6rem .85rem;
+  margin: .5rem 1.25rem; font-size: .8rem;
+}
+.mc-predict-title { font-weight: 700; color: #7c3aed; font-size: .78rem; margin-bottom: .2rem; }
+.mc-predict-text  { color: #374151; line-height: 1.5; }
+.mc-predict-score {
+  display: inline-block; padding: .15rem .5rem; border-radius: 6px;
+  font-size: .7rem; font-weight: 700; margin-left: .35rem;
+}
+.mc-predict-score.critical { background: #fff1f2; color: #991b1b; }
+.mc-predict-score.high     { background: #fff7ed; color: #9a3412; }
+.mc-predict-score.medium   { background: #fefce8; color: #713f12; }
+.mc-predict-score.low      { background: #f0fdf4; color: #166534; }
+
+/* ── SOC GAUGE ── */
+.soc-gauge-wrap {
+  display: flex; flex-direction: column; align-items: center; gap: .2rem;
+}
+.soc-arc {
+  position: relative; width: 72px; height: 40px; overflow: hidden;
+}
+.soc-arc-bg, .soc-arc-fill {
+  position: absolute; bottom: 0; left: 0;
+  width: 72px; height: 72px; border-radius: 50%;
+  border: 9px solid transparent;
+  clip: rect(0, 72px, 36px, 0);
+}
+.soc-arc-bg { border-color: #e2e8f0 #e2e8f0 transparent transparent; transform: rotate(0deg); }
+.soc-arc-val { position: absolute; bottom: 2px; left: 50%; transform: translateX(-50%); font-size: .78rem; font-weight: 800; color: #0f172a; white-space: nowrap; }
+.soc-lbl { font-size: .62rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: .04em; }
+
+/* ── ALERT BANNER ── */
+.mc-alert-banner {
+  margin: 0 1.25rem .5rem; padding: .55rem .85rem; border-radius: 10px;
+  font-size: .8rem; display: flex; align-items: flex-start; gap: .5rem;
+}
+.mc-alert-banner.critical { background: #fff1f2; border: 1.5px solid #fca5a5; color: #991b1b; }
+.mc-alert-banner.high     { background: #fff7ed; border: 1.5px solid #fed7aa; color: #9a3412; }
+.mc-alert-banner.medium   { background: #fefce8; border: 1.5px solid #fde047; color: #713f12; }
+
+/* ── PULSE ANIMATIONS ── */
+@keyframes pulse-ring { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.6;transform:scale(1.4)} }
+.live-dot { width:8px; height:8px; border-radius:50%; background:#10b981; display:inline-block; animation:pulse-ring 2s infinite; margin-right:.3rem; }
+.live-dot.amber { background:#f59e0b; }
+.live-dot.red   { background:#ef4444; }
+
+@keyframes slide-in-right { from{opacity:0;transform:translateX(20px)} to{opacity:1;transform:translateX(0)} }
+.mc-site-card { animation: slide-in-right .3s ease both; }
+
+/* ── RESPONSIVE ── */
+@media(max-width:480px) {
+  .mc-hero h1 { font-size:1.25rem; }
+  .mc-metrics { grid-template-columns: repeat(3, 1fr); }
+}
+</style>
+
+<div class="container-fluid py-4">
+
+  <!-- ── HERO COMMAND CENTER ── -->
+  <div class="mc-hero">
+    <div class="mc-hero-inner">
+      <div class="mc-eyebrow">
+        <span class="live-dot"></span> Emajinet Energy Intelligence · Live Monitoring
+      </div>
+      <h1>Energy Command Center</h1>
+      <div class="mc-hero-sub">Real-time intelligence across all sites — generation, storage, consumption, faults &amp; predictions · {{ business.name }}</div>
+
+      <div class="mc-kpi-bar">
+        <div class="mc-kpi-bar-item">
+          <div class="val" id="heroTotalSites">{{ total_sites|default:"0" }}</div>
+          <div class="lbl">Active Sites</div>
+        </div>
+        <div class="mc-kpi-bar-item">
+          <div class="val" id="heroTotalGen" style="color:#4ade80;">{{ total_gen_today|default:"–" }}</div>
+          <div class="lbl">Gen Today (kWh)</div>
+        </div>
+        <div class="mc-kpi-bar-item">
+          <div class="val" id="heroTotalAlerts" style="color:{% if open_alerts_count > 0 %}#fbbf24{% else %}#4ade80{% endif %};">{{ open_alerts_count|default:"0" }}</div>
+          <div class="lbl">Open Alerts</div>
+        </div>
+        <div class="mc-kpi-bar-item">
+          <div class="val" id="heroAvgHealth">{{ avg_portfolio_health|default:"–" }}%</div>
+          <div class="lbl">Portfolio Health</div>
+        </div>
+        <div class="mc-kpi-bar-item">
+          <div class="val" style="color:#c084fc;">{{ total_capacity_kw|default:"–" }} kW</div>
+          <div class="lbl">Total Capacity</div>
+        </div>
+      </div>
+
+      <!-- Live Event Ticker -->
+      <div class="mc-ticker">
+        <span class="mc-ticker-label">⚡ LIVE</span>
+        <div class="mc-ticker-scroll">
+          <span class="mc-ticker-inner" id="tickerInner">
+            {% for sd in sites_data %}
+              {% if sd.latest_reading %}
+                ☀️ {{ sd.site.name }}: {{ sd.gen_7d|floatformat:1 }} kWh generated (7d) &nbsp;·&nbsp;
+              {% endif %}
+            {% empty %}
+              ☀️ Solar panels generating energy &nbsp;·&nbsp; 🔋 Battery storage healthy &nbsp;·&nbsp; ⚡ All systems nominal &nbsp;·&nbsp; 📊 Intelligence engine active &nbsp;·&nbsp;
+            {% endfor %}
+            🤖 Predictive engine scanning all assets &nbsp;·&nbsp; 📡 IoT integration ready &nbsp;·&nbsp;
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── SYSTEM STATUS STRIP ── -->
+  <div class="mc-status-strip mb-3">
+    <div class="mc-status-pill pulse"><span class="live-dot" style="width:6px;height:6px;"></span> Intelligence Engine Active</div>
+    {% if critical_alert_count > 0 %}
+    <div class="mc-status-pill alert">🔴 {{ critical_alert_count }} Critical Alert{{ critical_alert_count|pluralize }}</div>
+    {% endif %}
+    {% if degraded_asset_count > 0 %}
+    <div class="mc-status-pill warn">⚠️ {{ degraded_asset_count }} Degraded Asset{{ degraded_asset_count|pluralize }}</div>
+    {% endif %}
+    {% if maintenance_overdue_count > 0 %}
+    <div class="mc-status-pill warn">🔧 {{ maintenance_overdue_count }} Overdue Maintenance</div>
+    {% endif %}
+    <div class="mc-status-pill ok">✅ {{ operational_asset_count|default:"0" }} Assets Operational</div>
+    <a href="{% url 'verticals:energy_trigger_alerts' %}" class="mc-status-pill" style="text-decoration:none;cursor:pointer;background:#faf5ff;border-color:#ddd6fe;color:#7c3aed;">
+      <i class="bi bi-robot me-1"></i>Scan for Alerts
+    </a>
+  </div>
+
+  <!-- ── MAIN CONTENT: SITE CARDS ── -->
+  {% if sites_data %}
+
+    <!-- System-wide recs -->
+    {% if monitoring_recs %}
+    <div class="mb-3">
+      {% for rec in monitoring_recs %}
+      <div style="padding:.55rem .9rem;border-radius:10px;font-size:.82rem;margin-bottom:.35rem;display:flex;align-items:flex-start;gap:.5rem;
+        {% if rec.type == 'risk' %}background:#fff1f2;border:1.5px solid #fca5a5;color:#991b1b;
+        {% elif rec.type == 'warning' %}background:#fff7ed;border:1.5px solid #fed7aa;color:#9a3412;
+        {% else %}background:#eff6ff;border:1.5px solid #bfdbfe;color:#1e40af;{% endif %}">
+        <span>{% if rec.type == 'risk' %}🔴{% elif rec.type == 'warning' %}⚠️{% else %}💡{% endif %}</span>
+        <div>{{ rec.text }}</div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% for sd in sites_data %}
+    {% with health=sd.avg_health alerts=sd.active_alerts %}
+    <div class="mc-site-card {% if alerts > 0 %}mc-site-card-critical{% elif health < 60 %}mc-site-card-warning{% endif %}" style="animation-delay:{{ forloop.counter0 }}00ms;">
+
+      <!-- CARD HEADER -->
+      <div class="mc-site-header">
+        <div>
+          <div class="d-flex align-items-center gap-2">
+            <span class="live-dot {% if alerts > 0 %}red{% elif health < 70 %}amber{% endif %}"></span>
+            <a href="{% url 'verticals:energy_site_detail' sd.site.id %}" class="mc-site-name text-decoration-none">{{ sd.site.name }}</a>
+          </div>
+          <div class="mc-site-type">
+            {{ sd.site.get_site_type_display }}
+            {% if sd.site.location %} · {{ sd.site.location }}{% endif %}
+          </div>
+        </div>
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+          {% if alerts > 0 %}
+            <div class="mc-status-badge critical">
+              <span class="live-dot red" style="width:6px;height:6px;"></span>
+              {{ alerts }} Alert{{ alerts|pluralize }}
+            </div>
+          {% elif health < 60 %}
+            <div class="mc-status-badge warning">⚠️ Degraded</div>
+          {% else %}
+            <div class="mc-status-badge online"><span class="live-dot" style="width:6px;height:6px;"></span> Online</div>
+          {% endif %}
+          {% if sd.site.installed_capacity_kw %}
+          <span style="font-size:.72rem;color:#94a3b8;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:.2rem .5rem;">
+            {{ sd.site.installed_capacity_kw }} kW
+          </span>
+          {% endif %}
+          <a href="{% url 'verticals:energy_site_detail' sd.site.id %}" class="btn btn-outline-secondary rounded-pill" style="font-size:.72rem;padding:.2rem .65rem;">Details</a>
+        </div>
+      </div>
+
+      <!-- POWER FLOW DIAGRAM -->
+      <div class="mc-power-flow">
+        <div class="flow-diagram">
+          <!-- Solar -->
+          <div class="flow-node solar">
+            <span class="flow-node-icon">☀️</span>
+            <div class="flow-node-val">{{ sd.gen_7d|floatformat:0 }}</div>
+            <div class="flow-node-lbl">kWh/7d</div>
+          </div>
+          <!-- Arrow solar → inverter -->
+          <div class="flow-arrow arrow-solar">
+            <div class="flow-arrow-line"></div>
+            <div class="flow-arrow-head">→</div>
+          </div>
+          <!-- Inverter -->
+          <div class="flow-node inverter">
+            <span class="flow-node-icon">⚡</span>
+            <div class="flow-node-val">
+              {% if sd.site.installed_capacity_kw %}{{ sd.site.installed_capacity_kw|floatformat:1 }}{% else %}–{% endif %}
+            </div>
+            <div class="flow-node-lbl">kW rated</div>
+          </div>
+          <!-- Arrow inv → load -->
+          <div class="flow-arrow arrow-solar">
+            <div class="flow-arrow-line"></div>
+            <div class="flow-arrow-head">→</div>
+          </div>
+          <!-- Load / Consumption -->
+          <div class="flow-node load">
+            <span class="flow-node-icon">🏭</span>
+            <div class="flow-node-val">{{ sd.cons_7d|floatformat:0 }}</div>
+            <div class="flow-node-lbl">kWh/7d</div>
+          </div>
+          <!-- Battery (if has battery) -->
+          {% if sd.latest_reading and sd.latest_reading.battery_soc_pct %}
+          <div class="flow-arrow arrow-batt" style="flex-direction:column-reverse;">
+            <div class="flow-arrow-line" style="transform:rotate(90deg);"></div>
+          </div>
+          <div class="flow-node battery">
+            <span class="flow-node-icon">🔋</span>
+            <div class="flow-node-val">{{ sd.latest_reading.battery_soc_pct }}%</div>
+            <div class="flow-node-lbl">Battery SOC</div>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- ALERT BANNERS -->
+      {% for alert in sd.top_alerts %}
+      <div class="mc-alert-banner {{ alert.severity }}">
+        <span>{% if alert.severity == 'critical' %}🔴{% elif alert.severity == 'high' %}🟠{% else %}🟡{% endif %}</span>
+        <div>
+          <strong>{{ alert.title }}</strong>
+          {% if alert.suggested_action %} — {{ alert.suggested_action }}{% endif %}
+        </div>
+      </div>
+      {% endfor %}
+
+      <!-- METRICS GRID -->
+      <div class="mc-metrics">
+        <div class="mc-metric">
+          <div class="mc-metric-val green">{{ sd.gen_7d|floatformat:1 }}</div>
+          <div class="mc-metric-lbl">Gen 7d (kWh)</div>
+          <div class="mc-metric-trend">☀️ solar</div>
+        </div>
+        <div class="mc-metric">
+          <div class="mc-metric-val blue">{{ sd.cons_7d|floatformat:1 }}</div>
+          <div class="mc-metric-lbl">Cons 7d (kWh)</div>
+          <div class="mc-metric-trend">🏭 load</div>
+        </div>
+        <div class="mc-metric">
+          <div class="mc-metric-val {% if health >= 70 %}green{% elif health >= 40 %}amber{% else %}red{% endif %}">{{ health }}%</div>
+          <div class="mc-metric-lbl">Asset Health</div>
+          <div class="mc-metric-trend">{{ sd.asset_count }} assets</div>
+        </div>
+        {% if sd.latest_reading %}
+        <div class="mc-metric">
+          <div class="mc-metric-val blue">{{ sd.latest_reading.generation_kwh|default:"–"|floatformat:1 }}</div>
+          <div class="mc-metric-lbl">Last Read (kWh)</div>
+          <div class="mc-metric-trend">{{ sd.latest_reading.reading_date }}</div>
+        </div>
+        {% if sd.latest_reading.battery_soc_pct %}
+        <div class="mc-metric">
+          <div class="mc-metric-val {% if sd.latest_reading.battery_soc_pct >= 50 %}green{% elif sd.latest_reading.battery_soc_pct >= 25 %}amber{% else %}red{% endif %}">
+            {{ sd.latest_reading.battery_soc_pct }}%
+          </div>
+          <div class="mc-metric-lbl">Battery SOC</div>
+          <div class="mc-metric-trend">🔋 latest</div>
+        </div>
+        {% endif %}
+        {% endif %}
+        <div class="mc-metric">
+          <div class="mc-metric-val {% if alerts == 0 %}green{% elif alerts <= 2 %}amber{% else %}red{% endif %}">{{ alerts }}</div>
+          <div class="mc-metric-lbl">Open Alerts</div>
+          <div class="mc-metric-trend">{% if alerts == 0 %}✅ clear{% else %}⚠️ action needed{% endif %}</div>
+        </div>
+        {% if sd.site.commissioning_date %}
+        <div class="mc-metric">
+          <div class="mc-metric-val">{{ sd.site.months_operational|default:"–" }}</div>
+          <div class="mc-metric-lbl">Months Live</div>
+          <div class="mc-metric-trend">🗓️ operational</div>
+        </div>
+        {% endif %}
+      </div>
+
+      <!-- ASSET HEALTH ROW -->
+      {% if sd.assets_summary %}
+      <div class="mc-assets-row">
+        <div style="font-size:.7rem;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.05em;flex-shrink:0;">Assets:</div>
+        {% for asset in sd.assets_summary %}
+        <div class="mc-asset-chip {% if asset.status == 'degraded' %}degraded{% elif asset.status == 'faulty' %}faulty{% else %}ok{% endif %}">
+          {% if asset.status == 'faulty' %}❌{% elif asset.status == 'degraded' %}⚠️{% else %}✅{% endif %}
+          {{ asset.get_asset_type_display }} {{ asset.health_score }}%
+        </div>
+        {% endfor %}
+        <div class="mc-asset-health">
+          <div style="font-size:.67rem;color:#94a3b8;text-align:right;">Avg {{ health }}%</div>
+          <div class="mc-health-bar">
+            <div class="mc-health-fill" style="width:{{ health }}%;background:{% if health >= 70 %}#10b981{% elif health >= 40 %}#f59e0b{% else %}#ef4444{% endif %};"></div>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- PREDICTIVE INTELLIGENCE -->
+      {% if sd.predictive_insights %}
+      {% for insight in sd.predictive_insights|slice:":1" %}
+      <div class="mc-predict">
+        <div class="mc-predict-title">🤖 Predictive Intelligence</div>
+        <div class="mc-predict-text">
+          {{ insight.title }}
+          <span class="mc-predict-score {{ insight.severity }}">{{ insight.severity|upper }}</span>
+        </div>
+        {% if insight.suggested_action %}
+        <div style="font-size:.75rem;color:#64748b;margin-top:.2rem;">Recommended: {{ insight.suggested_action }}</div>
+        {% endif %}
+      </div>
+      {% endfor %}
+      {% elif health < 80 %}
+      <div class="mc-predict">
+        <div class="mc-predict-title">🤖 Predictive Intelligence</div>
+        <div class="mc-predict-text">
+          {% if health < 50 %}
+            Asset health below 50% — risk of system underperformance. Schedule inspection.
+            <span class="mc-predict-score high">HIGH</span>
+          {% elif health < 70 %}
+            Asset degradation detected. Recommend maintenance within 2–4 weeks to prevent cascade failures.
+            <span class="mc-predict-score medium">MEDIUM</span>
+          {% else %}
+            System operating within normal parameters. Next maintenance due in {{ sd.site.months_operational|default:"6" }} weeks.
+            <span class="mc-predict-score low">LOW</span>
+          {% endif %}
+        </div>
+      </div>
+      {% endif %}
+
+    </div><!-- /mc-site-card -->
+    {% endwith %}
+    {% endfor %}
+
+  <!-- ── DEMO MODE ── -->
+  {% elif is_demo_monitoring %}
+    <div class="mc-site-card" style="border-color:#fde047;">
+      <div style="background:linear-gradient(90deg,#fefce8,#fff);padding:.5rem 1rem;border-bottom:1px solid #fde047;font-size:.72rem;font-weight:700;color:#713f12;display:flex;align-items:center;gap:.4rem;">
+        <span>🎭</span> DEMO PREVIEW — This is how your monitoring will look with real sites. <a href="{% url 'verticals:energy_site_create' %}" style="color:#059669;font-weight:700;">Add your first site →</a>
+      </div>
+      {% for demo in demo_monitoring_sites %}
+      <div class="mc-site-header" style="border-bottom:none;padding-bottom:.5rem;">
+        <div>
+          <div class="mc-site-name">{{ demo.name }}</div>
+          <div class="mc-site-type">{{ demo.type }}</div>
+        </div>
+        <div class="mc-status-badge online"><span class="live-dot" style="width:6px;height:6px;"></span> Demo</div>
+      </div>
+      <div class="mc-power-flow" style="background:#fefce8;">
+        <div class="flow-diagram">
+          <div class="flow-node solar"><span class="flow-node-icon">☀️</span><div class="flow-node-val">{{ demo.gen_7d }}</div><div class="flow-node-lbl">kWh/7d</div></div>
+          <div class="flow-arrow arrow-solar"><div class="flow-arrow-line"></div><div class="flow-arrow-head">→</div></div>
+          <div class="flow-node inverter"><span class="flow-node-icon">⚡</span><div class="flow-node-val">{{ demo.capacity }}</div><div class="flow-node-lbl">kW rated</div></div>
+          <div class="flow-arrow arrow-solar"><div class="flow-arrow-line"></div><div class="flow-arrow-head">→</div></div>
+          <div class="flow-node load"><span class="flow-node-icon">🏭</span><div class="flow-node-val">{{ demo.cons_7d }}</div><div class="flow-node-lbl">kWh/7d</div></div>
+        </div>
+      </div>
+      <div class="mc-metrics">
+        <div class="mc-metric"><div class="mc-metric-val green">{{ demo.gen_7d }}</div><div class="mc-metric-lbl">Gen 7d (kWh)</div></div>
+        <div class="mc-metric"><div class="mc-metric-val blue">{{ demo.cons_7d }}</div><div class="mc-metric-lbl">Cons 7d (kWh)</div></div>
+        <div class="mc-metric"><div class="mc-metric-val">{{ demo.capacity }}</div><div class="mc-metric-lbl">Capacity (kW)</div></div>
+        <div class="mc-metric"><div class="mc-metric-val" style="color:#10b981;">{{ demo.health }}%</div><div class="mc-metric-lbl">Avg Health</div></div>
+      </div>
+      {% if demo.alert %}
+      <div class="mc-alert-banner high" style="margin:.5rem 1.25rem;">
+        <span>⚠️</span><div>{{ demo.alert }}</div>
+      </div>
+      {% endif %}
+      {% endfor %}
+      <!-- Demo predictive alerts -->
+      <div style="padding:.75rem 1.25rem;border-top:1px solid #fde047;">
+        <div style="font-size:.78rem;font-weight:700;color:#713f12;margin-bottom:.5rem;">🤖 DEMO — Predictive Intelligence Examples:</div>
+        <div style="font-size:.8rem;background:#fff1f2;border:1.5px solid #fca5a5;border-radius:10px;padding:.6rem .85rem;margin-bottom:.4rem;color:#991b1b;">🔴 <strong>Battery bank imbalance detected.</strong> String 2 showing 12% lower SOC than strings 1&amp;3. Recommend balancing or cell replacement. Priority: HIGH</div>
+        <div style="font-size:.8rem;background:#fff7ed;border:1.5px solid #fed7aa;border-radius:10px;padding:.6rem .85rem;margin-bottom:.4rem;color:#9a3412;">🟠 <strong>Inverter efficiency dropped 8%.</strong> Output ratio below threshold for 3 consecutive days. Schedule inspection. Priority: MEDIUM</div>
+        <div style="font-size:.8rem;background:#fefce8;border:1.5px solid #fde047;border-radius:10px;padding:.6rem .85rem;color:#713f12;">🟡 <strong>Panel string 4 underperforming.</strong> 11% below expected output. Clean panels and check MC4 connectors. Priority: LOW</div>
+      </div>
+    </div>
+
+  {% else %}
+    <div class="text-center py-5">
+      <div style="font-size:4rem;opacity:.12;">📡</div>
+      <h5 class="text-muted mt-2 fw-bold">No active sites to monitor</h5>
+      <p class="text-muted small">Add your energy sites and start logging readings to see live intelligence here.</p>
+      <a href="{% url 'verticals:energy_site_create' %}" class="btn btn-success rounded-pill px-4 fw-bold">Add First Site</a>
+    </div>
+  {% endif %}
+
+  <!-- ── BOTTOM: TOOLS ROW ── -->
+  <div class="row g-3 mt-2">
+    <div class="col-md-4">
+      <a href="{% url 'verticals:energy_wiring_intelligence' %}" class="text-decoration-none">
+        <div style="background:linear-gradient(135deg,#eff6ff,#f0fdf4);border:1.5px solid #bfdbfe;border-radius:14px;padding:1.1rem;transition:all .15s;" onmouseover="this.style.boxShadow='0 4px 16px rgba(29,78,216,.12)'" onmouseout="this.style.boxShadow='none'">
+          <div style="font-size:1.5rem;margin-bottom:.35rem;">⚡</div>
+          <div style="font-size:.88rem;font-weight:700;color:#1e40af;">Wiring Intelligence</div>
+          <div style="font-size:.75rem;color:#64748b;margin-top:.15rem;">12V/24V/48V systems, series/parallel, cable sizing</div>
+        </div>
+      </a>
+    </div>
+    <div class="col-md-4">
+      <a href="{% url 'verticals:energy_cable_sizing' %}" class="text-decoration-none">
+        <div style="background:linear-gradient(135deg,#faf5ff,#eff6ff);border:1.5px solid #ddd6fe;border-radius:14px;padding:1.1rem;transition:all .15s;" onmouseover="this.style.boxShadow='0 4px 16px rgba(124,58,237,.12)'" onmouseout="this.style.boxShadow='none'">
+          <div style="font-size:1.5rem;margin-bottom:.35rem;">📐</div>
+          <div style="font-size:.88rem;font-weight:700;color:#6d28d9;">Cable Sizing & Voltage Drop</div>
+          <div style="font-size:.75rem;color:#64748b;margin-top:.15rem;">Professional cable calculator with IEC standards</div>
+        </div>
+      </a>
+    </div>
+    <div class="col-md-4">
+      <a href="{% url 'verticals:energy_smart_grid' %}" class="text-decoration-none">
+        <div style="background:linear-gradient(135deg,#fefce8,#faf5ff);border:1.5px solid #fde047;border-radius:14px;padding:1.1rem;transition:all .15s;" onmouseover="this.style.boxShadow='0 4px 16px rgba(124,58,237,.1)'" onmouseout="this.style.boxShadow='none'">
+          <div style="font-size:1.5rem;margin-bottom:.35rem;">🔋</div>
+          <div style="font-size:.88rem;font-weight:700;color:#713f12;">Smart Grid & Mini-Grid</div>
+          <div style="font-size:.75rem;color:#64748b;margin-top:.15rem;">Mini-grid planning, feeder analysis, reliability</div>
+        </div>
+      </a>
+    </div>
+  </div>
+
+  <!-- IoT readiness banner -->
+  <div class="mt-3 p-3 rounded-3 d-flex align-items-center gap-2" style="background:linear-gradient(135deg,#f0fdf4,#eff6ff);border:1.5px solid #bbf7d0;">
+    <span style="font-size:1.2rem;">🤖</span>
+    <div style="font-size:.78rem;color:#166534;">
+      <strong>IoT Ready:</strong> Connect smart meters, inverter APIs and battery BMS for real-time automated monitoring.
+      Manual readings work perfectly until hardware sensors are connected.
+      <a href="{% url 'verticals:energy_data_upload' %}" style="color:#059669;font-weight:700;margin-left:.35rem;">Upload Data →</a>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

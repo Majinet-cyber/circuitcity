@@ -1,0 +1,304 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Stock In · Groceries V2 · {{ business.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+  .gv2-page{max-width:1000px;margin:0 auto;padding:12px}
+  .gv2-header{background:linear-gradient(135deg,#8b5cf6,#7c3aed);padding:20px;border-radius:16px;color:#fff;margin-bottom:20px}
+  .gv2-header h1{margin:0 0 6px;font-size:26px;font-weight:800}
+  .gv2-header p{margin:0;opacity:0.9;font-size:13px}
+  
+  /* Search box - autofocus */
+  .gv2-search{position:relative;margin-bottom:20px}
+  .gv2-search input{width:100%;padding:16px 50px 16px 50px;border:3px solid #e2e8f0;border-radius:16px;font-size:16px;transition:all 0.3s;font-weight:500;background:#fff}
+  .gv2-search input:focus{border-color:#8b5cf6;outline:none;box-shadow:0 0 0 4px rgba(139,92,246,0.1)}
+  .gv2-search .icon{position:absolute;left:18px;top:50%;transform:translateY(-50%);font-size:24px;pointer-events:none}
+  .gv2-search .clear{position:absolute;right:16px;top:50%;transform:translateY(-50%);background:none;border:none;font-size:24px;cursor:pointer;color:#94a3b8;transition:color 0.3s}
+  .gv2-search .clear:hover{color:#ef4444}
+  
+  /* Top items grid */
+  .gv2-section-title{font-size:14px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;margin:0 0 12px;display:flex;align-items:center;gap:8px}
+  .gv2-top-items{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:24px}
+  .gv2-product-card{background:#fff;border:2px solid #e2e8f0;border-radius:12px;padding:14px;cursor:pointer;transition:all 0.3s;box-shadow:0 2px 6px rgba(15,23,42,0.05);position:relative;text-align:center}
+  .gv2-product-card:hover{border-color:#8b5cf6;transform:translateY(-3px);box-shadow:0 6px 18px rgba(139,92,246,0.15)}
+  .gv2-product-card .name{font-weight:700;font-size:14px;color:#0f172a;margin-bottom:6px;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .gv2-product-card .stock{font-size:12px;color:#64748b;font-weight:600}
+  .gv2-product-card .stock .value{color:#8b5cf6;font-weight:800}
+  
+  /* Product list */
+  .gv2-products-list{background:#fff;border-radius:12px;box-shadow:0 4px 12px rgba(15,23,42,0.06);border:1px solid #e2e8f0}
+  .gv2-product-row{display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid #e2e8f0;cursor:pointer;transition:background 0.2s}
+  .gv2-product-row:hover{background:#f8fafc}
+  .gv2-product-row:last-child{border-bottom:0}
+  .gv2-product-row .info{flex:1}
+  .gv2-product-row .name{font-weight:700;color:#0f172a;font-size:15px;margin-bottom:4px}
+  .gv2-product-row .meta{font-size:12px;color:#64748b}
+  .gv2-product-row .stock{background:linear-gradient(135deg,#e0e7ff,#c7d2fe);color:#3730a3;padding:8px 14px;border-radius:12px;font-weight:700;font-size:13px}
+  
+  /* Modal */
+  .gv2-modal{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(15,23,42,0.5);backdrop-filter:blur(4px);z-index:1000;align-items:center;justify-content:center;padding:20px}
+  .gv2-modal.visible{display:flex}
+  .gv2-modal-content{background:#fff;border-radius:20px;max-width:500px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(15,23,42,0.3);animation:slideUp 0.3s cubic-bezier(0.4,0,0.2,1)}
+  .gv2-modal-header{background:linear-gradient(135deg,#8b5cf6,#7c3aed);color:#fff;padding:24px;border-radius:20px 20px 0 0;position:relative}
+  .gv2-modal-header h2{margin:0 0 4px;font-size:20px;font-weight:800}
+  .gv2-modal-header p{margin:0;opacity:0.9;font-size:13px}
+  .gv2-modal-close{position:absolute;top:20px;right:20px;background:rgba(255,255,255,0.2);border:none;font-size:24px;cursor:pointer;color:#fff;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;transition:background 0.3s}
+  .gv2-modal-close:hover{background:rgba(255,255,255,0.3)}
+  .gv2-modal-body{padding:24px}
+  
+  /* Qty buttons */
+  .gv2-qty-buttons{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px}
+  .gv2-qty-btn{background:#f8fafc;border:2px solid #e2e8f0;border-radius:12px;padding:16px;font-size:20px;font-weight:800;color:#0f172a;cursor:pointer;transition:all 0.3s;text-align:center}
+  .gv2-qty-btn:hover{background:#8b5cf6;color:#fff;border-color:#8b5cf6;transform:scale(1.05)}
+  
+  .gv2-form-group{margin-bottom:18px}
+  .gv2-form-group label{display:block;font-weight:700;color:#0f172a;margin-bottom:8px;font-size:14px}
+  .gv2-form-group input,.gv2-form-group select{width:100%;padding:12px;border:2px solid #e2e8f0;border-radius:12px;font-size:15px;transition:all 0.3s}
+  .gv2-form-group input:focus,.gv2-form-group select:focus{border-color:#8b5cf6;outline:none;box-shadow:0 0 0 3px rgba(139,92,246,0.1)}
+  
+  .gv2-btn{padding:14px 24px;border-radius:12px;font-weight:700;font-size:15px;border:none;cursor:pointer;transition:all 0.3s;width:100%;background:linear-gradient(135deg,#8b5cf6,#7c3aed);color:#fff;box-shadow:0 4px 12px rgba(139,92,246,0.3)}
+  .gv2-btn:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(139,92,246,0.4)}
+  .gv2-btn:disabled{opacity:0.5;cursor:not-allowed;transform:none}
+  
+  @keyframes slideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+  
+  /* Toast notification */
+  .gv2-toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,#10b981,#059669);color:#fff;padding:16px 24px;border-radius:12px;box-shadow:0 8px 24px rgba(16,185,129,0.3);z-index:2000;display:none;animation:slideUp 0.3s}
+  .gv2-toast.visible{display:block}
+  .gv2-toast.error{background:linear-gradient(135deg,#ef4444,#dc2626)}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="gv2-page">
+  <!-- Header -->
+  <div class="gv2-header">
+    <h1>📥 Stock In</h1>
+    <p>Tap product · Enter qty · Done</p>
+  </div>
+  
+  <!-- Search Box -->
+  <div class="gv2-search">
+    <span class="icon">🔍</span>
+    <input 
+      type="text" 
+      id="search_input" 
+      placeholder="Search product, barcode, or SKU..." 
+      autocomplete="off"
+      autofocus
+      value="{{ query }}"
+    >
+    <button class="clear" onclick="clearSearch()" style="display:{% if query %}block{% else %}none{% endif %}">✕</button>
+  </div>
+  
+  <!-- Top Items -->
+  {% if not query and top_items %}
+  <div style="margin-bottom:24px">
+    <div class="gv2-section-title">
+      <span>⚡</span> Top Items (One-tap)
+    </div>
+    <div class="gv2-top-items">
+      {% for product in top_items %}
+      <div class="gv2-product-card" onclick="openStockModal({{ product.id }}, '{{ product.name|escapejs }}', '{{ product.base_unit }}', {% if product.pack_label %}'{{ product.pack_label }}'{% else %}null{% endif %}, {{ product.pack_size|default:'null' }})">
+        <div class="name">{{ product.name }}</div>
+        <div class="stock">Stock: <span class="value">{{ product.quantity_in_stock }}</span></div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+  
+  <!-- Products List -->
+  <div>
+    <div class="gv2-section-title">
+      <span>📦</span> {% if query %}Search Results{% else %}All Products{% endif %}
+    </div>
+    {% if products %}
+    <div class="gv2-products-list">
+      {% for product in products %}
+      <div class="gv2-product-row" onclick="openStockModal({{ product.id }}, '{{ product.name|escapejs }}', '{{ product.base_unit }}', {% if product.pack_label %}'{{ product.pack_label }}'{% else %}null{% endif %}, {{ product.pack_size|default:'null' }})">
+        <div class="info">
+          <div class="name">{{ product.name }}</div>
+          <div class="meta">
+            {% if product.category_group %}{{ product.category_group|title }} · {% endif %}
+            {{ product.base_unit }}
+            {% if product.pack_label %} · {{ product.pack_label }} ({{ product.pack_size }}){% endif %}
+          </div>
+        </div>
+        <div class="stock">{{ product.quantity_in_stock }}</div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div style="text-align:center;padding:40px 20px;color:#94a3b8">
+      <div style="font-size:48px;margin-bottom:12px">📭</div>
+      <p style="margin:0;font-size:15px">{% if query %}No products found{% else %}No products yet{% endif %}</p>
+      <a href="{% url 'verticals:groceries_product_add_v2' %}?step=1" style="margin-top:16px;display:inline-block;color:#8b5cf6;font-weight:600;text-decoration:none">+ Add Product</a>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Stock-In Modal -->
+<div class="gv2-modal" id="stock_modal">
+  <div class="gv2-modal-content">
+    <div class="gv2-modal-header">
+      <h2 id="modal_product_name">Product Name</h2>
+      <p>Enter quantity to add</p>
+      <button class="gv2-modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="gv2-modal-body">
+      <form id="stock_form" onsubmit="submitStock(event)">
+        {% csrf_token %}
+        <input type="hidden" id="product_id" name="product_id">
+        
+        <!-- Quick Qty Buttons -->
+        <div class="gv2-form-group">
+          <label>Quick Amount</label>
+          <div class="gv2-qty-buttons">
+            <button type="button" class="gv2-qty-btn" onclick="setQty(1)">1</button>
+            <button type="button" class="gv2-qty-btn" onclick="setQty(5)">5</button>
+            <button type="button" class="gv2-qty-btn" onclick="setQty(10)">10</button>
+            <button type="button" class="gv2-qty-btn" onclick="setQty(20)">20</button>
+          </div>
+        </div>
+        
+        <!-- Manual Qty -->
+        <div class="gv2-form-group">
+          <label>Quantity</label>
+          <input type="number" id="qty" name="qty" step="1" required min="1" placeholder="Enter amount">
+        </div>
+        
+        <!-- Unit Selector -->
+        <div class="gv2-form-group">
+          <label>Unit</label>
+          <select id="unit_label" name="unit_label">
+            <option value="base" id="unit_base"></option>
+            <option value="pack" id="unit_pack" style="display:none"></option>
+          </select>
+        </div>
+        
+        <!-- Optional Price Update -->
+        <details>
+          <summary style="cursor:pointer;font-weight:600;color:#64748b;font-size:13px;margin-bottom:12px">Update prices (optional)</summary>
+          <div style="margin-top:12px">
+            <div class="gv2-form-group">
+              <label>Cost Price</label>
+              <input type="number" step="0.01" name="cost_price" placeholder="Leave blank to keep current">
+            </div>
+            <div class="gv2-form-group">
+              <label>Selling Price</label>
+              <input type="number" step="0.01" name="selling_price" placeholder="Leave blank to keep current">
+            </div>
+          </div>
+        </details>
+        
+        <button type="submit" class="gv2-btn" id="submit_btn">Add to Stock</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="gv2-toast" id="toast"></div>
+
+<script>
+let currentProduct = null;
+
+function openStockModal(productId, productName, baseUnit, packLabel, packSize) {
+  currentProduct = {id: productId, name: productName, baseUnit, packLabel, packSize};
+  document.getElementById('product_id').value = productId;
+  document.getElementById('modal_product_name').textContent = productName;
+  document.getElementById('qty').value = '';
+  document.getElementById('qty').focus();
+  
+  // Setup unit selector
+  const baseOption = document.getElementById('unit_base');
+  const packOption = document.getElementById('unit_pack');
+  baseOption.textContent = baseUnit + '(s)';
+  baseOption.value = 'base';
+  
+  if (packLabel && packSize) {
+    packOption.textContent = packLabel + ' (' + packSize + ' ' + baseUnit + 's)';
+    packOption.value = 'pack';
+    packOption.style.display = 'block';
+  } else {
+    packOption.style.display = 'none';
+  }
+  
+  document.getElementById('stock_modal').classList.add('visible');
+}
+
+function closeModal() {
+  document.getElementById('stock_modal').classList.remove('visible');
+}
+
+function setQty(amount) {
+  document.getElementById('qty').value = amount;
+}
+
+function submitStock(event) {
+  event.preventDefault();
+  const form = document.getElementById('stock_form');
+  const btn = document.getElementById('submit_btn');
+  const formData = new FormData(form);
+  
+  btn.disabled = true;
+  btn.textContent = 'Adding...';
+  
+  fetch('{% url "verticals:groceries_stock_in_submit_v2" %}', {
+    method: 'POST',
+    body: formData,
+    headers: {'X-CSRFToken': formData.get('csrfmiddlewaretoken')}
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.success) {
+      showToast(data.message, 'success');
+      closeModal();
+      setTimeout(() => location.reload(), 1000);
+    } else {
+      showToast(data.error || 'Error adding stock', 'error');
+      btn.disabled = false;
+      btn.textContent = 'Add to Stock';
+    }
+  })
+  .catch(() => {
+    showToast('Network error', 'error');
+    btn.disabled = false;
+    btn.textContent = 'Add to Stock';
+  });
+}
+
+function showToast(message, type) {
+  const toast = document.getElementById('toast');
+  toast.textContent = message;
+  toast.className = 'gv2-toast visible' + (type === 'error' ? ' error' : '');
+  setTimeout(() => toast.classList.remove('visible'), 3000);
+}
+
+// Search with debounce
+let searchTimeout;
+document.getElementById('search_input').addEventListener('input', function(e) {
+  clearTimeout(searchTimeout);
+  const query = e.target.value.trim();
+  const clearBtn = document.querySelector('.gv2-search .clear');
+  clearBtn.style.display = query ? 'block' : 'none';
+  
+  searchTimeout = setTimeout(() => {
+    if (query) {
+      window.location.href = '?q=' + encodeURIComponent(query);
+    } else if (window.location.search) {
+      window.location.href = window.location.pathname;
+    }
+  }, 500);
+});
+
+function clearSearch() {
+  window.location.href = window.location.pathname;
+}
+</script>
+{% endblock %}
+

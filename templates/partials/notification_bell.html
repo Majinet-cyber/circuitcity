@@ -1,10 +1,12 @@
 <!-- Notification Bell Icon with Dropdown -->
-<div class="dropdown d-inline-block">
+<div class="dropdown d-inline-block" id="notificationDropdownContainer">
   <button class="btn btn-link position-relative text-decoration-none" 
           type="button" 
           id="notificationDropdown" 
           data-bs-toggle="dropdown" 
-          aria-expanded="false">
+          data-bs-auto-close="outside"
+          aria-expanded="false"
+          data-testid="nav-notifications">
     <i class="bi bi-bell fs-5"></i>
     <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" 
           id="notif-badge" 
@@ -13,7 +15,10 @@
     </span>
   </button>
   
-  <div class="dropdown-menu dropdown-menu-end shadow" style="min-width: 350px; max-height: 400px; overflow-y: auto;">
+  <div class="dropdown-menu dropdown-menu-end shadow" 
+       style="min-width: min(92vw, 350px); max-height: 400px; overflow-y: auto;"
+       aria-labelledby="notificationDropdown"
+       data-testid="notifications-panel">
     <div class="d-flex justify-content-between align-items-center px-3 py-2 border-bottom">
       <h6 class="mb-0">Notifications</h6>
       <a href="{% url 'notifications:mark_all_read' %}" class="small text-primary">Mark all read</a>
@@ -34,12 +39,18 @@
 
 <script>
 (function() {
+  // Guard: prevent double initialization
+  if (window.__notif_dropdown_init__) return;
+  window.__notif_dropdown_init__ = true;
+
   function loadNotifications() {
     fetch('{% url "notifications:dropdown" %}')
       .then(res => res.json())
       .then(data => {
         const badge = document.getElementById('notif-badge');
         const list = document.getElementById('notif-list');
+        
+        if (!badge || !list) return; // Safety check
         
         // Update badge
         if (data.unread_count > 0) {
@@ -79,8 +90,12 @@
       .catch(err => console.error('Failed to load notifications:', err));
   }
   
-  // Load on page load
-  loadNotifications();
+  // Load once on page load (DOMContentLoaded or immediate if DOM ready)
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', loadNotifications, {once: true});
+  } else {
+    loadNotifications();
+  }
   
   // Reload every 60 seconds
   setInterval(loadNotifications, 60000);

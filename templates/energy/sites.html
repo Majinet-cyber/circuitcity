@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Energy Sites – {{ business.name }}{% endblock %}
+{% block content %}
+<style>
+  .site-card{background:#fff;border-radius:14px;border:1.5px solid #e2e8f0;padding:1rem;transition:all .15s;text-decoration:none;color:inherit;display:block;}
+  .site-card:hover{border-color:#10b981;box-shadow:0 6px 20px rgba(0,0,0,.07);}
+  .status-badge{font-size:.7rem;font-weight:700;padding:.2rem .6rem;border-radius:20px;text-transform:uppercase;}
+  .status-active{background:#dcfce7;color:#15803d;}
+  .status-inactive{background:#f1f5f9;color:#64748b;}
+  .status-installing{background:#fef3c7;color:#d97706;}
+  .status-decommissioned{background:#fee2e2;color:#dc2626;}
+</style>
+<div class="container-fluid py-4">
+  <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
+    <div>
+      <h4 class="fw-bold mb-0">⚡ Energy Sites</h4>
+      <div class="text-muted small">{{ business.name }}</div>
+    </div>
+    <a href="{% url 'verticals:energy_site_create' %}" class="btn btn-success btn-sm rounded-pill">
+      <i class="bi bi-plus-lg me-1"></i>Add Site
+    </a>
+  </div>
+  {% if messages %}{% for m in messages %}<div class="alert alert-{{ m.tags|default:'info' }} rounded-3 mb-3">{{ m }}</div>{% endfor %}{% endif %}
+  {% if sites %}
+  <div class="row g-3">
+    {% for site in sites %}
+    <div class="col-12 col-md-6 col-lg-4">
+      <a href="{% url 'verticals:energy_site_detail' site.id %}" class="site-card">
+        <div class="d-flex align-items-center justify-content-between mb-2">
+          <span class="fw-bold" style="font-size:.95rem;">{{ site.name }}</span>
+          <span class="status-badge status-{{ site.status }}">{{ site.get_status_display }}</span>
+        </div>
+        <div class="text-muted small mb-1">{{ site.get_site_type_display }}</div>
+        {% if site.location %}<div class="text-muted" style="font-size:.78rem;"><i class="bi bi-geo-alt me-1"></i>{{ site.location|truncatechars:50 }}</div>{% endif %}
+        <div class="d-flex gap-3 mt-2" style="font-size:.78rem;color:#64748b;">
+          <span><i class="bi bi-cpu me-1"></i>{{ site.asset_count }} assets</span>
+          {% if site.installed_capacity_kw %}<span><i class="bi bi-lightning me-1"></i>{{ site.installed_capacity_kw }} kW</span>{% endif %}
+          {% if site.commissioning_date %}<span><i class="bi bi-calendar me-1"></i>{{ site.commissioning_date|date:"M Y" }}</span>{% endif %}
+        </div>
+      </a>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div style="max-width:520px;margin:3rem auto;text-align:center;">
+    <div style="font-size:4rem;margin-bottom:1rem;">🏡</div>
+    <h5 class="fw-bold mb-2" style="color:#0f172a;">No sites registered yet</h5>
+    <p class="text-muted mb-3" style="font-size:.9rem;">A <strong>site</strong> represents a physical location where you've installed solar, battery, or other energy equipment — a home, office, clinic, farm, or factory.</p>
+    <a href="{% url 'verticals:energy_site_create' %}" class="btn btn-success rounded-pill px-4 me-2">
+      <i class="bi bi-plus-lg me-1"></i>Add First Site
+    </a>
+    <a href="{% url 'verticals:energy_sizing_create' %}" class="btn btn-outline-primary rounded-pill px-4">
+      <i class="bi bi-calculator me-1"></i>Run System Sizing First
+    </a>
+    <div style="margin-top:2rem;background:#f0fdf4;border-radius:14px;border:1.5px solid #bbf7d0;padding:1.25rem;text-align:left;">
+      <div style="font-size:.82rem;font-weight:700;color:#065f46;margin-bottom:.5rem;">💡 Getting started</div>
+      <ol style="font-size:.82rem;color:#047857;margin:0;padding-left:1.2rem;line-height:1.8;">
+        <li>Add a site (customer location, installation address)</li>
+        <li>Register equipment assets at the site</li>
+        <li>Log energy readings to track generation & consumption</li>
+        <li>View ROI, savings, and predictive maintenance</li>
+      </ol>
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

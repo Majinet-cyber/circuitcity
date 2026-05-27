@@ -1,7 +1,11 @@
 {% extends "base.html" %}
+{% load humanize %}
+{% load math_extras %}
+{% load agent_links %}
 
 {% block title %}Phones Dashboard · Emajinet{% endblock %}
 
+{% comment %}Template cache cleared{% endcomment %}
 {% block extra_head %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 {% endblock %}
@@ -29,12 +33,33 @@
   .hero-actions .ghost{border:2px solid rgba(255,255,255,.9);color:#fff}
   .hero-actions .ghost:hover{background:rgba(255,255,255,.15)}
   
-  .metrics-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:18px}
-  .metric-card{background:linear-gradient(135deg,#ffffff,#f8fafc);border-radius:20px;padding:20px;box-shadow:0 10px 30px rgba(15,23,42,.1);border:1px solid rgba(148,163,184,0.1);transition:all 0.3s}
+  /* Dashboard-specific card styling (glassmorphic premium look) */
+  .metric-card{
+    background:linear-gradient(135deg,#ffffff,#f8fafc);
+    border-radius:20px;
+    padding:20px;
+    box-shadow:0 10px 30px rgba(15,23,42,.1);
+    border:1px solid rgba(148,163,184,0.1);
+    transition:all 0.3s;
+    min-width:0;
+    overflow:hidden;
+  }
   .metric-card:hover{transform:translateY(-4px);box-shadow:0 20px 50px rgba(15,23,42,.15)}
   .metric-card h3{margin:0;font-size:.95rem;text-transform:uppercase;color:#64748b;letter-spacing:0.05em;font-weight:600}
-  .metric-card p{margin:8px 0 0;font-size:2rem;font-weight:900;color:#0f172a}
+  .metric-card p{
+    margin:8px 0 0;
+    font-size:2rem;
+    font-weight:900;
+    color:#0f172a;
+    min-width:0;
+  }
   .metric-card small{display:block;margin-top:6px;font-size:.9rem;color:#64748b}
+  
+  /* Mobile: responsive KPI values (use clamp from mobile-system.css utilities) */
+  @media (max-width:640px){
+    .metric-card p{font-size:clamp(1.5rem,5vw,2rem)}
+    .metric-card small{font-size:clamp(0.75rem,2.5vw,0.9rem);line-height:1.4}
+  }
   
   .section-title{font-size:1.3rem;font-weight:800;color:#0f172a;margin:0 0 16px;display:flex;align-items:center;gap:10px}
   .section-title i{color:#3b82f6}
@@ -46,227 +71,571 @@
   .badge.yellow{background:#fef9c3;color:#854d0e}
   .badge.red{background:#fee2e2;color:#991b1b}
   
-  .chart-container{position:relative;height:280px;margin-top:16px}
   .leaderboard{display:grid;gap:12px}
-  .leaderboard-item{display:flex;justify-content:space-between;align-items:center;padding:14px;background:linear-gradient(135deg,#f1f5f9,#e2e8f0);border-radius:14px;transition:all 0.2s}
+  .leaderboard-item{display:flex;justify-content:space-between;align-items:center;padding:14px;background:linear-gradient(135deg,#f1f5f9,#e2e8f0);border-radius:14px;transition:all 0.2s;gap:12px}
   .leaderboard-item:hover{background:linear-gradient(135deg,#e2e8f0,#cbd5e1);transform:translateX(4px)}
-  .leaderboard-rank{font-weight:900;font-size:1.2rem;color:#3b82f6;min-width:40px}
-  .leaderboard-name{flex:1;font-weight:600;color:#0f172a}
-  .leaderboard-value{font-weight:700;color:#16a34a}
+  .leaderboard-rank{font-weight:900;font-size:1.2rem;color:#3b82f6;min-width:40px;flex-shrink:0}
+  .leaderboard-name{flex:1;font-weight:600;color:#0f172a;min-width:0}
+  .leaderboard-name strong{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .leaderboard-name div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .leaderboard-value{font-weight:700;color:#16a34a;white-space:nowrap;flex-shrink:0;text-align:right;min-width:120px}
+  
+  /* Mobile: prevent overflow in leaderboard values - ENHANCED */
+  @media (max-width:640px){
+    .leaderboard-value{
+      min-width:80px;
+      max-width:120px;
+      font-size:clamp(0.75rem,2.5vw,0.95rem);
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+      font-variant-numeric:tabular-nums;
+    }
+    .leaderboard-rank{min-width:32px;font-size:clamp(0.9rem,3vw,1.2rem)}
+    .leaderboard-item{
+      padding:12px;
+      gap:8px;
+      min-width:0;
+    }
+    .leaderboard-name{
+      min-width:0;
+      overflow:hidden;
+    }
+  }
+  
+  /* Mobile responsive: stack dashboard cards vertically */
+  @media (max-width:768px){
+    .dashboard-cards-grid{
+      grid-template-columns:1fr !important;
+    }
+  }
 </style>
 
 <div class="vertical-page">
   <header class="vertical-hero">
     <div>
       <p style="margin:0;opacity:.9;text-transform:uppercase;letter-spacing:.08em;font-size:.85rem">{{ business.name }} · {{ location_label|default:"All Locations" }}</p>
-      <h1>{{ hero_title }}</h1>
+      <h1 data-testid="dashboard-heading">{{ hero_title }}</h1>
       <p>{{ hero_blurb }}</p>
     </div>
     <div class="hero-actions">
       <a class="primary" href="{% url 'inventory:scan_in' %}"><i class="bi bi-box-arrow-in-down"></i> Scan IN</a>
-      <a class="primary" href="{% url 'inventory:scan_sold' %}"><i class="bi bi-phone"></i> Sell Phone</a>
+      <a class="primary" href="{% url 'inventory:scan_sell_landing' %}"><i class="bi bi-phone"></i> Sell</a>
       <a class="ghost" href="{% url 'inventory:stock_list' %}"><i class="bi bi-list-ul"></i> Stock List</a>
+      {% if IS_MANAGER %}
+      <a class="ghost" href="{% url 'sales:rollback_home' %}" style="border-color:rgba(251,191,36,.9);color:#fbbf24"><i class="bi bi-arrow-counterclockwise"></i> Rollback Sale</a>
+      {% endif %}
+      {% include "partials/vertical_more_dropdown.html" %}
     </div>
   </header>
 
-  <!-- PHONES BUSINESS PANEL - Fast-Moving KPIs -->
-  <section class="recent-block">
-    <h2 class="section-title"><i class="bi bi-speedometer2"></i> Phones Business Panel</h2>
-    
-    <div class="metrics-grid" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr))">
-      <!-- TODAY -->
-      <article class="metric-card">
-        <h3><i class="bi bi-calendar-day"></i> Today</h3>
-        <p style="color:#3b82f6">{{ phones_kpis.today.units }}</p>
-        <small>units sold</small>
-        <div style="margin-top:10px;padding-top:10px;border-top:1px solid #e2e8f0">
-          <small><strong>Revenue:</strong> MK {{ phones_kpis.today.revenue|floatformat:0 }}</small><br>
-          <small><strong>Profit:</strong> MK {{ phones_kpis.today.gross_profit|floatformat:0 }}</small>
-        </div>
-      </article>
-      
-      <!-- LAST 7 DAYS -->
-      <article class="metric-card">
-        <h3><i class="bi bi-calendar-week"></i> Last 7 Days</h3>
-        <p style="color:#8b5cf6">{{ phones_kpis.last_7_days.units }}</p>
-        <small>units sold</small>
-        <div style="margin-top:10px;padding-top:10px;border-top:1px solid #e2e8f0">
-          <small><strong>Revenue:</strong> MK {{ phones_kpis.last_7_days.revenue|floatformat:0 }}</small><br>
-          <small><strong>Profit:</strong> MK {{ phones_kpis.last_7_days.gross_profit|floatformat:0 }}</small>
-        </div>
-      </article>
-      
-      <!-- MONTH-TO-DATE -->
-      <article class="metric-card">
-        <h3><i class="bi bi-calendar-month"></i> This Month</h3>
-        <p style="color:#16a34a">{{ phones_kpis.mtd.units }}</p>
-        <small>units sold</small>
-        <div style="margin-top:10px;padding-top:10px;border-top:1px solid #e2e8f0">
-          <small><strong>Revenue:</strong> MK {{ phones_kpis.mtd.revenue|floatformat:0 }}</small><br>
-          <small><strong>Profit:</strong> MK {{ phones_kpis.mtd.gross_profit|floatformat:0 }}</small>
-        </div>
-      </article>
-      
-      <!-- STOCK ON HAND -->
-      <article class="metric-card">
-        <h3><i class="bi bi-box-seam"></i> Stock on Hand</h3>
-        <p style="color:#0f172a">{{ phones_kpis.stock.units }}</p>
-        <small>units available</small>
-        <div style="margin-top:10px;padding-top:10px;border-top:1px solid #e2e8f0">
-          <small><strong>Cost Value:</strong> MK {{ phones_kpis.stock.cost_value|floatformat:0 }}</small><br>
-          <small><strong>Selling Value:</strong> MK {{ phones_kpis.stock.selling_value|floatformat:0 }}</small><br>
-          <small style="color:#16a34a"><strong>Potential Profit:</strong> MK {{ phones_kpis.stock.potential_profit|floatformat:0 }}</small>
-        </div>
-      </article>
+  <!-- DATE RANGE FILTER BAR (ALL OPTIONS RESTORED) -->
+  <section class="recent-block" style="padding:16px 22px;position:relative;overflow:visible">
+    <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between">
+      <div style="display:flex;gap:12px;align-items:center">
+        {% include "partials/date_filter_unified.html" with filter_mode=dashboard_kpis.filter_mode period=dashboard_kpis.period month=dashboard_kpis.month year=dashboard_kpis.year custom_start=dashboard_kpis.custom_start custom_end=dashboard_kpis.custom_end range_label=dashboard_kpis.range_label %}
+      </div>
+      <div style="font-size:.9rem;color:#64748b">
+        <strong>Showing:</strong> {{ dashboard_kpis.range_label }}
+      </div>
     </div>
   </section>
 
-  <!-- BUSINESS PERFORMANCE METRICS -->
+  <!-- PREMIUM KPI CARDS (with date range filtering) -->
   <section class="recent-block">
-    <h2 class="section-title"><i class="bi bi-bar-chart-line"></i> Business Performance (This Month)</h2>
+    <h2 class="section-title">
+      <i class="bi bi-graph-up-arrow"></i> Business KPIs
+      <span style="font-size:.85rem;font-weight:600;color:#64748b;margin-left:12px">{{ dashboard_kpis.range_label }}</span>
+    </h2>
     
-    <div class="metrics-grid">
+    <div class="cc-kpi-grid">
+      <!-- STOCK ON HAND -->
       <article class="metric-card">
-        <h3>Avg Selling Price</h3>
-        <p style="color:#3b82f6">MK {{ business_panel.avg_selling_price_mtd|floatformat:0 }}</p>
-        <small>per unit sold</small>
+        <h3><i class="bi bi-box-seam"></i> Stock on Hand</h3>
+        <p class="cc-minw-0" style="color:#0f172a">{{ dashboard_kpis.stock_on_hand|intcomma }}</p>
+        <small>units in stock</small>
       </article>
       
+      <!-- UNITS SOLD -->
       <article class="metric-card">
-        <h3>Avg Gross Profit</h3>
-        <p style="color:#16a34a">MK {{ business_panel.avg_gross_profit_mtd|floatformat:0 }}</p>
-        <small>per unit sold</small>
+        <h3><i class="bi bi-cart-check"></i> Units Sold</h3>
+        <p class="cc-minw-0" style="color:#3b82f6">{{ dashboard_kpis.units_sold|intcomma }}</p>
+        <small>in selected period</small>
       </article>
       
+      <!-- REVENUE -->
       <article class="metric-card">
-        <h3>Profit Margin</h3>
-        <p style="color:#f59e0b">{{ business_panel.profit_margin_mtd }}%</p>
-        <small>gross margin</small>
+        <h3><i class="bi bi-cash-stack"></i> Revenue</h3>
+        <p class="cc-amount cc-minw-0" style="color:#16a34a" title="MK {{ dashboard_kpis.revenue|floatformat:0|intcomma }}">MK {{ dashboard_kpis.revenue|floatformat:0|intcomma }}</p>
+        <small>total sales amount</small>
       </article>
       
+      <!-- COSTS (Enhanced with breakdown) -->
       <article class="metric-card">
-        <h3>Sell-Through Rate</h3>
-        <p style="color:{% if business_panel.sell_through_color == 'green' %}#16a34a{% elif business_panel.sell_through_color == 'yellow' %}#f59e0b{% else %}#dc2626{% endif %}">{{ business_panel.sell_through_rate }}%</p>
+        <h3><i class="bi bi-receipt"></i> Costs</h3>
+        <p class="cc-amount cc-minw-0" style="color:#f59e0b" title="MK {{ dashboard_kpis.total_costs|floatformat:0|intcomma }}">MK {{ dashboard_kpis.total_costs|floatformat:0|intcomma }}</p>
+        <small style="display:block;margin-top:4px;line-height:1.5">
+          <span class="cc-amount cc-minw-0" title="Cost of goods: MK {{ dashboard_kpis.cost_of_goods|floatformat:0|intcomma }}">Cost of goods: MK {{ dashboard_kpis.cost_of_goods|floatformat:0|intcomma }}</span><br>
+          <span class="cc-amount cc-minw-0" title="Business costs: MK {{ dashboard_kpis.business_costs|floatformat:0|intcomma }}">Business costs: MK {{ dashboard_kpis.business_costs|floatformat:0|intcomma }}</span>
+        </small>
+      </article>
+      
+      <!-- PROFIT (with enhanced margin display) -->
+      <article class="metric-card" style="border:2px solid {% if dashboard_kpis.profit >= 0 %}#16a34a{% else %}#dc2626{% endif %}">
+        <h3><i class="bi bi-trophy"></i> Profit</h3>
+        <p class="cc-amount cc-minw-0" style="color:{% if dashboard_kpis.profit >= 0 %}#16a34a{% else %}#dc2626{% endif %}" title="{% if dashboard_kpis.profit < 0 %}-{% endif %}MK {{ dashboard_kpis.profit|abs|floatformat:0|intcomma }}">
+          {% if dashboard_kpis.profit < 0 %}-{% endif %}MK {{ dashboard_kpis.profit|abs|floatformat:0|intcomma }}
+        </p>
         <small>
-          <span class="badge {{ business_panel.sell_through_color }}">{{ business_panel.sell_through_hint }}</span>
+          <span class="badge {% if dashboard_kpis.profit_margin >= 20 %}green{% elif dashboard_kpis.profit_margin >= 10 %}yellow{% else %}red{% endif %}">
+            {% if dashboard_kpis.profit_margin < 0 %}-{% endif %}{{ dashboard_kpis.profit_margin|abs|floatformat:1 }}% margin
+          </span>
         </small>
       </article>
     </div>
     
     <div style="margin-top:16px;padding:14px;background:linear-gradient(135deg,#dbeafe,#e0e7ff);border-radius:12px;border-left:4px solid #3b82f6">
       <p style="margin:0;color:#1e40af;font-size:.95rem">
-        <strong>💡 Tip:</strong> 
-        {% if business_panel.sell_through_rate < 40 %}
-          Your sell-through rate is low. Consider reviewing pricing or increasing marketing efforts.
-        {% elif business_panel.sell_through_rate < 70 %}
-          Good sell-through rate! Keep up the momentum and optimize stock levels.
+        <strong><i class="bi bi-lightbulb-fill me-1" style="color:#f59e0b;"></i>Insight:</strong> 
+        {% if dashboard_kpis.units_sold == 0 %}
+          No sales recorded in this period. Check your date range or start selling!
+        {% elif dashboard_kpis.profit_margin < 10 %}
+          Your profit margin is low ({{ dashboard_kpis.profit_margin|floatformat:1 }}%). Consider reviewing pricing or reducing costs.
+        {% elif dashboard_kpis.profit_margin < 20 %}
+          Good profit margin of {{ dashboard_kpis.profit_margin|floatformat:1 }}%. Keep optimizing to reach 20%+.
         {% else %}
-          Excellent sell-through! Your inventory is moving fast. Consider increasing stock.
+          Excellent profit margin of {{ dashboard_kpis.profit_margin|floatformat:1 }}%! Your business is performing great.
         {% endif %}
       </p>
     </div>
+
+    {% if dashboard_kpis.category_breakdown %}
+    <div style="margin-top:20px;padding:16px;background:#f8fafc;border-radius:12px;border:1px solid #e2e8f0">
+      <h4 style="margin:0 0 12px;font-size:.95rem;font-weight:700;color:#334155">Stock &amp; Sales by Category</h4>
+      <table style="width:100%;border-collapse:collapse;font-size:.9rem">
+        <thead>
+          <tr style="border-bottom:1px solid #e2e8f0">
+            <th style="text-align:left;padding:8px 12px;color:#64748b;font-weight:600">Category</th>
+            <th style="text-align:right;padding:8px 12px;color:#64748b;font-weight:600">Stock</th>
+            <th style="text-align:right;padding:8px 12px;color:#64748b;font-weight:600">Sales Today</th>
+            <th style="text-align:right;padding:8px 12px;color:#64748b;font-weight:600">Sales (Period)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr style="border-bottom:1px solid #e2e8f0"><td style="padding:8px 12px"><i class="bi bi-phone me-1" style="color:#3b82f6;"></i> Phones</td><td style="text-align:right;padding:8px 12px">{{ dashboard_kpis.category_breakdown.phones.stock|intcomma }}</td><td style="text-align:right;padding:8px 12px">{{ dashboard_kpis.category_breakdown.phones.sales_today|intcomma }}</td><td style="text-align:right;padding:8px 12px">{{ dashboard_kpis.category_breakdown.phones.sales_in_range|intcomma }}</td></tr>
+          <tr style="border-bottom:1px solid #e2e8f0"><td style="padding:8px 12px"><i class="bi bi-laptop me-1" style="color:#6366f1;"></i> Laptops</td><td style="text-align:right;padding:8px 12px">{{ dashboard_kpis.category_breakdown.laptops.stock|intcomma }}</td><td style="text-align:right;padding:8px 12px">{{ dashboard_kpis.category_breakdown.laptops.sales_today|intcomma }}</td><td style="text-align:right;padding:8px 12px">{{ dashboard_kpis.category_breakdown.laptops.sales_in_range|intcomma }}</td></tr>
+          <tr><td style="padding:8px 12px"><i class="bi bi-display me-1" style="color:#8b5cf6;"></i> Desktops</td><td style="text-align:right;padding:8px 12px">{{ dashboard_kpis.category_breakdown.desktops.stock|intcomma }}</td><td style="text-align:right;padding:8px 12px">{{ dashboard_kpis.category_breakdown.desktops.sales_today|intcomma }}</td><td style="text-align:right;padding:8px 12px">{{ dashboard_kpis.category_breakdown.desktops.sales_in_range|intcomma }}</td></tr>
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
   </section>
 
+  <!-- BUSINESS PROGRESS CHIPS (Lightweight insights from existing data) -->
+  {% if dashboard_kpis.units_sold > 0 %}
+  <section class="recent-block" style="padding:18px 22px">
+    <h2 class="section-title" style="margin-bottom:14px">
+      <i class="bi bi-graph-up-arrow"></i> Business Progress
+      <span style="font-size:.85rem;font-weight:600;color:#64748b;margin-left:8px">({{ dashboard_kpis.range_label }})</span>
+    </h2>
+    
+    <div style="display:flex;flex-wrap:wrap;gap:12px">
+      <!-- Average Sale Value -->
+      {% with avg_sale=dashboard_kpis.revenue|floatformat:0|add:"0"|default:0 %}
+        {% if dashboard_kpis.units_sold > 0 %}
+          {% widthratio dashboard_kpis.revenue 1 1 as revenue_float %}
+          {% widthratio revenue_float dashboard_kpis.units_sold 1 as avg_sale_value %}
+          <div class="badge" style="background:linear-gradient(135deg,#dbeafe,#bfdbfe);color:#1e40af;font-size:.9rem;padding:10px 18px;border-radius:12px;box-shadow:0 2px 8px rgba(59,130,246,0.2)">
+            <i class="bi bi-receipt"></i>
+            <strong>Avg Sale:</strong> 
+            <span class="cc-amount" title="MK {{ avg_sale_value|floatformat:0|intcomma }}">MK {{ avg_sale_value|floatformat:0|intcomma }}</span>
+          </div>
+        {% endif %}
+      {% endwith %}
+      
+      <!-- Net Margin Badge (color-coded) -->
+      <div class="badge" style="background:linear-gradient(135deg,{% if dashboard_kpis.profit_margin >= 20 %}#dcfce7,#bbf7d0{% elif dashboard_kpis.profit_margin >= 10 %}#fef9c3,#fef08a{% else %}#fee2e2,#fecaca{% endif %});color:{% if dashboard_kpis.profit_margin >= 20 %}#166534{% elif dashboard_kpis.profit_margin >= 10 %}#854d0e{% else %}#991b1b{% endif %};font-size:.9rem;padding:10px 18px;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.1)">
+        <i class="bi bi-trophy-fill"></i>
+        <strong>Net Margin:</strong> 
+        <span class="cc-amount" title="{% if dashboard_kpis.profit_margin < 0 %}-{% endif %}{{ dashboard_kpis.profit_margin|abs|floatformat:1 }}%">
+          {% if dashboard_kpis.profit_margin < 0 %}-{% endif %}{{ dashboard_kpis.profit_margin|abs|floatformat:1 }}%
+        </span>
+        {% if dashboard_kpis.profit_margin >= 20 %}
+          <i class="bi bi-graph-up-arrow" style="margin-left:4px;color:#059669;"></i>
+        {% elif dashboard_kpis.profit_margin >= 10 %}
+          <i class="bi bi-dash-circle" style="margin-left:4px;color:#d97706;"></i>
+        {% else %}
+          <i class="bi bi-graph-down-arrow" style="margin-left:4px;color:#dc2626;"></i>
+        {% endif %}
+      </div>
+      
+      <!-- Stock Turnover (units sold / stock on hand) -->
+      {% if dashboard_kpis.stock_on_hand > 0 %}
+        {% widthratio dashboard_kpis.units_sold dashboard_kpis.stock_on_hand 100 as turnover_pct %}
+        <div class="badge" style="background:linear-gradient(135deg,#fef3c7,#fde68a);color:#92400e;font-size:.9rem;padding:10px 18px;border-radius:12px;box-shadow:0 2px 8px rgba(251,191,36,0.2)">
+          <i class="bi bi-arrow-repeat"></i>
+          <strong>Turnover:</strong> 
+          <span class="cc-amount" title="{{ turnover_pct }}% of stock sold this period">{{ turnover_pct }}%</span>
+          <small style="opacity:0.8;margin-left:6px">({{ dashboard_kpis.units_sold }} / {{ dashboard_kpis.stock_on_hand }})</small>
+        </div>
+      {% endif %}
+      
+      <!-- Stock Value At Risk (potential profit if all stock sells) -->
+      {% if dashboard_kpis.stock_on_hand > 0 %}
+        <div class="badge" style="background:linear-gradient(135deg,#e0e7ff,#c7d2fe);color:#4338ca;font-size:.9rem;padding:10px 18px;border-radius:12px;box-shadow:0 2px 8px rgba(99,102,241,0.2)">
+          <i class="bi bi-box-seam"></i>
+          <strong>Stock Potential:</strong> 
+          <span class="cc-amount" title="MK {{ dashboard_kpis.stock_potential_profit|floatformat:0|intcomma }}">MK {{ dashboard_kpis.stock_potential_profit|floatformat:0|intcomma }}</span>
+          <small style="opacity:0.8;margin-left:6px">({{ dashboard_kpis.stock_on_hand }} units)</small>
+        </div>
+      {% endif %}
+    </div>
+  </section>
+  {% endif %}
+
+  <!-- PAYMENT MIX (PHONES) - Using standardized component -->
+  {% include "partials/payment_mix_bar_standard.html" with payment_mix=dashboard_kpis.payment_mix range_label=dashboard_kpis.range_label %}
+
   <!-- SALES TREND & FAST MOVERS -->
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px">
+  <div class="dashboard-cards-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:18px">
     <!-- SALES TREND CHART -->
     <section class="recent-block">
       <h2 class="section-title"><i class="bi bi-graph-up"></i> Sales Trend (Last 30 Days)</h2>
-      <div class="chart-container">
+      <div class="chart-wrap cc-chart-container" style="height:280px;margin-top:16px">
         <canvas id="salesTrendChart"></canvas>
       </div>
     </section>
     
+    <!-- ACCESSORIES QUICK STATS (if available) -->
+    {% if accessories_kpis %}
+    <section class="recent-block" style="background:linear-gradient(135deg,#fef3c7,#fed7aa);border:2px solid #f59e0b">
+      <h2 class="section-title" style="color:#92400e">
+        <i class="bi bi-box-seam"></i> Accessories
+        <span style="font-size:.85rem;font-weight:600;color:#92400e;margin-left:8px">({{ dashboard_kpis.range_label }})</span>
+      </h2>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:16px">
+        <div>
+          <div style="font-size:.8rem;color:#92400e;font-weight:600;text-transform:uppercase;letter-spacing:0.05em">Revenue</div>
+          <div style="font-size:1.5rem;font-weight:900;color:#92400e;margin-top:4px">MK {{ accessories_kpis.revenue|floatformat:0|intcomma }}</div>
+        </div>
+        <div>
+          <div style="font-size:.8rem;color:#92400e;font-weight:600;text-transform:uppercase;letter-spacing:0.05em">Profit</div>
+          <div style="font-size:1.5rem;font-weight:900;color:#92400e;margin-top:4px">MK {{ accessories_kpis.profit|floatformat:0|intcomma }}</div>
+        </div>
+        <div>
+          <div style="font-size:.8rem;color:#92400e;font-weight:600;text-transform:uppercase;letter-spacing:0.05em">Stock Value</div>
+          <div style="font-size:1.5rem;font-weight:900;color:#92400e;margin-top:4px">MK {{ accessories_kpis.stock_value|floatformat:0|intcomma }}</div>
+        </div>
+        <div>
+          <div style="font-size:.8rem;color:#92400e;font-weight:600;text-transform:uppercase;letter-spacing:0.05em">Units Sold</div>
+          <div style="font-size:1.5rem;font-weight:900;color:#92400e;margin-top:4px">{{ accessories_kpis.units_sold|intcomma }}</div>
+        </div>
+      </div>
+      <div style="margin-top:16px;text-align:center">
+        <a href="{% url 'verticals:phones_accessories_dashboard' %}" style="display:inline-flex;align-items:center;gap:8px;padding:10px 20px;background:#f59e0b;color:#fff;border-radius:999px;text-decoration:none;font-weight:700;transition:all 0.2s">
+          <i class="bi bi-box-seam"></i> View Accessories Dashboard
+        </a>
+      </div>
+    </section>
+    {% endif %}
+
     <!-- FAST MOVING MODELS -->
     <section class="recent-block">
-      <h2 class="section-title"><i class="bi bi-fire"></i> Fast Moving Models</h2>
-      {% if fast_models_30d %}
+      <h2 class="section-title">
+        <i class="bi bi-fire"></i> {% if fast_models_source == "stock" %}Top Models in Stock{% else %}Fast Moving Models{% endif %}
+        <span style="font-size:.85rem;font-weight:600;color:#64748b;margin-left:8px">({% if fast_models_source == "stock" %}current stock{% else %}{{ dashboard_kpis.range_label }}{% endif %})</span>
+      </h2>
+      {% if fast_models %}
+        {% if fast_models_source == "stock" %}
+        <p style="color:#64748b;font-size:.9rem;margin-bottom:12px"><i class="bi bi-info-circle"></i> No sales yet this period — showing top models by stock count.</p>
+        {% endif %}
         <div class="leaderboard">
-          {% for model in fast_models_30d %}
-            <div class="leaderboard-item">
+          {% for model in fast_models %}
+            <div class="leaderboard-item cc-flex-safe">
               <div class="leaderboard-rank">{{ forloop.counter }}</div>
-              <div class="leaderboard-name">
-                <strong>{{ model.brand }} {{ model.model }}</strong>
-                <div style="font-size:.85rem;color:#64748b">{{ model.ram_rom }}</div>
+              <div class="leaderboard-name cc-minw-0">
+                <strong class="cc-ellipsis" title="{{ model.brand }} {{ model.model }}">{{ model.brand }} {{ model.model }}</strong>
+                <div class="cc-ellipsis" style="font-size:.85rem;color:#64748b">{{ model.ram_rom }}</div>
               </div>
-              <div class="leaderboard-value">
-                {{ model.units }} units · MK {{ model.revenue|floatformat:0 }}
+              <div class="leaderboard-value cc-amount cc-minw-0" title="{{ model.units }} units · MK {{ model.revenue|floatformat:0|intcomma }}">
+                {{ model.units }} {% if fast_models_source == "stock" %}in stock{% else %}units{% endif %} · MK {{ model.revenue|floatformat:0|intcomma }}
               </div>
             </div>
           {% endfor %}
         </div>
       {% else %}
-        <p style="color:#64748b;text-align:center;padding:40px 0">No sales data for the last 30 days</p>
+        <p style="color:#64748b;text-align:center;padding:40px 0">No stock or sales data available yet. Add some inventory to get started!</p>
       {% endif %}
     </section>
   </div>
 
-  <!-- TOP AGENTS LEADERBOARD -->
+  <!-- SALES BY PHONE MODEL (NEW) -->
   <section class="recent-block">
-    <h2 class="section-title"><i class="bi bi-trophy"></i> Top Agents (Last 30 Days)</h2>
-    {% if fast_agents_30d %}
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px">
-        {% for agent in fast_agents_30d %}
-          <div class="leaderboard-item">
-            <div class="leaderboard-rank">
-              {% if forloop.counter == 1 %}🥇
-              {% elif forloop.counter == 2 %}🥈
-              {% elif forloop.counter == 3 %}🥉
-              {% else %}{{ forloop.counter }}{% endif %}
+    <h2 class="section-title">
+      <i class="bi bi-phone"></i> {% if sales_by_model_source == "stock" %}Stock by Phone Model{% else %}Sales by Phone Model{% endif %}
+      <span style="font-size:.85rem;font-weight:600;color:#64748b;margin-left:8px">({% if sales_by_model_source == "stock" %}current stock{% else %}{{ dashboard_kpis.range_label }}{% endif %})</span>
+    </h2>
+    {% if sales_by_model %}
+      {% if sales_by_model_source == "stock" %}
+      <p style="color:#64748b;font-size:.9rem;margin-bottom:12px"><i class="bi bi-info-circle"></i> No sales yet this period — showing models by stock count.</p>
+      {% endif %}
+      <div style="display:grid;gap:12px">
+        {% for model in sales_by_model %}
+          <div style="display:flex;align-items:center;gap:12px">
+            <!-- Model name -->
+            <div style="min-width:150px;font-weight:600;color:#0f172a;font-size:.95rem">
+              {{ model.model_name }}
             </div>
-            <div class="leaderboard-name">
-              <strong>{{ agent.agent_name }}</strong>
-              <div style="font-size:.85rem;color:#64748b">
-                {{ agent.units }} units · Best day: {% if agent.best_day %}{{ agent.best_day }}{% else %}N/A{% endif %}
+            
+            <!-- Visual bar (units) -->
+            <div style="flex:1;position:relative;height:36px;background:linear-gradient(135deg,#e0e7ff,#dbeafe);border-radius:10px;overflow:hidden">
+              {% with max_units=sales_by_model.0.units_sold %}
+                {% with bar_width=model.units_sold|floatformat:0|add:"0"|floatformat:0 %}
+                  {% widthratio model.units_sold max_units 100 as width_pct %}
+                  <div style="position:absolute;left:0;top:0;bottom:0;width:{{ width_pct }}%;background:linear-gradient(90deg,#3b82f6,#8b5cf6);border-radius:10px;transition:width 0.3s ease"></div>
+                {% endwith %}
+              {% endwith %}
+              
+              <!-- Units label overlay -->
+              <div style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#fff;font-weight:700;font-size:.9rem;text-shadow:0 1px 2px rgba(0,0,0,0.3)">
+                {{ model.units_sold }} {% if sales_by_model_source == "stock" %}in stock{% else %}unit{{ model.units_sold|pluralize }}{% endif %}
               </div>
             </div>
-            <div class="leaderboard-value">MK {{ agent.revenue|floatformat:0 }}</div>
+            
+            <!-- Revenue -->
+            <div class="cc-amount" style="min-width:140px;text-align:right;font-weight:700;color:#16a34a;font-size:.95rem" title="MK {{ model.revenue|floatformat:0|intcomma }}">
+              MK {{ model.revenue|floatformat:0|intcomma }}
+            </div>
           </div>
         {% endfor %}
       </div>
     {% else %}
-      <p style="color:#64748b;text-align:center;padding:40px 0">No agent sales data for the last 30 days</p>
+      <div style="text-align:center;padding:60px 20px;color:#64748b">
+        <i class="bi bi-phone" style="font-size:3rem;opacity:0.3;display:block;margin-bottom:16px"></i>
+        <p style="margin:0;font-size:1.1rem;font-weight:600">No phone data available yet</p>
+        <p style="margin:8px 0 0;font-size:.95rem">Add inventory or make sales to see data here.</p>
+      </div>
+    {% endif %}
+  </section>
+
+  <!-- LOW STOCK ALERTS -->
+  {% if low_stock_phones or low_stock_electronics %}
+  <section class="recent-block" style="border:2px solid #fbbf24;background:linear-gradient(135deg,#fffbeb,#fef3c7)">
+    <h2 class="section-title" style="color:#92400e">
+      <i class="bi bi-exclamation-triangle-fill" style="color:#f59e0b"></i>
+      Low Stock Alert
+      <span style="font-size:.8rem;font-weight:600;background:#fbbf24;color:#78350f;border-radius:999px;padding:3px 10px;margin-left:8px">
+        {{ low_stock_phones|length|add:low_stock_electronics|length }} item{{ low_stock_phones|length|add:low_stock_electronics|length|pluralize }}
+      </span>
+    </h2>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px">
+      {% for item in low_stock_phones %}
+      <div style="display:flex;align-items:center;justify-content:space-between;background:rgba(251,191,36,.15);border:1.5px solid #fbbf24;border-radius:12px;padding:12px 16px;gap:12px">
+        <div>
+          <div style="font-weight:700;color:#0f172a;font-size:.9rem"><i class="bi bi-phone me-1" style="color:#3b82f6;"></i>{{ item.label }}</div>
+          <div style="font-size:.78rem;color:#92400e;margin-top:2px">Only {{ item.qty }} unit{{ item.qty|pluralize }} left</div>
+        </div>
+        <a href="{% url 'inventory:scan_in' %}" style="background:#f59e0b;color:#fff;border-radius:999px;padding:5px 12px;font-size:.78rem;font-weight:700;text-decoration:none;white-space:nowrap">Restock</a>
+      </div>
+      {% endfor %}
+      {% for item in low_stock_electronics %}
+      <div style="display:flex;align-items:center;justify-content:space-between;background:rgba(251,191,36,.15);border:1.5px solid #fbbf24;border-radius:12px;padding:12px 16px;gap:12px">
+        <div>
+          <div style="font-weight:700;color:#0f172a;font-size:.9rem"><i class="bi bi-laptop me-1" style="color:#6366f1;"></i>{{ item.label }}</div>
+          <div style="font-size:.78rem;color:#92400e;margin-top:2px">Only {{ item.qty }} unit{{ item.qty|pluralize }} left</div>
+        </div>
+        <a href="{% url 'inventory:electronics_stock_in' %}" style="background:#f59e0b;color:#fff;border-radius:999px;padding:5px 12px;font-size:.78rem;font-weight:700;text-decoration:none;white-space:nowrap">Restock</a>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  <!-- TOP AGENTS LEADERBOARD -->
+  <section class="recent-block">
+    <h2 class="section-title">
+      <i class="bi bi-trophy"></i> Top Agents
+      <span style="font-size:.85rem;font-weight:600;color:#64748b;margin-left:8px">({{ dashboard_kpis.range_label }})</span>
+    </h2>
+    {% if top_agents %}
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px">
+        {% for agent in top_agents %}
+          <div class="leaderboard-item cc-flex-safe">
+            <div class="leaderboard-rank">
+              {% if forloop.counter == 1 %}<i class="bi bi-trophy-fill" style="color:#f59e0b;"></i>
+              {% elif forloop.counter == 2 %}<i class="bi bi-award-fill" style="color:#94a3b8;"></i>
+              {% elif forloop.counter == 3 %}<i class="bi bi-award" style="color:#b45309;"></i>
+              {% else %}{{ forloop.counter }}{% endif %}
+            </div>
+            <div class="leaderboard-name cc-minw-0">
+              <strong class="cc-ellipsis" title="{{ agent.agent_name }}">
+                {% if agent.agent_id and IS_MANAGER %}
+                  <a href="{% agent_performance_url agent.agent_id %}" style="color:#2563eb;text-decoration:none" class="cc-ellipsis">{{ agent.agent_name }}</a>
+                {% else %}
+                  {{ agent.agent_name }}
+                {% endif %}
+              </strong>
+              <div class="cc-ellipsis" style="font-size:.85rem;color:#64748b">
+                {{ agent.units }} sales
+              </div>
+            </div>
+            <div class="leaderboard-value cc-amount cc-minw-0" title="Commission: MK {{ agent.commission|floatformat:0|intcomma }}">
+              <div style="font-size:.75rem;color:#64748b;font-weight:500;text-transform:uppercase;letter-spacing:0.02em">Commission</div>
+              <div style="color:#10b981;font-weight:700">MK {{ agent.commission|floatformat:0|intcomma }}</div>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p style="color:#64748b;text-align:center;padding:40px 0">No agent sales data for {{ dashboard_kpis.range_label|lower }}</p>
     {% endif %}
   </section>
 
   <!-- BEST SALES DAY HIGHLIGHT -->
-  {% if best_sales_day_30d %}
+  {% if best_sales_day %}
   <section class="recent-block" style="background:linear-gradient(135deg,#fef3c7,#fde68a);border:2px solid #fbbf24">
-    <h2 class="section-title" style="color:#92400e"><i class="bi bi-star-fill"></i> Best Sales Day (Last 30 Days)</h2>
+    <h2 class="section-title" style="color:#92400e">
+      <i class="bi bi-star-fill"></i> Best Sales Day ({{ dashboard_kpis.range_label }})
+    </h2>
     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:20px">
       <div>
-        <p style="margin:0;font-size:2rem;font-weight:900;color:#92400e">{{ best_sales_day_30d.date }}</p>
-        <p style="margin:4px 0 0;color:#78350f;font-size:1.1rem">Your best day in the last month!</p>
+        <p style="margin:0;font-size:2rem;font-weight:900;color:#92400e">{{ best_sales_day.date }}</p>
+        <p style="margin:4px 0 0;color:#78350f;font-size:1.1rem">Your best day in the selected period!</p>
       </div>
       <div style="text-align:right">
-        <p style="margin:0;font-size:1.8rem;font-weight:800;color:#16a34a">{{ best_sales_day_30d.units }} units</p>
-        <p style="margin:4px 0 0;font-size:1.2rem;color:#78350f">MK {{ best_sales_day_30d.revenue|floatformat:0 }}</p>
+        <p class="cc-amount" style="margin:0;font-size:1.8rem;font-weight:800;color:#16a34a" title="{{ best_sales_day.units }} units">{{ best_sales_day.units }} units</p>
+        <p class="cc-amount" style="margin:4px 0 0;font-size:1.2rem;color:#78350f" title="MK {{ best_sales_day.revenue|floatformat:0|intcomma }}">MK {{ best_sales_day.revenue|floatformat:0|intcomma }}</p>
       </div>
     </div>
   </section>
   {% endif %}
+
+  <!-- RECOMMENDED ACTIONS PANEL -->
+  <section class="recent-block" style="background:linear-gradient(135deg,#eff6ff,#f8fafc);border:1.5px solid #bfdbfe;">
+    <h2 class="section-title" style="color:#1e40af;margin-bottom:14px">
+      <i class="bi bi-lightbulb-fill" style="color:#3b82f6"></i> Recommended Actions
+    </h2>
+    <div style="display:flex;flex-direction:column;gap:.55rem;">
+      {% if dashboard_kpis.stock_on_hand == 0 and not dashboard_kpis.units_sold %}
+      <div style="padding:.65rem .9rem;background:#fff1f2;border:1px solid #fca5a5;border-radius:10px;font-size:.85rem;color:#991b1b;">
+        <i class="bi bi-exclamation-circle-fill me-1" style="color:#dc2626;"></i><strong>No stock and no sales.</strong> Add phone, laptop, or desktop inventory to get started. <a href="{% url 'inventory:scan_in' %}" style="color:#1d4ed8;">Scan In →</a>
+      </div>
+      {% endif %}
+      {% if dashboard_kpis.profit_margin < 10 and dashboard_kpis.units_sold > 0 %}
+      <div style="padding:.65rem .9rem;background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;font-size:.85rem;color:#9a3412;">
+        <i class="bi bi-exclamation-triangle-fill me-1" style="color:#f59e0b;"></i><strong>Profit margin is low ({{ dashboard_kpis.profit_margin|floatformat:1 }}%).</strong> Review cost prices and selling prices for all models.
+      </div>
+      {% endif %}
+      {% if low_stock_phones or low_stock_electronics %}
+      <div style="padding:.65rem .9rem;background:#fffbeb;border:1px solid #fde68a;border-radius:10px;font-size:.85rem;color:#92400e;">
+        <i class="bi bi-box-seam me-1" style="color:#d97706;"></i><strong>{{ low_stock_phones|length|add:low_stock_electronics|length }} model{{ low_stock_phones|length|add:low_stock_electronics|length|pluralize }} running low.</strong> Restock before stock runs out.
+      </div>
+      {% endif %}
+      {% if dashboard_kpis.category_breakdown.laptops.stock == 0 %}
+      <div style="padding:.65rem .9rem;background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;font-size:.85rem;color:#1e40af;">
+        <i class="bi bi-laptop me-1" style="color:#2563eb;"></i><strong>No laptops in stock.</strong> Laptop stock is zero. <a href="{% url 'inventory:electronics_stock_in' %}" style="color:#1d4ed8;">Add laptops →</a>
+      </div>
+      {% endif %}
+      {% if dashboard_kpis.category_breakdown.desktops.stock == 0 %}
+      <div style="padding:.65rem .9rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:10px;font-size:.85rem;color:#5b21b6;">
+        <i class="bi bi-display me-1" style="color:#6d28d9;"></i><strong>No desktops in stock.</strong> Desktop stock is zero. <a href="{% url 'inventory:electronics_stock_in' %}" style="color:#6d28d9;">Add desktops →</a>
+      </div>
+      {% endif %}
+      {% if dashboard_kpis.stock_on_hand > 0 and dashboard_kpis.units_sold == 0 %}
+      <div style="padding:.65rem .9rem;background:#ecfdf5;border:1px solid #a7f3d0;border-radius:10px;font-size:.85rem;color:#065f46;">
+        <i class="bi bi-cart-check me-1" style="color:#059669;"></i><strong>Stock in but no sales in {{ dashboard_kpis.range_label|lower }}.</strong> Use Scan &amp; Sell to start recording sales. <a href="{% url 'inventory:scan_sell_landing' %}" style="color:#059669;">Sell →</a>
+      </div>
+      {% endif %}
+      <div style="padding:.65rem .9rem;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;font-size:.85rem;color:#166534;">
+        <i class="bi bi-lightbulb-fill me-1" style="color:#059669;"></i><strong>High-margin accessories improve cash flow.</strong> Add cables, cases, and chargers — they sell fast with high margins. <a href="{% url 'verticals:phones_accessories_dashboard' %}" style="color:#059669;">Accessories →</a>
+      </div>
+    </div>
+  </section>
+
 </div>
 
 <script>
-// Sales Trend Chart
+// =============================================================================
+// CUSTOM DATE RANGE FILTER - Bound on multiple events for reliability
+// =============================================================================
+function initCustomDateFilter() {
+  const toggleBtn = document.getElementById('customRangeToggle');
+  const cancelBtn = document.getElementById('customRangeCancel');
+  const form = document.getElementById('customRangeForm');
+  
+  if (!form || !toggleBtn) return;
+  
+  // Toggle function
+  function toggleCustomRange() {
+    if (form.style.display === 'none' || !form.style.display) {
+      form.style.display = 'flex';
+      // Focus first input for better UX
+      setTimeout(() => {
+        const startInput = document.getElementById('startDate');
+        if (startInput) startInput.focus();
+      }, 100);
+    } else {
+      form.style.display = 'none';
+    }
+  }
+  
+  // Bind toggle button
+  toggleBtn.addEventListener('click', toggleCustomRange);
+  
+  // Bind cancel button
+  if (cancelBtn) {
+    cancelBtn.addEventListener('click', () => {
+      form.style.display = 'none';
+    });
+  }
+}
+
+// Initialize on DOMContentLoaded (standard page load)
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initCustomDateFilter);
+} else {
+  initCustomDateFilter();
+}
+
+// Re-initialize on pageshow (browser back/forward cache)
+window.addEventListener('pageshow', function(event) {
+  if (event.persisted) {
+    initCustomDateFilter();
+  }
+});
+
+// Re-initialize on HTMX afterSwap (if HTMX is used for dynamic content)
+if (typeof htmx !== 'undefined') {
+  document.body.addEventListener('htmx:afterSwap', initCustomDateFilter);
+}
+
+// Sales Trend Chart - LINE GRAPH (always renders, never empty)
 (function() {
   const trendData = {{ sales_trend_json|safe }};
   const ctx = document.getElementById('salesTrendChart');
   
-  if (ctx && trendData && trendData.length > 0) {
+  // Always render chart (even if all zeros - shows baseline)
+  if (ctx && trendData && Array.isArray(trendData)) {
+    // Ensure we have data structure (use defaults if missing)
+    const labels = trendData.length > 0 ? trendData.map(d => d.date) : [];
+    const units = trendData.length > 0 ? trendData.map(d => d.units || 0) : [];
+    
     new Chart(ctx, {
       type: 'line',
       data: {
-        labels: trendData.map(d => d.date),
+        labels: labels,
         datasets: [{
           label: 'Units Sold',
-          data: trendData.map(d => d.units),
+          data: units,
           borderColor: '#3b82f6',
           backgroundColor: 'rgba(59, 130, 246, 0.1)',
           fill: true,
           tension: 0.4,
           pointRadius: 4,
           pointHoverRadius: 6,
+          pointBackgroundColor: '#3b82f6',
+          pointBorderColor: '#fff',
+          pointBorderWidth: 2,
         }]
       },
       options: {
@@ -275,6 +644,10 @@
         plugins: {
           legend: { display: false },
           tooltip: {
+            backgroundColor: 'rgba(15, 23, 42, 0.9)',
+            padding: 12,
+            titleFont: { size: 13, weight: '600' },
+            bodyFont: { size: 12 },
             callbacks: {
               label: function(context) {
                 return 'Units: ' + context.parsed.y;
@@ -283,9 +656,35 @@
           }
         },
         scales: {
+          x: {
+            grid: { display: false },
+            ticks: {
+              font: { size: 11 },
+              maxRotation: 45,
+              minRotation: 0,
+              autoSkip: true,
+              autoSkipPadding: 15,
+              maxTicksLimit: 10,
+              callback: function(value, index, ticks) {
+                // Show short date format (MM-DD) to reduce clutter
+                const label = this.getLabelForValue(value);
+                if (label && label.length > 6) {
+                  // If label is long (e.g., "Jan 15"), keep it short
+                  return label;
+                }
+                return label;
+              }
+            }
+          },
           y: {
             beginAtZero: true,
-            ticks: { precision: 0 }
+            ticks: { 
+              precision: 0,
+              font: { size: 11 }
+            },
+            grid: {
+              color: 'rgba(148, 163, 184, 0.1)'
+            }
           }
         }
       }

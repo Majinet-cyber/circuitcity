@@ -1,0 +1,353 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% load cc_extras %}
+
+{% block title %}Stock List · Cement · {{ business.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+  .warehouse-score-card {
+    background: linear-gradient(135deg, rgba(30, 64, 175, 0.06), rgba(16, 185, 129, 0.08));
+    border: 1px solid #e2e8f0;
+  }
+  .cement-card-actions .btn {
+    min-width: 120px;
+  }
+  .cement-card-meta {
+    font-size: 0.85rem;
+  }
+  
+  /* Premium KPI Strip */
+  .kpi-strip {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+  .kpi-card {
+    background: linear-gradient(135deg, #ffffff, #f8fafc);
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    padding: 1rem 1.25rem;
+    text-align: center;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  }
+  .kpi-card .kpi-icon {
+    font-size: 1.5rem;
+    margin-bottom: 0.5rem;
+  }
+  .kpi-card .kpi-value {
+    font-size: 1.4rem;
+    font-weight: 800;
+    color: #0f172a;
+  }
+  .kpi-card .kpi-label {
+    font-size: 0.8rem;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .kpi-card.danger .kpi-value { color: #dc2626; }
+  .kpi-card.warning .kpi-value { color: #d97706; }
+  .kpi-card.success .kpi-value { color: #16a34a; }
+  .kpi-card.primary .kpi-value { color: #2563eb; }
+  
+  /* Reorder Queue */
+  .reorder-queue {
+    background: linear-gradient(135deg, #fef3c7, #fef9c3);
+    border: 1px solid #fbbf24;
+    border-radius: 14px;
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+  }
+  .reorder-queue h5 {
+    color: #92400e;
+    font-weight: 700;
+    margin-bottom: 0.75rem;
+  }
+  .reorder-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid rgba(251, 191, 36, 0.3);
+  }
+  .reorder-item:last-child { border-bottom: none; }
+  .reorder-item .item-name { font-weight: 600; color: #78350f; }
+  .reorder-item .item-status { font-size: 0.85rem; }
+  .reorder-item .btn-sm { padding: 0.25rem 0.75rem; font-size: 0.85rem; }
+  
+  /* ========= MOBILE-FIRST CEMENT STOCK CARDS POLISH (Jan 2026) ========= */
+  /* Premium, gamified stock cards like clothing vertical */
+  .cement-stock-card {
+    background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+    border: 1px solid rgba(14, 165, 233, 0.12);
+    border-radius: 18px;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.05);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow: hidden;
+  }
+  
+  .cement-stock-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 28px rgba(14, 165, 233, 0.15);
+    border-color: rgba(14, 165, 233, 0.3);
+  }
+  
+  .cement-brand-header {
+    font-size: 1.1rem;
+    font-weight: 800;
+    color: #0f172a;
+    margin-bottom: 4px;
+  }
+  
+  .cement-unit-label {
+    font-size: 0.85rem;
+    color: #64748b;
+  }
+  
+  .cement-stock-badge {
+    font-size: 0.75rem;
+    padding: 4px 12px;
+    border-radius: 999px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+  }
+  
+  .cement-stock-qty {
+    font-size: 2rem;
+    font-weight: 900;
+    color: #0ea5e9;
+    line-height: 1;
+  }
+  
+  .cement-price-display {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #0f172a;
+  }
+  
+  /* Mobile responsive */
+  @media (max-width: 768px) {
+    .kpi-strip {
+      grid-template-columns: repeat(2, 1fr) !important;
+      gap: 12px !important;
+    }
+    
+    .kpi-card {
+      padding: 12px !important;
+    }
+    
+    .kpi-card .kpi-value {
+      font-size: 1.2rem !important;
+    }
+    
+    .kpi-card .kpi-label {
+      font-size: 0.7rem !important;
+    }
+    
+    .cement-stock-card {
+      margin-bottom: 12px !important;
+    }
+    
+    .cement-card-actions {
+      flex-direction: row !important;
+      gap: 8px !important;
+    }
+    
+    .cement-card-actions .btn {
+      font-size: 0.85rem !important;
+      padding: 8px 12px !important;
+      min-width: 0 !important;
+    }
+    
+    .cement-stock-qty {
+      font-size: 1.75rem !important;
+    }
+    
+    .cement-price-display {
+      font-size: 1rem !important;
+    }
+  }
+  
+  @media (max-width: 480px) {
+    .kpi-strip {
+      grid-template-columns: 1fr !important;
+    }
+    
+    .container-fluid {
+      padding-left: 12px !important;
+      padding-right: 12px !important;
+    }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+  <div class="row mb-4">
+    <div class="col">
+      <h1 class="h3 mb-0">📋 Building Materials & Hardware</h1>
+      <p class="text-muted">{{ business.name }}</p>
+    </div>
+    <div class="col-auto">
+      <a href="{% url 'cement:stock_in' %}" class="btn btn-primary">
+        <i class="bi bi-plus-circle"></i> Add Stock
+      </a>
+    </div>
+  </div>
+
+  <!-- Premium KPI Strip -->
+  <div class="kpi-strip" data-testid="kpi-strip">
+    <div class="kpi-card primary">
+      <div class="kpi-icon">📦</div>
+      <div class="kpi-value">{{ total_units|intcomma }}</div>
+      <div class="kpi-label">Total Units</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-icon">💰</div>
+      <div class="kpi-value">MK {{ total_stock_value|floatformat:0|intcomma }}</div>
+      <div class="kpi-label">Stock Value</div>
+    </div>
+    <div class="kpi-card success">
+      <div class="kpi-icon">📈</div>
+      <div class="kpi-value">MK {{ total_potential_profit|floatformat:0|intcomma }}</div>
+      <div class="kpi-label">Potential Profit</div>
+    </div>
+    <div class="kpi-card warning">
+      <div class="kpi-icon">⚠️</div>
+      <div class="kpi-value">{{ low_stock_count }}</div>
+      <div class="kpi-label">Low Stock</div>
+    </div>
+    <div class="kpi-card danger">
+      <div class="kpi-icon">🚫</div>
+      <div class="kpi-value">{{ out_of_stock_count }}</div>
+      <div class="kpi-label">Out of Stock</div>
+    </div>
+  </div>
+
+  <!-- Warehouse Health Score -->
+  <div class="card warehouse-score-card mb-4">
+    <div class="card-body">
+      <div class="d-flex flex-column flex-md-row align-items-start align-items-md-center justify-content-between gap-3">
+        <div>
+          <h2 class="h5 mb-1">🏗️ Warehouse Health Score</h2>
+          <div class="text-muted">{{ warehouse_healthy_count }} of {{ warehouse_total_products }} SKUs in healthy stock</div>
+        </div>
+        <div class="text-md-end">
+          <div class="display-6 fw-bold {% if warehouse_score >= 80 %}text-success{% elif warehouse_score >= 50 %}text-warning{% else %}text-danger{% endif %}">{{ warehouse_score }}%</div>
+          <div class="text-muted">{% if warehouse_score >= 80 %}Excellent{% elif warehouse_score >= 50 %}Needs Attention{% else %}Critical{% endif %}</div>
+        </div>
+      </div>
+      <div class="progress mt-3" style="height:12px;">
+        <div class="progress-bar {% if warehouse_score >= 80 %}bg-success{% elif warehouse_score >= 50 %}bg-warning{% else %}bg-danger{% endif %}" role="progressbar" style="width: {{ warehouse_score }}%;"
+             aria-valuenow="{{ warehouse_score }}" aria-valuemin="0" aria-valuemax="100"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Reorder Queue -->
+  {% if reorder_queue %}
+  <div class="reorder-queue" data-testid="reorder-queue">
+    <h5>🔔 Reorder Queue</h5>
+    {% for item in reorder_queue %}
+    <div class="reorder-item">
+      <div>
+        <span class="item-name">{{ item.display_name }}</span>
+        <span class="item-status badge bg-{{ item.stock_badge_class }} ms-2">{{ item.stock_badge_label }}</span>
+      </div>
+      <a href="{% url 'cement:stock_in' %}" class="btn btn-warning btn-sm">Stock In →</a>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <div class="card">
+    <div class="card-body">
+      {% if products %}
+      <div class="row g-3">
+        {% for product in products %}
+        <div class="col-12 col-md-6">
+          <div class="card cement-stock-card h-100">
+            <div class="card-body d-flex flex-column">
+              <div class="d-flex align-items-start justify-content-between gap-3 mb-3">
+                <div>
+                  <div class="cement-brand-header">{{ product.display_name }}</div>
+                  <div class="cement-unit-label">{{ product.unit_label }}</div>
+                </div>
+                <span class="cement-stock-badge badge bg-{{ product.stock_badge_class }}">{{ product.stock_badge_label }}</span>
+              </div>
+
+              <div class="mt-auto">
+                <div class="d-flex align-items-end justify-content-between mb-3">
+                  <div>
+                    <div class="text-muted small mb-1">Stock on Hand</div>
+                    <div class="cement-stock-qty">{{ product.quantity_in_stock }}</div>
+                  </div>
+                  <div class="text-end">
+                    <div class="text-muted small mb-1">Selling Price</div>
+                    <div class="cement-price-display">
+                      {% if product.selling_price != None %}
+                        MK {{ product.selling_price|floatformat:0|intcomma }}
+                      {% else %}
+                        —
+                      {% endif %}
+                    </div>
+                  </div>
+                </div>
+
+                <div class="cement-card-meta text-muted small mb-3">
+                  Cost:
+                  {% if product.cost_price != None %}
+                    MK {{ product.cost_price|floatformat:0|intcomma }}
+                  {% else %}
+                    —
+                  {% endif %}
+                  · Stock Value:
+                  {% if product.stock_value != None %}
+                    MK {{ product.stock_value|floatformat:0|intcomma }}
+                  {% else %}
+                    —
+                  {% endif %}
+                </div>
+
+                {% if product.potential_profit != None %}
+                <div class="alert alert-success py-2 px-3 mb-3" style="border-radius: 12px; font-size: 0.85rem;">
+                  <i class="bi bi-graph-up-arrow me-1"></i>
+                  <strong>Potential Profit:</strong> MK {{ product.potential_profit|floatformat:0|intcomma }}
+                </div>
+                {% endif %}
+
+                {% if product.stock_badge_label == "Out of stock" or product.stock_badge_label == "Low stock" %}
+                <div class="alert alert-warning py-2 px-3 mb-3" style="border-radius: 12px; font-size: 0.85rem;">
+                  <i class="bi bi-exclamation-triangle me-1"></i>
+                  Reorder soon to keep stock moving
+                </div>
+                {% endif %}
+
+                <div class="cement-card-actions d-flex gap-2">
+                  <a href="{% url 'cement:stock_in' %}" class="btn btn-outline-primary flex-fill">
+                    <i class="bi bi-box-arrow-in-down me-1"></i> Stock In
+                  </a>
+                  <a href="{% url 'cement:sell' %}?prefill_product={{ product.id }}&prefill_brand={{ product.brand_key }}"
+                     class="btn btn-primary flex-fill">
+                    <i class="bi bi-cart-check me-1"></i> Sell
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="text-center py-5">
+        <p class="text-muted mb-3">No products yet</p>
+        <a href="{% url 'cement:stock_in' %}" class="btn btn-primary">Add Your First Product</a>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}
+

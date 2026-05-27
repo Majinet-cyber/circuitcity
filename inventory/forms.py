@@ -55,6 +55,7 @@ class StyledForm(forms.Form):
     """
     Adds the .input class to all widgets automatically for consistent styling.
     """
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         for f in self.fields.values():
@@ -66,6 +67,7 @@ class StyledModelForm(forms.ModelForm):
     """
     Same as StyledForm but for ModelForms.
     """
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         for f in self.fields.values():
@@ -131,11 +133,7 @@ def get_product_qs_for_business(business):
     if _is_phone_business(business):
         return base.order_by("brand", "model", "variant", "id")
 
-    return (
-        base.filter(inventoryitem__business=business)
-            .distinct()
-            .order_by("brand", "model", "variant", "id")
-    )
+    return base.filter(inventoryitem__business=business).distinct().order_by("brand", "model", "variant", "id")
 
 
 # ---------- Scan IN ----------
@@ -144,43 +142,37 @@ class ScanInForm(StyledForm):
         label="IMEI",
         max_length=15,
         help_text="Exactly 15 digits",
-        widget=forms.TextInput(attrs={
-            "autofocus": "autofocus",
-            "inputmode": "numeric",
-            "maxlength": "15",
-            "minlength": "15",
-            "pattern": r"\d{15}",
-            "placeholder": "15-digit IMEI",
-            "id": "id_imei",
-        }),
+        widget=forms.TextInput(
+            attrs={
+                "autofocus": "autofocus",
+                "inputmode": "numeric",
+                "maxlength": "15",
+                "minlength": "15",
+                "pattern": r"\d{15}",
+                "placeholder": "15-digit IMEI",
+                "id": "id_imei",
+            }
+        ),
     )
-    product = forms.ModelChoiceField(
-        queryset=Product.objects.none(),
-        widget=forms.Select(attrs={"id": "id_product"})
-    )
+    product = forms.ModelChoiceField(queryset=Product.objects.none(), widget=forms.Select(attrs={"id": "id_product"}))
     order_price = forms.DecimalField(
         label="Order price",
         max_digits=12,
         decimal_places=2,
         required=False,
         help_text="If left blank, we’ll use the model’s default order price.",
-        widget=forms.NumberInput(attrs={"id": "id_order_price", "step": "any"})
+        widget=forms.NumberInput(attrs={"id": "id_order_price", "step": "any"}),
     )
     received_at = forms.DateField(
-        widget=forms.DateInput(attrs={"type": "date", "id": "id_received_at"}),
-        label="Received date"
+        widget=forms.DateInput(attrs={"type": "date", "id": "id_received_at"}), label="Received date"
     )
     location = forms.ModelChoiceField(
         queryset=Location.objects.none(),
         required=False,
         empty_label="---------",
-        widget=forms.Select(attrs={"id": "id_location"})
+        widget=forms.Select(attrs={"id": "id_location"}),
     )
-    assigned_to_me = forms.BooleanField(
-        label="Assign to me",
-        required=False,
-        initial=True
-    )
+    assigned_to_me = forms.BooleanField(label="Assign to me", required=False, initial=True)
 
     def __init__(self, *args, request=None, user=None, business=None, lock_location: bool = True, **kwargs):
         """
@@ -280,35 +272,31 @@ class ScanSoldForm(StyledForm):
         label="IMEI",
         max_length=15,
         help_text="Exactly 15 digits",
-        widget=forms.TextInput(attrs={
-            "autofocus": "autofocus",
-            "inputmode": "numeric",
-            "maxlength": "15",
-            "minlength": "15",
-            "pattern": r"\d{15}",
-            "placeholder": "15-digit IMEI",
-            "id": "id_imei",
-        }),
+        widget=forms.TextInput(
+            attrs={
+                "autofocus": "autofocus",
+                "inputmode": "numeric",
+                "maxlength": "15",
+                "minlength": "15",
+                "pattern": r"\d{15}",
+                "placeholder": "15-digit IMEI",
+                "id": "id_imei",
+            }
+        ),
     )
-    sold_at = forms.DateField(
-        widget=forms.DateInput(attrs={"type": "date", "id": "id_sold_at"}),
-        label="Sold date"
-    )
+    sold_at = forms.DateField(widget=forms.DateInput(attrs={"type": "date", "id": "id_sold_at"}), label="Sold date")
     price = forms.DecimalField(
-        max_digits=12,
-        decimal_places=2,
-        widget=forms.NumberInput(attrs={"id": "id_price", "step": "any", "min": "0"})
+        max_digits=12, decimal_places=2, widget=forms.NumberInput(attrs={"id": "id_price", "step": "any", "min": "0"})
     )
     commission_pct = forms.DecimalField(
         label="Commission %",
         max_digits=5,
         decimal_places=2,
         initial=0,
-        widget=forms.NumberInput(attrs={"id": "id_commission_pct", "step": "any", "min": "0", "max": "100"})
+        widget=forms.NumberInput(attrs={"id": "id_commission_pct", "step": "any", "min": "0", "max": "100"}),
     )
     location = forms.ModelChoiceField(
-        queryset=Location.objects.none(),
-        widget=forms.Select(attrs={"id": "id_location"})
+        queryset=Location.objects.none(), widget=forms.Select(attrs={"id": "id_location"})
     )
 
     def __init__(self, *args, request=None, user=None, business=None, **kwargs):
@@ -379,26 +367,33 @@ class InventoryItemForm(forms.ModelForm):
     - If a staff user updates either price, all items of the same Product
       get updated in one go (bulk UPDATE).
     """
+
     class Meta:
         model = InventoryItem
         fields = [
-            "imei", "product", "status",
-            "order_price", "selling_price",
-            "current_location", "assigned_agent",
+            "imei",
+            "product",
+            "status",
+            "order_price",
+            "selling_price",
+            "current_location",
+            "assigned_agent",
             "received_at",
         ]
         widgets = {
             "received_at": forms.DateInput(attrs={"type": "date", "class": "input"}),
             "order_price": forms.NumberInput(attrs={"step": "0.01", "class": "input"}),
             "selling_price": forms.NumberInput(attrs={"step": "0.01", "class": "input"}),
-            "imei": forms.TextInput(attrs={
-                "inputmode": "numeric",
-                "maxlength": "15",
-                "minlength": "15",
-                "pattern": r"\d{15}",
-                "placeholder": "15-digit IMEI",
-                "class": "input",
-            }),
+            "imei": forms.TextInput(
+                attrs={
+                    "inputmode": "numeric",
+                    "maxlength": "15",
+                    "minlength": "15",
+                    "pattern": r"\d{15}",
+                    "placeholder": "15-digit IMEI",
+                    "class": "input",
+                }
+            ),
         }
 
     def __init__(self, *args, **kwargs):
@@ -464,22 +459,38 @@ class PurchaseOrderHeaderForm(forms.ModelForm if AdminPurchaseOrder else forms.F
     """
     Header for AdminPurchaseOrder. Uses MWK by default.
     """
+
     if AdminPurchaseOrder:
+
         class Meta:
             model = AdminPurchaseOrder
             fields = [
-                "supplier_name", "supplier_email", "supplier_phone",
-                "agent_name", "notes", "currency", "tax",
+                "supplier_name",
+                "supplier_email",
+                "supplier_phone",
+                "agent_name",
+                "notes",
+                "payment_terms",
+                "expected_delivery_date",
+                "currency",
+                "tax",
             ]
             widgets = {
                 "supplier_name": forms.TextInput(attrs={"class": "input", "placeholder": "Supplier or Company"}),
                 "supplier_email": forms.EmailInput(attrs={"class": "input", "placeholder": "supplier@example.com"}),
                 "supplier_phone": forms.TextInput(attrs={"class": "input", "placeholder": "+265... (WhatsApp ok)"}),
-                "agent_name": forms.TextInput(attrs={"class": "input", "placeholder": "If sending to a specific agent"}),
-                "notes": forms.Textarea(attrs={"rows": 3, "class": "input", "placeholder": "Notes for supplier / delivery"}),
+                "agent_name": forms.TextInput(
+                    attrs={"class": "input", "placeholder": "If sending to a specific agent"}
+                ),
+                "notes": forms.Textarea(
+                    attrs={"rows": 3, "class": "input", "placeholder": "Notes for supplier / delivery"}
+                ),
+                "payment_terms": forms.TextInput(attrs={"class": "input", "placeholder": "Payment terms"}),
+                "expected_delivery_date": forms.DateInput(attrs={"class": "input", "type": "date"}),
                 "currency": forms.TextInput(attrs={"class": "input", "placeholder": "MWK"}),
                 "tax": forms.NumberInput(attrs={"step": "0.01", "class": "input"}),
             }
+
     else:
         supplier_name = forms.CharField(max_length=120, required=False)
         supplier_email = forms.EmailField(required=False)
@@ -491,15 +502,14 @@ class PurchaseOrderHeaderForm(forms.ModelForm if AdminPurchaseOrder else forms.F
 
 
 class PurchaseOrderItemForm(StyledForm):
-    product = forms.ModelChoiceField(
-        queryset=Product.objects.none(),
-        widget=forms.Select(attrs={"class": "input"})
-    )
+    product = forms.ModelChoiceField(queryset=Product.objects.none(), widget=forms.Select(attrs={"class": "input"}))
     quantity = forms.IntegerField(min_value=1, initial=1, widget=forms.NumberInput(attrs={"class": "input"}))
     unit_price = forms.DecimalField(
-        max_digits=12, decimal_places=2, required=False,
+        max_digits=12,
+        decimal_places=2,
+        required=False,
         widget=forms.NumberInput(attrs={"class": "input", "step": "0.01"}),
-        help_text="If blank, uses the model’s default order price."
+        help_text="If blank, uses the model’s default order price.",
     )
 
     def __init__(self, *args, business=None, **kwargs):
@@ -536,8 +546,7 @@ class PurchaseOrderItemForm(StyledForm):
 # ---------- Agent password reset (forms) ----------
 class AgentForgotForm(StyledForm):
     email = forms.EmailField(
-        label="Your email",
-        widget=forms.EmailInput(attrs={"autocomplete": "email", "placeholder": "you@example.com"})
+        label="Your email", widget=forms.EmailInput(attrs={"autocomplete": "email", "placeholder": "you@example.com"})
     )
 
     def clean_email(self):
@@ -553,26 +562,26 @@ class AgentForgotForm(StyledForm):
 
 class AgentResetConfirmForm(StyledForm):
     email = forms.EmailField(
-        label="Your email",
-        widget=forms.EmailInput(attrs={"autocomplete": "email", "placeholder": "you@example.com"})
+        label="Your email", widget=forms.EmailInput(attrs={"autocomplete": "email", "placeholder": "you@example.com"})
     )
     code = forms.CharField(
         label="Reset code",
-        max_length=6, min_length=6,
-        widget=forms.TextInput(attrs={
-            "inputmode": "numeric",
-            "maxlength": "6",
-            "placeholder": "6-digit code",
-            "autocomplete": "one-time-code",
-        })
+        max_length=6,
+        min_length=6,
+        widget=forms.TextInput(
+            attrs={
+                "inputmode": "numeric",
+                "maxlength": "6",
+                "placeholder": "6-digit code",
+                "autocomplete": "one-time-code",
+            }
+        ),
     )
     new_password1 = forms.CharField(
-        label="New password",
-        widget=forms.PasswordInput(attrs={"autocomplete": "new-password"})
+        label="New password", widget=forms.PasswordInput(attrs={"autocomplete": "new-password"})
     )
     new_password2 = forms.CharField(
-        label="Confirm new password",
-        widget=forms.PasswordInput(attrs={"autocomplete": "new-password"})
+        label="Confirm new password", widget=forms.PasswordInput(attrs={"autocomplete": "new-password"})
     )
 
     def clean(self):
@@ -589,24 +598,26 @@ class AgentResetConfirmForm(StyledForm):
 # ---------- Auth (custom login form) ----------
 class CCAuthenticationForm(AuthenticationForm):
     username = forms.CharField(
-        widget=forms.TextInput(attrs={
-            "class": "input",
-            "autofocus": "autofocus",
-            "autocomplete": "username",
-            "placeholder": "your.username",
-        })
+        widget=forms.TextInput(
+            attrs={
+                "class": "input",
+                "autofocus": "autofocus",
+                "autocomplete": "username",
+                "placeholder": "your.username",
+            }
+        )
     )
     password = forms.CharField(
-        widget=forms.PasswordInput(attrs={
-            "class": "input",
-            "autocomplete": "current-password",
-            "placeholder": "•••••••••",
-            "id": "password-input",
-        })
+        widget=forms.PasswordInput(
+            attrs={
+                "class": "input",
+                "autocomplete": "current-password",
+                "placeholder": "•••••••••",
+                "id": "password-input",
+            }
+        )
     )
-    remember_me = forms.BooleanField(
-        required=False, initial=False, label="Stay signed in for 14 days"
-    )
+    remember_me = forms.BooleanField(required=False, initial=False, label="Stay signed in for 14 days")
 
 
 # ---------- Phase 6: CSV Import (products + opening stock) ----------
@@ -616,14 +627,9 @@ class CSVImportForm(StyledForm):
     required: product_code, product_name, location, quantity
     optional: serial_or_imei, cost_price, sale_price
     """
-    csv_file = forms.FileField(
-        label="CSV file",
-        widget=forms.FileInput(attrs={"accept": ".csv", "class": "input"})
-    )
-    create_missing_products = forms.BooleanField(
-        required=False, initial=True,
-        label="Create products that don't exist"
-    )
+
+    csv_file = forms.FileField(label="CSV file", widget=forms.FileInput(attrs={"accept": ".csv", "class": "input"}))
+    create_missing_products = forms.BooleanField(required=False, initial=True, label="Create products that don't exist")
 
     def clean_csv_file(self):
         f = self.cleaned_data.get("csv_file")
@@ -676,45 +682,85 @@ except Exception:
 # Fields you *might* have across installations. We intersect with the real model.
 _DESIRED_PRODUCT_FIELDS = [
     # generic / earlier schema candidates
-    "business", "name", "kind", "sku",
-    "track_inventory", "scan_required",
-    "has_shots", "shots_per_bottle", "base_unit",
+    "business",
+    "name",
+    "kind",
+    "sku",
+    "track_inventory",
+    "scan_required",
+    "has_shots",
+    "shots_per_bottle",
+    "base_unit",
     # phone-ish / liquor-ish optional fields
-    "brand", "model", "specs", "phone_name",
-    "liquor_name", "price_bottle", "price_shot", "qty_bottles",
+    "brand",
+    "model",
+    "specs",
+    "phone_name",
+    "liquor_name",
+    "price_bottle",
+    "price_shot",
+    "qty_bottles",
     # prices commonly on Product
-    "cost_price", "sale_price", "price",
+    "cost_price",
+    "sale_price",
+    "price",
 ]
 
 _PRODUCT_FIELDS = _intersect_fields(Product, _DESIRED_PRODUCT_FIELDS)
 
 if _PRODUCT_FIELDS:
+
     class MerchProductForm(StyledModelForm):
         """
         Generic product creator used on /inventory/products/new/.
         Only includes fields that actually exist on your Product model.
         """
+
         class Meta:
             model = Product
             fields = _PRODUCT_FIELDS
             widgets = {
                 **({"business": forms.HiddenInput()} if "business" in _PRODUCT_FIELDS else {}),
-                **({"name": forms.TextInput(attrs={"class": "input", "placeholder": "Product name"})}
-                   if "name" in _PRODUCT_FIELDS else {}),
-                **({"kind": forms.TextInput(attrs={"class": "input", "placeholder": "Category / kind"})}
-                   if "kind" in _PRODUCT_FIELDS else {}),
-                **({"sku": forms.TextInput(attrs={"class": "input", "placeholder": "SKU / code"})}
-                   if "sku" in _PRODUCT_FIELDS else {}),
-                **({"shots_per_bottle": forms.NumberInput(attrs={"class": "input", "min": "1"})}
-                   if "shots_per_bottle" in _PRODUCT_FIELDS else {}),
-                **({"base_unit": forms.TextInput(attrs={"class": "input", "placeholder": "unit, bottle, shot…"})}
-                   if "base_unit" in _PRODUCT_FIELDS else {}),
-                **({"cost_price": forms.NumberInput(attrs={"class": "input", "step": "0.01"})}
-                   if "cost_price" in _PRODUCT_FIELDS else {}),
-                **({"sale_price": forms.NumberInput(attrs={"class": "input", "step": "0.01"})}
-                   if "sale_price" in _PRODUCT_FIELDS else {}),
-                **({"price": forms.NumberInput(attrs={"class": "input", "step": "0.01"})}
-                   if "price" in _PRODUCT_FIELDS else {}),
+                **(
+                    {"name": forms.TextInput(attrs={"class": "input", "placeholder": "Product name"})}
+                    if "name" in _PRODUCT_FIELDS
+                    else {}
+                ),
+                **(
+                    {"kind": forms.TextInput(attrs={"class": "input", "placeholder": "Category / kind"})}
+                    if "kind" in _PRODUCT_FIELDS
+                    else {}
+                ),
+                **(
+                    {"sku": forms.TextInput(attrs={"class": "input", "placeholder": "SKU / code"})}
+                    if "sku" in _PRODUCT_FIELDS
+                    else {}
+                ),
+                **(
+                    {"shots_per_bottle": forms.NumberInput(attrs={"class": "input", "min": "1"})}
+                    if "shots_per_bottle" in _PRODUCT_FIELDS
+                    else {}
+                ),
+                **(
+                    {"base_unit": forms.TextInput(attrs={"class": "input", "placeholder": "unit, bottle, shot…"})}
+                    if "base_unit" in _PRODUCT_FIELDS
+                    else {}
+                ),
+                **(
+                    {"cost_price": forms.NumberInput(attrs={"class": "input", "step": "0.01"})}
+                    if "cost_price" in _PRODUCT_FIELDS
+                    else {}
+                ),
+                **(
+                    {"sale_price": forms.NumberInput(attrs={"class": "input", "step": "0.01"})}
+                    if "sale_price" in _PRODUCT_FIELDS
+                    else {}
+                ),
+                **(
+                    {"price": forms.NumberInput(attrs={"class": "input", "step": "0.01"})}
+                    if "price" in _PRODUCT_FIELDS
+                    else {}
+                ),
             }
 
         def clean(self):
@@ -726,7 +772,9 @@ if _PRODUCT_FIELDS:
                 if "base_unit" in self.fields and not cleaned.get("base_unit"):
                     cleaned["base_unit"] = "shot"
             return cleaned
+
 else:
+
     class MerchProductForm(StyledForm):
         name = forms.CharField(label="Product name", max_length=120, required=True)
         price = forms.DecimalField(label="Price", max_digits=12, decimal_places=2, required=False)
@@ -738,44 +786,64 @@ if _UnitPriceModel is not None:
     _UNITPRICE_FIELDS = _intersect_fields(_UnitPriceModel, _DESIRED_UNITPRICE_FIELDS)
 
     if _UNITPRICE_FIELDS:
+
         class _UnitPriceModelForm(StyledModelForm):
             class Meta:
                 model = _UnitPriceModel
                 fields = _UNITPRICE_FIELDS
                 widgets = {
-                    **({"label": forms.TextInput(attrs={"class": "input", "placeholder": "e.g., Bottle / Dozen"})}
-                       if "label" in _UNITPRICE_FIELDS else {}),
-                    **({"multiplier": forms.NumberInput(attrs={"class": "input", "min": "1"})}
-                       if "multiplier" in _UNITPRICE_FIELDS else {}),
-                    **({"price": forms.NumberInput(attrs={"class": "input", "step": "0.01"})}
-                       if "price" in _UNITPRICE_FIELDS else {}),
+                    **(
+                        {"label": forms.TextInput(attrs={"class": "input", "placeholder": "e.g., Bottle / Dozen"})}
+                        if "label" in _UNITPRICE_FIELDS
+                        else {}
+                    ),
+                    **(
+                        {"multiplier": forms.NumberInput(attrs={"class": "input", "min": "1"})}
+                        if "multiplier" in _UNITPRICE_FIELDS
+                        else {}
+                    ),
+                    **(
+                        {"price": forms.NumberInput(attrs={"class": "input", "step": "0.01"})}
+                        if "price" in _UNITPRICE_FIELDS
+                        else {}
+                    ),
                 }
 
         try:
             from django.forms import modelformset_factory
+
             MerchUnitPriceFormSet = modelformset_factory(
                 _UnitPriceModel, form=_UnitPriceModelForm, extra=1, can_delete=True
             )
         except Exception:
+
             class _UP(StyledForm):
                 label = forms.CharField(max_length=60)
                 multiplier = forms.IntegerField(min_value=1, initial=1)
                 price = forms.DecimalField(max_digits=12, decimal_places=2)
+
             from django.forms import formset_factory as _fsf  # local alias to be explicit
+
             MerchUnitPriceFormSet = _fsf(_UP, extra=1, can_delete=True)
     else:
+
         class _UP(StyledForm):
             label = forms.CharField(max_length=60)
             multiplier = forms.IntegerField(min_value=1, initial=1)
             price = forms.DecimalField(max_digits=12, decimal_places=2)
+
         from django.forms import formset_factory as _fsf
+
         MerchUnitPriceFormSet = _fsf(_UP, extra=1, can_delete=True)
 else:
+
     class _UP(StyledForm):
         label = forms.CharField(max_length=60)
         multiplier = forms.IntegerField(min_value=1, initial=1)
         price = forms.DecimalField(max_digits=12, decimal_places=2)
+
     from django.forms import formset_factory as _fsf
+
     MerchUnitPriceFormSet = _fsf(_UP, extra=1, can_delete=True)
 
 
@@ -788,6 +856,7 @@ class BizLocationForm(StyledModelForm):
     Matches your Location model fields:
       - name, city, latitude, longitude, geofence_radius_m, is_default
     """
+
     class Meta:
         model = Location
         fields = ["name", "city", "latitude", "longitude", "geofence_radius_m", "is_default"]
@@ -871,27 +940,22 @@ class ProductForm(StyledModelForm):
       - price -> price (else sale_price)
       - specs -> specs (if your model has it; else ignored safely)
     """
+
     # UI fields (always shown)
     brand = forms.ChoiceField(
         choices=[("", "— Select brand —")] + [(b, b) for b in PHONE_BRANDS] + [("Other", "Other…")],
         required=False,
-        widget=forms.Select(attrs={"id": "id_brand_select"})
+        widget=forms.Select(attrs={"id": "id_brand_select"}),
     )
     model_number = forms.CharField(
-        required=False,
-        widget=forms.TextInput(attrs={"placeholder": "e.g., KB8, A17, SM-A145F"})
+        required=False, widget=forms.TextInput(attrs={"placeholder": "e.g., KB8, A17, SM-A145F"})
     )
     specs = forms.CharField(
-        required=False,
-        widget=forms.TextInput(attrs={"placeholder": "e.g., 128+4", "list": "specs-list"})
+        required=False, widget=forms.TextInput(attrs={"placeholder": "e.g., 128+4", "list": "specs-list"})
     )
-    phone_name = forms.CharField(
-        required=False,
-        widget=forms.TextInput(attrs={"placeholder": "e.g., Tecno Pop 7"})
-    )
+    phone_name = forms.CharField(required=False, widget=forms.TextInput(attrs={"placeholder": "e.g., Tecno Pop 7"}))
     price = forms.DecimalField(
-        required=False, max_digits=12, decimal_places=2,
-        widget=forms.NumberInput(attrs={"step": "0.01", "min": "0"})
+        required=False, max_digits=12, decimal_places=2, widget=forms.NumberInput(attrs={"step": "0.01", "min": "0"})
     )
 
     class Meta:

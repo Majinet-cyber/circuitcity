@@ -56,9 +56,7 @@ def _backfill_locations_and_business(apps, schema_editor):
         return loc.id if loc else None
 
     # 1) Add a default location where missing
-    missing_loc = InventoryItem.objects.using(db).filter(
-        current_location__isnull=True, business__isnull=False
-    )
+    missing_loc = InventoryItem.objects.using(db).filter(current_location__isnull=True, business__isnull=False)
     for item in missing_loc.iterator():
         loc_id = ensure_default_location_id(item.business_id)
         if loc_id:
@@ -66,17 +64,10 @@ def _backfill_locations_and_business(apps, schema_editor):
             item.save(update_fields=["current_location"])
 
     # 2) Inherit business from current_location where missing
-    missing_biz = InventoryItem.objects.using(db).filter(
-        business__isnull=True, current_location__isnull=False
-    )
+    missing_biz = InventoryItem.objects.using(db).filter(business__isnull=True, current_location__isnull=False)
     for item in missing_biz.iterator():
         try:
-            loc_biz_id = (
-                Location.objects.using(db)
-                .only("business_id")
-                .get(pk=item.current_location_id)
-                .business_id
-            )
+            loc_biz_id = Location.objects.using(db).only("business_id").get(pk=item.current_location_id).business_id
         except Location.DoesNotExist:
             loc_biz_id = None
 
@@ -93,12 +84,7 @@ def _backfill_locations_and_business(apps, schema_editor):
     # Use a loop (SQLite dislikes joined updates with F() on some backends)
     for item in mismatched.iterator():
         try:
-            loc_biz_id = (
-                Location.objects.using(db)
-                .only("business_id")
-                .get(pk=item.current_location_id)
-                .business_id
-            )
+            loc_biz_id = Location.objects.using(db).only("business_id").get(pk=item.current_location_id).business_id
         except Location.DoesNotExist:
             loc_biz_id = None
 
@@ -113,7 +99,6 @@ def _noop_reverse(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         # Chain AFTER your latest inventory migration:
         ("inventory", "0024_alter_inventoryaudit_action"),

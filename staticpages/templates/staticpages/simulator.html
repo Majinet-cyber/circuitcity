@@ -5,6 +5,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Business Simulator - Emajinet</title>
+  
+  <!-- SEO: Canonical URL -->
+  <link rel="canonical" href="{{ request.scheme }}://{{ request.get_host }}{{ request.path }}">
+  
   <link rel="icon" href="{% static 'favicon.ico' %}">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <style>
@@ -413,7 +417,15 @@
         </div>
 
         <!-- CFO Assistant Card (in-layout) -->
-        {% include "staticpages/partials/cfo_assistant.html" %}
+        <div class="cfo-assistant-card">
+          <div class="cfo-avatar">
+            <div class="avatar-img" style="display: flex; align-items: center; justify-content: center; font-size: 2rem;">💼</div>
+          </div>
+          <div class="cfo-content">
+            <h4 class="cfo-title">CFO Assistant</h4>
+            <p class="cfo-message" id="cfo-message">Adjust the sliders to see personalized advice for your business.</p>
+          </div>
+        </div>
       </div>
 
       <!-- Chart and Metrics Card -->

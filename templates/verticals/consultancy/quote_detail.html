@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block title %}{{ quote.quote_number }} · {{ business.name }}{% endblock %}
+{% block content %}
+<div style="max-width:780px;margin:0 auto;padding:20px 14px;">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:10px;">
+    <div>
+      <a href="{% url 'consultancy:quotes' %}" style="color:#64748b;font-size:.82rem;text-decoration:none;">← Quotes</a>
+      <h1 style="font-size:1.3rem;font-weight:900;margin:4px 0 0;">{{ quote.quote_number }}</h1>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <form method="post" style="display:flex;gap:6px;align-items:center;">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="update_status">
+        <select name="status" style="padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:.82rem;">
+          {% for val, label in status_choices %}<option value="{{ val }}" {% if quote.status == val %}selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select>
+        <button type="submit" style="padding:6px 12px;background:#64748b;color:#fff;border:none;border-radius:6px;font-size:.82rem;font-weight:700;cursor:pointer;">Update</button>
+      </form>
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="convert_to_invoice">
+        <button type="submit" style="padding:6px 14px;background:#16a34a;color:#fff;border:none;border-radius:6px;font-size:.82rem;font-weight:700;cursor:pointer;">→ Invoice</button>
+      </form>
+    </div>
+  </div>
+  {% if messages %}{% for msg in messages %}<div class="msg msg-{{ msg.tags }}" style="margin-bottom:12px;">{{ msg }}</div>{% endfor %}{% endif %}
+
+  <div style="background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:20px;margin-bottom:14px;">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:.88rem;margin-bottom:16px;">
+      <div><span style="color:#64748b;">Client:</span> <strong>{{ quote.client.name }}</strong></div>
+      <div><span style="color:#64748b;">Status:</span> <strong>{{ quote.get_status_display }}</strong></div>
+      {% if quote.project %}<div><span style="color:#64748b;">Project:</span> {{ quote.project.title }}</div>{% endif %}
+      {% if quote.valid_until %}<div><span style="color:#64748b;">Valid Until:</span> {{ quote.valid_until|date:"d M Y" }}</div>{% endif %}
+      <div><span style="color:#64748b;">Date:</span> {{ quote.created_at|date:"d M Y" }}</div>
+    </div>
+
+    <!-- Line Items -->
+    <table style="width:100%;border-collapse:collapse;font-size:.88rem;">
+      <thead>
+        <tr style="background:#f8fafc;">
+          <th style="padding:8px 12px;text-align:left;font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;color:#64748b;">Description</th>
+          <th style="padding:8px 12px;text-align:right;font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;color:#64748b;">Qty</th>
+          <th style="padding:8px 12px;text-align:right;font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;color:#64748b;">Unit Price</th>
+          <th style="padding:8px 12px;text-align:right;font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;color:#64748b;">Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in line_items %}
+        <tr style="border-top:1px solid #f1f5f9;">
+          <td style="padding:8px 12px;">{{ item.description }}</td>
+          <td style="padding:8px 12px;text-align:right;">{{ item.quantity|floatformat:2 }}</td>
+          <td style="padding:8px 12px;text-align:right;">{{ item.unit_price|floatformat:0|intcomma }}</td>
+          <td style="padding:8px 12px;text-align:right;font-weight:600;">{{ item.total|floatformat:0|intcomma }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot>
+        {% if quote.discount %}<tr style="border-top:1px solid #e2e8f0;"><td colspan="3" style="padding:6px 12px;text-align:right;color:#64748b;">Discount:</td><td style="padding:6px 12px;text-align:right;color:#ef4444;">–{{ quote.discount|floatformat:0|intcomma }}</td></tr>{% endif %}
+        {% if quote.tax %}<tr><td colspan="3" style="padding:6px 12px;text-align:right;color:#64748b;">Tax:</td><td style="padding:6px 12px;text-align:right;">{{ quote.tax|floatformat:0|intcomma }}</td></tr>{% endif %}
+        <tr style="border-top:2px solid #e2e8f0;"><td colspan="3" style="padding:10px 12px;text-align:right;font-weight:800;font-size:1rem;">TOTAL:</td><td style="padding:10px 12px;text-align:right;font-weight:900;font-size:1.1rem;">MWK {{ quote.total_amount|floatformat:0|intcomma }}</td></tr>
+      </tfoot>
+    </table>
+    {% if quote.notes %}<p style="margin-top:12px;font-size:.85rem;color:#64748b;">Notes: {{ quote.notes }}</p>{% endif %}
+  </div>
+</div>
+{% endblock %}

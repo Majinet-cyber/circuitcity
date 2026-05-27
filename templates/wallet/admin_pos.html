@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Purchase Orders · Emajinet{% endblock %}
+{% block header_title %}<i class="bi bi-box-seam me-2"></i>Supplier Purchase Orders{% endblock %}
+
+{% block body %}
+<div class="container-xxl px-0">
+  <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+    <div class="text-muted small">Create supplier orders, download PDFs, and reopen order history.</div>
+    <a class="btn btn-primary" href="{% url 'wallet:admin_po_new' %}"><i class="bi bi-plus-circle me-1"></i>New purchase order</a>
+  </div>
+  <div class="card border-0 shadow-sm">
+    <div class="table-responsive">
+      <table class="table align-middle mb-0">
+        <thead class="text-muted small"><tr><th>PO</th><th>Supplier</th><th>Status</th><th class="text-end">Total</th><th>Date</th><th></th></tr></thead>
+        <tbody>
+          {% for po in orders %}
+          <tr>
+            <td>PO-{{ po.id|stringformat:"05d" }}</td>
+            <td>{{ po.supplier_name|default:"Not specified" }}</td>
+            <td><span class="badge text-bg-light">{% if po.status == "draft" %}Prepared{% else %}{{ po.get_status_display }}{% endif %}</span></td>
+            <td class="text-end">{{ po.currency }} {{ po.total|floatformat:2|intcomma }}</td>
+            <td>{{ po.created_at|date:"Y-m-d" }}</td>
+            <td class="text-end">
+              <a class="btn btn-sm btn-outline-secondary" href="{% url 'wallet:admin_po_pdf' po.id %}"><i class="bi bi-file-pdf"></i></a>
+              <a class="btn btn-sm btn-outline-primary" href="{% url 'wallet:admin_po_detail' po.id %}">Open</a>
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="6" class="text-center text-muted py-4">No purchase orders yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

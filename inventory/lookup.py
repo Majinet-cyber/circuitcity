@@ -11,11 +11,14 @@ from django.db.models import Q
 try:
     from tenants.utils import get_active_business  # canonical if available
 except Exception:  # pragma: no cover
+
     def get_active_business(_request):
         return None
 
+
 try:
     from .models import InventoryItem as _InventoryItem, Location as _Location
+
     InventoryItem = _InventoryItem
     Location = _Location
 except Exception:  # pragma: no cover
@@ -69,9 +72,13 @@ def _candidate_code_fields(model) -> Iterable[str]:
     """
     names = _fieldnames(model)
     order = [
-        "imei", "imei1", "imei_1",
-        "barcode", "serial",
-        "sku", "code",
+        "imei",
+        "imei1",
+        "imei_1",
+        "barcode",
+        "serial",
+        "sku",
+        "code",
         "name",
     ]
     return [n for n in order if n in names]
@@ -95,15 +102,17 @@ def _is_soldish(obj) -> bool:
                 qty = None
             break
 
-    return any([
-        bool(getattr(obj, "sold_at", None)),
-        bool(getattr(obj, "is_sold", False)),
-        status_val in {"sold", "completed", "closed"},
-        (hasattr(obj, "in_stock") and getattr(obj, "in_stock") is False),
-        (hasattr(obj, "available") and getattr(obj, "available") is False),
-        (hasattr(obj, "availability") and not getattr(obj, "availability")),
-        (qty is not None and qty <= 0),
-    ])
+    return any(
+        [
+            bool(getattr(obj, "sold_at", None)),
+            bool(getattr(obj, "is_sold", False)),
+            status_val in {"sold", "completed", "closed"},
+            (hasattr(obj, "in_stock") and getattr(obj, "in_stock") is False),
+            (hasattr(obj, "available") and getattr(obj, "available") is False),
+            (hasattr(obj, "availability") and not getattr(obj, "availability")),
+            (qty is not None and qty <= 0),
+        ]
+    )
 
 
 # =============================================================================

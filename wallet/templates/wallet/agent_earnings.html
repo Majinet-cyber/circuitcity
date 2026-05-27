@@ -39,8 +39,16 @@
 
 {% block body %}
 <div class="earnings-wrap">
+  {% if not commissions_enabled %}
+  <div style="background:#fef3c7;border:1px solid #fbbf24;border-radius:12px;padding:1rem;margin-bottom:1.5rem;">
+    <strong>ℹ️ Commissions Disabled</strong>
+    <p style="margin:.5rem 0 0;color:#92400e;font-size:.9rem;">Commission earnings are currently disabled by your manager. Contact your manager for more information.</p>
+  </div>
+  {% endif %}
+  
   <h1>💰 My Earnings</h1>
 
+  {% if commissions_enabled %}
   {# KPI Cards #}
   <div class="earn-grid">
     <div class="stat-card">

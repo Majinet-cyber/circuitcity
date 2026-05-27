@@ -1,0 +1,570 @@
+/**
+ * =============================================================================
+ * HQ LAYOUT — SINGLE SOURCE OF TRUTH
+ * =============================================================================
+ * 
+ * CSS Grid-based two-column layout.
+ * Sidebar NEVER disappears or transforms offscreen.
+ * Loaded LAST to override any conflicting rules.
+ * 
+ * Cache-buster: ?v=20260428-2
+ * =============================================================================
+ */
+
+/* ========================================
+   GRID LAYOUT: 260px sidebar + fluid main
+   ======================================== */
+body[data-layout="hq"] .hq-layout {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  min-height: 100vh;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+/* ========================================
+   SIDEBAR: base visual & scroll styles
+   (position is set per breakpoint below)
+   ======================================== */
+body[data-layout="hq"] #hqSidebar,
+body[data-layout="hq"] .hq-sidebar {
+  position: sticky !important;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+  overflow-x: hidden;
+  /* Visual */
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+  color: #e2e8f0;
+  box-shadow: 2px 0 12px rgba(0, 0, 0, 0.3);
+  /* Never hide, never transform */
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  transform: none !important;
+  left: auto !important;
+}
+
+/* ========================================
+   DESKTOP (≥992px): Fixed sidebar + block layout
+   
+   WHY display:block instead of grid:
+   When a grid item is position:fixed, CSS removes
+   it from the grid's in-flow items. Grid auto-
+   placement then puts .hq-main into column 1 (the
+   260px column) instead of column 2 — content
+   becomes 260px wide and hides behind the sidebar.
+   
+   Solution: switch to display:block on desktop so
+   .hq-main fills the full width, then push it right
+   with margin-left equal to the sidebar width.
+   ======================================== */
+@media (min-width: 992px) {
+  /* Block layout — grid spacer is not needed when
+     sidebar is fixed and .hq-main uses margin-left */
+  body[data-layout="hq"] .hq-layout {
+    display: block;
+    overflow-x: clip;
+  }
+
+  body[data-layout="hq"] #hqSidebar,
+  body[data-layout="hq"] .hq-sidebar {
+    position: fixed !important;
+    left: 0 !important;
+    top: 0;
+    width: 260px;
+    height: 100vh;
+    overflow-y: auto;
+    overflow-x: hidden;
+    z-index: 1000;
+  }
+
+  /* Push main content to the right of the fixed sidebar */
+  body[data-layout="hq"] .hq-main {
+    margin-left: 260px;
+    width: calc(100% - 260px);
+    min-height: 100vh;
+  }
+}
+
+/* ========================================
+   MAIN CONTENT: fluid, overflow protected
+   ======================================== */
+body[data-layout="hq"] .hq-main {
+  min-width: 0;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+body[data-layout="hq"] .hq-content {
+  flex: 1;
+  padding: 1rem;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+@media (min-width: 768px) {
+  body[data-layout="hq"] .hq-content {
+    padding: 1.25rem 1.5rem;
+  }
+}
+
+@media (min-width: 992px) {
+  body[data-layout="hq"] .hq-content {
+    padding: 1.5rem 2rem;
+  }
+}
+
+/* ========================================
+   TABLE OVERFLOW: horizontal scroll only
+   ======================================== */
+body[data-layout="hq"] .hq-content .table-responsive,
+body[data-layout="hq"] .hq-content .hq-table-responsive,
+body[data-layout="hq"] .hq-content .table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+body[data-layout="hq"] .hq-content table {
+  max-width: none;
+  width: 100%;
+}
+
+/* ========================================
+   MOBILE: slim sidebar (56px, icons only)
+   ======================================== */
+@media (max-width: 991.98px) {
+  body[data-layout="hq"] .hq-layout {
+    grid-template-columns: 56px 1fr;
+  }
+  
+  body[data-layout="hq"] #hqSidebar,
+  body[data-layout="hq"] .hq-sidebar {
+    width: 56px;
+    min-width: 56px;
+    max-width: 56px;
+  }
+  
+  /* Hide labels, center icons */
+  body[data-layout="hq"] #hqSidebar:not(.hq-expanded) .cc-nav li a span,
+  body[data-layout="hq"] #hqSidebar:not(.hq-expanded) .cc-brand > span:last-child,
+  body[data-layout="hq"] #hqSidebar:not(.hq-expanded) .cc-section,
+  body[data-layout="hq"] #hqSidebar:not(.hq-expanded) .sidebar-close {
+    display: none !important;
+  }
+  
+  body[data-layout="hq"] #hqSidebar:not(.hq-expanded) .cc-nav li a {
+    justify-content: center;
+    padding: 12px 0;
+    gap: 0;
+  }
+  
+  body[data-layout="hq"] #hqSidebar:not(.hq-expanded) .cc-nav li a i {
+    margin: 0;
+    font-size: 1.25rem;
+    width: auto;
+    text-align: center;
+  }
+  
+  body[data-layout="hq"] #hqSidebar:not(.hq-expanded) .cc-brand {
+    justify-content: center;
+    padding: 14px 6px;
+    gap: 0;
+  }
+  
+  body[data-layout="hq"] #hqSidebar:not(.hq-expanded) .cc-brand .logo {
+    margin: 0;
+  }
+  
+  body[data-layout="hq"] #hqSidebar:not(.hq-expanded) .cc-nav li {
+    margin: 2px 4px;
+  }
+  
+  /* Expanded overlay state (fixed position) */
+  body[data-layout="hq"] #hqSidebar.hq-expanded,
+  body[data-layout="hq"] .hq-sidebar.hq-expanded {
+    position: fixed !important;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 260px !important;
+    min-width: 260px !important;
+    max-width: 260px !important;
+    z-index: 1050;
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.35);
+  }
+  
+  body[data-layout="hq"] #hqSidebar.hq-expanded .sidebar-close {
+    display: flex !important;
+  }
+}
+
+/* ========================================
+   MOBILE TOPBAR
+   ======================================== */
+body[data-layout="hq"] .hq-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  background: #ffffff;
+  border-bottom: 1px solid #e2e8f0;
+  position: sticky;
+  top: 0;
+  z-index: 1030;
+  gap: 0.75rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+@media (min-width: 992px) {
+  body[data-layout="hq"] .hq-topbar {
+    display: none;
+  }
+}
+
+body[data-layout="hq"] .hq-icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: none;
+  background: transparent;
+  color: #1e293b;
+  font-size: 1.5rem;
+  cursor: pointer;
+  border-radius: 0.5rem;
+  transition: background-color 0.15s ease;
+  padding: 0;
+}
+
+body[data-layout="hq"] .hq-icon-btn:hover,
+body[data-layout="hq"] .hq-icon-btn:focus {
+  background-color: #f1f5f9;
+}
+
+body[data-layout="hq"] .hq-topbar-title {
+  flex: 1;
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #0f172a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+body[data-layout="hq"] .hq-topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* ========================================
+   BACKDROP (for expanded mobile sidebar)
+   ======================================== */
+body[data-layout="hq"] .hq-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 1045;
+}
+
+body[data-layout="hq"] .hq-backdrop.is-open {
+  display: block;
+}
+
+@media (min-width: 992px) {
+  body[data-layout="hq"] .hq-backdrop {
+    display: none !important;
+  }
+}
+
+/* ========================================
+   SIDEBAR VISUAL STYLES
+   ======================================== */
+body[data-layout="hq"] .cc-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 20px;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #fff;
+  text-decoration: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+body[data-layout="hq"] .cc-brand .logo {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: linear-gradient(135deg, #10b981, #059669);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+body[data-layout="hq"] .cc-section {
+  padding: 12px 20px 8px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #94a3b8;
+}
+
+body[data-layout="hq"] .cc-nav {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 1rem;
+}
+
+body[data-layout="hq"] .cc-nav li {
+  margin: 2px 10px;
+}
+
+body[data-layout="hq"] .cc-nav li a {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  color: #cbd5e1;
+  text-decoration: none;
+  transition: all 0.2s;
+}
+
+body[data-layout="hq"] .cc-nav li a i {
+  width: 20px;
+  text-align: center;
+  color: #10b981;
+  flex-shrink: 0;
+}
+
+body[data-layout="hq"] .cc-nav li a:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: #fff;
+}
+
+body[data-layout="hq"] .cc-nav li.active a {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+  font-weight: 600;
+}
+
+/* Close button (only on expanded mobile sidebar) */
+body[data-layout="hq"] #hqSidebar .sidebar-close {
+  display: none;
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  color: #ffffff;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  font-size: 18px;
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  z-index: 10;
+}
+
+body[data-layout="hq"] #hqSidebar .sidebar-close:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* Scrollbar styling */
+body[data-layout="hq"] #hqSidebar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+}
+
+body[data-layout="hq"] #hqSidebar::-webkit-scrollbar {
+  width: 6px;
+}
+
+body[data-layout="hq"] #hqSidebar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+body[data-layout="hq"] #hqSidebar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+}
+
+body[data-layout="hq"] #hqSidebar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* ========================================
+   CONTENT OVERFLOW PROTECTION
+   ======================================== */
+body[data-layout="hq"] .hq-content > .container,
+body[data-layout="hq"] .hq-content > .container-fluid {
+  max-width: none !important;
+  width: 100% !important;
+  padding-left: 0;
+  padding-right: 0;
+}
+
+body[data-layout="hq"] .hq-content .card,
+body[data-layout="hq"] .hq-content .table-responsive,
+body[data-layout="hq"] .hq-content table {
+  max-width: none !important;
+  width: 100% !important;
+}
+
+/* ========================================
+   PREMIUM CARD SYSTEM
+   ======================================== */
+body[data-layout="hq"] .hq-card {
+  background: #fff;
+  border: 1px solid #e8ecf2;
+  border-radius: 16px;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05);
+  overflow: hidden;
+  transition: box-shadow 0.2s, transform 0.2s;
+}
+body[data-layout="hq"] .hq-card:hover {
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.10);
+}
+body[data-layout="hq"] .hq-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 20px 14px;
+  border-bottom: 1px solid #f1f5f9;
+  background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+}
+body[data-layout="hq"] .hq-card-title {
+  font-size: 14.5px;
+  font-weight: 700;
+  color: #0f172a;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+body[data-layout="hq"] .hq-card-body {
+  padding: 20px;
+}
+
+/* ---- Premium tables ---- */
+body[data-layout="hq"] .hq-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+body[data-layout="hq"] .hq-table th {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: #94a3b8;
+  padding: 10px 16px;
+  border-bottom: 1px solid #f1f5f9;
+  text-align: left;
+  background: #fafbfc;
+  white-space: nowrap;
+}
+body[data-layout="hq"] .hq-table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid #f8fafc;
+  font-size: 13.5px;
+  color: #374151;
+  vertical-align: middle;
+}
+body[data-layout="hq"] .hq-table tr:last-child td {
+  border-bottom: none;
+}
+body[data-layout="hq"] .hq-table tr:hover td {
+  background: #f8fafc;
+}
+
+/* ---- Status badges ---- */
+body[data-layout="hq"] .hq-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+body[data-layout="hq"] .hq-badge-success  { background: #d1fae5; color: #065f46; }
+body[data-layout="hq"] .hq-badge-warning  { background: #fef3c7; color: #92400e; }
+body[data-layout="hq"] .hq-badge-danger   { background: #fee2e2; color: #991b1b; }
+body[data-layout="hq"] .hq-badge-info     { background: #dbeafe; color: #1e40af; }
+body[data-layout="hq"] .hq-badge-neutral  { background: #f1f5f9; color: #475569; }
+body[data-layout="hq"] .hq-badge-purple   { background: #ede9fe; color: #5b21b6; }
+
+/* ---- Trend chips ---- */
+body[data-layout="hq"] .hq-trend-up   { color: #16a34a; background: #dcfce7; padding: 2px 7px; border-radius: 5px; font-size: 11.5px; font-weight: 700; }
+body[data-layout="hq"] .hq-trend-down { color: #dc2626; background: #fee2e2; padding: 2px 7px; border-radius: 5px; font-size: 11.5px; font-weight: 700; }
+
+/* ---- Section heading ---- */
+body[data-layout="hq"] .hq-section-heading {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #94a3b8;
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+body[data-layout="hq"] .hq-section-heading::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: #f1f5f9;
+}
+
+/* ---- Sidebar: stronger active state ---- */
+body[data-layout="hq"] .cc-nav li.active a {
+  background: rgba(99, 102, 241, 0.15) !important;
+  color: #a5b4fc !important;
+  font-weight: 700 !important;
+  border-left: 3px solid #6366f1;
+  padding-left: 9px;
+}
+body[data-layout="hq"] .cc-nav li.active a i {
+  color: #a5b4fc !important;
+}
+body[data-layout="hq"] .cc-nav li a:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #e2e8f0;
+}
+
+/* ---- HQ page base ---- */
+body[data-layout="hq"] .hq-page {
+  background: #f8fafc;
+}
+
+/* ---- Empty state ---- */
+body[data-layout="hq"] .hq-empty-state {
+  text-align: center;
+  padding: 48px 20px;
+  color: #94a3b8;
+}
+body[data-layout="hq"] .hq-empty-state i {
+  font-size: 2.5rem;
+  margin-bottom: 12px;
+  display: block;
+  opacity: 0.4;
+}
+body[data-layout="hq"] .hq-empty-state p {
+  margin: 0;
+  font-size: 13.5px;
+}
+
+
+

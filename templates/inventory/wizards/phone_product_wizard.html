@@ -1,0 +1,545 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Add Phone Product · Wizard{% endblock %}
+
+{% block extra_head %}
+<!-- Pricing Intelligence Styles -->
+<link rel="stylesheet" href="{% static 'css/pricing-intelligence.css' %}">
+{% endblock %}
+
+{% block content %}
+<style>
+  .wizard-container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 20px;
+  }
+  
+  .wizard-header {
+    text-align: center;
+    margin-bottom: 40px;
+  }
+  
+  .wizard-header h1 {
+    font-size: 2rem;
+    font-weight: 800;
+    color: #0f172a;
+    margin-bottom: 8px;
+  }
+  
+  .wizard-header p {
+    color: #64748b;
+    font-size: 1rem;
+  }
+  
+  .wizard-step {
+    background: #fff;
+    border-radius: 20px;
+    padding: 32px;
+    box-shadow: 0 4px 20px rgba(15,23,42,.08);
+    border: 1px solid rgba(226,232,240,0.5);
+    margin-bottom: 24px;
+  }
+  
+  .step-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #0f172a;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  
+  .step-number {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+    color: #fff;
+    border-radius: 50%;
+    font-size: 0.9rem;
+    font-weight: 700;
+  }
+  
+  .brand-grid, .model-grid, .specs-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 12px;
+    margin-top: 16px;
+  }
+  
+  .wizard-card {
+    padding: 20px 16px;
+    background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+    border: 2px solid #e2e8f0;
+    border-radius: 14px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+  }
+  
+  .wizard-card:hover {
+    transform: translateY(-4px);
+    border-color: #3b82f6;
+    background: linear-gradient(135deg, #eff6ff, #dbeafe);
+    box-shadow: 0 8px 24px rgba(59,130,246,0.15);
+  }
+  
+  .wizard-card.selected {
+    border-color: #3b82f6;
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+    color: #fff;
+    box-shadow: 0 8px 24px rgba(59,130,246,0.3);
+  }
+  
+  .wizard-card.selected .card-icon {
+    filter: brightness(0) invert(1);
+  }
+  
+  .card-icon {
+    font-size: 2rem;
+    margin-bottom: 8px;
+  }
+  
+  .card-label {
+    font-weight: 600;
+    font-size: 0.95rem;
+  }
+  
+  .form-group {
+    margin-bottom: 20px;
+  }
+  
+  .form-label {
+    display: block;
+    font-weight: 600;
+    color: #0f172a;
+    margin-bottom: 8px;
+    font-size: 0.95rem;
+  }
+  
+  .form-input {
+    width: 100%;
+    padding: 12px 16px;
+    border: 2px solid #e2e8f0;
+    border-radius: 12px;
+    font-size: 1rem;
+    transition: all 0.2s;
+  }
+  
+  .form-input:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59,130,246,0.1);
+  }
+  
+  .wizard-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: space-between;
+    margin-top: 32px;
+  }
+  
+  .btn-wizard {
+    padding: 12px 24px;
+    border-radius: 12px;
+    font-weight: 700;
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: none;
+  }
+  
+  .btn-primary {
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+    color: #fff;
+    box-shadow: 0 4px 12px rgba(59,130,246,0.3);
+  }
+  
+  .btn-primary:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(59,130,246,0.4);
+  }
+  
+  .btn-primary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  
+  .btn-secondary {
+    background: #fff;
+    color: #3b82f6;
+    border: 2px solid #3b82f6;
+  }
+  
+  .btn-secondary:hover {
+    background: #eff6ff;
+  }
+  
+  .hidden {
+    display: none;
+  }
+  
+  .custom-input-container {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid #e2e8f0;
+  }
+  
+  @media (max-width: 768px) {
+    .brand-grid, .model-grid, .specs-grid {
+      grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    }
+    
+    .wizard-step {
+      padding: 20px;
+    }
+  }
+</style>
+
+<div class="wizard-container">
+  <div class="wizard-header">
+    <h1>📱 Add Phone Product</h1>
+    <p>Follow the steps to add a new phone to your catalog</p>
+  </div>
+  
+  <form id="wizardForm" method="post">
+    {% csrf_token %}
+    
+    <!-- Step 1: Choose Brand -->
+    <div class="wizard-step" id="step1">
+      <h2 class="step-title">
+        <span class="step-number">1</span>
+        Choose Brand
+      </h2>
+      <div class="brand-grid">
+        {% for brand in brands %}
+        <div class="wizard-card brand-card" data-value="{{ brand.key }}">
+          <div class="card-icon">📱</div>
+          <div class="card-label">{{ brand.display }}</div>
+        </div>
+        {% endfor %}
+      </div>
+      <input type="hidden" name="brand" id="brandInput" required>
+    </div>
+    
+    <!-- Step 2: Choose Model -->
+    <div class="wizard-step hidden" id="step2">
+      <h2 class="step-title">
+        <span class="step-number">2</span>
+        Choose Model
+      </h2>
+      <div id="modelSuggestions">
+        <!-- Popular models will be inserted here -->
+      </div>
+      <div class="custom-input-container">
+        <label class="form-label">Or enter custom model:</label>
+        <input type="text" class="form-input" id="customModelInput" placeholder="e.g., Spark 40">
+      </div>
+      <input type="hidden" name="model" id="modelInput" required>
+    </div>
+    
+    <!-- Step 3: Choose Specs -->
+    <div class="wizard-step hidden" id="step3">
+      <h2 class="step-title">
+        <span class="step-number">3</span>
+        Choose Specs (RAM / Storage)
+      </h2>
+      <div class="specs-grid">
+        <div class="wizard-card specs-card" data-value="2/32">
+          <div class="card-icon">💾</div>
+          <div class="card-label">2GB / 32GB</div>
+        </div>
+        <div class="wizard-card specs-card" data-value="3/64">
+          <div class="card-icon">💾</div>
+          <div class="card-label">3GB / 64GB</div>
+        </div>
+        <div class="wizard-card specs-card" data-value="4/64">
+          <div class="card-icon">💾</div>
+          <div class="card-label">4GB / 64GB</div>
+        </div>
+        <div class="wizard-card specs-card" data-value="4/128">
+          <div class="card-icon">💾</div>
+          <div class="card-label">4GB / 128GB</div>
+        </div>
+        <div class="wizard-card specs-card" data-value="6/128">
+          <div class="card-icon">💾</div>
+          <div class="card-label">6GB / 128GB</div>
+        </div>
+        <div class="wizard-card specs-card" data-value="8/128">
+          <div class="card-icon">💾</div>
+          <div class="card-label">8GB / 128GB</div>
+        </div>
+        <div class="wizard-card specs-card" data-value="8/256">
+          <div class="card-icon">💾</div>
+          <div class="card-label">8GB / 256GB</div>
+        </div>
+      </div>
+      <input type="hidden" name="specs" id="specsInput" required>
+    </div>
+    
+    <!-- Step 4: Pricing -->
+    <div class="wizard-step hidden" id="step4">
+      <h2 class="step-title">
+        <span class="step-number">4</span>
+        Set Prices
+      </h2>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+        <div class="form-group">
+          <label class="form-label">Cost Price (MWK)</label>
+          <input type="number" class="form-input" id="wizard_cost_price" name="cost_price" min="0" step="0.01" placeholder="0.00">
+          <small style="color: #64748b; font-size: 0.85rem;">What you paid for it</small>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Selling Price (MWK)</label>
+          <input type="number" class="form-input" id="wizard_selling_price" name="selling_price" min="0" step="0.01" placeholder="0.00">
+          <small style="color: #64748b; font-size: 0.85rem;">What customers pay</small>
+          <!-- Real-time pricing intelligence feedback -->
+          <div id="wizard-price-feedback" class="pricing-feedback" style="display:none;"></div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Step 5: Tracking -->
+    <div class="wizard-step hidden" id="step5">
+      <h2 class="step-title">
+        <span class="step-number">5</span>
+        Tracking Method
+      </h2>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px;">
+        <div class="wizard-card tracking-card" data-value="imei">
+          <div class="card-icon">🔢</div>
+          <div class="card-label">IMEI Only</div>
+          <small style="color: #64748b; font-size: 0.8rem;">Track by 15-digit IMEI</small>
+        </div>
+        <div class="wizard-card tracking-card" data-value="barcode">
+          <div class="card-icon">📊</div>
+          <div class="card-label">Barcode Only</div>
+          <small style="color: #64748b; font-size: 0.8rem;">Track by barcode</small>
+        </div>
+        <div class="wizard-card tracking-card selected" data-value="both">
+          <div class="card-icon">🎯</div>
+          <div class="card-label">Both</div>
+          <small style="color: #fff; font-size: 0.8rem;">IMEI + Barcode</small>
+        </div>
+      </div>
+      <input type="hidden" name="tracking_type" id="trackingInput" value="both" required>
+    </div>
+    
+    <!-- Navigation -->
+    <div class="wizard-actions">
+      <button type="button" class="btn-wizard btn-secondary" id="backBtn" style="display: none;">
+        ← Back
+      </button>
+      <div style="flex: 1;"></div>
+      <a href="{% url 'inventory:phone_products' %}" class="btn-wizard btn-secondary">
+        Cancel
+      </a>
+      <button type="button" class="btn-wizard btn-primary" id="nextBtn" disabled>
+        Next →
+      </button>
+      <button type="submit" class="btn-wizard btn-primary hidden" id="submitBtn">
+        Save Product
+      </button>
+    </div>
+  </form>
+  
+  <div style="text-align: center; margin-top: 24px;">
+    <a href="{% url 'inventory:phone_products' %}" style="color: #64748b; text-decoration: none; font-size: 0.9rem;">
+      Or use classic form →
+    </a>
+  </div>
+</div>
+
+<script>
+(function() {
+  let currentStep = 1;
+  const totalSteps = 5;
+  
+  const popularModels = {
+    tecno: ['Spark 40', 'Spark 30', 'Spark 20', 'Spark 10', 'Camon 40', 'Camon 30', 'Camon 20', 'Pop 10', 'Pop 10C'],
+    itel: ['P55', 'P40', 'S23', 'A70', 'Vision 3', 'A60'],
+    infinix: ['Hot 40', 'Hot 30', 'Note 40', 'Note 30', 'Smart 8'],
+    samsung: ['A15', 'A25', 'A35', 'A55', 'S24', 'S23', 'A05'],
+    iphone: ['15', '15 Pro', '14', '14 Pro', '13', '12', 'SE'],
+    redmi: ['Note 13', 'Note 12', '13C', 'A3'],
+    huawei: ['Y9', 'P40', 'Nova', 'Y7'],
+    other: []
+  };
+  
+  // Card selection handlers
+  document.querySelectorAll('.brand-card').forEach(card => {
+    card.addEventListener('click', function() {
+      selectCard(this, '.brand-card', '#brandInput');
+      loadModels(this.dataset.value);
+      nextStep();
+    });
+  });
+  
+  document.addEventListener('click', function(e) {
+    if (e.target.closest('.model-card')) {
+      const card = e.target.closest('.model-card');
+      selectCard(card, '.model-card', '#modelInput');
+      document.getElementById('customModelInput').value = '';
+      checkStepComplete();
+    }
+    
+    if (e.target.closest('.specs-card')) {
+      selectCard(e.target.closest('.specs-card'), '.specs-card', '#specsInput');
+      checkStepComplete();
+    }
+    
+    if (e.target.closest('.tracking-card')) {
+      selectCard(e.target.closest('.tracking-card'), '.tracking-card', '#trackingInput');
+      checkStepComplete();
+    }
+  });
+  
+  // Custom model input
+  document.getElementById('customModelInput').addEventListener('input', function() {
+    if (this.value.trim()) {
+      document.querySelectorAll('.model-card').forEach(c => c.classList.remove('selected'));
+      document.getElementById('modelInput').value = this.value.trim();
+      checkStepComplete();
+    }
+  });
+  
+  // Navigation
+  document.getElementById('nextBtn').addEventListener('click', nextStep);
+  document.getElementById('backBtn').addEventListener('click', prevStep);
+  
+  function selectCard(card, selector, inputId) {
+    document.querySelectorAll(selector).forEach(c => c.classList.remove('selected'));
+    card.classList.add('selected');
+    document.querySelector(inputId).value = card.dataset.value;
+    checkStepComplete();
+  }
+  
+  function loadModels(brand) {
+    const models = popularModels[brand] || [];
+    const container = document.getElementById('modelSuggestions');
+    
+    if (models.length > 0) {
+      container.innerHTML = '<div class="model-grid">' + 
+        models.map(model => `
+          <div class="wizard-card model-card" data-value="${model}">
+            <div class="card-icon">📱</div>
+            <div class="card-label">${model}</div>
+          </div>
+        `).join('') + '</div>';
+    } else {
+      container.innerHTML = '<p style="color: #64748b; font-style: italic;">Enter custom model below</p>';
+    }
+  }
+  
+  function checkStepComplete() {
+    const nextBtn = document.getElementById('nextBtn');
+    let isComplete = false;
+    
+    if (currentStep === 1) {
+      isComplete = !!document.getElementById('brandInput').value;
+    } else if (currentStep === 2) {
+      isComplete = !!document.getElementById('modelInput').value;
+    } else if (currentStep === 3) {
+      isComplete = !!document.getElementById('specsInput').value;
+    } else if (currentStep === 4) {
+      isComplete = true; // Pricing is optional
+    } else if (currentStep === 5) {
+      isComplete = !!document.getElementById('trackingInput').value;
+    }
+    
+    nextBtn.disabled = !isComplete;
+  }
+  
+  function nextStep() {
+    if (currentStep < totalSteps) {
+      document.getElementById(`step${currentStep}`).classList.add('hidden');
+      currentStep++;
+      document.getElementById(`step${currentStep}`).classList.remove('hidden');
+      
+      if (currentStep === totalSteps) {
+        document.getElementById('nextBtn').classList.add('hidden');
+        document.getElementById('submitBtn').classList.remove('hidden');
+      }
+      
+      document.getElementById('backBtn').style.display = 'block';
+      checkStepComplete();
+    }
+  }
+  
+  function prevStep() {
+    if (currentStep > 1) {
+      document.getElementById(`step${currentStep}`).classList.add('hidden');
+      currentStep--;
+      document.getElementById(`step${currentStep}`).classList.remove('hidden');
+      
+      if (currentStep === 1) {
+        document.getElementById('backBtn').style.display = 'none';
+      }
+      
+      document.getElementById('nextBtn').classList.remove('hidden');
+      document.getElementById('submitBtn').classList.add('hidden');
+      checkStepComplete();
+    }
+  }
+  
+  // Initialize
+  checkStepComplete();
+})();
+</script>
+
+<!-- Pricing Intelligence JavaScript -->
+<script src="{% static 'js/pricing-intelligence.js' %}"></script>
+<script>
+  // Initialize pricing intelligence for wizard selling price
+  document.addEventListener('DOMContentLoaded', function() {
+    const costPriceInput = document.getElementById('wizard_cost_price');
+    const sellingPriceInput = document.getElementById('wizard_selling_price');
+    
+    if (costPriceInput && sellingPriceInput) {
+      let pricingValidator = null;
+      
+      // Function to initialize or update pricing intelligence
+      function initializeWizardPricingIntelligence() {
+        const costPrice = parseFloat(costPriceInput.value) || 0;
+        
+        if (costPrice > 0) {
+          // Calculate suggested price (20% markup as default for phones)
+          const suggestedPrice = costPrice * 1.20;
+          
+          if (pricingValidator) {
+            // Update existing validator
+            pricingValidator.updateCostPrice(costPrice);
+            pricingValidator.updateSuggestedPrice(suggestedPrice);
+          } else {
+            // Create new validator
+            pricingValidator = new PricingIntelligence({
+              sellingPriceInput: '#wizard_selling_price',
+              costPrice: costPrice,
+              suggestedPrice: suggestedPrice,
+              feedbackContainer: '#wizard-price-feedback',
+              currency: 'MK'
+            });
+          }
+        }
+      }
+      
+      // Listen for changes to cost price to update suggestions
+      costPriceInput.addEventListener('input', function() {
+        initializeWizardPricingIntelligence();
+      });
+      
+      costPriceInput.addEventListener('blur', function() {
+        initializeWizardPricingIntelligence();
+      });
+    }
+  });
+</script>
+
+{% endblock %}
+

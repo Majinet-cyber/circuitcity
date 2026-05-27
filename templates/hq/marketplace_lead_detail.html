@@ -1,0 +1,195 @@
+{% extends "hq/base_hq.html" %}
+{% load humanize %}
+
+{% block title %}Marketplace Lead #{{ lead.id }} - HQ{% endblock %}
+{% block topbar_title %}Marketplace Lead Detail{% endblock %}
+
+{% block content %}
+<style>
+  .lead-detail{max-width:980px;margin:0 auto;padding:20px;}
+  .detail-card{background:#fff;border:1px solid #bbf7d0;border-radius:18px;box-shadow:0 18px 44px rgba(5,150,105,.08);overflow:hidden;}
+  .detail-head{padding:1rem 1.25rem;background:linear-gradient(135deg,#ecfdf5,#fff);border-bottom:1px solid #bbf7d0;display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap;}
+  .detail-body{padding:1.25rem;}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1rem;margin-bottom:1rem;}
+  .field{background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:.8rem;}
+  .field .label{font-size:.7rem;text-transform:uppercase;letter-spacing:.06em;color:#64748b;font-weight:900;}
+  .field .value{font-weight:800;color:#0f172a;margin-top:.2rem;}
+  /* Payment modal */
+  .payment-modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;align-items:center;justify-content:center;}
+  .payment-modal-overlay.active{display:flex;}
+  .payment-modal{background:#fff;border-radius:20px;padding:2rem;max-width:520px;width:90%;box-shadow:0 24px 60px rgba(0,0,0,.2);}
+  .payment-modal h4{font-weight:900;color:#0f172a;margin-bottom:.5rem;}
+  .plan-option{border:2px solid #e2e8f0;border-radius:12px;padding:.9rem;margin:.5rem 0;cursor:pointer;transition:border-color .2s;}
+  .plan-option:hover,.plan-option.selected{border-color:#059669;background:#ecfdf5;}
+  .plan-option input[type=radio]{accent-color:#059669;}
+  .payment-status-area{margin-top:1rem;padding:.9rem;border-radius:12px;background:#f0fdf4;border:1px solid #bbf7d0;display:none;}
+  .payment-status-area.active{display:block;}
+</style>
+
+<div class="lead-detail">
+  <div class="mb-3">
+    <a href="{% url 'hq:marketplace_leads' %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left"></i> Back to leads</a>
+  </div>
+
+  <div class="detail-card">
+    <div class="detail-head">
+      <div>
+        <h3 class="fw-bold mb-1">Lead #{{ lead.id }} · {{ lead.listing.title }}</h3>
+        <div class="text-muted">{{ lead.seller_business.name|default:"Unassigned seller" }} · {{ lead.get_source_type_display }} · {{ lead.created_at|date:"d M Y H:i" }}</div>
+      </div>
+      <div class="d-flex gap-2 flex-wrap">
+        {% if lead.status == "won" %}
+        <button class="btn btn-success btn-sm" onclick="document.getElementById('paymentModal').classList.add('active')">
+          <i class="bi bi-credit-card me-1"></i>Initiate Payment
+        </button>
+        {% endif %}
+        <form method="post" action="{% url 'hq:marketplace_lead_mark_paid' lead.pk %}">
+          {% csrf_token %}
+          <button class="btn btn-outline-success btn-sm">✓ Mark Paid</button>
+        </form>
+        <form method="post" action="{% url 'hq:marketplace_lead_mark_waived' lead.pk %}">
+          {% csrf_token %}
+          <button class="btn btn-outline-secondary btn-sm">Waive</button>
+        </form>
+      </div>
+    </div>
+    <div class="detail-body">
+      <div class="grid">
+        <div class="field"><div class="label">Customer</div><div class="value">{{ lead.customer_name|default:"Unknown" }}</div></div>
+        <div class="field"><div class="label">Phone</div><div class="value">{{ lead.customer_phone|default:"-" }}</div></div>
+        <div class="field"><div class="label">Email</div><div class="value">{{ lead.customer_email|default:"-" }}</div></div>
+        <div class="field"><div class="label">Status</div><div class="value">{{ lead.get_status_display }}</div></div>
+        <div class="field"><div class="label">Deal Amount</div><div class="value">{% if lead.deal_amount %}MWK {{ lead.deal_amount|floatformat:0|intcomma }}{% else %}-{% endif %}</div></div>
+        <div class="field"><div class="label">Commission</div><div class="value">{{ lead.commission_percentage|floatformat:2 }}% · MWK {{ lead.commission_amount|default:0|floatformat:0|intcomma }}</div></div>
+        <div class="field"><div class="label">Commission Status</div><div class="value">{{ lead.get_commission_status_display }}</div></div>
+        <div class="field"><div class="label">Converted</div><div class="value">{% if lead.converted_at %}{{ lead.converted_at|date:"d M Y H:i" }}{% else %}-{% endif %}</div></div>
+        <div class="field"><div class="label">Paid</div><div class="value">{% if lead.commission_paid_at %}{{ lead.commission_paid_at|date:"d M Y H:i" }} by {{ lead.commission_paid_by|default:"HQ" }}{% else %}-{% endif %}</div></div>
+        <div class="field"><div class="label">Waived</div><div class="value">{% if lead.commission_waived_at %}{{ lead.commission_waived_at|date:"d M Y H:i" }} by {{ lead.commission_waived_by|default:"HQ" }}{% else %}-{% endif %}</div></div>
+      </div>
+
+      <div class="mb-3">
+        <h6 class="fw-bold">Customer Message</h6>
+        <div class="border rounded-3 p-3 bg-light">{{ lead.customer_message|default:"No message"|linebreaksbr }}</div>
+      </div>
+
+      <form method="post" action="{% url 'hq:marketplace_lead_update' lead.pk %}" class="row g-3">
+        {% csrf_token %}
+        <div class="col-md-4">
+          <label class="form-label">Status</label>
+          <select name="status" class="form-select">
+            {% for value,label in lead_statuses %}<option value="{{ value }}" {% if lead.status == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Deal Amount</label>
+          <input name="deal_amount" type="number" min="0" step="0.01" class="form-control" value="{% if lead.deal_amount %}{{ lead.deal_amount }}{% endif %}">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Commission %</label>
+          <input name="commission_percentage" type="number" min="0" step="0.01" class="form-control" value="{{ lead.commission_percentage }}">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Commission Amount Override</label>
+          <input name="commission_amount" type="number" min="0" step="0.01" class="form-control" value="{% if lead.commission_amount_overridden and lead.commission_amount %}{{ lead.commission_amount }}{% endif %}" placeholder="Leave blank to auto-calculate">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Commission Status</label>
+          <select name="commission_status" class="form-select">
+            {% for value,label in commission_statuses %}<option value="{{ value }}" {% if lead.commission_status == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="col-12">
+          <label class="form-label">Seller Notes</label>
+          <textarea name="notes" class="form-control" rows="3">{{ lead.notes }}</textarea>
+        </div>
+        <div class="col-12">
+          <label class="form-label">HQ Internal Notes</label>
+          <textarea name="hq_notes" class="form-control" rows="3">{{ lead.hq_notes }}</textarea>
+        </div>
+        <div class="col-12">
+          <button class="btn btn-primary">Save Lead</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Payment Initiation Modal -->
+<div class="payment-modal-overlay" id="paymentModal">
+  <div class="payment-modal">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h4 class="mb-0">💳 Initiate Subscription Payment</h4>
+      <button class="btn-close" onclick="document.getElementById('paymentModal').classList.remove('active')"></button>
+    </div>
+    <p class="text-muted small mb-3">Select the subscription plan for <strong>{{ lead.seller_business.name|default:"this business" }}</strong>. A PayChangu checkout link will be generated.</p>
+
+    <form id="paymentForm">
+      {% csrf_token %}
+      <div id="planOptions">
+        <label class="plan-option d-flex align-items-center gap-3" onclick="selectPlan(this, 'lite', 9500)">
+          <input type="radio" name="plan" value="lite"> <div><div class="fw-bold">Lite Plan</div><div class="text-muted small">MWK 9,500 / month</div></div>
+        </label>
+        <label class="plan-option d-flex align-items-center gap-3" onclick="selectPlan(this, 'pro', 20000)">
+          <input type="radio" name="plan" value="pro"> <div><div class="fw-bold">Pro Plan (Flagship)</div><div class="text-muted small">MWK 20,000 / month</div></div>
+        </label>
+        <label class="plan-option d-flex align-items-center gap-3" onclick="selectPlan(this, 'enterprise', 50000)">
+          <input type="radio" name="plan" value="enterprise"> <div><div class="fw-bold">Enterprise Plan</div><div class="text-muted small">MWK 50,000+ / month</div></div>
+        </label>
+      </div>
+      <div id="paymentStatusArea" class="payment-status-area">
+        <div id="paymentStatusText" class="fw-bold"></div>
+        <a id="checkoutLink" href="#" target="_blank" class="btn btn-success rounded-pill mt-2" style="display:none">Open Checkout Page →</a>
+      </div>
+      <div class="d-flex gap-2 mt-3">
+        <button type="button" class="btn btn-success rounded-pill flex-fill" onclick="initiatePayment()">
+          <i class="bi bi-credit-card me-1"></i>Generate Payment Link
+        </button>
+        <button type="button" class="btn btn-outline-secondary rounded-pill" onclick="document.getElementById('paymentModal').classList.remove('active')">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+(function(){
+  var selectedPlan = null;
+  window.selectPlan = function(el, planKey, amount) {
+    document.querySelectorAll('.plan-option').forEach(function(l){ l.classList.remove('selected'); });
+    el.classList.add('selected');
+    selectedPlan = {key: planKey, amount: amount};
+  };
+  window.initiatePayment = function() {
+    if (!selectedPlan) { alert('Please select a plan first.'); return; }
+    var btn = document.querySelector('#paymentForm .btn-success');
+    btn.disabled = true; btn.textContent = 'Processing…';
+    var csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    fetch('{% url "hq:marketplace_lead_initiate_payment" lead.pk %}', {
+      method: 'POST',
+      headers: {'X-CSRFToken': csrfToken, 'Content-Type': 'application/json'},
+      body: JSON.stringify({plan: selectedPlan.key, amount: selectedPlan.amount})
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      var area = document.getElementById('paymentStatusArea');
+      var text = document.getElementById('paymentStatusText');
+      var link = document.getElementById('checkoutLink');
+      area.classList.add('active');
+      if (data.checkout_url) {
+        text.innerHTML = '✅ Payment link generated for <strong>' + data.plan_name + '</strong> · MWK ' + data.amount;
+        link.href = data.checkout_url; link.style.display = 'inline-flex';
+      } else {
+        text.innerHTML = '❌ ' + (data.error || 'Could not generate link. Check PayChangu configuration.');
+        text.style.color = '#dc2626';
+      }
+      btn.disabled = false; btn.textContent = 'Generate Payment Link';
+    })
+    .catch(function(e){
+      document.getElementById('paymentStatusArea').classList.add('active');
+      document.getElementById('paymentStatusText').innerHTML = '❌ Network error: ' + e.message;
+      document.getElementById('paymentStatusText').style.color = '#dc2626';
+      btn.disabled = false; btn.textContent = 'Generate Payment Link';
+    });
+  };
+})();
+</script>
+{% endblock %}

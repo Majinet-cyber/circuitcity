@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% load static %}
+{% load brand_icons %}
 
 {% block title %}Scan Sell Phones · Inventory{% endblock %}
 {% block header_title %}💸 Scan Sell Phones{% endblock %}
@@ -80,6 +81,10 @@
     transition:all 0.25s ease;
     box-shadow:var(--cc-shadow);
     text-align:center;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    min-height:180px;
   }
   .brand-card:hover{
     transform:translateY(-4px);
@@ -90,11 +95,28 @@
     background:linear-gradient(135deg,rgba(16,185,129,0.05),rgba(16,185,129,0.02));
     box-shadow:0 0 0 4px rgba(16,185,129,.15),var(--cc-shadow);
   }
-  .brand-card img{
-    max-height:48px;
-    width:auto;
+  /* Fixed aspect ratio container for brand images - prevents warping (Samsung, etc.) */
+  .brand-card .brand-img-wrap{
+    width:100%;
+    max-width:80px;
+    aspect-ratio:1/1;
+    display:flex;
+    align-items:center;
+    justify-content:center;
     margin:0 auto 12px;
+    flex-shrink:0;
+  }
+  .brand-card img{
+    width:100%;
+    height:100%;
+    object-fit:contain;
+    object-position:center;
     display:block;
+  }
+  /* Fallback for missing images */
+  .brand-card img[src=""],
+  .brand-card img:not([src]){
+    display:none;
   }
   .brand-card h3{
     font-size:20px;
@@ -136,6 +158,7 @@
     align-items:center;
     box-shadow:0 2px 8px rgba(2,6,23,.04);
     margin-bottom:16px;
+    min-width:0;
   }
   .field > label{
     position:absolute;
@@ -207,6 +230,37 @@
     background:linear-gradient(135deg,var(--cc-accent-600),#047857);
   }
 
+  /* ===== IMEI Scan Button (Below Input) ===== */
+  .btn-scan-below{
+    appearance:none;
+    background:var(--cc-accent);
+    color:#fff;
+    border:none;
+    border-radius:10px;
+    padding:12px 18px;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+    cursor:pointer;
+    transition:all 0.2s ease;
+    font-size:15px;
+    font-weight:600;
+    min-height:44px;
+    touch-action:manipulation;
+  }
+  .btn-scan-below:hover{
+    background:var(--cc-accent-600);
+    transform:translateY(-2px);
+    box-shadow:0 4px 12px rgba(16,185,129,.25);
+  }
+  .btn-scan-below:active{
+    transform:translateY(0);
+  }
+  @media (max-width:430px){
+    .btn-scan-below{font-size:14px;padding:10px 16px;}
+  }
+
   /* ===== Mobile Responsive ===== */
   @media (max-width:640px){
     .brand-cards{
@@ -219,10 +273,33 @@
     }
   }
 </style>
+
+<link rel="stylesheet" href="{% static 'css/imei-scanner-modal.css' %}?v={{ BUILD_ID|default:STATIC_VERSION|default:'1' }}">
+<link rel="stylesheet" href="{% static 'css/pricing-intelligence.css' %}?v={{ BUILD_ID|default:STATIC_VERSION|default:'1' }}">
 {% endblock %}
 
 {% block content %}
 <div class="page">
+  {% if show_category_selector %}
+  <!-- Category selector (unified scan-sell: Phones / Laptops / Desktops) -->
+  <div class="cat-chooser" style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:24px">
+    <a href="{{ scan_sell_url }}?category=phones" class="cat-card" style="background:var(--cc-panel);border:2.5px solid var(--cc-accent);border-radius:18px;padding:20px;text-align:center;text-decoration:none;color:inherit;background:linear-gradient(135deg,rgba(16,185,129,0.07),rgba(16,185,129,0.02))">
+      <div style="font-size:2.5rem;margin-bottom:8px">📱</div>
+      <div style="font-weight:800;font-size:1rem">Phones</div>
+      <div style="font-size:.78rem;color:var(--cc-muted);margin-top:2px">IMEI-based sell</div>
+    </a>
+    <a href="{{ scan_sell_url }}?category=laptops" class="cat-card" style="background:var(--cc-panel);border:2.5px solid var(--cc-border);border-radius:18px;padding:20px;text-align:center;text-decoration:none;color:inherit">
+      <div style="font-size:2.5rem;margin-bottom:8px">💻</div>
+      <div style="font-weight:800;font-size:1rem">Laptops</div>
+      <div style="font-size:.78rem;color:var(--cc-muted);margin-top:2px">Serial number sell</div>
+    </a>
+    <a href="{{ scan_sell_url }}?category=desktops" class="cat-card" style="background:var(--cc-panel);border:2.5px solid var(--cc-border);border-radius:18px;padding:20px;text-align:center;text-decoration:none;color:inherit">
+      <div style="font-size:2.5rem;margin-bottom:8px">🖥️</div>
+      <div style="font-weight:800;font-size:1rem">Desktops</div>
+      <div style="font-size:.78rem;color:var(--cc-muted);margin-top:2px">Serial number sell</div>
+    </a>
+  </div>
+  {% endif %}
   <!-- Gamification Bar (Sales Target) -->
   <div class="gamification-bar">
     <div class="stats-row">
@@ -245,7 +322,13 @@
   <div class="brand-cards">
     {% for brand in brands %}
     <div class="brand-card" data-brand="{{ brand.key }}" onclick="selectBrand('{{ brand.key }}', '{{ brand.name }}')">
-      <img src="{% static brand.logo %}" alt="{{ brand.name }}" onerror="this.style.display='none'">
+      <div class="brand-img-wrap">
+        {% if brand.logo %}
+        <img src="{% brand_icon_path brand.logo %}" alt="{{ brand.name }}" onerror="this.style.display='none'; this.parentElement.style.display='none';">
+        {% else %}
+        <div style="width:100%;height:100%;background:linear-gradient(135deg,#e2e8f0,#cbd5e1);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:24px;color:#64748b;">{{ brand.name|slice:":2" }}</div>
+        {% endif %}
+      </div>
       <h3>{{ brand.name }}</h3>
       <p class="tagline">{{ brand.tagline }}</p>
       <p class="tap-hint">👆 Tap to select</p>
@@ -262,20 +345,27 @@
       💸 Sell <span id="selected-brand-name"></span> Phone
     </h3>
 
-    <div class="field">
+    <div class="field" style="min-width:0;">
       <label>IMEI (15 digits)</label>
-      <input type="text" name="imei" id="imei-input" maxlength="15" pattern="\d{15}" placeholder="Enter 15-digit IMEI" required>
+      <input type="text" name="imei" id="imei-input" maxlength="15" pattern="\d{15}" placeholder="Enter 15-digit IMEI" inputmode="numeric" required>
+    </div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-top:-8px;margin-bottom:16px;gap:12px;flex-wrap:wrap;">
+      <button type="button" class="btn-scan-below" data-imei-scan-trigger="imei-input" title="Scan IMEI with camera">
+        <i class="bi bi-upc-scan"></i> Scan IMEI
+      </button>
+      <div class="imei-counter" id="imei-counter" style="font-size:11px;color:#64748b;font-weight:600;margin:0;">0 / 15 digits</div>
     </div>
 
     <div class="row">
       <div class="field">
         <label>Selling Price (MWK)</label>
-        <input type="number" name="selling_price" id="selling-price-input" step="0.01" min="0" placeholder="0.00" required>
+        <input type="number" name="selling_price" id="selling-price-input" step="0.01" min="0" placeholder="e.g. 374000" required>
+        <small style="display:block;margin-top:4px;color:#64748b;font-size:0.875rem;">Enter full amount in MK (no commas). Minimum: MK 10,000</small>
       </div>
 
       <div class="field">
         <label>Payment Method</label>
-        <select name="payment_method" id="payment-method-select">
+        <select name="payment_method" id="payment-method-select" required>
           <option value="CASH">Cash</option>
           <option value="BANK">Bank</option>
           <option value="MOBILE_MONEY">Mobile Money</option>
@@ -283,7 +373,10 @@
       </div>
     </div>
 
-    <button type="submit" class="btn btn-primary" style="width:100%;">
+    <!-- Pricing Intelligence Feedback -->
+    <div id="price-feedback" class="pricing-feedback" style="display:none;"></div>
+
+    <button type="submit" class="btn btn-primary" id="submit-button" style="width:100%;" disabled>
       💰 Complete Sale
     </button>
   </form>
@@ -312,24 +405,77 @@
     document.getElementById('sell-form').scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
-  // IMEI input: auto-format as digits only
+  // IMEI input: auto-format as digits only + live counter
   const imeiInput = document.getElementById('imei-input');
+  const imeiCounter = document.getElementById('imei-counter');
+  const submitButton = document.getElementById('submit-button');
+  
   imeiInput.addEventListener('input', function(e) {
     let value = e.target.value.replace(/\D/g, '');  // digits only
     if (value.length > 15) {
-      value = value.slice(-15);  // last 15 digits
+      value = value.slice(0, 15);  // block beyond 15 digits
     }
     e.target.value = value;
+    
+    // Update counter
+    const len = value.length;
+    imeiCounter.textContent = `${len} / 15 digits`;
+    
+    // Visual feedback & validation
+    imeiCounter.classList.remove('valid', 'invalid');
+    if (len === 15) {
+      imeiCounter.classList.add('valid');
+      imeiCounter.textContent = '✅ 15 / 15 digits';
+      imeiCounter.style.color = '#10b981';
+      submitButton.disabled = false;
+    } else if (len > 0) {
+      imeiCounter.classList.add('invalid');
+      imeiCounter.style.color = '#ef4444';
+      submitButton.disabled = true;
+    } else {
+      imeiCounter.style.color = '#64748b';
+      submitButton.disabled = true;
+    }
   });
 
-  // Selling price: format with commas on blur
-  const priceInput = document.getElementById('selling-price-input');
-  priceInput.addEventListener('blur', function(e) {
-    const value = parseFloat(e.target.value);
-    if (!isNaN(value)) {
-      e.target.value = value.toFixed(2);
+  // ========== PRICING INTELLIGENCE ==========
+  let pricingValidator = null;
+  let currentItemCost = null;
+
+  // Fetch cost price when IMEI is entered (for intelligent pricing)
+  imeiInput.addEventListener('input', function(e) {
+    const imeiValue = e.target.value;
+    
+    if (imeiValue.length === 15) {
+      // Fetch cost price for this IMEI
+      fetch(`/inventory/api/phone-cost-by-imei/?imei=${imeiValue}`)
+        .then(response => response.json())
+        .then(data => {
+          if (data.ok && data.cost_price) {
+            currentItemCost = parseFloat(data.cost_price);
+            
+            // Initialize or update pricing validator
+            if (!pricingValidator) {
+              pricingValidator = new PricingIntelligence({
+                sellingPriceInput: '#selling-price-input',
+                costPrice: currentItemCost,
+                feedbackContainer: '#price-feedback',
+                currency: 'MWK'
+              });
+            } else {
+              pricingValidator.updateCostPrice(currentItemCost);
+            }
+          }
+        })
+        .catch(err => {
+          console.error('Failed to fetch cost price:', err);
+        });
     }
   });
 </script>
+
+<link rel="stylesheet" href="{% static 'css/imei-scanner-modal.css' %}?v={{ BUILD_ID|default:STATIC_VERSION|default:'1' }}">
+<script src="{% static 'js/phones-imei-scanner.js' %}?v={{ BUILD_ID|default:STATIC_VERSION|default:'1' %}"></script>
+<script src="{% static 'js/pricing-intelligence.js' %}?v={{ BUILD_ID|default:STATIC_VERSION|default:'1' }}"></script>
 {% endblock %}
 

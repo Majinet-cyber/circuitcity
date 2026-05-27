@@ -22,8 +22,21 @@ def app_version_view(request: HttpRequest) -> JsonResponse:
     """
     Return the current app version as JSON.
     Public endpoint - no authentication required.
+    Used by PWA / service worker / Android wrapper for version checks.
     """
-    return JsonResponse({"version": getattr(settings, "APP_VERSION", "1.1.0")})
+    import datetime
+    import os
+
+    environment = "production" if not settings.DEBUG else "development"
+    build = getattr(settings, "BUILD_ID", os.environ.get("BUILD_ID", "local-dev"))
+    version = getattr(settings, "APP_VERSION", "1.1.0")
+
+    return JsonResponse({
+        "version": version,
+        "build": build,
+        "environment": environment,
+        "timestamp": datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+    })
 
 
 @login_required
@@ -31,18 +44,19 @@ def app_version_view(request: HttpRequest) -> JsonResponse:
 def whatsapp_test(request: HttpRequest) -> HttpResponse:
     """
     Debug view to test sending WhatsApp messages.
-    
+
     Restricted to staff/superuser only.
     """
     # Restrict to staff/superuser
     if not (request.user.is_staff or request.user.is_superuser):
         return HttpResponse("Access denied: staff only", status=403)
-    
+
     # Get env vars for display (safely)
     import os
+
     whatsapp_token = os.environ.get("WHATSAPP_TOKEN", "")
     whatsapp_phone_id = os.environ.get("WHATSAPP_PHONE_NUMBER_ID", "")
-    
+
     context = {
         "success": False,
         "error": None,
@@ -51,35 +65,31 @@ def whatsapp_test(request: HttpRequest) -> HttpResponse:
         "WHATSAPP_TOKEN": whatsapp_token,
         "WHATSAPP_PHONE_NUMBER_ID": whatsapp_phone_id,
     }
-    
+
     if request.method == "POST":
         to_number = request.POST.get("to_number", "").strip()
-        
+
         if not to_number:
             context["error"] = "Phone number is required"
         else:
             try:
                 # Import here to avoid import errors if module doesn't exist
                 from notifications.whatsapp import send_whatsapp_text
-                
+
                 # Send test message
-                response = send_whatsapp_text(
-                    to_number,
-                    "Emajinet test: your WhatsApp integration is live ✅"
-                )
-                
+                response = send_whatsapp_text(to_number, "Emajinet test: your WhatsApp integration is live ✅")
+
                 context["success"] = True
                 context["response_data"] = json.dumps(response, indent=2)
                 logger.info(f"WhatsApp test message sent to {to_number}")
-                
+
             except ImportError as e:
                 context["error"] = f"WhatsApp module not found: {e}"
                 logger.error(f"WhatsApp module import error: {e}")
             except Exception as e:
                 context["error"] = str(e)
                 logger.error(f"WhatsApp test error: {e}")
-            
-            context["to_number"] = to_number
-    
-    return render(request, "core/debug_whatsapp_test.html", context)
 
+            context["to_number"] = to_number
+
+    return render(request, "core/debug_whatsapp_test.html", context)

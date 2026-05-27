@@ -4,6 +4,7 @@ from django.urls import reverse, NoReverseMatch
 
 register = template.Library()
 
+
 @register.simple_tag(takes_context=True)
 def ns_url(context, viewname, *args, **kwargs):
     """
@@ -20,5 +21,3 @@ def ns_url(context, viewname, *args, **kwargs):
             except NoReverseMatch:
                 pass
         raise
-
-

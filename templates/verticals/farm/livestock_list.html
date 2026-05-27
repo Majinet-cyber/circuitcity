@@ -1,0 +1,201 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Livestock - Farm Manager{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-3">
+
+  <!-- Header -->
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div class="d-flex align-items-center gap-2">
+      <span class="fs-2">🐄</span>
+      <div>
+        <h1 class="h3 mb-0">Livestock</h1>
+        <p class="text-muted mb-0 small">
+          {{ total_animals|intcomma }} animals across {{ batch_snapshots|length }} batch{{ batch_snapshots|length|pluralize:"es" }}
+        </p>
+      </div>
+    </div>
+    <div class="d-flex gap-2">
+      <a href="{% url 'verticals:farm_livestock_add_event' %}" class="btn btn-outline-primary">
+        <i class="bi bi-plus-lg"></i> Add Event
+      </a>
+      <a href="{% url 'verticals:farm_livestock_create' %}" class="btn btn-success">
+        <i class="bi bi-plus-circle"></i> New Batch
+      </a>
+    </div>
+  </div>
+
+  <!-- Quick Stats Banner -->
+  {% if batch_snapshots %}
+  <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:.75rem;margin-bottom:1.25rem;" class="livestock-stats-banner">
+    <div style="background:#eff6ff;border-radius:16px;padding:1rem 1.25rem;text-align:center;">
+      <div style="font-size:1.75rem;font-weight:900;color:#2563eb;">{{ total_animals|intcomma }}</div>
+      <div style="font-size:.75rem;color:#64748b;font-weight:600;">Total Animals</div>
+    </div>
+    <div style="background:#f0fdf4;border-radius:16px;padding:1rem 1.25rem;text-align:center;">
+      <div style="font-size:1.75rem;font-weight:900;color:#16a34a;">{{ batch_snapshots|length }}</div>
+      <div style="font-size:.75rem;color:#64748b;font-weight:600;">Active Batches</div>
+    </div>
+    {% with critical_count=0 %}
+    <div style="background:#fef2f2;border-radius:16px;padding:1rem 1.25rem;text-align:center;">
+      <div style="font-size:1.75rem;font-weight:900;color:#dc2626;">
+        {% for bs in batch_snapshots %}{% if bs.intel.mortality_risk_level == 'critical' %}!{% endif %}{% endfor %}
+        {% for bs in batch_snapshots %}{% if bs.snapshot.deaths_total %}{{ bs.snapshot.deaths_total }}{% endif %}{% endfor %}
+        {% if not batch_snapshots %}—{% endif %}
+      </div>
+      <div style="font-size:.75rem;color:#64748b;font-weight:600;">Total Deaths</div>
+    </div>
+    {% endwith %}
+    <div style="background:#f8fafc;border-radius:16px;padding:1rem 1.25rem;text-align:center;">
+      <a href="{% url 'verticals:farm_egg_tracking' %}" style="text-decoration:none;">
+        <div style="font-size:1.75rem;font-weight:900;color:#0284c7;">🥚</div>
+        <div style="font-size:.75rem;color:#64748b;font-weight:600;">Egg Tracking</div>
+      </a>
+    </div>
+  </div>
+  <style>@media(min-width:640px){.livestock-stats-banner{grid-template-columns:repeat(4,1fr)!important;}}</style>
+  {% endif %}
+
+  <!-- Batch Cards -->
+  <div class="row g-4">
+    {% for bs in batch_snapshots %}
+    <div class="col-md-6 col-lg-4">
+      <div class="card border-0 shadow-sm h-100
+        {% if bs.snapshot.mortality_rate > 20 %}border-danger border-top border-3
+        {% elif bs.snapshot.mortality_rate > 10 %}border-warning border-top border-3
+        {% else %}{% endif %}">
+
+        <!-- Card Header -->
+        <div class="card-header bg-light d-flex justify-content-between align-items-start">
+          <div>
+            <h5 class="mb-0">{{ bs.batch.name }}</h5>
+            <small class="text-muted">{{ bs.batch.get_animal_type_display }}
+              {% if bs.batch.animal_subtype %} — {{ bs.batch.get_animal_subtype_display }}{% endif %}
+            </small>
+          </div>
+          <!-- Risk badge -->
+          {% if bs.snapshot.mortality_rate > 20 %}
+          <span class="badge bg-danger">Critical</span>
+          {% elif bs.snapshot.mortality_rate > 10 %}
+          <span class="badge bg-warning text-dark">High Risk</span>
+          {% elif bs.snapshot.mortality_rate > 5 %}
+          <span class="badge bg-secondary">Watch</span>
+          {% else %}
+          <span class="badge bg-success">Good</span>
+          {% endif %}
+        </div>
+
+        <!-- Stats Grid -->
+        <div class="card-body">
+          <!-- Count row -->
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem;text-align:center;margin-bottom:.875rem;">
+            <div>
+              <div style="font-size:1.5rem;font-weight:900;color:#2563eb;">{{ bs.snapshot.count_current }}</div>
+              <div style="font-size:.7rem;color:#64748b;">Current</div>
+            </div>
+            <div>
+              <div style="font-size:1.5rem;font-weight:900;color:#16a34a;">{{ bs.snapshot.births_total }}</div>
+              <div style="font-size:.7rem;color:#64748b;">Births/In</div>
+            </div>
+            <div>
+              <div style="font-size:1.5rem;font-weight:900;color:#dc2626;">{{ bs.snapshot.deaths_total }}</div>
+              <div style="font-size:.7rem;color:#64748b;">Deaths</div>
+            </div>
+          </div>
+
+          {% if bs.snapshot.mortality_rate %}
+          <div style="margin-bottom:.75rem;">
+            <div style="display:flex;justify-content:space-between;font-size:.72rem;margin-bottom:3px;">
+              <span style="color:#64748b;">Mortality</span>
+              <span style="font-weight:700;color:{% if bs.snapshot.mortality_rate > 20 %}#dc2626{% elif bs.snapshot.mortality_rate > 10 %}#d97706{% else %}#16a34a{% endif %}">
+                {{ bs.snapshot.mortality_rate|floatformat:1 }}%
+              </span>
+            </div>
+            <div style="height:5px;background:#f1f5f9;border-radius:999px;overflow:hidden;">
+              <div style="height:100%;width:{% widthratio bs.snapshot.mortality_rate 100 100 %}%;max-width:100%;
+                background:{% if bs.snapshot.mortality_rate > 20 %}#dc2626{% elif bs.snapshot.mortality_rate > 10 %}#f59e0b{% else %}#16a34a{% endif %};
+                border-radius:999px;"></div>
+            </div>
+          </div>
+          {% endif %}
+
+          {% if bs.intel %}
+          <!-- Intelligence row -->
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:.72rem;margin-bottom:.5rem;">
+            {% if bs.intel.net_profit_mwk != 0 %}
+            <div style="background:{% if bs.intel.net_profit_mwk >= 0 %}#f0fdf4{% else %}#fef2f2{% endif %};border-radius:8px;padding:5px 8px;">
+              <div style="color:#64748b;">Net P/L</div>
+              <div style="font-weight:700;color:{% if bs.intel.net_profit_mwk >= 0 %}#15803d{% else %}#dc2626{% endif %};">
+                MWK {{ bs.intel.net_profit_mwk|floatformat:0|intcomma }}
+              </div>
+            </div>
+            {% endif %}
+            {% if bs.intel.break_even_price_mwk %}
+            <div style="background:#eff6ff;border-radius:8px;padding:5px 8px;">
+              <div style="color:#64748b;">Break-even</div>
+              <div style="font-weight:700;color:#2563eb;">MWK {{ bs.intel.break_even_price_mwk|floatformat:0|intcomma }}</div>
+            </div>
+            {% elif bs.intel.estimated_value %}
+            <div style="background:#eff6ff;border-radius:8px;padding:5px 8px;">
+              <div style="color:#64748b;">Est. Value</div>
+              <div style="font-weight:700;color:#2563eb;">MWK {{ bs.intel.estimated_value|floatformat:0|intcomma }}</div>
+            </div>
+            {% endif %}
+          </div>
+
+          <!-- Health score bar -->
+          <div style="display:flex;align-items:center;gap:8px;font-size:.72rem;">
+            <span style="color:#64748b;white-space:nowrap;">Health</span>
+            <div style="flex:1;height:6px;background:#f1f5f9;border-radius:999px;overflow:hidden;">
+              <div style="height:100%;width:{{ bs.intel.batch_health_score }}%;
+                background:{% if bs.intel.batch_health_score >= 75 %}#16a34a{% elif bs.intel.batch_health_score >= 50 %}#f59e0b{% else %}#dc2626{% endif %};
+                border-radius:999px;"></div>
+            </div>
+            <span style="font-weight:700;color:#0f172a;white-space:nowrap;">{{ bs.intel.batch_health_score }}</span>
+          </div>
+          {% elif bs.snapshot.estimated_value %}
+          <div class="d-flex justify-content-between align-items-center mt-1">
+            <small class="text-muted">Est. Value</small>
+            <strong class="text-primary">MWK {{ bs.snapshot.estimated_value|floatformat:0|intcomma }}</strong>
+          </div>
+          {% endif %}
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="card-footer bg-transparent border-top-0 pt-0">
+          <div class="d-flex gap-2">
+            <a href="{% url 'verticals:farm_livestock_detail' batch_id=bs.batch.pk %}"
+               class="btn btn-sm btn-primary flex-fill">
+              <i class="bi bi-gear me-1"></i>Manage
+            </a>
+            <a href="{% url 'verticals:farm_livestock_simulate' batch_id=bs.batch.pk %}"
+               class="btn btn-sm btn-outline-info"
+               title="Profit Simulator">
+              <i class="bi bi-calculator"></i>
+            </a>
+            <a href="{% url 'verticals:farm_livestock_housing_planner' batch_id=bs.batch.pk %}"
+               class="btn btn-sm btn-outline-secondary"
+               title="Housing Planner">
+              <i class="bi bi-house"></i>
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% empty %}
+    <div class="col-12 text-center py-5">
+      <div class="display-4 mb-3">🐄</div>
+      <h4 class="text-muted">No livestock batches yet</h4>
+      <p class="text-muted">Add your first batch to start tracking livestock performance.</p>
+      <a href="{% url 'verticals:farm_livestock_create' %}" class="btn btn-primary btn-lg">
+        <i class="bi bi-plus-circle me-1"></i>Add First Batch
+      </a>
+    </div>
+    {% endfor %}
+  </div>
+
+</div>
+{% endblock %}
+

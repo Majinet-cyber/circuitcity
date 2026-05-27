@@ -1,0 +1,527 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Payment Processing{% endblock %}
+
+{% block extra_css %}
+<style>
+  .waiting-container {
+    max-width: 600px;
+    margin: 60px auto;
+    padding: 40px 24px;
+    text-align: center;
+  }
+
+  .waiting-card {
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 20px;
+    padding: 48px 32px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+  }
+
+  .waiting-icon {
+    font-size: 64px;
+    margin-bottom: 24px;
+  }
+
+  .waiting-icon.pulse {
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.05); opacity: 0.8; }
+  }
+
+  .waiting-title {
+    font-size: 24px;
+    font-weight: 700;
+    color: #0f172a;
+    margin: 0 0 12px;
+  }
+
+  .waiting-message {
+    font-size: 15px;
+    color: #64748b;
+    margin: 0 0 8px;
+    line-height: 1.6;
+  }
+
+  .waiting-subtext {
+    font-size: 13px;
+    color: #94a3b8;
+    margin: 0 0 24px;
+  }
+
+  .waiting-details {
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 20px;
+    margin: 24px 0;
+    text-align: left;
+  }
+
+  .waiting-detail-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid #f1f5f9;
+  }
+
+  .waiting-detail-row:last-child {
+    border-bottom: none;
+  }
+
+  .waiting-detail-label {
+    font-size: 13px;
+    color: #64748b;
+    font-weight: 500;
+  }
+
+  .waiting-detail-value {
+    font-size: 14px;
+    color: #0f172a;
+    font-weight: 600;
+  }
+
+  .waiting-spinner {
+    display: inline-block;
+    width: 40px;
+    height: 40px;
+    border: 4px solid #e5e7eb;
+    border-top-color: #2563eb;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 24px 0;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  .waiting-actions {
+    margin-top: 32px;
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .btn-primary {
+    background: linear-gradient(180deg, #3b82f6, #2563eb);
+    color: #ffffff;
+    padding: 12px 24px;
+    border-radius: 12px;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 14px;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .btn-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 16px rgba(37, 99, 235, 0.3);
+    color: #ffffff;
+  }
+
+  .btn-secondary {
+    background: #f9fafb;
+    color: #475569;
+    padding: 12px 24px;
+    border-radius: 12px;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 14px;
+    border: 1px solid #e5e7eb;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .btn-secondary:hover {
+    background: #f1f5f9;
+    color: #334155;
+  }
+
+  .status-badge {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+  }
+
+  .status-pending {
+    background: #fef3c7;
+    color: #92400e;
+  }
+
+  .status-success {
+    background: #dcfce7;
+    color: #166534;
+  }
+
+  .status-failed, .status-cancelled, .status-rejected, .status-expired, .status-timeout {
+    background: #fee2e2;
+    color: #991b1b;
+  }
+
+  .progress-bar {
+    width: 100%;
+    height: 4px;
+    background: #e5e7eb;
+    border-radius: 2px;
+    margin: 24px 0;
+    overflow: hidden;
+  }
+
+  .progress-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #3b82f6, #2563eb);
+    width: 0%;
+    transition: width 0.5s ease;
+  }
+
+  .poll-counter {
+    font-size: 12px;
+    color: #94a3b8;
+    margin-top: 8px;
+  }
+
+  /* State-specific styling */
+  .state-waiting .waiting-icon { color: #3b82f6; }
+  .state-success .waiting-icon { color: #10b981; }
+  .state-failed .waiting-icon { color: #ef4444; }
+  .state-cancelled .waiting-icon { color: #f59e0b; }
+
+  .connection-issue {
+    background: #fef3c7;
+    border: 1px solid #fcd34d;
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin: 16px 0;
+    font-size: 13px;
+    color: #92400e;
+  }
+
+  .connection-issue.hidden { display: none; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="waiting-container" id="waitingContainer" data-state="waiting">
+  <div class="waiting-card">
+    <div class="waiting-icon pulse" id="statusIcon">📱</div>
+    <h1 class="waiting-title" id="statusTitle">Check your phone</h1>
+    <p class="waiting-message" id="statusMessage">
+      We've sent a payment request to your {{ method }} number.
+      Please approve it to complete your subscription.
+    </p>
+    <p class="waiting-subtext" id="statusSubtext">
+      This may take up to 2 minutes. Please keep this page open.
+    </p>
+
+    <div class="progress-bar" id="progressBar">
+      <div class="progress-bar-fill" id="progressFill"></div>
+    </div>
+
+    <div class="waiting-spinner" id="spinner"></div>
+
+    <div class="connection-issue hidden" id="connectionIssue">
+      <span>⚠️</span> Connection issue. Retrying...
+    </div>
+
+    <div class="waiting-details">
+      <div class="waiting-detail-row">
+        <span class="waiting-detail-label">Payment Method</span>
+        <span class="waiting-detail-value">{{ method }}</span>
+      </div>
+      <div class="waiting-detail-row">
+        <span class="waiting-detail-label">Phone Number</span>
+        <span class="waiting-detail-value">{{ phone_masked }}</span>
+      </div>
+      <div class="waiting-detail-row">
+        <span class="waiting-detail-label">Amount</span>
+        <span class="waiting-detail-value">{{ currency }} {{ amount|floatformat:0 }}</span>
+      </div>
+      <div class="waiting-detail-row">
+        <span class="waiting-detail-label">Status</span>
+        <span class="waiting-detail-value status-badge status-pending" id="statusBadge">Waiting...</span>
+      </div>
+    </div>
+
+    <div class="poll-counter" id="pollCounter">Checking status...</div>
+
+    <div class="waiting-actions" id="actions">
+      <button onclick="cancelWaiting()" class="btn-secondary" id="cancelBtn">
+        <span>❌</span> Cancel Waiting
+      </button>
+      <a href="{% url 'billing:checkout' %}" class="btn-secondary" id="changeMethodBtn">
+        <span>🔄</span> Change Method
+      </a>
+    </div>
+  </div>
+</div>
+
+<script>
+  const txRef = "{{ tx_ref }}";
+  const chargeId = "{{ charge_id }}";
+  
+  // Polling configuration
+  const MAX_POLL_TIME = 120000; // 2 minutes max
+  const INITIAL_INTERVAL = 3000; // 3 seconds
+  const MAX_INTERVAL = 8000; // 8 seconds (with backoff)
+  const BACKOFF_FACTOR = 1.2;
+  
+  let pollCount = 0;
+  let pollStartTime = Date.now();
+  let currentInterval = INITIAL_INTERVAL;
+  let pollTimeout = null;
+  let consecutiveErrors = 0;
+  let stopped = false;
+  
+  // Update progress bar
+  function updateProgress() {
+    const elapsed = Date.now() - pollStartTime;
+    const progress = Math.min((elapsed / MAX_POLL_TIME) * 100, 100);
+    document.getElementById('progressFill').style.width = progress + '%';
+    document.getElementById('pollCounter').textContent = 
+      `Checking status (${Math.floor(elapsed/1000)}s / ${MAX_POLL_TIME/1000}s)`;
+  }
+
+  // Update UI based on state
+  function updateUI(state, title, message, icon, badgeText, badgeClass) {
+    document.getElementById('waitingContainer').dataset.state = state;
+    document.getElementById('statusTitle').textContent = title;
+    document.getElementById('statusMessage').textContent = message;
+    document.getElementById('statusIcon').textContent = icon;
+    document.getElementById('statusIcon').className = 'waiting-icon' + (state === 'waiting' ? ' pulse' : '');
+    
+    const badge = document.getElementById('statusBadge');
+    badge.textContent = badgeText;
+    badge.className = 'waiting-detail-value status-badge ' + badgeClass;
+    
+    if (state !== 'waiting') {
+      document.getElementById('spinner').style.display = 'none';
+      document.getElementById('progressBar').style.display = 'none';
+      document.getElementById('pollCounter').style.display = 'none';
+    }
+  }
+
+  function showSuccess() {
+    updateUI(
+      'success',
+      'Payment Confirmed!',
+      'Your subscription is now active. You\'ll receive an invoice by email.',
+      '✅',
+      'Success',
+      'status-success'
+    );
+    
+    document.getElementById('statusSubtext').textContent = 'Redirecting to your dashboard...';
+    
+    document.getElementById('actions').innerHTML = `
+      <a href="{% url 'billing:success' %}" class="btn-primary">
+        <span>🎉</span> Go to Dashboard
+      </a>
+    `;
+    
+    // Redirect after 3 seconds
+    setTimeout(() => {
+      window.location.href = "{% url 'billing:success' %}";
+    }, 3000);
+  }
+
+  function showFailed(message, reason) {
+    const displayReason = reason || 'rejected';
+    const reasonMap = {
+      'cancelled': { icon: '❌', title: 'Payment Cancelled', badge: 'Cancelled', class: 'status-cancelled' },
+      'rejected': { icon: '🚫', title: 'Payment Not Accepted', badge: 'Rejected', class: 'status-rejected' },
+      'failed': { icon: '❌', title: 'Payment Failed', badge: 'Failed', class: 'status-failed' },
+      'expired': { icon: '⏰', title: 'Payment Expired', badge: 'Expired', class: 'status-expired' },
+      'timeout': { icon: '⏱️', title: 'Request Timed Out', badge: 'Timeout', class: 'status-timeout' },
+    };
+    
+    const info = reasonMap[displayReason] || reasonMap['failed'];
+    
+    updateUI(
+      'failed',
+      info.title,
+      message || 'The payment request was not accepted. Please try again.',
+      info.icon,
+      info.badge,
+      info.class
+    );
+    
+    document.getElementById('statusSubtext').textContent = '';
+    
+    document.getElementById('actions').innerHTML = `
+      <a href="{% url 'billing:checkout' %}" class="btn-primary">
+        <span>🔄</span> Retry Payment
+      </a>
+      <a href="{% url 'billing:checkout' %}" class="btn-secondary">
+        <span>💳</span> Change Method
+      </a>
+      <a href="{% url 'billing:manage' %}" class="btn-secondary">
+        <span>⬅️</span> Back to Billing
+      </a>
+    `;
+  }
+
+  function showTimeout() {
+    updateUI(
+      'failed',
+      'Still Processing...',
+      'Your payment is taking longer than expected. We\'ll notify you when it\'s confirmed.',
+      '⏱️',
+      'Pending',
+      'status-pending'
+    );
+    
+    document.getElementById('statusSubtext').textContent = 
+      'You can safely close this page. Check your email for confirmation.';
+    
+    document.getElementById('actions').innerHTML = `
+      <button onclick="checkNow()" class="btn-primary">
+        <span>🔍</span> Check Again
+      </button>
+      <a href="{% url 'billing:manage' %}" class="btn-secondary">
+        <span>⬅️</span> Back to Billing
+      </a>
+    `;
+  }
+
+  function showConnectionIssue(show) {
+    const el = document.getElementById('connectionIssue');
+    if (show) {
+      el.classList.remove('hidden');
+    } else {
+      el.classList.add('hidden');
+    }
+  }
+
+  async function checkPaymentStatus() {
+    if (stopped) return;
+    
+    pollCount++;
+    updateProgress();
+    
+    try {
+      const response = await fetch(`/billing/api/payment-status/?charge_id=${chargeId}&tx_ref=${txRef}`);
+      const data = await response.json();
+      
+      // Clear connection issue on success
+      consecutiveErrors = 0;
+      showConnectionIssue(false);
+      
+      if (data.status === 'success') {
+        stopped = true;
+        showSuccess();
+        return;
+      } else if (data.status === 'failed') {
+        stopped = true;
+        // Determine reason from message if available
+        let reason = 'failed';
+        const msg = (data.message || '').toLowerCase();
+        if (msg.includes('cancel')) reason = 'cancelled';
+        else if (msg.includes('reject')) reason = 'rejected';
+        else if (msg.includes('expire')) reason = 'expired';
+        showFailed(data.message, reason);
+        return;
+      }
+      
+      // Still pending - schedule next poll
+      scheduleNextPoll();
+      
+    } catch (error) {
+      console.error('Error checking payment status:', error);
+      consecutiveErrors++;
+      
+      // Show connection issue after 2 consecutive errors
+      if (consecutiveErrors >= 2) {
+        showConnectionIssue(true);
+        // Increase backoff on errors
+        currentInterval = Math.min(currentInterval * BACKOFF_FACTOR * 1.5, MAX_INTERVAL * 2);
+      }
+      
+      scheduleNextPoll();
+    }
+  }
+
+  function scheduleNextPoll() {
+    if (stopped) return;
+    
+    const elapsed = Date.now() - pollStartTime;
+    
+    if (elapsed >= MAX_POLL_TIME) {
+      stopped = true;
+      showTimeout();
+      return;
+    }
+    
+    // Apply backoff
+    currentInterval = Math.min(currentInterval * BACKOFF_FACTOR, MAX_INTERVAL);
+    
+    pollTimeout = setTimeout(checkPaymentStatus, currentInterval);
+  }
+
+  function cancelWaiting() {
+    stopped = true;
+    if (pollTimeout) clearTimeout(pollTimeout);
+    
+    showFailed(
+      'You cancelled waiting for the payment. If you approved the payment on your phone, it may still be processed.',
+      'cancelled'
+    );
+  }
+
+  function checkNow() {
+    stopped = false;
+    pollStartTime = Date.now();
+    pollCount = 0;
+    currentInterval = INITIAL_INTERVAL;
+    consecutiveErrors = 0;
+    
+    document.getElementById('spinner').style.display = 'block';
+    document.getElementById('progressBar').style.display = 'block';
+    document.getElementById('pollCounter').style.display = 'block';
+    
+    updateUI(
+      'waiting',
+      'Checking payment status...',
+      'Please wait while we verify your payment.',
+      '📱',
+      'Checking...',
+      'status-pending'
+    );
+    
+    document.getElementById('statusSubtext').textContent = '';
+    
+    document.getElementById('actions').innerHTML = `
+      <button onclick="cancelWaiting()" class="btn-secondary" id="cancelBtn">
+        <span>❌</span> Cancel Waiting
+      </button>
+      <a href="{% url 'billing:checkout' %}" class="btn-secondary" id="changeMethodBtn">
+        <span>🔄</span> Change Method
+      </a>
+    `;
+    
+    checkPaymentStatus();
+  }
+
+  // Start polling when page loads
+  checkPaymentStatus();
+</script>
+{% endblock %}

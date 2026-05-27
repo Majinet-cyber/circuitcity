@@ -1,0 +1,227 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Developers — Emajinet | IoT, Webhooks & Integrations</title>
+  <meta name="description" content="Build with Emajinet. IoT webhook monitoring, ESP32 device support, mobile money integrations, and a developer-ready foundation for African business automation.">
+  <link rel="icon" href="{% static 'img/majn.png' %}" type="image/png">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    body { margin: 0; font-family: 'Segoe UI', system-ui, sans-serif; background: #f8fafc; color: #0f172a; line-height: 1.6; }
+    a { color: #2563eb; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    /* Nav */
+    .top-nav { background: #fff; border-bottom: 1px solid #e2e8f0; padding: 14px 24px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; }
+    .top-nav .brand { font-weight: 900; font-size: 1.1rem; color: #0f172a; }
+    .top-nav .nav-links { display: flex; gap: 20px; font-size: 0.9rem; font-weight: 600; }
+
+    /* Hero */
+    .hero { background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 60%, #2563eb 100%); color: #fff; padding: 80px 24px 60px; text-align: center; }
+    .hero .badge { display: inline-block; background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3); border-radius: 99px; padding: 6px 16px; font-size: 0.8rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 16px; }
+    .hero h1 { font-size: clamp(2rem, 5vw, 3rem); font-weight: 900; margin: 0 0 16px; }
+    .hero p { font-size: 1.1rem; opacity: 0.85; max-width: 600px; margin: 0 auto 32px; }
+    .hero .cta-group { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+    .btn-primary { background: #fff; color: #0f172a; border: none; border-radius: 10px; padding: 12px 24px; font-weight: 700; cursor: pointer; font-size: 0.95rem; }
+    .btn-outline { background: transparent; color: #fff; border: 2px solid rgba(255,255,255,0.7); border-radius: 10px; padding: 12px 24px; font-weight: 700; cursor: pointer; font-size: 0.95rem; }
+
+    /* Sections */
+    .section { max-width: 900px; margin: 0 auto; padding: 60px 24px; }
+    .section-title { font-size: 1.6rem; font-weight: 800; color: #0f172a; margin: 0 0 8px; }
+    .section-sub { color: #64748b; margin: 0 0 32px; font-size: 1rem; }
+
+    /* Feature cards */
+    .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 20px; }
+    .card { background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 24px; }
+    .card .icon { font-size: 2rem; margin-bottom: 12px; }
+    .card h3 { font-size: 1rem; font-weight: 800; margin: 0 0 6px; }
+    .card p { font-size: 0.875rem; color: #475569; margin: 0; }
+    .badge-pill { display: inline-block; padding: 3px 10px; border-radius: 99px; font-size: 0.72rem; font-weight: 700; margin-top: 10px; }
+    .badge-green { background: #dcfce7; color: #15803d; }
+    .badge-yellow { background: #fef9c3; color: #854d0e; }
+    .badge-blue { background: #dbeafe; color: #1d4ed8; }
+    .badge-purple { background: #ede9fe; color: #6d28d9; }
+
+    /* Code block */
+    .code-block { background: #0f172a; color: #e2e8f0; border-radius: 14px; padding: 24px; overflow-x: auto; font-family: 'Consolas', 'Monaco', monospace; font-size: 0.84rem; line-height: 1.6; margin: 20px 0; }
+    .code-block .comment { color: #64748b; }
+    .code-block .key { color: #93c5fd; }
+    .code-block .string { color: #86efac; }
+    .code-block .number { color: #fda4af; }
+
+    /* Steps */
+    .steps { display: grid; gap: 16px; }
+    .step { display: flex; gap: 16px; align-items: flex-start; background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 20px; }
+    .step-num { width: 36px; height: 36px; border-radius: 99px; background: #2563eb; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 0.9rem; flex-shrink: 0; }
+    .step h4 { font-size: 0.95rem; font-weight: 700; margin: 0 0 4px; }
+    .step p { font-size: 0.87rem; color: #475569; margin: 0; }
+
+    /* Footer */
+    footer { background: #0f172a; color: #94a3b8; padding: 40px 24px; text-align: center; font-size: 0.875rem; }
+    footer a { color: #60a5fa; }
+    .footer-links { display: flex; gap: 20px; justify-content: center; flex-wrap: wrap; margin-bottom: 16px; }
+    .divider { border: none; border-top: 1px solid #1e293b; margin: 60px 0 0; }
+    @media (max-width: 600px) { .top-nav .nav-links { display: none; } }
+  </style>
+</head>
+<body>
+
+<!-- Navigation -->
+<nav class="top-nav">
+  <a class="brand" href="{% url 'staticpages:home' %}">⚡ Emajinet</a>
+  <div class="nav-links">
+    <a href="{% url 'staticpages:home' %}">Home</a>
+    <a href="{% url 'staticpages:pricing' %}">Pricing</a>
+    <a href="{% url 'staticpages:about' %}">About</a>
+    <a href="{% url 'staticpages:contact' %}">Contact</a>
+  </div>
+</nav>
+
+<!-- Hero -->
+<section class="hero">
+  <span class="badge">Developer Platform</span>
+  <h1>Build with Emajinet</h1>
+  <p>Connect IoT devices, integrate mobile money, automate reconciliation, and access a developer-ready foundation built for African business.</p>
+  <div class="cta-group">
+    <a href="{% url 'staticpages:contact' %}" class="btn-primary">Contact Developer Team</a>
+    <a href="#webhook-docs" class="btn-outline">View Webhook Docs</a>
+  </div>
+</section>
+
+<!-- What you can build -->
+<section class="section">
+  <h2 class="section-title">Integration-Ready Architecture</h2>
+  <p class="section-sub">Emajinet is designed to grow with you — from simple operations to connected IoT monitoring and automated reconciliation.</p>
+  <div class="cards">
+    <div class="card">
+      <div class="icon">📡</div>
+      <h3>IoT Webhooks</h3>
+      <p>Send readings from ESP32 or any HTTP device directly to Emajinet. We store, display, and alert on your readings.</p>
+      <span class="badge-pill badge-green">Live Foundation</span>
+    </div>
+    <div class="card">
+      <div class="icon">☀️</div>
+      <h3>ESP32 Energy Monitor</h3>
+      <p>Track voltage, current, power, battery SOC, and temperature from your solar or battery system in real time.</p>
+      <span class="badge-pill badge-green">Webhook-ready</span>
+    </div>
+    <div class="card">
+      <div class="icon">💸</div>
+      <h3>Mobile Money Integration</h3>
+      <p>Agent float management, cash-in/cash-out recording, and daily reconciliation for Airtel Money and TNM Mpamba.</p>
+      <span class="badge-pill badge-green">Available Now</span>
+    </div>
+    <div class="card">
+      <div class="icon">📊</div>
+      <h3>Credit Scoring API</h3>
+      <p>We are building a credit scoring layer based on business transaction history. Lend with confidence using real data.</p>
+      <span class="badge-pill badge-yellow">Coming Soon</span>
+    </div>
+    <div class="card">
+      <div class="icon">🛒</div>
+      <h3>Marketplace Integrations</h3>
+      <p>List products and livestock via API. Connect your platform to the Emajinet marketplace for discovery.</p>
+      <span class="badge-pill badge-blue">Developer Preview</span>
+    </div>
+    <div class="card">
+      <div class="icon">🌾</div>
+      <h3>Farm IoT Monitoring</h3>
+      <p>Connect soil sensors, weather stations, and farm devices to your Farm Manager dashboard via webhook.</p>
+      <span class="badge-pill badge-yellow">Planned Q3 2026</span>
+    </div>
+  </div>
+</section>
+
+<!-- Webhook Docs -->
+<section class="section" id="webhook-docs">
+  <h2 class="section-title">IoT Webhook</h2>
+  <p class="section-sub">Send device readings via a simple HTTP POST. Authenticate with your device API key.</p>
+
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div>
+        <h4>Register Your Device</h4>
+        <p>Contact us or use the IoT Dashboard to create a device and receive your API key.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div>
+        <h4>Set Authorization Header</h4>
+        <p>Include <code>Authorization: Bearer YOUR_API_KEY</code> in all requests.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div>
+        <h4>POST to the Webhook</h4>
+        <p>Send JSON with your device ID, type, and readings dictionary. Optional ISO timestamp.</p>
+      </div>
+    </div>
+  </div>
+
+  <h3 style="margin-top:32px;font-size:1rem;font-weight:800;color:#0f172a;">Endpoint</h3>
+  <div class="code-block">POST https://emajinet.africa/iot/webhook/<br>Authorization: Bearer &lt;your_api_key&gt;<br>Content-Type: application/json</div>
+
+  <h3 style="font-size:1rem;font-weight:800;color:#0f172a;margin-top:24px;">Example Payload</h3>
+  <pre class="code-block">{{ webhook_example }}</pre>
+
+  <h3 style="font-size:1rem;font-weight:800;color:#0f172a;margin-top:24px;">Supported Reading Types</h3>
+  <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:24px;">
+    {% for rt in "voltage,current,power,energy_kwh,battery_soc,temperature,humidity,water_level,motion,gps,custom_fields"|split:"," %}
+    <span class="badge-pill badge-blue" style="margin:0;">{{ rt }}</span>
+    {% endfor %}
+  </div>
+
+  <h3 style="font-size:1rem;font-weight:800;color:#0f172a;margin-top:24px;">Response</h3>
+  <div class="code-block">{<br>  "status": "ok",<br>  "device_id": "esp32-energy-001",<br>  "readings_saved": 5,<br>  "timestamp": "2026-04-28T07:00:00Z"<br>}</div>
+</section>
+
+<!-- ESP32 Code -->
+<section class="section">
+  <h2 class="section-title">ESP32 Arduino Example</h2>
+  <p class="section-sub">Copy this sketch to your ESP32 and replace the WiFi credentials and API key.</p>
+  <pre class="code-block">{{ arduino_snippet }}</pre>
+</section>
+
+<!-- Credit Scoring -->
+<section class="section" style="background:#f1f5f9;border-radius:20px;padding:40px;">
+  <div style="max-width:600px;">
+    <h2 class="section-title">Credit Scoring API <span class="badge-pill badge-yellow" style="font-size:0.75rem;vertical-align:middle;">Coming Soon</span></h2>
+    <p class="section-sub" style="margin-bottom:16px;">We are building a credit scoring layer that uses real business transaction data to generate credit profiles for small businesses and mobile money agents.</p>
+    <ul style="color:#475569;font-size:0.9rem;padding-left:20px;margin:0 0 20px;">
+      <li>Based on actual sales, cash flow, and repayment history</li>
+      <li>Designed for Malawi's informal economy</li>
+      <li>API-ready for lenders and microfinance institutions</li>
+      <li>Consent-based data sharing</li>
+    </ul>
+    <a href="{% url 'staticpages:contact' %}" class="btn-primary" style="display:inline-block;background:#2563eb;color:#fff;border-radius:10px;padding:12px 24px;font-weight:700;text-decoration:none;">Express Interest</a>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="section" style="text-align:center;">
+  <h2 class="section-title">Ready to Integrate?</h2>
+  <p class="section-sub">We work with developers, system integrators, and IoT builders. Get in touch to discuss your use case.</p>
+  <a href="{% url 'staticpages:contact' %}" style="display:inline-block;background:#2563eb;color:#fff;border-radius:12px;padding:14px 32px;font-weight:800;font-size:1rem;text-decoration:none;">Contact Developer Support</a>
+</section>
+
+<hr class="divider">
+<footer>
+  <div class="footer-links">
+    <a href="{% url 'staticpages:home' %}">Home</a>
+    <a href="{% url 'staticpages:developers' %}">Developers</a>
+    <a href="{% url 'staticpages:pricing' %}">Pricing</a>
+    <a href="{% url 'staticpages:about' %}">About</a>
+    <a href="{% url 'staticpages:contact' %}">Contact</a>
+    <a href="{% url 'staticpages:privacy' %}">Privacy</a>
+    <a href="{% url 'staticpages:terms' %}">Terms</a>
+  </div>
+  <p>&copy; 2026 Emajinet Africa · Built in Malawi 🇲🇼 · Developer-ready foundation</p>
+</footer>
+
+</body>
+</html>

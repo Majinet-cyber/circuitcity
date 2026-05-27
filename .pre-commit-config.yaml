@@ -1,0 +1,93 @@
+# Pre-commit hooks for security and code quality
+# Install: pip install pre-commit && pre-commit install
+# Run manually: pre-commit run --all-files
+
+repos:
+  # Secret scanning
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.18.1
+    hooks:
+      - id: gitleaks
+
+  # Python code formatting
+  - repo: https://github.com/psf/black
+    rev: 23.12.1
+    hooks:
+      - id: black
+        args: [--line-length=120]
+        exclude: ^(migrations|\.venv|venv|node_modules)/
+
+  # Python import sorting
+  - repo: https://github.com/PyCQA/isort
+    rev: 5.13.2
+    hooks:
+      - id: isort
+        args: [--profile=black, --line-length=120]
+        exclude: ^(migrations|\.venv|venv)/
+
+  # Python linting (security focus)
+  - repo: https://github.com/PyCQA/flake8
+    rev: 7.0.0
+    hooks:
+      - id: flake8
+        args: [--max-line-length=120, --select=E,W,F,S,B, --ignore=E501,W503]
+        additional_dependencies: [flake8-bandit, flake8-bugbear]
+        exclude: ^(migrations|\.venv|venv|node_modules)/
+
+  # Security vulnerability scanner (Bandit)
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.7.6
+    hooks:
+      - id: bandit
+        args: [-ll, -i]  # Low and above, skip __init__.py
+        exclude: ^(tests?/|migrations/|\.venv/|venv/)
+
+  # Dependency vulnerability scanning
+  - repo: local
+    hooks:
+      - id: pip-audit
+        name: pip-audit
+        entry: pip-audit
+        language: system
+        args: [--desc, --skip-editable]
+        pass_filenames: false
+        files: requirements\.txt$
+
+  # Django checks
+  - repo: local
+    hooks:
+      - id: django-check
+        name: Django system check
+        entry: python manage.py check --deploy
+        language: system
+        pass_filenames: false
+        files: \.(py|html|yml)$
+
+  # Trailing whitespace
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: ^(migrations|\.venv|venv)/
+      - id: end-of-file-fixer
+        exclude: ^(migrations|\.venv|venv)/
+      - id: check-yaml
+        exclude: ^(\.venv|venv)/
+      - id: check-json
+        exclude: ^(\.venv|venv)/
+      - id: check-added-large-files
+        args: [--maxkb=500]
+      - id: check-merge-conflict
+      - id: detect-private-key  # Detect accidentally committed private keys
+
+  # Custom IDOR test runner
+  - repo: local
+    hooks:
+      - id: idor-tests
+        name: Run IDOR security tests
+        entry: python manage.py test tenants.tests_security_idor --failfast
+        language: system
+        pass_filenames: false
+        files: \.(py)$
+        stages: [pre-push]  # Only on git push, not every commit
+

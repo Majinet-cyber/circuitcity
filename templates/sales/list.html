@@ -63,13 +63,13 @@
     <!-- Pagination -->
     <nav class="pagination" aria-label="Pagination" style="display:flex;gap:.5rem;justify-content:flex-end;padding:var(--sp-3);">
       {% if page_obj.has_previous %}
-        <a class="btn" href="?{% querystring request.GET 'page'=(page_obj.previous_page_number) %}" aria-label="Previous page">‹ Prev</a>
+        <a class="btn" href="?page={{ page_obj.previous_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" aria-label="Previous page">‹ Prev</a>
       {% else %}<span class="btn" aria-disabled="true">‹ Prev</span>{% endif %}
 
       <span aria-current="page" style="align-self:center;">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
 
       {% if page_obj.has_next %}
-        <a class="btn" href="?{% querystring request.GET 'page'=(page_obj.next_page_number) %}" aria-label="Next page">Next ›</a>
+        <a class="btn" href="?page={{ page_obj.next_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" aria-label="Next page">Next ›</a>
       {% else %}<span class="btn" aria-disabled="true">Next ›</span>{% endif %}
     </nav>
   {% endif %}

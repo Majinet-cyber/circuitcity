@@ -1,32 +1,32 @@
-/* -------- Glass Sidebar -------- */
+/* -------- Light Glass Sidebar (Consistent with App) -------- */
 :root{
   --sb-bg: 255 255 255;           /* white glass */
-  --sb-ink: 16 24 40;             /* dark text */
-  --sb-ink-dim: 99 115 129;       /* dim text */
+  --sb-ink: 15 23 42;             /* slate-900 text */
+  --sb-ink-dim: 100 116 139;      /* slate-500 dim text */
   --sb-ring: 0 0 0 / .06;
-  --sb-card: 255 255 255 / .55;   /* inner glass cards */
+  --sb-card: 255 255 255 / .65;   /* inner glass cards */
 }
 
 .app-shell{
   display:grid; grid-template-columns: 260px 1fr; min-height:100vh;
-  background: #f6f8fb;
+  background: #f5f8ff;
 }
 
-/* main sidebar container */
+/* main sidebar container - LIGHT styling to match app */
 .sidebar{
   position:sticky; top:0; height:100dvh; padding:18px 16px;
-  background: rgba(var(--sb-bg) / .72);
+  background: rgba(var(--sb-bg) / .85);
   backdrop-filter: blur(14px) saturate(120%);
   -webkit-backdrop-filter: blur(14px) saturate(120%);
-  box-shadow: 0 10px 30px rgba(16,24,40,.06), inset 0 1px 0 rgba(255,255,255,.6);
-  border-right: 1px solid rgba(0,0,0,.06);
+  box-shadow: 0 4px 16px rgba(15,23,42,.08), inset 0 1px 0 rgba(255,255,255,.8);
+  border-right: 1px solid rgba(148,163,184,.2);
 }
 
 /* brand header */
 .sidebar .brand{
   display:flex; align-items:center; gap:10px; margin-bottom:14px;
 }
-.sidebar .brand .dot{ width:8px; height:8px; border-radius:999px; background:#22c55e; }
+.sidebar .brand .dot{ width:8px; height:8px; border-radius:999px; background:#ff6a1a; }
 
 /* groups */
 .sidebar .group-title{
@@ -49,8 +49,10 @@
   transform: translateY(-1px);
 }
 .sidebar a.nav.active{
-  background: rgba(99,102,241,.10);
-  box-shadow: inset 0 0 0 1px rgba(99,102,241,.22);
+  background: rgba(255,106,26,.10);
+  box-shadow: inset 0 0 0 1px rgba(255,106,26,.22);
+  color: #ff6a1a;
+  font-weight: 600;
 }
 
 /* small “chip” (e.g., counts) */

@@ -6,7 +6,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("notifications", "0002_whatsapppreference"),
         ("tenants", "0012_add_business_logo"),

@@ -1,0 +1,232 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Groceries V2 · {{ business.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+  /* Mobile-first design - maximize tappable areas, minimize clutter */
+  .groceries-v2-page{max-width:1200px;margin:0 auto;padding:12px;display:flex;flex-direction:column;gap:20px}
+  
+  /* Hero section - clean, gradient */
+  .gv2-hero{background:linear-gradient(135deg,#059669 0%,#10b981 100%);padding:24px;border-radius:20px;color:#fff;box-shadow:0 8px 24px rgba(5,150,105,0.2)}
+  .gv2-hero h1{margin:0 0 8px;font-size:clamp(24px,5vw,32px);font-weight:800}
+  .gv2-hero p{margin:0;opacity:0.95;font-size:14px}
+  
+  /* Big 3 action cards - thumb-friendly */
+  .gv2-actions{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:16px}
+  .gv2-action-card{background:#fff;border-radius:16px;padding:24px;text-align:center;box-shadow:0 4px 12px rgba(15,23,42,0.08);border:2px solid #e2e8f0;text-decoration:none;color:#0f172a;transition:all 0.3s cubic-bezier(0.4,0,0.2,1);position:relative;overflow:hidden}
+  .gv2-action-card::before{content:'';position:absolute;top:0;left:0;right:0;height:4px;background:linear-gradient(90deg,#10b981,#059669);opacity:0;transition:opacity 0.3s}
+  .gv2-action-card:hover{transform:translateY(-4px);box-shadow:0 12px 32px rgba(15,23,42,0.15);border-color:#10b981}
+  .gv2-action-card:hover::before{opacity:1}
+  .gv2-action-card .icon{font-size:42px;margin-bottom:12px;display:block}
+  .gv2-action-card .label{font-weight:700;font-size:16px;color:#0f172a}
+  
+  /* KPI Cards - compact */
+  .gv2-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px}
+  .gv2-kpi{background:#fff;border-radius:16px;padding:16px;box-shadow:0 2px 8px rgba(15,23,42,0.06);border:1px solid #e2e8f0;transition:all 0.3s}
+  .gv2-kpi:hover{box-shadow:0 4px 16px rgba(15,23,42,0.1);transform:translateY(-2px)}
+  .gv2-kpi .label{font-size:11px;text-transform:uppercase;color:#64748b;font-weight:600;letter-spacing:0.05em;margin-bottom:6px}
+  .gv2-kpi .value{font-size:clamp(20px,4vw,28px);font-weight:800;color:#0f172a;line-height:1.1}
+  .gv2-kpi .value.positive{color:#059669}
+  .gv2-kpi .value.warning{color:#f59e0b}
+  
+  /* Section blocks */
+  .gv2-section{background:#fff;border-radius:16px;padding:20px;box-shadow:0 4px 12px rgba(15,23,42,0.06);border:1px solid #e2e8f0}
+  .gv2-section h2{margin:0 0 16px;font-size:18px;font-weight:700;color:#0f172a;display:flex;align-items:center;gap:8px}
+  .gv2-section h2 .badge{background:linear-gradient(135deg,#10b981,#059669);color:#fff;padding:4px 10px;border-radius:12px;font-size:12px;font-weight:700}
+  
+  /* Product list items */
+  .gv2-product-item{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid #e2e8f0}
+  .gv2-product-item:last-child{border-bottom:0}
+  .gv2-product-item .name{font-weight:600;color:#0f172a;font-size:14px}
+  .gv2-product-item .qty{background:linear-gradient(135deg,#fef3c7,#fde68a);color:#92400e;padding:6px 12px;border-radius:12px;font-weight:700;font-size:13px}
+  .gv2-product-item .qty.low{background:linear-gradient(135deg,#fee2e2,#fecaca);color:#991b1b}
+  
+  /* PHASE 5: Premium Gamification Strip */
+  .gv2-gamification-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
+  .gv2-gami-card{background:#fff;border-radius:16px;padding:16px;display:flex;align-items:center;gap:12px;box-shadow:0 4px 12px rgba(15,23,42,0.08);border:2px solid #e2e8f0;transition:all 0.3s;position:relative;overflow:hidden}
+  .gv2-gami-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;opacity:0;transition:opacity 0.3s}
+  .gv2-gami-card:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(15,23,42,0.12)}
+  .gv2-gami-card:hover::before{opacity:1}
+  
+  /* Level card */
+  .gv2-gami-level{border-color:#fbbf24}
+  .gv2-gami-level::before{background:linear-gradient(90deg,#f59e0b,#fbbf24)}
+  
+  /* Streak card */
+  .gv2-gami-streak{border-color:#f97316}
+  .gv2-gami-streak::before{background:linear-gradient(90deg,#ea580c,#f97316)}
+  
+  /* Rank card */
+  .gv2-gami-rank{border-color:#8b5cf6}
+  .gv2-gami-rank::before{background:linear-gradient(90deg,#7c3aed,#8b5cf6)}
+  
+  /* Badges card */
+  .gv2-gami-badges{border-color:#10b981}
+  .gv2-gami-badges::before{background:linear-gradient(90deg,#059669,#10b981)}
+  
+  .gv2-gami-icon{font-size:32px;flex-shrink:0}
+  .gv2-gami-content{flex:1;min-width:0}
+  .gv2-gami-label{font-weight:700;font-size:14px;color:#0f172a;margin-bottom:4px}
+  .gv2-gami-detail{font-size:11px;color:#64748b}
+  .gv2-gami-progress{height:6px;background:#e2e8f0;border-radius:3px;overflow:hidden;margin-top:6px}
+  .gv2-gami-progress-bar{height:100%;background:linear-gradient(90deg,#f59e0b,#fbbf24);transition:width 0.5s ease}
+  .gv2-gami-badge-icons{display:flex;gap:4px;font-size:14px;margin-top:4px}
+  
+  @media (max-width:640px){
+    .gv2-gamification-strip{grid-template-columns:1fr}
+  }
+  
+  /* Empty states */
+  .gv2-empty{text-align:center;padding:32px 20px;color:#94a3b8}
+  .gv2-empty .icon{font-size:48px;margin-bottom:12px;opacity:0.5}
+  .gv2-empty p{margin:0;font-size:14px}
+  
+  /* Responsive */
+  @media (max-width:640px){
+    .gv2-actions{grid-template-columns:1fr}
+    .gv2-kpis{grid-template-columns:repeat(2,1fr)}
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="groceries-v2-page">
+  <!-- Hero -->
+  <header class="gv2-hero">
+    <h1><i class="bi bi-basket3-fill me-2" style="font-size:.85em;"></i>{{ business.name }}</h1>
+    <p>Retail + Wholesale · Faster than a notebook</p>
+  </header>
+  
+  <!-- Big 3 Actions -->
+  <section class="gv2-actions">
+    <a href="{% url 'verticals:groceries_product_add_v2' %}?step=1" class="gv2-action-card">
+      <i class="bi bi-box-seam icon" style="font-size:2.4rem;color:#059669;"></i>
+      <span class="label">Add Product</span>
+    </a>
+    <a href="{% url 'verticals:groceries_stock_in_v2' %}" class="gv2-action-card">
+      <i class="bi bi-arrow-bar-down icon" style="font-size:2.4rem;color:#2563eb;"></i>
+      <span class="label">Stock In</span>
+    </a>
+    <a href="{% url 'verticals:groceries_sell_v2' %}" class="gv2-action-card">
+      <i class="bi bi-bag-check icon" style="font-size:2.4rem;color:#ea580c;"></i>
+      <span class="label">Sell</span>
+    </a>
+  </section>
+  
+  <!-- PHASE 5: Premium Gamification Strip -->
+  <div class="gv2-gamification-strip">
+    <!-- XP & Level -->
+    <div class="gv2-gami-card gv2-gami-level">
+      <div class="gv2-gami-icon"><i class="bi bi-star-fill" style="color:#f59e0b;"></i></div>
+      <div class="gv2-gami-content">
+        <div class="gv2-gami-label">Level {{ gamification.xp.level }}</div>
+        <div class="gv2-gami-progress">
+          <div class="gv2-gami-progress-bar" style="width:{{ gamification.xp.progress_percent }}%"></div>
+        </div>
+        <div class="gv2-gami-detail">{{ gamification.xp.total }} XP · +{{ gamification.xp.xp_today }} today</div>
+      </div>
+    </div>
+    
+    <!-- Streak -->
+    {% if gamification.streak.current > 0 %}
+    <div class="gv2-gami-card gv2-gami-streak">
+      <div class="gv2-gami-icon"><i class="bi bi-lightning-charge-fill" style="color:#f97316;"></i></div>
+      <div class="gv2-gami-content">
+        <div class="gv2-gami-label">{{ gamification.streak.current }} Day Streak</div>
+        <div class="gv2-gami-detail">Best: {{ gamification.streak.longest }} days</div>
+      </div>
+    </div>
+    {% endif %}
+    
+    <!-- Rank (if available) -->
+    {% if gamification.rank_today %}
+    <div class="gv2-gami-card gv2-gami-rank">
+      <div class="gv2-gami-icon"><i class="bi bi-trophy-fill" style="color:#8b5cf6;"></i></div>
+      <div class="gv2-gami-content">
+        <div class="gv2-gami-label">Rank #{{ gamification.rank_today }}</div>
+        <div class="gv2-gami-detail">Today's leaderboard</div>
+      </div>
+    </div>
+    {% endif %}
+    
+    <!-- Badges -->
+    {% if gamification.badges %}
+    <div class="gv2-gami-card gv2-gami-badges">
+      <div class="gv2-gami-icon"><i class="bi bi-award-fill" style="color:#10b981;"></i></div>
+      <div class="gv2-gami-content">
+        <div class="gv2-gami-label">{{ gamification.badges|length }} Badge{{ gamification.badges|length|pluralize }}</div>
+        <div class="gv2-gami-badge-icons">
+          {% for badge in gamification.badges|slice:":5" %}
+          <span title="{{ badge.name }}">{{ badge.icon }}</span>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+  
+  <!-- KPIs -->
+  <section class="gv2-kpis">
+    <div class="gv2-kpi">
+      <div class="label">Revenue Today</div>
+      <div class="value positive">K {{ revenue_today|floatformat:0|intcomma }}</div>
+    </div>
+    <div class="gv2-kpi">
+      <div class="label">Profit Today</div>
+      <div class="value positive">K {{ profit_today|floatformat:0|intcomma }}</div>
+    </div>
+    <div class="gv2-kpi">
+      <div class="label">Sales Today</div>
+      <div class="value">{{ sales_count }}</div>
+    </div>
+    <div class="gv2-kpi">
+      <div class="label">Stock Value</div>
+      <div class="value">K {{ stock_value|floatformat:0|intcomma }}</div>
+    </div>
+  </section>
+  
+  <!-- Low Stock Alert -->
+  {% if low_stock_count > 0 %}
+  <section class="gv2-section">
+    <h2>⚠️ Low Stock <span class="badge">{{ low_stock_count }}</span></h2>
+    {% for product in low_stock_items %}
+    <div class="gv2-product-item">
+      <div>
+        <div class="name">{{ product.name }}</div>
+        <small style="color:#64748b;font-size:12px">{{ product.category_group|title }}</small>
+      </div>
+      <div class="qty low">{{ product.quantity_in_stock }} {{ product.base_unit }}</div>
+    </div>
+    {% endfor %}
+    <a href="{% url 'verticals:groceries_stock_in_v2' %}" style="display:inline-block;margin-top:12px;color:#10b981;font-weight:600;font-size:14px;text-decoration:none">Stock in now →</a>
+  </section>
+  {% endif %}
+  
+  <!-- Top Sellers -->
+  {% if top_sellers %}
+  <section class="gv2-section">
+    <h2>🔥 Top Sellers (7 days)</h2>
+    {% for item in top_sellers %}
+    <div class="gv2-product-item">
+      <div>
+        <div class="name">{{ item.product__name }}</div>
+        <small style="color:#64748b;font-size:12px">{{ item.total_qty }} sold · K {{ item.total_revenue|floatformat:0|intcomma }}</small>
+      </div>
+    </div>
+    {% endfor %}
+  </section>
+  {% endif %}
+  
+  <!-- Dead Stock Alert -->
+  {% if dead_stock_count > 0 %}
+  <section class="gv2-section">
+    <h2>💤 Dead Stock <span class="badge" style="background:#94a3b8">{{ dead_stock_count }}</span></h2>
+    <p style="color:#64748b;font-size:14px;margin:0">{{ dead_stock_count }} product(s) with no sales in 30 days. Consider promotions or stock adjustments.</p>
+  </section>
+  {% endif %}
+  
+</div>
+{% endblock %}
+

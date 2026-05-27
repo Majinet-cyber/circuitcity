@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Record Egg Collection{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-3" style="max-width:520px;">
+
+  <div style="margin-bottom:1.25rem;">
+    <a href="{% url 'verticals:farm_egg_tracking' %}" style="color:#64748b;font-size:.85rem;text-decoration:none;">
+      ← Back to Egg Tracking
+    </a>
+    <h1 style="font-size:1.5rem;font-weight:800;margin:.5rem 0 0;">Record Egg Collection</h1>
+    <p style="color:#64748b;font-size:.875rem;margin:0;">Enter today's production numbers</p>
+  </div>
+
+  <form method="post" style="background:#fff;border:1px solid #e2e8f0;border-radius:20px;padding:1.5rem;box-shadow:0 2px 8px rgba(0,0,0,0.05);">
+    {% csrf_token %}
+    <input type="hidden" name="batch_id" value="{% if preselect_id %}{{ preselect_id }}{% endif %}">
+
+    <div style="margin-bottom:1rem;">
+      <label style="font-size:.78rem;font-weight:600;color:#0f172a;display:block;margin-bottom:4px;">Poultry Batch</label>
+      <select name="batch_id" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:10px;font-size:.875rem;" required>
+        {% for b in batches %}
+        <option value="{{ b.pk }}" {% if preselect_id == b.pk %}selected{% endif %}>{{ b.name }} ({{ b.current_birds }} birds)</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div style="margin-bottom:1rem;">
+      <label style="font-size:.78rem;font-weight:600;color:#0f172a;display:block;margin-bottom:4px;">Date</label>
+      <input type="date" name="date" value="{{ today|date:'Y-m-d' }}"
+        style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:10px;font-size:.875rem;" required>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;">
+      <div>
+        <label style="font-size:.78rem;font-weight:600;color:#0f172a;display:block;margin-bottom:4px;">Eggs Collected</label>
+        <input type="number" name="eggs_collected" min="0" value="0"
+          style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:10px;font-size:.875rem;" required>
+      </div>
+      <div>
+        <label style="font-size:.78rem;font-weight:600;color:#0f172a;display:block;margin-bottom:4px;">Deaths Today</label>
+        <input type="number" name="deaths" min="0" value="0"
+          style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:10px;font-size:.875rem;">
+      </div>
+      <div>
+        <label style="font-size:.78rem;font-weight:600;color:#0f172a;display:block;margin-bottom:4px;">Feed Given (kg)</label>
+        <input type="number" name="feed_kg" min="0" step="0.1" value="0"
+          style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:10px;font-size:.875rem;">
+      </div>
+      <div>
+        <label style="font-size:.78rem;font-weight:600;color:#0f172a;display:block;margin-bottom:4px;">Birds Alive</label>
+        <input type="number" name="birds_alive" min="0"
+          style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:10px;font-size:.875rem;">
+      </div>
+    </div>
+
+    <div style="margin-bottom:1.25rem;">
+      <label style="font-size:.78rem;font-weight:600;color:#0f172a;display:block;margin-bottom:4px;">Remarks (optional)</label>
+      <textarea name="remarks" rows="2" placeholder="e.g. noticed 3 sick birds, gave vitamins..."
+        style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:10px;font-size:.875rem;resize:none;"></textarea>
+    </div>
+
+    <button type="submit" style="width:100%;background:#16a34a;color:#fff;border:none;border-radius:12px;padding:12px;font-weight:700;font-size:.9rem;cursor:pointer;">
+      Save Record
+    </button>
+  </form>
+
+</div>
+{% endblock %}

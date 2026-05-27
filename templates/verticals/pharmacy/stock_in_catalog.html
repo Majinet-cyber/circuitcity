@@ -1,0 +1,580 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Stock In {{ category_name }} · Pharmacy & Cosmetics{% endblock %}
+
+{% block content %}
+
+<style>
+  /* Mobile-First Catalog Page */
+  .catalog-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+  }
+  
+  /* Header */
+  .catalog-header {
+    margin-bottom: 32px;
+  }
+  
+  .catalog-header h1 {
+    font-size: clamp(1.8rem, 4vw, 2.5rem);
+    font-weight: 800;
+    color: #0f172a;
+    margin: 0 0 8px 0;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  
+  .catalog-header p {
+    font-size: 1rem;
+    color: #64748b;
+    margin: 0;
+  }
+  
+  .back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: #3b82f6;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 0.95rem;
+    margin-bottom: 16px;
+    transition: color 0.2s;
+  }
+  
+  .back-link:hover {
+    color: #2563eb;
+  }
+  
+  /* Search Bar */
+  .search-bar {
+    background: #fff;
+    border: 2px solid #e2e8f0;
+    border-radius: 14px;
+    padding: 14px 20px;
+    margin-bottom: 32px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    box-shadow: 0 4px 16px rgba(15, 23, 42, 0.04);
+  }
+  
+  .search-bar input {
+    flex: 1;
+    border: none;
+    outline: none;
+    font-size: 1rem;
+    color: #0f172a;
+  }
+  
+  .search-bar input::placeholder {
+    color: #94a3b8;
+  }
+  
+  .search-icon {
+    color: #94a3b8;
+    font-size: 1.2rem;
+  }
+  
+  /* Product Cards Grid */
+  .products-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 16px;
+    margin-bottom: 40px;
+  }
+  
+  @media (min-width: 640px) {
+    .products-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+  
+  @media (min-width: 1024px) {
+    .products-grid {
+      grid-template-columns: repeat(3, 1fr);
+    }
+  }
+  
+  .product-card {
+    background: #fff;
+    border: 2px solid #e2e8f0;
+    border-radius: 16px;
+    padding: 24px;
+    cursor: pointer;
+    transition: all 0.2s;
+    box-shadow: 0 4px 16px rgba(15, 23, 42, 0.04);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .product-card:hover {
+    border-color: #10b981;
+    transform: translateY(-4px);
+    box-shadow: 0 12px 32px rgba(16, 185, 129, 0.15);
+  }
+  
+  .product-name {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #0f172a;
+    margin: 0;
+  }
+  
+  .product-category {
+    font-size: 0.85rem;
+    color: #64748b;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  
+  .product-icon {
+    font-size: 2rem;
+    margin-bottom: 4px;
+  }
+  
+  /* Stock In Modal */
+  .modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(15, 23, 42, 0.7);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    overflow-y: auto;
+  }
+  
+  .modal.active {
+    display: flex;
+  }
+  
+  .modal-content {
+    background: #fff;
+    border-radius: 20px;
+    padding: 32px;
+    max-width: 500px;
+    width: 100%;
+    box-shadow: 0 20px 60px rgba(15, 23, 42, 0.3);
+    position: relative;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+  
+  .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: start;
+    margin-bottom: 24px;
+  }
+  
+  .modal-title {
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: #0f172a;
+    margin: 0;
+  }
+  
+  .modal-close {
+    background: #f1f5f9;
+    border: none;
+    border-radius: 8px;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 1.2rem;
+    color: #64748b;
+    transition: all 0.2s;
+  }
+  
+  .modal-close:hover {
+    background: #e2e8f0;
+    color: #0f172a;
+  }
+  
+  .form-group {
+    margin-bottom: 20px;
+  }
+  
+  .form-label {
+    display: block;
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: #0f172a;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  
+  .form-input {
+    width: 100%;
+    padding: 12px 16px;
+    border: 2px solid #e2e8f0;
+    border-radius: 10px;
+    font-size: 1rem;
+    transition: border-color 0.2s;
+  }
+  
+  .form-input:focus {
+    outline: none;
+    border-color: #10b981;
+  }
+  
+  .form-input::placeholder {
+    color: #94a3b8;
+  }
+  
+  .form-hint {
+    font-size: 0.85rem;
+    color: #64748b;
+    margin-top: 4px;
+  }
+  
+  .btn-primary {
+    width: 100%;
+    padding: 14px 24px;
+    background: #10b981;
+    color: #fff;
+    border: none;
+    border-radius: 12px;
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  
+  .btn-primary:hover {
+    background: #059669;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(16, 185, 129, 0.3);
+  }
+  
+  .btn-primary:disabled {
+    background: #cbd5e1;
+    cursor: not-allowed;
+    transform: none;
+  }
+  
+  /* Success Message */
+  .success-toast {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: #10b981;
+    color: #fff;
+    padding: 16px 24px;
+    border-radius: 12px;
+    font-weight: 600;
+    box-shadow: 0 12px 32px rgba(16, 185, 129, 0.3);
+    z-index: 2000;
+    display: none;
+    animation: slideIn 0.3s ease;
+  }
+  
+  .success-toast.active {
+    display: block;
+  }
+  
+  @keyframes slideIn {
+    from {
+      transform: translateX(400px);
+      opacity: 0;
+    }
+    to {
+      transform: translateX(0);
+      opacity: 1;
+    }
+  }
+  
+  /* Empty State */
+  .empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: #94a3b8;
+  }
+  
+  .empty-state-icon {
+    font-size: 4rem;
+    margin-bottom: 16px;
+    opacity: 0.5;
+  }
+  
+  .empty-state-text {
+    font-size: 1.1rem;
+    font-weight: 600;
+  }
+</style>
+
+<div class="catalog-container">
+  <!-- Back Link -->
+  <a href="{% url 'pharmacy:stock_in_choice' %}" class="back-link">
+    ← Back to Stock In
+  </a>
+  
+  <!-- Header -->
+  <div class="catalog-header">
+    <h1>
+      <span>{{ category_icon }}</span>
+      Stock In {{ category_name }}
+    </h1>
+    <p>Click a product to quickly add stock. Only essential fields required.</p>
+  </div>
+  
+  <!-- Search Bar -->
+  <div class="search-bar">
+    <span class="search-icon">🔍</span>
+    <input 
+      type="text" 
+      id="searchInput" 
+      placeholder="Search products..." 
+      autocomplete="off"
+    >
+  </div>
+  
+  <!-- Products Grid -->
+  <div class="products-grid" id="productsGrid">
+    {% for product in products %}
+    <div class="product-card" data-product-name="{{ product.name }}" data-product-category="{{ product.category }}" data-testid="product-card-{{ forloop.counter }}">
+      <div class="product-icon">{{ product.icon }}</div>
+      <h3 class="product-name">{{ product.name }}</h3>
+      <p class="product-category">{{ product.category_display }}</p>
+    </div>
+    {% empty %}
+    <div class="empty-state">
+      <div class="empty-state-icon">📦</div>
+      <p class="empty-state-text">No products found</p>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- Stock In Modal -->
+<div class="modal" id="stockInModal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2 class="modal-title" id="modalTitle">Stock In Product</h2>
+      <button class="modal-close" id="modalClose">✕</button>
+    </div>
+    
+    <form id="stockInForm">
+      {% csrf_token %}
+      <input type="hidden" id="productName" name="product_name">
+      <input type="hidden" id="productCategory" name="category">
+      
+      <div class="form-group">
+        <label class="form-label" for="quantity">Quantity *</label>
+        <input 
+          type="number" 
+          id="quantity" 
+          name="quantity" 
+          class="form-input" 
+          placeholder="Enter quantity" 
+          required
+          min="1"
+          step="1"
+        >
+      </div>
+      
+      <div class="form-group">
+        <label class="form-label" for="costPrice">Cost Price (MWK) *</label>
+        <input 
+          type="number" 
+          id="costPrice" 
+          name="cost_price" 
+          class="form-input" 
+          placeholder="0.00" 
+          required
+          min="0"
+          step="0.01"
+        >
+        <p class="form-hint">What you paid per unit</p>
+      </div>
+      
+      <div class="form-group">
+        <label class="form-label" for="sellingPrice">Selling Price (MWK) *</label>
+        <input 
+          type="number" 
+          id="sellingPrice" 
+          name="selling_price" 
+          class="form-input" 
+          placeholder="0.00" 
+          required
+          min="0"
+          step="0.01"
+        >
+        <p class="form-hint">What you'll charge customers</p>
+      </div>
+      
+      {% if is_pharmacy %}
+      <div class="form-group">
+        <label class="form-label" for="expiryDate">Expiry Date</label>
+        <input 
+          type="date" 
+          id="expiryDate" 
+          name="expiry_date" 
+          class="form-input"
+        >
+        <p class="form-hint">Recommended for medicines</p>
+      </div>
+      
+      <div class="form-group">
+        <label class="form-label" for="batchNumber">Batch Number</label>
+        <input 
+          type="text" 
+          id="batchNumber" 
+          name="batch_number" 
+          class="form-input" 
+          placeholder="Optional"
+        >
+      </div>
+      {% endif %}
+      
+      <button type="submit" class="btn-primary" id="submitBtn" data-testid="submit-stock-in">
+        ✅ Save Stock
+      </button>
+    </form>
+  </div>
+</div>
+
+<!-- Success Toast -->
+<div class="success-toast" id="successToast">
+  ✅ Stock added successfully!
+</div>
+
+<script>
+(function() {
+  const modal = document.getElementById('stockInModal');
+  const modalTitle = document.getElementById('modalTitle');
+  const modalClose = document.getElementById('modalClose');
+  const form = document.getElementById('stockInForm');
+  const productNameInput = document.getElementById('productName');
+  const productCategoryInput = document.getElementById('productCategory');
+  const searchInput = document.getElementById('searchInput');
+  const productsGrid = document.getElementById('productsGrid');
+  const successToast = document.getElementById('successToast');
+  const submitBtn = document.getElementById('submitBtn');
+  
+  // Open modal when product card clicked
+  productsGrid.addEventListener('click', function(e) {
+    const card = e.target.closest('.product-card');
+    if (!card) return;
+    
+    const productName = card.dataset.productName;
+    const productCategory = card.dataset.productCategory;
+    
+    productNameInput.value = productName;
+    productCategoryInput.value = productCategory;
+    modalTitle.textContent = `Stock In: ${productName}`;
+    
+    // Reset form
+    form.reset();
+    productNameInput.value = productName;  // Restore after reset
+    productCategoryInput.value = productCategory;  // Restore after reset
+    
+    modal.classList.add('active');
+  });
+  
+  // Close modal
+  modalClose.addEventListener('click', function() {
+    modal.classList.remove('active');
+  });
+  
+  // Close modal when clicking backdrop
+  modal.addEventListener('click', function(e) {
+    if (e.target === modal) {
+      modal.classList.remove('active');
+    }
+  });
+  
+  // Handle form submission
+  form.addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(form);
+    const data = {
+      product_name: formData.get('product_name'),
+      category: formData.get('category'),
+      quantity: parseInt(formData.get('quantity')),
+      cost_price: parseFloat(formData.get('cost_price')),
+      selling_price: parseFloat(formData.get('selling_price')),
+      expiry_date: formData.get('expiry_date') || null,
+      batch_number: formData.get('batch_number') || null,
+    };
+    
+    // Disable submit button
+    submitBtn.disabled = true;
+    submitBtn.textContent = '⏳ Saving...';
+    
+    // Submit via AJAX
+    fetch('{% url "pharmacy:stock_in_catalog_save" %}', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': formData.get('csrfmiddlewaretoken')
+      },
+      body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(result => {
+      if (result.ok) {
+        // Show success toast
+        successToast.textContent = `✅ ${result.message || 'Stock added successfully!'}`;
+        successToast.classList.add('active');
+        setTimeout(() => {
+          successToast.classList.remove('active');
+        }, 3000);
+        
+        // Close modal
+        modal.classList.remove('active');
+        
+        // Reset form
+        form.reset();
+      } else {
+        alert('Error: ' + (result.error || 'Failed to add stock'));
+      }
+    })
+    .catch(error => {
+      console.error('Error:', error);
+      alert('Failed to add stock. Please try again.');
+    })
+    .finally(() => {
+      // Re-enable submit button
+      submitBtn.disabled = false;
+      submitBtn.textContent = '✅ Save Stock';
+    });
+  });
+  
+  // Search functionality
+  searchInput.addEventListener('input', function() {
+    const query = this.value.toLowerCase().trim();
+    const cards = productsGrid.querySelectorAll('.product-card');
+    
+    cards.forEach(card => {
+      const name = card.dataset.productName.toLowerCase();
+      const category = card.dataset.productCategory.toLowerCase();
+      
+      if (name.includes(query) || category.includes(query)) {
+        card.style.display = '';
+      } else {
+        card.style.display = 'none';
+      }
+    });
+  });
+})();
+</script>
+
+{% endblock %}
+

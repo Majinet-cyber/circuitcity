@@ -9,17 +9,23 @@ app_name = "reports"
 urlpatterns = [
     # Landing page for Reports (must RENDER, not redirect)
     path("", views.home, name="home"),
-
-    # Back-compat alias â†’ send /reports/index/ to /reports/
+    # Back-compat alias
     path(
         "index/",
         RedirectView.as_view(pattern_name="reports:home", permanent=False),
         name="index",
     ),
-
-    # Concrete report pages (these should render a template directly)
-    path("sales/",     views.sales_report,     name="sales"),
+    # Existing report pages
+    path("sales/", views.sales_report, name="sales"),
+    path("sales/pdf/", views.sales_report_pdf, name="sales_pdf"),
     path("inventory/", views.inventory_report, name="inventory"),
+    path("inventory/pdf/", views.inventory_report_pdf, name="inventory_pdf"),
+    # New premium report pages (additive — no existing routes changed)
+    path("pl/", views.pl_report, name="pl_report"),
+    path("pl/pdf/", views.pl_report_pdf, name="pl_report_pdf"),
+    path("executive/", views.executive_summary, name="executive_summary"),
+    path("executive/pdf/", views.executive_summary_pdf, name="executive_summary_pdf"),
+    path("credit-exposure/", views.credit_exposure_report, name="credit_exposure"),
 ]
 
 # Debug helper: shows which templates each URL resolves to
@@ -27,5 +33,3 @@ if settings.DEBUG:
     urlpatterns += [
         path("which/", views.which_templates, name="which"),
     ]
-
-

@@ -1,8 +1,9 @@
 ﻿# cc/views.py
 from __future__ import annotations
-from decimal import Decimal
+
 from datetime import datetime, timedelta
-from typing import Dict, Any
+from decimal import Decimal
+from typing import Any, Dict
 
 from django.conf import settings
 from django.contrib import messages
@@ -10,11 +11,11 @@ from django.contrib.auth import get_user_model, logout
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.db import connection
 from django.db.models import Sum
-from django.http import JsonResponse, HttpRequest, HttpResponse
-from django.shortcuts import redirect, render, get_object_or_404
+from django.http import HttpRequest, HttpResponse, JsonResponse
+from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
+from django.views.decorators.csrf import csrf_protect, ensure_csrf_cookie
 from django.views.decorators.http import require_GET, require_http_methods
-from django.views.decorators.csrf import ensure_csrf_cookie, csrf_protect
 
 from inventory.models import InventoryItem, TimeLog, WalletTxn
 from sales.models import Sale
@@ -22,16 +23,21 @@ from sales.models import Sale
 User = get_user_model()
 
 # Compensation knobs
-BASE_SALARY = Decimal("40000")          # MK40,000
-EARLY_BIRD_BONUS = Decimal("5000")      # before 08:00
-LATE_STEP_PENALTY = Decimal("5000")     # every 30 min after 08:00
-SUNDAY_BONUS = Decimal("15000")         # any time on Sunday
+BASE_SALARY = Decimal("40000")  # MK40,000
+EARLY_BIRD_BONUS = Decimal("5000")  # before 08:00
+LATE_STEP_PENALTY = Decimal("5000")  # every 30 min after 08:00
+SUNDAY_BONUS = Decimal("15000")  # any time on Sunday
 
 
 # ==============================================================================
 # Single Source of Truth: error rendering helper
 # ==============================================================================
-def _render_error(request: HttpRequest, template: str, status: int, context: Dict[str, Any] | None = None) -> HttpResponse:
+def _render_error(
+    request: HttpRequest,
+    template: str,
+    status: int,
+    context: Dict[str, Any] | None = None,
+) -> HttpResponse:
     """
     Centralized renderer for error pages so all errors:
       - Share the same template look/feel
@@ -85,23 +91,29 @@ def is_admin(user: User) -> bool:
     return user.is_staff or user_in_group(user, "Admin")
 
 
+# ==============================================================================
+# Global HOME alias
+# ==============================================================================
 @login_required
 @ensure_csrf_cookie  # ensure csrftoken cookie is set on first GET
 def home(request: HttpRequest) -> HttpResponse:
     """
-    Route users to the correct dashboard using the NEW (namespaced) routes.
-    Staff/Admin  -> dashboard:dashboard
-    Manager      -> manager_dashboard
-    Agent        -> dashboard:agent_dashboard
+    Global 'home' alias view.
+
+    Many templates / old code use `{% url 'home' %}`.
+    We now treat 'home' as "go to the main inventory dashboard".
+
+    - If user is authenticated -> redirect to inventory:inventory_dashboard
+    - Else -> redirect to login page
     """
-    u = request.user
-    if is_admin(u):
-        return redirect("dashboard:dashboard")
-    if user_in_group(u, "Manager"):
-        return redirect("manager_dashboard")
-    return redirect("dashboard:agent_dashboard")
+    if request.user.is_authenticated:
+        return redirect("inventory:inventory_dashboard")
+    return redirect("login")
 
 
+# ==============================================================================
+# Logout helper
+# ==============================================================================
 @require_http_methods(["GET", "POST"])
 def logout_now(request: HttpRequest) -> HttpResponse:
     """
@@ -148,17 +160,17 @@ def _totals_for_user(user: User, scope: str = "all") -> Dict[str, Any]:
 @login_required
 @user_passes_test(is_admin)
 def admin_dashboard(_request: HttpRequest) -> HttpResponse:
-    """Old route name â†’ redirect to the new namespaced admin dashboard."""
+    """Old route name → redirect to the new namespaced admin dashboard."""
     return redirect("dashboard:dashboard")
 
 
 # ==============================================================================
-# Admin â†’ per-agent detail + record advance
+# Admin → per-agent detail + record advance
 # ==============================================================================
 @login_required
 @user_passes_test(is_admin)
-@ensure_csrf_cookie         # set cookie on GET
-@csrf_protect               # enforce token on POST
+@ensure_csrf_cookie  # set cookie on GET
+@csrf_protect  # enforce token on POST
 def admin_agent_detail(request: HttpRequest, user_id: int) -> HttpResponse:
     agent = get_object_or_404(User, pk=user_id)
 
@@ -182,7 +194,10 @@ def admin_agent_detail(request: HttpRequest, user_id: int) -> HttpResponse:
                 reason="ADVANCE",
                 memo=memo or "Advance payment",
             )
-            messages.success(request, f"Advance of MK{amount:,} recorded for {agent.get_username()}.")
+            messages.success(
+                request,
+                f"Advance of MK{amount:,} recorded for {agent.get_username()}.",
+            )
         else:
             messages.error(request, "Enter a non-zero amount.")
         return redirect("admin_agent_detail", user_id=agent.id)
@@ -197,16 +212,14 @@ def admin_agent_detail(request: HttpRequest, user_id: int) -> HttpResponse:
     month_commission = sum((s.commission_amount for s in sales_month), Decimal("0"))
     lifetime_commission = sum((s.commission_amount for s in sales_all), Decimal("0"))
 
-    month_txn_total = WalletTxn.objects.filter(
-        user=agent, created_at__date__gte=month_start
-    ).aggregate(t=Sum("amount"))["t"] or Decimal("0")
-    lifetime_txn_total = WalletTxn.objects.filter(user=agent).aggregate(
+    month_txn_total = WalletTxn.objects.filter(user=agent, created_at__date__gte=month_start).aggregate(
         t=Sum("amount")
     )["t"] or Decimal("0")
+    lifetime_txn_total = WalletTxn.objects.filter(user=agent).aggregate(t=Sum("amount"))["t"] or Decimal("0")
 
-    month_deductions = WalletTxn.objects.filter(
-        user=agent, created_at__date__gte=month_start, amount__lt=0
-    ).aggregate(t=Sum("amount"))["t"] or Decimal("0")
+    month_deductions = WalletTxn.objects.filter(user=agent, created_at__date__gte=month_start, amount__lt=0).aggregate(
+        t=Sum("amount")
+    )["t"] or Decimal("0")
 
     total_monthly_earnings = BASE_SALARY + month_commission + month_txn_total
     lifetime_earnings = lifetime_commission + lifetime_txn_total
@@ -244,7 +257,7 @@ def manager_dashboard(request: HttpRequest) -> HttpResponse:
 # ==============================================================================
 @login_required
 @ensure_csrf_cookie  # set csrftoken cookie for JS/phone before any POST
-@csrf_protect        # enforce token on POST
+@csrf_protect  # enforce token on POST
 def agent_dashboard(request: HttpRequest) -> HttpResponse:
     """
     Agent dashboard:
@@ -268,7 +281,11 @@ def agent_dashboard(request: HttpRequest) -> HttpResponse:
             except Exception:
                 when = now
 
-        TimeLog.objects.create(user=user, logged_at=when, note=request.POST.get("note", "")[:200])
+        TimeLog.objects.create(
+            user=user,
+            logged_at=when,
+            note=request.POST.get("note", "")[:200],
+        )
 
         # Rewards/penalties using LOCAL time
         local_when = timezone.localtime(when)
@@ -280,7 +297,10 @@ def agent_dashboard(request: HttpRequest) -> HttpResponse:
                 reason="SUNDAY_BONUS",
                 memo="Sunday work bonus",
             )
-            messages.success(request, "ðŸŽ‰ Sunday bonus MK15,000 added to your wallet!")
+            messages.success(
+                request,
+                "🎉 Sunday bonus MK15,000 added to your wallet!",
+            )
         else:
             eight_am = local_when.replace(hour=8, minute=0, second=0, microsecond=0)
             if local_when <= eight_am:
@@ -290,7 +310,10 @@ def agent_dashboard(request: HttpRequest) -> HttpResponse:
                     reason="EARLY_BIRD",
                     memo="Early-bird before 8am",
                 )
-                messages.success(request, "ðŸ˜Š Early-bird bonus MK5,000 added to your wallet!")
+                messages.success(
+                    request,
+                    "🙂 Early-bird bonus MK5,000 added to your wallet!",
+                )
             else:
                 secs_after = (local_when - eight_am).total_seconds()
                 blocks = int((secs_after + 1799) // 1800)  # 30-min blocks, rounded up
@@ -302,15 +325,16 @@ def agent_dashboard(request: HttpRequest) -> HttpResponse:
                         reason="LATE_PENALTY",
                         memo=f"Late by ~{blocks*30} minutes",
                     )
-                    messages.error(request, f"ðŸ˜¢ Late penalty âˆ’MK{penalty:,} applied.")
+                    messages.error(
+                        request,
+                        f"😢 Late penalty −MK{penalty:,} applied.",
+                    )
 
         # Stay on this (cc) agent dashboard
         return redirect("agent_dashboard")
 
     # --- Stock for battery (agent-specific rules; max=20) ---
-    agent_in_stock = InventoryItem.objects.filter(
-        assigned_agent=user, status="IN_STOCK"
-    ).count()
+    agent_in_stock = InventoryItem.objects.filter(assigned_agent=user, status="IN_STOCK").count()
     battery_max = 20
     battery_pct = min(100, int(round((agent_in_stock / battery_max) * 100))) if agent_in_stock > 0 else 0
     if agent_in_stock < 10:
@@ -330,16 +354,14 @@ def agent_dashboard(request: HttpRequest) -> HttpResponse:
     month_commission = sum((s.commission_amount for s in my_sales_month), Decimal("0"))
     lifetime_commission = sum((s.commission_amount for s in my_sales_all), Decimal("0"))
 
-    month_txn_total = WalletTxn.objects.filter(
-        user=user, created_at__date__gte=month_start
-    ).aggregate(t=Sum("amount"))["t"] or Decimal("0")
-    lifetime_txn_total = WalletTxn.objects.filter(user=user).aggregate(
+    month_txn_total = WalletTxn.objects.filter(user=user, created_at__date__gte=month_start).aggregate(t=Sum("amount"))[
+        "t"
+    ] or Decimal("0")
+    lifetime_txn_total = WalletTxn.objects.filter(user=user).aggregate(t=Sum("amount"))["t"] or Decimal("0")
+
+    month_deductions = WalletTxn.objects.filter(user=user, created_at__date__gte=month_start, amount__lt=0).aggregate(
         t=Sum("amount")
     )["t"] or Decimal("0")
-
-    month_deductions = WalletTxn.objects.filter(
-        user=user, created_at__date__gte=month_start, amount__lt=0
-    ).aggregate(t=Sum("amount"))["t"] or Decimal("0")
 
     total_monthly_earnings = BASE_SALARY + month_commission + month_txn_total
     lifetime_earnings = lifetime_commission + lifetime_txn_total
@@ -391,20 +413,24 @@ def api_recommendations(request: HttpRequest) -> JsonResponse:
     # Stock-based nudge
     in_stock = InventoryItem.objects.filter(assigned_agent=user, status="IN_STOCK").count()
     if in_stock < 10:
-        items.append({
-            "type": "restock",
-            "message": f"Low stock: only {in_stock} items available. Consider restocking to at least 12.",
-            "confidence": 0.82,
-        })
+        items.append(
+            {
+                "type": "restock",
+                "message": (f"Low stock: only {in_stock} items available. " "Consider restocking to at least 12."),
+                "confidence": 0.82,
+            }
+        )
 
     # Recent sales nudge
     recent_sales = Sale.objects.filter(agent=user, sold_at__gte=now - timedelta(days=14)).count()
     if recent_sales == 0:
-        items.append({
-            "type": "marketing",
-            "message": "No sales in the last 14 days. Try a small discount or a WhatsApp broadcast.",
-            "confidence": 0.61,
-        })
+        items.append(
+            {
+                "type": "marketing",
+                "message": ("No sales in the last 14 days. " "Try a small discount or a WhatsApp broadcast."),
+                "confidence": 0.61,
+            }
+        )
 
     return JsonResponse({"success": True, "items": items})
 
@@ -426,8 +452,8 @@ def page_not_found(request: HttpRequest, exception, *args, **kwargs) -> HttpResp
 
 def server_error(request: HttpRequest, *args, **kwargs) -> HttpResponse:
     """
-    Global 500 renderer. Django calls this when DEBUG=False, or our FriendlyErrorsMiddleware
-    decides to render a user-safe page.
+    Global 500 renderer. Django calls this when DEBUG=False, or our
+    FriendlyErrorsMiddleware decides to render a user-safe page.
     """
     return _render_error(request, template="errors/500.html", status=500)
 
@@ -440,6 +466,69 @@ def feature_unavailable(request: HttpRequest, *args, **kwargs) -> HttpResponse:
     return _render_error(request, template="errors/501.html", status=501)
 
 
+# ==============================================================================
+# PWA: Service Worker
+# ==============================================================================
+
+# Stable BUILD_ID computed once at module import (prevents changing per request)
+# Priority: Render git commit > env GIT_SHA > settings > timestamp fallback
+import os
+_BUILD_ID = (
+    os.getenv("RENDER_GIT_COMMIT") or 
+    os.getenv("GIT_SHA") or 
+    getattr(settings, 'BUILD_ID', None) or 
+    getattr(settings, 'STATIC_VERSION', None) or
+    datetime.now().strftime("%Y%m%d%H%M%S")
+)
 
 
+@require_GET
+def sw_js(request: HttpRequest) -> HttpResponse:
+    """
+    Serve service worker from root path /sw.js with proper headers.
+    This allows the service worker to control the entire site scope (/).
 
+    CRITICAL: This view MUST be public (no @login_required) and always return 200.
+    Service workers must be accessible without authentication for PWA functionality.
+    All gating middleware bypass /sw.js via BYPASS_PREFIXES constant.
+    """
+    import os
+    from pathlib import Path
+
+    from django.contrib.staticfiles import finders
+
+    # Try to find the service worker file using Django's static file finder
+    sw_path = finders.find("sw.js")
+    if not sw_path:
+        # Fallback: try to read from static directory relative to BASE_DIR
+        static_path = Path(settings.BASE_DIR) / "static" / "sw.js"
+        if static_path.exists():
+            sw_path = str(static_path)
+        else:
+            # Last resort: try STATIC_ROOT if set
+            if settings.STATIC_ROOT:
+                static_root_path = Path(settings.STATIC_ROOT) / "sw.js"
+                if static_root_path.exists():
+                    sw_path = str(static_root_path)
+
+    if sw_path and os.path.exists(sw_path):
+        try:
+            with open(sw_path, "r", encoding="utf-8") as f:
+                content = f.read()
+            
+            # Inject BUILD_ID for cache busting (computed once at module load)
+            content = content.replace('BUILD_ID_PLACEHOLDER', str(_BUILD_ID))
+        except (IOError, OSError):
+            # Return minimal service worker if file read fails
+            content = "// Service worker file not found\nself.skipWaiting();"
+    else:
+        # Return minimal service worker if file not found
+        content = "// Service worker file not found\nself.skipWaiting();"
+
+    response = HttpResponse(content, content_type="application/javascript")
+    # Critical headers for service worker scope and cache control
+    response["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response["Pragma"] = "no-cache"
+    response["Expires"] = "0"
+    response["Service-Worker-Allowed"] = "/"
+    return response

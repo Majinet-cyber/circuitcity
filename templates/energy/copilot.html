@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+
+{% block title %}Energy Copilot · {{ business.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+.page-wrapper{max-width:900px;margin:0 auto;padding:16px}
+.page-header{margin-bottom:28px}
+.page-header h2{font-size:1.5rem;font-weight:700;color:#1e293b;margin:0 0 4px}
+.page-header p{color:#64748b;margin:0;font-size:.95rem}
+.copilot-badge{display:inline-flex;align-items:center;gap:6px;background:linear-gradient(135deg,#8b5cf6,#6366f1);color:#fff;padding:6px 14px;border-radius:20px;font-size:.8rem;font-weight:600;margin-bottom:20px}
+.insight-card{background:#fff;border-radius:14px;padding:20px;margin-bottom:14px;box-shadow:0 2px 8px rgba(0,0,0,.04);display:flex;gap:16px;align-items:flex-start;border-left:4px solid #e2e8f0}
+.insight-card.high,.insight-card.critical{border-left-color:#ef4444}
+.insight-card.medium{border-left-color:#f59e0b}
+.insight-card.low{border-left-color:#10b981}
+.insight-icon{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.2rem;flex-shrink:0}
+.insight-icon.maintenance{background:#fef3c7;color:#d97706}
+.insight-icon.capacity{background:#dbeafe;color:#2563eb}
+.insight-icon.performance{background:#fee2e2;color:#dc2626}
+.insight-icon.risk{background:#fce7f3;color:#db2777}
+.insight-icon.cost{background:#d1fae5;color:#059669}
+.insight-icon.opportunity{background:#e0e7ff;color:#4f46e5}
+.insight-body h4{font-size:1rem;font-weight:600;margin:0 0 4px;color:#1e293b}
+.insight-body p{color:#64748b;font-size:.9rem;margin:0 0 8px;line-height:1.5}
+.insight-action{font-size:.85rem;color:#2563eb;font-weight:600;display:flex;align-items:center;gap:4px}
+.empty-state{text-align:center;padding:80px 20px;color:#94a3b8}
+.empty-state i{font-size:3rem;margin-bottom:12px;display:block}
+.severity-tag{font-size:.7rem;text-transform:uppercase;padding:2px 8px;border-radius:4px;font-weight:600;margin-left:8px}
+.severity-tag.high,.severity-tag.critical{background:#fee2e2;color:#991b1b}
+.severity-tag.medium{background:#fef3c7;color:#92400e}
+.severity-tag.low{background:#d1fae5;color:#065f46}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-wrapper">
+  <div class="page-header">
+    <div class="copilot-badge"><i class="bi bi-cpu"></i> Energy Copilot</div>
+    <h2>Intelligent Insights</h2>
+    <p>Rule-based intelligence that analyzes your energy portfolio and suggests actions.</p>
+  </div>
+
+  {% if insights %}
+  {% for i in insights %}
+  <div class="insight-card {{ i.severity }}">
+    <div class="insight-icon {{ i.category }}">
+      {% if i.category == "maintenance" %}<i class="bi bi-wrench"></i>
+      {% elif i.category == "capacity" %}<i class="bi bi-bar-chart-steps"></i>
+      {% elif i.category == "performance" %}<i class="bi bi-speedometer"></i>
+      {% elif i.category == "risk" %}<i class="bi bi-shield-exclamation"></i>
+      {% elif i.category == "cost" %}<i class="bi bi-piggy-bank"></i>
+      {% elif i.category == "opportunity" %}<i class="bi bi-lightning-charge"></i>
+      {% else %}<i class="bi bi-lightbulb"></i>
+      {% endif %}
+    </div>
+    <div class="insight-body">
+      <h4>{{ i.title }}<span class="severity-tag {{ i.severity }}">{{ i.severity }}</span></h4>
+      <p>{{ i.explanation }}</p>
+      {% if i.action %}
+      <div class="insight-action"><i class="bi bi-arrow-right-circle"></i> {{ i.action }}</div>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+  {% else %}
+  <div class="empty-state">
+    <i class="bi bi-cpu"></i>
+    <h3>No insights available yet</h3>
+    <p>Add sites, assets, and readings to start receiving intelligent recommendations.</p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

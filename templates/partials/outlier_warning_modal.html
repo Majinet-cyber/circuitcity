@@ -1,0 +1,312 @@
+{% comment %}
+    Outlier Warning Modal - Non-Blocking AI-Driven Advice
+    
+    Shows gentle warnings when values are unusually high/low.
+    User can continue anyway or edit the value.
+    
+    Usage:
+    Include in forms where outlier detection is needed, then call showOutlierWarning() JS function
+{% endcomment %}
+
+<style>
+  .outlier-modal-backdrop {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
+    z-index: var(--z-modal-backdrop, 400);
+    animation: fadeIn 0.2s ease;
+  }
+  
+  .outlier-modal-backdrop.show {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+  }
+  
+  .outlier-modal {
+    background: white;
+    border-radius: 16px;
+    max-width: 500px;
+    width: 100%;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    animation: slideUp 0.3s ease;
+    overflow: hidden;
+  }
+  
+  .outlier-modal-header {
+    background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+    padding: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+  
+  .outlier-modal-icon {
+    font-size: 2.5rem;
+    flex-shrink: 0;
+  }
+  
+  .outlier-modal-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #78350f;
+    margin: 0;
+  }
+  
+  .outlier-modal-body {
+    padding: 1.5rem;
+  }
+  
+  .outlier-warning-text {
+    font-size: 1rem;
+    line-height: 1.6;
+    color: #374151;
+    margin-bottom: 1.5rem;
+  }
+  
+  .outlier-suggestion-box {
+    background: #f0fdf4;
+    border-left: 4px solid #10b981;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+  }
+  
+  .outlier-suggestion-label {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #065f46;
+    margin-bottom: 0.5rem;
+  }
+  
+  .outlier-suggestion-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #047857;
+  }
+  
+  .outlier-modal-actions {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+  }
+  
+  .outlier-btn {
+    flex: 1;
+    min-width: 120px;
+    padding: 0.75rem 1.5rem;
+    border-radius: 100px;
+    font-weight: 600;
+    font-size: 1rem;
+    cursor: pointer;
+    border: none;
+    transition: all 0.2s ease;
+    min-height: 44px;
+  }
+  
+  .outlier-btn-primary {
+    background: linear-gradient(135deg, #4f46e5 0%, #4338ca 100%);
+    color: white;
+    box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+  }
+  
+  .outlier-btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(79, 70, 229, 0.4);
+  }
+  
+  .outlier-btn-secondary {
+    background: white;
+    color: #6b7280;
+    border: 2px solid #e5e7eb;
+  }
+  
+  .outlier-btn-secondary:hover {
+    border-color: #d1d5db;
+    background: #f9fafb;
+  }
+  
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  
+  @keyframes slideUp {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  @media (max-width: 640px) {
+    .outlier-modal {
+      margin: 1rem;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+    
+    .outlier-modal-actions {
+      flex-direction: column;
+    }
+    
+    .outlier-btn {
+      width: 100%;
+    }
+  }
+</style>
+
+<!-- Outlier Warning Modal -->
+<div class="outlier-modal-backdrop" id="outlierModalBackdrop">
+  <div class="outlier-modal" role="dialog" aria-labelledby="outlierModalTitle" aria-describedby="outlierModalDescription">
+    <div class="outlier-modal-header">
+      <div class="outlier-modal-icon">⚠️</div>
+      <h2 class="outlier-modal-title" id="outlierModalTitle">Unusual Value Detected</h2>
+    </div>
+    
+    <div class="outlier-modal-body">
+      <p class="outlier-warning-text" id="outlierWarningText">
+        <!-- Dynamic warning text will be inserted here -->
+      </p>
+      
+      <div class="outlier-suggestion-box" id="outlierSuggestionBox" style="display: none;">
+        <div class="outlier-suggestion-label">Suggested value:</div>
+        <div class="outlier-suggestion-value" id="outlierSuggestedValue">
+          <!-- Suggested value will be inserted here -->
+        </div>
+      </div>
+      
+      <div class="outlier-modal-actions">
+        <button type="button" class="outlier-btn outlier-btn-secondary" onclick="closeOutlierWarning()">
+          Edit Value
+        </button>
+        <button type="button" class="outlier-btn outlier-btn-primary" onclick="continueWithValue()">
+          Continue Anyway
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// Global functions for outlier warning modal
+let outlierWarningCallback = null;
+
+function showOutlierWarning(warningData, onContinue) {
+  // warningData: { warning_message, suggested_value (optional) }
+  // onContinue: callback function to call if user continues
+  
+  const backdrop = document.getElementById('outlierModalBackdrop');
+  const warningText = document.getElementById('outlierWarningText');
+  const suggestionBox = document.getElementById('outlierSuggestionBox');
+  const suggestedValue = document.getElementById('outlierSuggestedValue');
+  
+  // Set warning text
+  warningText.textContent = warningData.warning_message || 'This value looks unusual.';
+  
+  // Show suggestion if available
+  if (warningData.suggested_value) {
+    suggestedValue.textContent = 'MWK ' + parseFloat(warningData.suggested_value).toLocaleString();
+    suggestionBox.style.display = 'block';
+  } else {
+    suggestionBox.style.display = 'none';
+  }
+  
+  // Store callback
+  outlierWarningCallback = onContinue;
+  
+  // Show modal
+  backdrop.classList.add('show');
+  
+  // Trap focus in modal
+  const modal = backdrop.querySelector('.outlier-modal');
+  modal.focus();
+}
+
+function closeOutlierWarning() {
+  const backdrop = document.getElementById('outlierModalBackdrop');
+  backdrop.classList.remove('show');
+  outlierWarningCallback = null;
+}
+
+function continueWithValue() {
+  // User chose to continue with the unusual value
+  if (outlierWarningCallback) {
+    outlierWarningCallback();
+  }
+  closeOutlierWarning();
+}
+
+// Close modal on backdrop click
+document.getElementById('outlierModalBackdrop')?.addEventListener('click', function(e) {
+  if (e.target === this) {
+    closeOutlierWarning();
+  }
+});
+
+// Close modal on Escape key
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') {
+    const backdrop = document.getElementById('outlierModalBackdrop');
+    if (backdrop && backdrop.classList.contains('show')) {
+      closeOutlierWarning();
+    }
+  }
+});
+
+/**
+ * Check for outliers before submitting a value
+ * @param {string} checkType - 'sale', 'stock_quantity', 'selling_price', 'cost_price'
+ * @param {number} value - The value to check
+ * @param {Object} context - Additional context (vertical, product_name, etc.)
+ * @param {Function} onSuccess - Callback if no outlier or user continues
+ */
+async function checkOutlierBeforeSubmit(checkType, value, context, onSuccess) {
+  try {
+    const response = await fetch('/api/check-outlier/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': getCsrfToken()
+      },
+      body: JSON.stringify({
+        check_type: checkType,
+        value: value,
+        context: context
+      })
+    });
+    
+    const data = await response.json();
+    
+    if (data.is_outlier && data.warning_message) {
+      // Show warning modal
+      showOutlierWarning(data, onSuccess);
+    } else {
+      // No outlier, proceed
+      onSuccess();
+    }
+  } catch (error) {
+    console.error('Outlier check failed:', error);
+    // On error, don't block user - proceed
+    onSuccess();
+  }
+}
+
+function getCsrfToken() {
+  return document.querySelector('[name=csrfmiddlewaretoken]')?.value || '';
+}
+</script>
+

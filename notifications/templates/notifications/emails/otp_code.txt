@@ -1,0 +1,18 @@
+Your Emajinet Verification Code
+
+Hi,
+
+Your Emajinet verification code is:
+
+{{ code }}
+
+This code will expire in 10 minutes.
+
+If you didn't request this code, please ignore this email or contact support if you have concerns.
+
+Best regards,
+The Emajinet Team
+
+---
+This is an automated email. Please do not reply directly to this message.
+

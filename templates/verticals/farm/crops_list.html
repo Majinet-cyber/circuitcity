@@ -1,0 +1,506 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Crops - {{ business.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+/* ===== Farm Crops Premium Styles ===== */
+.farm-crops {
+    --farm-green: #16a34a;
+    --farm-green-light: #dcfce7;
+    --farm-amber: #d97706;
+    --farm-amber-light: #fef3c7;
+    --farm-blue: #2563eb;
+    --farm-blue-light: #dbeafe;
+    --farm-brown: #92400e;
+    --farm-brown-light: #fef3c7;
+}
+
+/* Page Header */
+.crops-header {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.crops-header-text h1 {
+    font-size: clamp(1.5rem, 4vw, 1.875rem);
+    font-weight: 800;
+    color: var(--ink);
+    margin: 0 0 0.25rem 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.crops-header-text p {
+    color: var(--muted);
+    margin: 0;
+    font-size: 0.875rem;
+}
+
+/* Category Sections */
+.crop-category {
+    margin-bottom: 2rem;
+}
+
+.crop-category-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.crop-category-header h2 {
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: var(--ink);
+    margin: 0;
+}
+
+.crop-category-header .emoji {
+    font-size: 1.25rem;
+}
+
+/* Crop Cards Grid */
+.crop-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+}
+
+@media (min-width: 576px) {
+    .crop-cards-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+@media (min-width: 992px) {
+    .crop-cards-grid {
+        grid-template-columns: repeat(4, 1fr);
+    }
+}
+
+/* Premium Crop Card */
+.crop-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 1.25rem 0.75rem;
+    background: var(--surface);
+    border: 2px solid var(--border);
+    border-radius: var(--radius);
+    text-decoration: none;
+    color: var(--ink);
+    font-weight: 600;
+    font-size: 0.8125rem;
+    transition: all 0.2s ease;
+    box-shadow: var(--shadow-xs);
+    cursor: pointer;
+    text-align: center;
+}
+
+.crop-card:hover {
+    background: var(--farm-green-light);
+    border-color: var(--farm-green);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+    text-decoration: none;
+    color: var(--ink);
+}
+
+.crop-card:focus {
+    outline: 2px solid var(--farm-green);
+    outline-offset: 2px;
+}
+
+.crop-card .emoji {
+    font-size: 2rem;
+}
+
+.crop-card .label {
+    font-weight: 600;
+}
+
+.crop-card .sublabel {
+    font-size: 0.6875rem;
+    color: var(--muted);
+    font-weight: 400;
+}
+
+/* Category-specific colors on hover */
+.crop-card[data-category="staples"]:hover {
+    background: #fef3c7;
+    border-color: var(--farm-amber);
+}
+
+.crop-card[data-category="legumes"]:hover {
+    background: #dcfce7;
+    border-color: var(--farm-green);
+}
+
+.crop-card[data-category="cash"]:hover {
+    background: #dbeafe;
+    border-color: var(--farm-blue);
+}
+
+.crop-card[data-category="roots"]:hover {
+    background: #fed7aa;
+    border-color: var(--farm-brown);
+}
+
+.crop-card[data-category="vegetables"]:hover {
+    background: #d1fae5;
+    border-color: #059669;
+}
+
+/* Active Seasons Panel */
+.active-seasons-panel {
+    background: var(--surface);
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-sm);
+    margin-bottom: 2rem;
+}
+
+.active-seasons-header {
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.active-seasons-header h3 {
+    font-size: 0.9375rem;
+    font-weight: 700;
+    margin: 0;
+}
+
+.season-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1.25rem;
+    border-bottom: 1px solid var(--border);
+    transition: background 0.15s ease;
+}
+
+.season-item:last-child {
+    border-bottom: none;
+}
+
+.season-item:hover {
+    background: var(--surface-2);
+}
+
+.season-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+    background: var(--farm-green-light);
+}
+
+.season-details {
+    flex: 1;
+    min-width: 0;
+}
+
+.season-name {
+    font-weight: 600;
+    color: var(--ink);
+    font-size: 0.9375rem;
+}
+
+.season-meta {
+    font-size: 0.75rem;
+    color: var(--muted);
+}
+
+.season-status {
+    padding: 0.25rem 0.75rem;
+    border-radius: 999px;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.season-status.planning { background: #e0e7ff; color: #4338ca; }
+.season-status.active { background: var(--farm-green-light); color: var(--farm-green); }
+.season-status.harvested { background: var(--farm-amber-light); color: var(--farm-amber); }
+.season-status.closed { background: #f1f5f9; color: var(--muted); }
+
+/* Empty State */
+.empty-state {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: var(--muted);
+}
+
+.empty-state .emoji {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+}
+
+.empty-state h3 {
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: var(--ink);
+    margin-bottom: 0.5rem;
+}
+
+.empty-state p {
+    margin-bottom: 1.5rem;
+    font-size: 0.875rem;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="farm-crops container-fluid py-3" data-testid="farm-crops-page">
+    
+    <!-- Page Header -->
+    <div class="crops-header">
+        <div class="crops-header-text">
+            <h1><span>🌾</span> Crops</h1>
+            <p>Plan and track your crop seasons</p>
+        </div>
+        <a href="{% url 'verticals:farm_add_season' %}" class="btn btn-primary">
+            <i class="bi bi-plus-circle me-1"></i> New Season
+        </a>
+    </div>
+
+    <!-- Active Seasons Panel -->
+    {% if seasons %}
+    <div class="active-seasons-panel" data-testid="farm-active-seasons">
+        <div class="active-seasons-header">
+            <h3><i class="bi bi-calendar2-check me-2"></i>Your Crop Seasons</h3>
+            <span class="badge bg-success">{{ seasons|length }} season{% if seasons|length != 1 %}s{% endif %}</span>
+        </div>
+        {% for season in seasons %}
+        <a href="{% url 'verticals:farm_crop_detail' season.id %}" class="season-item text-decoration-none">
+            <div class="season-icon">
+                {% if season.crop_type == 'maize' %}🌽{% elif season.crop_type == 'soya' %}🫘{% elif season.crop_type == 'groundnuts' %}🥜{% elif season.crop_type == 'tobacco' %}🍂{% elif season.crop_type == 'cotton' %}☁️{% elif season.crop_type == 'rice' %}🍚{% elif season.crop_type == 'beans' %}🫘{% elif season.crop_type == 'cassava' %}🥔{% elif season.crop_type == 'sweet_potato' %}🍠{% elif season.crop_type == 'vegetables' %}🥬{% else %}🌱{% endif %}
+            </div>
+            <div class="season-details">
+                <div class="season-name">{{ season.name }}</div>
+                <div class="season-meta">{{ season.area_value }} {{ season.get_area_unit_display }} · Started {{ season.start_date|date:"M Y" }}</div>
+            </div>
+            <span class="season-status {{ season.status }}">{{ season.get_status_display }}</span>
+        </a>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Quick Start: Select Crop Type -->
+    <div class="mb-4">
+        <h2 class="h5 mb-3"><i class="bi bi-lightning-fill me-2 text-warning"></i>Quick Start: Choose Your Crop</h2>
+        <p class="text-muted mb-3">Click a crop to start planning a new season</p>
+    </div>
+
+    <!-- Staples -->
+    <div class="crop-category" data-testid="crop-category-staples">
+        <div class="crop-category-header">
+            <span class="emoji">🌾</span>
+            <h2>Staples</h2>
+        </div>
+        <div class="crop-cards-grid" data-testid="crop-cards-staples">
+            <a href="{% url 'verticals:farm_add_season' %}?crop=maize" class="crop-card" data-category="staples" data-testid="crop-card-maize">
+                <span class="emoji">🌽</span>
+                <span class="label">Maize</span>
+                <span class="sublabel">Chimanga</span>
+            </a>
+            <a href="{% url 'verticals:farm_add_season' %}?crop=rice" class="crop-card" data-category="staples" data-testid="crop-card-rice">
+                <span class="emoji">🍚</span>
+                <span class="label">Rice</span>
+                <span class="sublabel">Mpunga</span>
+            </a>
+            <a href="{% url 'verticals:farm_add_season' %}?crop=sorghum" class="crop-card" data-category="staples" data-testid="crop-card-sorghum">
+                <span class="emoji">🌾</span>
+                <span class="label">Sorghum</span>
+                <span class="sublabel">Mapira</span>
+            </a>
+            <a href="{% url 'verticals:farm_add_season' %}?crop=millet" class="crop-card" data-category="staples" data-testid="crop-card-millet">
+                <span class="emoji">🌾</span>
+                <span class="label">Millet</span>
+                <span class="sublabel">Mawere</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- Legumes -->
+    <div class="crop-category" data-testid="crop-category-legumes">
+        <div class="crop-category-header">
+            <span class="emoji">🫘</span>
+            <h2>Legumes</h2>
+        </div>
+        <div class="crop-cards-grid" data-testid="crop-cards-legumes">
+            <a href="{% url 'verticals:farm_add_season' %}?crop=groundnuts" class="crop-card" data-category="legumes" data-testid="crop-card-groundnuts">
+                <span class="emoji">🥜</span>
+                <span class="label">Groundnuts</span>
+                <span class="sublabel">Mtedza</span>
+            </a>
+            <a href="{% url 'verticals:farm_add_season' %}?crop=soya" class="crop-card" data-category="legumes" data-testid="crop-card-soya">
+                <span class="emoji">🫘</span>
+                <span class="label">Soya Beans</span>
+                <span class="sublabel">Soya</span>
+            </a>
+            <a href="{% url 'verticals:farm_add_season' %}?crop=beans" class="crop-card" data-category="legumes" data-testid="crop-card-beans">
+                <span class="emoji">🫘</span>
+                <span class="label">Common Beans</span>
+                <span class="sublabel">Nyemba</span>
+            </a>
+            <a href="{% url 'verticals:farm_add_season' %}?crop=cowpeas" class="crop-card" data-category="legumes" data-testid="crop-card-cowpeas">
+                <span class="emoji">🫛</span>
+                <span class="label">Cowpeas</span>
+                <span class="sublabel">Khobwe</span>
+            </a>
+            <a href="{% url 'verticals:farm_add_season' %}?crop=pigeon_peas" class="crop-card" data-category="legumes" data-testid="crop-card-pigeon-peas">
+                <span class="emoji">🫛</span>
+                <span class="label">Pigeon Peas</span>
+                <span class="sublabel">Nandolo</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- Cash Crops -->
+    <div class="crop-category" data-testid="crop-category-cash">
+        <div class="crop-category-header">
+            <span class="emoji">💰</span>
+            <h2>Cash Crops</h2>
+        </div>
+        <div class="crop-cards-grid" data-testid="crop-cards-cash">
+            <a href="{% url 'verticals:farm_add_season' %}?crop=tobacco" class="crop-card" data-category="cash" data-testid="crop-card-tobacco">
+                <span class="emoji">🍂</span>
+                <span class="label">Tobacco</span>
+                <span class="sublabel">Fodya</span>
+            </a>
+            <a href="{% url 'verticals:farm_add_season' %}?crop=cotton" class="crop-card" data-category="cash" data-testid="crop-card-cotton">
+                <span class="emoji">☁️</span>
+                <span class="label">Cotton</span>
+                <span class="sublabel">Thonje</span>
+            </a>
+            <a href="{% url 'verticals:farm_add_season' %}?crop=sunflower" class="crop-card" data-category="cash" data-testid="crop-card-sunflower">
+                <span class="emoji">🌻</span>
+                <span class="label">Sunflower</span>
+                <span class="sublabel">Mpendadzuwa</span>
+            </a>
+            <a href="{% url 'verticals:farm_add_season' %}?crop=macadamia" class="crop-card" data-category="cash" data-testid="crop-card-macadamia">
+                <span class="emoji">🥜</span>
+                <span class="label">Macadamia</span>
+                <span class="sublabel">Tree nut</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- Roots & Tubers -->
+    <div class="crop-category" data-testid="crop-category-roots">
+        <div class="crop-category-header">
+            <span class="emoji">🥔</span>
+            <h2>Roots & Tubers</h2>
+        </div>
+        <div class="crop-cards-grid" data-testid="crop-cards-roots">
+            <a href="{% url 'verticals:farm_add_season' %}?crop=cassava" class="crop-card" data-category="roots" data-testid="crop-card-cassava">
+                <span class="emoji">🥔</span>
+                <span class="label">Cassava</span>
+                <span class="sublabel">Chinangwa</span>
+            </a>
+            <a href="{% url 'verticals:farm_add_season' %}?crop=sweet_potato" class="crop-card" data-category="roots" data-testid="crop-card-sweet-potato">
+                <span class="emoji">🍠</span>
+                <span class="label">Sweet Potatoes</span>
+                <span class="sublabel">Mbatata</span>
+            </a>
+            <a href="{% url 'verticals:farm_add_season' %}?crop=irish_potato" class="crop-card" data-category="roots" data-testid="crop-card-irish-potato">
+                <span class="emoji">🥔</span>
+                <span class="label">Irish Potatoes</span>
+                <span class="sublabel">Kachewere</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- Vegetables -->
+    <div class="crop-category" data-testid="crop-category-vegetables">
+        <div class="crop-category-header">
+            <span class="emoji">🥬</span>
+            <h2>Vegetables</h2>
+        </div>
+        <div class="crop-cards-grid" data-testid="crop-cards-vegetables">
+            <a href="{% url 'verticals:farm_add_season' %}?crop=tomato" class="crop-card" data-category="vegetables" data-testid="crop-card-tomato">
+                <span class="emoji">🍅</span>
+                <span class="label">Tomato</span>
+                <span class="sublabel">Matimati</span>
+            </a>
+            <a href="{% url 'verticals:farm_add_season' %}?crop=onion" class="crop-card" data-category="vegetables" data-testid="crop-card-onion">
+                <span class="emoji">🧅</span>
+                <span class="label">Onion</span>
+                <span class="sublabel">Anyezi</span>
+            </a>
+            <a href="{% url 'verticals:farm_add_season' %}?crop=cabbage" class="crop-card" data-category="vegetables" data-testid="crop-card-cabbage">
+                <span class="emoji">🥬</span>
+                <span class="label">Cabbage</span>
+                <span class="sublabel">Kabichi</span>
+            </a>
+            <a href="{% url 'verticals:farm_add_season' %}?crop=rape" class="crop-card" data-category="vegetables" data-testid="crop-card-rape">
+                <span class="emoji">🥬</span>
+                <span class="label">Rape / Mustard</span>
+                <span class="sublabel">Mpiru</span>
+            </a>
+            <a href="{% url 'verticals:farm_add_season' %}?crop=okra" class="crop-card" data-category="vegetables" data-testid="crop-card-okra">
+                <span class="emoji">🌿</span>
+                <span class="label">Okra</span>
+                <span class="sublabel">Therere</span>
+            </a>
+            <a href="{% url 'verticals:farm_add_season' %}?crop=pumpkin" class="crop-card" data-category="vegetables" data-testid="crop-card-pumpkin">
+                <span class="emoji">🎃</span>
+                <span class="label">Pumpkin</span>
+                <span class="sublabel">Dzungu</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- Other Crops -->
+    <div class="crop-category">
+        <div class="crop-category-header">
+            <span class="emoji">🌱</span>
+            <h2>Other Crops</h2>
+        </div>
+        <div class="crop-cards-grid">
+            <a href="{% url 'verticals:farm_add_season' %}?crop=other" class="crop-card" data-category="other" data-testid="crop-card-other">
+                <span class="emoji">🌱</span>
+                <span class="label">Other Crop</span>
+                <span class="sublabel">Custom entry</span>
+            </a>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Keyboard navigation for crop cards
+document.addEventListener('DOMContentLoaded', function() {
+    const cards = document.querySelectorAll('.crop-card');
+    cards.forEach(card => {
+        card.setAttribute('tabindex', '0');
+        card.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                this.click();
+            }
+        });
+    });
+});
+</script>
+{% endblock %}

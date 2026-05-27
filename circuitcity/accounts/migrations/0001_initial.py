@@ -14,7 +14,6 @@ def avatar_upload_to(instance, filename):
 
 
 class Migration(migrations.Migration):
-
     initial = True
 
     dependencies = [
@@ -23,28 +22,40 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.CreateModel(
-            name='Profile',
+            name="Profile",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('avatar', models.ImageField(blank=True, null=True, upload_to=avatar_upload_to)),
-                ('user', models.OneToOneField(on_delete=django.db.models.deletion.CASCADE, related_name='profile', to=settings.AUTH_USER_MODEL)),
+                ("id", models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name="ID")),
+                ("avatar", models.ImageField(blank=True, null=True, upload_to=avatar_upload_to)),
+                (
+                    "user",
+                    models.OneToOneField(
+                        on_delete=django.db.models.deletion.CASCADE, related_name="profile", to=settings.AUTH_USER_MODEL
+                    ),
+                ),
             ],
         ),
         migrations.CreateModel(
-            name='PasswordResetCode',
+            name="PasswordResetCode",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('code_hash', models.CharField(max_length=256)),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('expires_at', models.DateTimeField()),
-                ('attempts', models.PositiveIntegerField(default=0)),
-                ('used', models.BooleanField(default=False)),
-                ('requester_ip', models.GenericIPAddressField(blank=True, null=True)),
-                ('user', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='password_reset_codes', to=settings.AUTH_USER_MODEL)),
+                ("id", models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name="ID")),
+                ("code_hash", models.CharField(max_length=256)),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("expires_at", models.DateTimeField()),
+                ("attempts", models.PositiveIntegerField(default=0)),
+                ("used", models.BooleanField(default=False)),
+                ("requester_ip", models.GenericIPAddressField(blank=True, null=True)),
+                (
+                    "user",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="password_reset_codes",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
             ],
             options={
-                'ordering': ['-created_at'],
-                'indexes': [models.Index(fields=['user', 'expires_at', 'used'], name='accounts_pa_user_id_e2d71c_idx')],
+                "ordering": ["-created_at"],
+                "indexes": [models.Index(fields=["user", "expires_at", "used"], name="accounts_pa_user_id_e2d71c_idx")],
             },
         ),
     ]

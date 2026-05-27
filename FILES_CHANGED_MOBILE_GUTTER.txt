@@ -1,0 +1,39 @@
+FILES CHANGED — Global Mobile Gutter Implementation
+================================================
+
+NEW FILES (1):
+--------------
+1. static/css/mobile-gutter-system.css
+   - 476 lines
+   - Global mobile gutter system
+   - Single source of truth for mobile gutters (--cc-gutter-mobile: 10px)
+   - Matches landing page near-edge feel
+   - Neutralizes nested container padding on mobile
+   - Excludes modals, offcanvas, toasts, scanners
+   - Desktop/tablet layouts unchanged
+
+
+MODIFIED FILES (1):
+-------------------
+1. templates/base.html
+   - Lines 68-79 (CSS includes section)
+   - Added mobile-gutter-system.css include
+   - Positioned after mobile-fixes.css, before glassmorphic-enhancement.css
+   - Exact change:
+     <!-- GLOBAL MOBILE GUTTER SYSTEM — Match landing page near-edge feel (2025-12-21) -->
+     <link rel="stylesheet" href="{% static 'css/mobile-gutter-system.css' %}?v={{ ASSET_V }}">
+
+
+DOCUMENTATION FILES (2):
+------------------------
+1. MOBILE_GUTTER_IMPLEMENTATION_SUMMARY.md (NEW)
+   - Comprehensive implementation documentation
+   - Technical details, acceptance tests, deployment notes
+
+2. FILES_CHANGED_MOBILE_GUTTER.txt (THIS FILE)
+
+
+TOTAL FILES CHANGED: 2 (1 new, 1 modified)
+TOTAL DOCUMENTATION: 2 (both new)
+================================================
+

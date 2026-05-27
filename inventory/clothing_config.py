@@ -1,0 +1,606 @@
+# inventory/clothing_config.py
+"""
+Single source of truth for CLOTHING vertical configuration.
+Defines categories, sizes, colors, SKU format, and QR signing helpers.
+"""
+from __future__ import annotations
+
+from typing import Dict, List, Tuple, Optional
+from decimal import Decimal
+import secrets
+import hashlib
+import json
+from django.conf import settings
+from django.core.signing import Signer, BadSignature
+
+
+# ============================================================================
+# CLOTHING CATEGORIES & ITEM TYPES
+# ============================================================================
+
+
+class ClothingItemType:
+    """Top-level item type classification"""
+
+    APPAREL = "apparel"
+    FOOTWEAR = "footwear"
+    ACCESSORY = "accessory"
+    FRAGRANCE = "fragrance"
+    HOME = "home"
+    OTHER = "other"
+
+    CHOICES = [
+        (APPAREL, "Apparel"),
+        (FOOTWEAR, "Footwear"),
+        (ACCESSORY, "Accessory"),
+        (FRAGRANCE, "Fragrance"),
+        (HOME, "Home & Linen"),
+        (OTHER, "Other"),
+    ]
+
+
+# Category definitions: (value, display_name, icon, item_type)
+CLOTHING_CATEGORIES: List[Tuple[str, str, str, str]] = [
+    # Apparel — tops
+    ("shirt", "Shirt", "👔", ClothingItemType.APPAREL),
+    ("t-shirt", "T-Shirt", "👕", ClothingItemType.APPAREL),
+    ("blouse", "Blouse", "👚", ClothingItemType.APPAREL),
+    # Apparel — bottoms
+    ("trouser", "Trouser", "👖", ClothingItemType.APPAREL),
+    ("jeans", "Jeans", "👖", ClothingItemType.APPAREL),
+    ("shorts", "Shorts", "🩳", ClothingItemType.APPAREL),
+    ("skirt", "Skirt", "👗", ClothingItemType.APPAREL),
+    ("leggings", "Leggings", "🩱", ClothingItemType.APPAREL),
+    # Apparel — full outfits
+    ("dress", "Dress", "👗", ClothingItemType.APPAREL),
+    ("suit", "Suit", "🤵", ClothingItemType.APPAREL),
+    ("jumpsuit", "Jumpsuit", "🧥", ClothingItemType.APPAREL),
+    # Apparel — outerwear
+    ("jacket", "Jacket", "🧥", ClothingItemType.APPAREL),
+    ("hoodie", "Hoodie", "🧥", ClothingItemType.APPAREL),
+    ("coat", "Coat", "🧥", ClothingItemType.APPAREL),
+    # Apparel — other
+    ("jersey", "Jersey", "⚽", ClothingItemType.APPAREL),
+    ("underwear", "Underwear", "🩲", ClothingItemType.APPAREL),
+    # Footwear
+    ("sneaker", "Sneakers", "👟", ClothingItemType.FOOTWEAR),
+    ("boot", "Boots", "🥾", ClothingItemType.FOOTWEAR),
+    ("office-shoe", "Office Shoes", "👞", ClothingItemType.FOOTWEAR),
+    ("sports-shoe", "Sports Shoes", "👟", ClothingItemType.FOOTWEAR),
+    ("sandal", "Sandals", "👡", ClothingItemType.FOOTWEAR),
+    ("slides", "Slides", "🩴", ClothingItemType.FOOTWEAR),
+    ("heels", "Heels", "👠", ClothingItemType.FOOTWEAR),
+    # Accessories
+    ("belt", "Belt", "🔗", ClothingItemType.ACCESSORY),
+    ("bag", "Bag", "👜", ClothingItemType.ACCESSORY),
+    ("handbag", "Handbag", "👜", ClothingItemType.ACCESSORY),
+    ("schoolbag", "School Bag", "🎒", ClothingItemType.ACCESSORY),
+    ("cap", "Cap / Hat", "🧢", ClothingItemType.ACCESSORY),
+    ("socks", "Socks", "🧦", ClothingItemType.ACCESSORY),
+    ("sunglasses", "Sunglasses", "🕶️", ClothingItemType.ACCESSORY),
+    ("watch", "Watch", "⌚", ClothingItemType.ACCESSORY),
+    ("luxury-watch", "Luxury Watch", "⌚", ClothingItemType.ACCESSORY),
+    ("tie", "Tie / Necktie", "👔", ClothingItemType.ACCESSORY),
+    ("wallet", "Wallet", "👛", ClothingItemType.ACCESSORY),
+    ("scarf", "Scarf", "🧣", ClothingItemType.ACCESSORY),
+    # Fragrance
+    ("perfume", "Perfume", "🌸", ClothingItemType.FRAGRANCE),
+    ("deodorant", "Deodorant", "🌿", ClothingItemType.FRAGRANCE),
+    # Home & Linen
+    ("bedsheet", "Bedsheet", "🛏️", ClothingItemType.HOME),
+    ("pillowcase", "Pillow Case", "🛏️", ClothingItemType.HOME),
+    ("duvet", "Duvet / Blanket", "🛏️", ClothingItemType.HOME),
+    ("towel", "Towel", "🛁", ClothingItemType.HOME),
+    ("curtain", "Curtain", "🏠", ClothingItemType.HOME),
+    # Other
+    ("other", "Other", "🛍️", ClothingItemType.OTHER),
+]
+
+
+def get_category_display(category_value: str) -> str:
+    """Get human-readable category name.
+
+    For predefined categories, returns the configured display name.
+    For custom categories (slugified, e.g. 'soccer-jerseys'), converts
+    hyphens/underscores to spaces and title-cases: 'Soccer Jerseys'.
+    """
+    for val, display, _, _ in CLOTHING_CATEGORIES:
+        if val == category_value:
+            return display
+    # Custom category stored as slug — convert back to readable form
+    return category_value.replace("-", " ").replace("_", " ").title()
+
+
+def get_category_icon(category_value: str) -> str:
+    """Get emoji icon for category"""
+    for val, _, icon, _ in CLOTHING_CATEGORIES:
+        if val == category_value:
+            return icon
+    return "👕"
+
+
+def get_item_type_for_category(category_value: str) -> str:
+    """Get item type for a category"""
+    for val, _, _, item_type in CLOTHING_CATEGORIES:
+        if val == category_value:
+            return item_type
+    return ClothingItemType.OTHER
+
+
+# ============================================================================
+# SIZES & COLORS
+# ============================================================================
+
+# Apparel sizes (XS to XXL)
+APPAREL_SIZES = ["XS", "S", "M", "L", "XL", "XXL", "XXXL"]
+
+# Footwear sizes (EU sizing, common in Africa)
+FOOTWEAR_SIZES = [str(i) for i in range(36, 47)]  # 36-46
+
+# Trouser/Jeans waist sizes (inches)
+TROUSER_SIZES = [str(i) for i in range(28, 45, 2)]  # 28, 30, 32, ..., 44
+
+# Combined size list (for generic use)
+ALL_SIZES = sorted(set(APPAREL_SIZES + FOOTWEAR_SIZES + TROUSER_SIZES), key=lambda x: (len(x), x))
+
+
+def get_sizes_for_category(category_value: str) -> List[str]:
+    """Get appropriate size list for a category"""
+    item_type = get_item_type_for_category(category_value)
+
+    if item_type in (ClothingItemType.HOME, ClothingItemType.FRAGRANCE):
+        return []
+    if item_type == ClothingItemType.FOOTWEAR:
+        return FOOTWEAR_SIZES
+    elif category_value in ("trouser", "jeans", "shorts", "leggings"):
+        return TROUSER_SIZES
+    elif item_type == ClothingItemType.APPAREL:
+        return APPAREL_SIZES
+    else:
+        # Accessories/Fragrance typically don't have sizes
+        return []
+
+
+# Standard color palette
+CLOTHING_COLORS = [
+    "Black",
+    "White",
+    "Navy",
+    "Grey",
+    "Beige",
+    "Brown",
+    "Blue",
+    "Red",
+    "Green",
+    "Yellow",
+    "Pink",
+    "Purple",
+    "Orange",
+    "Multi",
+    "Other",
+]
+
+
+# ============================================================================
+# CLOTHING BRANDS (for gamified UI)
+# ============================================================================
+
+CLOTHING_BRANDS = [
+    # Sportswear & Athletic
+    "Nike",
+    "Adidas",
+    "Puma",
+    "Reebok",
+    "Under Armour",
+    "New Balance",
+    "Skechers",
+    "Converse",
+    "Vans",
+    "Jordan",
+    "Fila",
+    "Asics",
+    
+    # Fashion & Premium
+    "Gucci",
+    "Louis Vuitton",
+    "Balenciaga",
+    "Versace",
+    "Prada",
+    "Dior",
+    "Chanel",
+    "Burberry",
+    "Givenchy",
+    
+    # Casual & Fast Fashion
+    "Zara",
+    "H&M",
+    "Forever 21",
+    "Uniqlo",
+    "Gap",
+    "Pull & Bear",
+    
+    # Denim & Streetwear
+    "Levi's",
+    "Diesel",
+    "Wrangler",
+    "Lee",
+    "G-Star",
+    "Guess",
+    
+    # Footwear Specialists
+    "Timberland",
+    "Clarks",
+    "Dr. Martens",
+    "Crocs",
+    "Birkenstock",
+    
+    # Other/Generic
+    "Other",
+]
+
+
+# ============================================================================
+# CLOTHING SUBTYPES (type within category)
+# ============================================================================
+
+CLOTHING_SUBTYPES = {
+    # Footwear
+    "sneaker": ["Sneakers", "Running Shoes", "Basketball Shoes", "Lifestyle Sneakers", "High Tops", "Low Tops"],
+    "boot": ["Ankle Boots", "Combat Boots", "Chelsea Boots", "Work Boots", "Fashion Boots"],
+    "office-shoe": ["Formal Shoes", "Loafers", "Derby", "Oxford", "Brogues"],
+    "sports-shoe": ["Football Boots", "Running Shoes", "Training Shoes", "Tennis Shoes"],
+    
+    # Apparel - Dresses
+    "dress": ["Evening Dress", "Casual Dress", "Office Dress", "Traditional Dress", "Maxi Dress", "Mini Dress", "Midi Dress"],
+    
+    # Apparel - Shirts
+    "shirt": ["Formal Shirt", "Casual Shirt", "Button-Up", "Flannel", "Denim Shirt"],
+    "t-shirt": ["Crew Neck", "V-Neck", "Polo Shirt", "Henley", "Tank Top", "Long Sleeve Tee"],
+    
+    # Apparel - Pants
+    "trouser": ["Formal Trousers", "Chinos", "Dress Pants", "Cargo Pants"],
+    "jeans": ["Skinny Jeans", "Slim Fit", "Regular Fit", "Bootcut", "Straight Leg", "Relaxed Fit"],
+    "shorts": ["Casual Shorts", "Cargo Shorts", "Athletic Shorts", "Board Shorts", "Denim Shorts"],
+    
+    # Apparel - Jackets
+    "jacket": ["Bomber Jacket", "Leather Jacket", "Blazer", "Denim Jacket", "Windbreaker", "Parka", "Coat", "Puffer Jacket"],
+    
+    # Apparel - Other
+    "suit": ["Two-Piece Suit", "Three-Piece Suit", "Tuxedo", "Business Suit"],
+    "jersey": ["Football Jersey", "Basketball Jersey", "Rugby Jersey", "Team Jersey"],
+    "skirt": ["Mini Skirt", "Midi Skirt", "Maxi Skirt", "Pencil Skirt", "A-Line Skirt"],
+    
+    # Accessories
+    "belt": ["Leather Belt", "Casual Belt", "Formal Belt", "Designer Belt"],
+    "bag": ["Backpack", "Crossbody Bag", "Tote Bag", "Messenger Bag", "Duffel Bag"],
+    "handbag": ["Clutch", "Shoulder Bag", "Hobo Bag", "Satchel"],
+    "schoolbag": ["Backpack", "School Bag", "Laptop Bag"],
+    "hat": ["Baseball Cap", "Beanie", "Fedora", "Bucket Hat", "Snapback"],
+    "socks": ["Ankle Socks", "Crew Socks", "Knee High Socks", "No-Show Socks"],
+    
+    # Fragrance
+    "perfume": ["Eau de Parfum", "Eau de Toilette", "Cologne", "Body Spray", "Roll-On"],
+}
+
+
+def get_subtypes_for_category(category_value: str) -> List[str]:
+    """Get subtypes for a given category"""
+    return CLOTHING_SUBTYPES.get(category_value, [])
+
+
+def generate_auto_description(
+    category: str,
+    custom_category: Optional[str] = None,
+    brand: Optional[str] = None,
+    item_subtype: Optional[str] = None,
+    size: Optional[str] = None,
+    color: Optional[str] = None,
+) -> str:
+    """
+    Build a clean auto-generated product description from selected attributes.
+
+    Example: brand=Lacoste, subtype=Polo Shirt, category=shirt, size=M, color=Navy
+    → "Navy Lacoste Polo Shirt, Size M"
+
+    Returns empty string if no useful parts are available.
+    """
+    display_category = (
+        custom_category.strip().title() if custom_category and category == "other"
+        else get_category_display(category)
+    )
+
+    parts: List[str] = []
+    if color and color.lower() not in ("other", ""):
+        parts.append(color.strip())
+    if brand:
+        parts.append(brand.strip())
+    if item_subtype:
+        parts.append(item_subtype.strip())
+    elif display_category:
+        parts.append(display_category)
+
+    result = " ".join(parts)
+    if size:
+        result = f"{result}, Size {size}" if result else f"Size {size}"
+    return result
+
+
+# ============================================================================
+# AUTO-GENERATED SKU SYSTEM
+# ============================================================================
+
+
+def generate_internal_sku(
+    business_id: int, category: str, brand: Optional[str] = None, sequence: Optional[int] = None
+) -> str:
+    """
+    Generate a business-scoped internal SKU.
+
+    Format: BIZ{business_id}-{CATEGORY_CODE}-{SEQ}
+    Example: BIZ42-SNK-001 (Sneaker #1 for business 42)
+
+    Args:
+        business_id: Business ID
+        category: Category value (e.g., "sneaker")
+        brand: Optional brand name (not used in SKU, but can be for future)
+        sequence: Optional sequence number (auto-generated if None)
+
+    Returns:
+        Internal SKU string
+    """
+    # Category code: first 3 letters uppercase
+    category_code = category[:3].upper() if category else "GEN"
+
+    # If sequence not provided, generate random 3-digit
+    if sequence is None:
+        sequence = secrets.randbelow(1000)
+
+    sku = f"BIZ{business_id}-{category_code}-{sequence:03d}"
+    return sku
+
+
+def generate_variant_sku(base_sku: str, size: Optional[str] = None, color: Optional[str] = None) -> str:
+    """
+    Generate variant SKU from base SKU + size/color.
+
+    Format: {BASE_SKU}-{SIZE}-{COLOR_CODE}
+    Example: BIZ42-SNK-001-42-BLK
+
+    Args:
+        base_sku: Base product SKU
+        size: Size value (e.g., "42", "M")
+        color: Color value (e.g., "Black")
+
+    Returns:
+        Variant SKU string
+    """
+    parts = [base_sku]
+
+    if size:
+        parts.append(size.upper())
+
+    if color:
+        # Color code: first 3 letters
+        color_code = color[:3].upper()
+        parts.append(color_code)
+
+    return "-".join(parts)
+
+
+# ============================================================================
+# QR CODE SIGNING (for secure product labels)
+# ============================================================================
+
+
+def sign_product_qr_data(
+    business_id: int, product_id: int, variant_id: Optional[int] = None, expiry_days: int = 365
+) -> str:
+    """
+    Create a signed token for QR code that encodes product/variant info.
+
+    Token format: {business_id}:{product_id}:{variant_id}:{timestamp}:{signature}
+
+    Args:
+        business_id: Business ID
+        product_id: Product ID
+        variant_id: Optional variant ID
+        expiry_days: Token validity in days (default 1 year)
+
+    Returns:
+        Signed token string
+    """
+    import time
+
+    timestamp = int(time.time())
+    variant_part = str(variant_id) if variant_id else "0"
+
+    # Payload: business:product:variant:timestamp
+    payload = f"{business_id}:{product_id}:{variant_part}:{timestamp}"
+
+    # Sign with Django's Signer
+    signer = Signer(salt="clothing_qr_v1")
+    signed_token = signer.sign(payload)
+
+    return signed_token
+
+
+def verify_product_qr_token(token: str, max_age_days: int = 365) -> Optional[Dict]:
+    """
+    Verify and decode a QR token.
+
+    Args:
+        token: Signed token string
+        max_age_days: Maximum age in days
+
+    Returns:
+        Dict with {business_id, product_id, variant_id} or None if invalid
+    """
+    import time
+
+    try:
+        signer = Signer(salt="clothing_qr_v1")
+        payload = signer.unsign(token)
+
+        # Parse payload
+        parts = payload.split(":")
+        if len(parts) != 4:
+            return None
+
+        business_id = int(parts[0])
+        product_id = int(parts[1])
+        variant_id = int(parts[2]) if parts[2] != "0" else None
+        timestamp = int(parts[3])
+
+        # Check expiry
+        age_seconds = time.time() - timestamp
+        age_days = age_seconds / 86400
+
+        if age_days > max_age_days:
+            return None
+
+        return {
+            "business_id": business_id,
+            "product_id": product_id,
+            "variant_id": variant_id,
+            "timestamp": timestamp,
+        }
+
+    except (BadSignature, ValueError, IndexError):
+        return None
+
+
+# ============================================================================
+# PRICE TIERS (for smart filtering)
+# ============================================================================
+
+
+def get_price_tier(price: Decimal) -> str:
+    """
+    Classify product into price tier for filtering.
+
+    Args:
+        price: Selling price
+
+    Returns:
+        Tier name: "budget", "mid", "premium", "luxury"
+    """
+    if price < Decimal("50"):
+        return "budget"
+    elif price < Decimal("200"):
+        return "mid"
+    elif price < Decimal("500"):
+        return "premium"
+    else:
+        return "luxury"
+
+
+PRICE_TIER_LABELS = {
+    "budget": "Budget (< K50)",
+    "mid": "Mid-Range (K50-200)",
+    "premium": "Premium (K200-500)",
+    "luxury": "Luxury (K500+)",
+}
+
+
+# ============================================================================
+# STOCK STATUS HELPERS
+# ============================================================================
+
+
+def get_stock_status(quantity: int, low_threshold: int = 3) -> str:
+    """
+    Get stock status label.
+
+    Args:
+        quantity: Current stock quantity
+        low_threshold: Threshold for low stock warning
+
+    Returns:
+        Status: "out", "low", "in"
+    """
+    if quantity <= 0:
+        return "out"
+    elif quantity <= low_threshold:
+        return "low"
+    else:
+        return "in"
+
+
+# ============================================================================
+# GAMIFICATION CONFIG
+# ============================================================================
+
+# Daily sales targets (configurable per business)
+DEFAULT_DAILY_SALES_TARGET = 10  # items
+DEFAULT_DAILY_REVENUE_TARGET = Decimal("1000.00")  # Kwacha
+
+# Badges
+BADGES = {
+    "first_sale": {"name": "First Sale", "icon": "🎯", "description": "Recorded your first sale today"},
+    "ten_items": {"name": "Top Seller", "icon": "🔥", "description": "Sold 10+ items today"},
+    "stock_hero": {"name": "Stock Hero", "icon": "📦", "description": "Stocked in 20+ items today"},
+    "profit_king": {"name": "Profit King", "icon": "💰", "description": "Made K500+ profit today"},
+    "streak_3": {"name": "3-Day Streak", "icon": "⚡", "description": "Sales for 3 days straight"},
+    "streak_7": {"name": "Week Warrior", "icon": "🏆", "description": "Sales for 7 days straight"},
+}
+
+
+def check_badges_earned(sales_count: int, revenue: Decimal, profit: Decimal, streak_days: int) -> List[str]:
+    """
+    Check which badges have been earned based on metrics.
+
+    Returns:
+        List of badge keys
+    """
+    earned = []
+
+    if sales_count >= 1:
+        earned.append("first_sale")
+
+    if sales_count >= 10:
+        earned.append("ten_items")
+
+    if profit >= Decimal("500"):
+        earned.append("profit_king")
+
+    if streak_days >= 3:
+        earned.append("streak_3")
+
+    if streak_days >= 7:
+        earned.append("streak_7")
+
+    return earned
+
+
+# ============================================================================
+# EXPORTS
+# ============================================================================
+
+__all__ = [
+    "ClothingItemType",
+    "CLOTHING_CATEGORIES",
+    "CLOTHING_SUBTYPES",
+    "APPAREL_SIZES",
+    "FOOTWEAR_SIZES",
+    "TROUSER_SIZES",
+    "ALL_SIZES",
+    "CLOTHING_COLORS",
+    "CLOTHING_BRANDS",
+    "get_category_display",
+    "get_category_icon",
+    "get_item_type_for_category",
+    "get_sizes_for_category",
+    "get_subtypes_for_category",
+    "generate_auto_description",
+    "generate_internal_sku",
+    "generate_variant_sku",
+    "sign_product_qr_data",
+    "verify_product_qr_token",
+    "get_price_tier",
+    "PRICE_TIER_LABELS",
+    "get_stock_status",
+    "DEFAULT_DAILY_SALES_TARGET",
+    "DEFAULT_DAILY_REVENUE_TARGET",
+    "BADGES",
+    "check_badges_earned",
+]

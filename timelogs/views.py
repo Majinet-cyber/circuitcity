@@ -23,6 +23,20 @@ from tenants.scope import get_membership, resolve_location_for_user
 
 from .models import AgentWorkLog, LocationPing, WorkingHours, TimeLog, TimeLogSegment
 from .utils import haversine_m
+from .services_presence import (
+    attendance_kpis,
+    attendance_rows_for_agents,
+    attach_presence_summaries,
+    available_business_agents,
+    dashboard_kpis,
+    geofence_status,
+    parse_date,
+    permitted_work_logs_for_export,
+    presence_summary,
+    reliability_score,
+    resolve_selected_agent,
+    user_can_manage_timelogs,
+)
 
 
 def _get_location_model():
@@ -221,7 +235,10 @@ def _is_within_working_hours(work_log: AgentWorkLog, dt) -> bool:
     if not work_log.scheduled_start or not work_log.scheduled_end:
         return True  # Assume working hours if not configured
     
-    time_only = dt.time() if hasattr(dt, "time") else dt
+    if hasattr(dt, "time"):
+        time_only = timezone.localtime(dt).time() if timezone.is_aware(dt) else dt.time()
+    else:
+        time_only = dt
     return work_log.scheduled_start <= time_only <= work_log.scheduled_end
 
 
@@ -249,6 +266,11 @@ def agent_presence_today(request):
         return JsonResponse({
             "ok": True,
             "has_logged_in": False,
+            "checked_in": False,
+            "checked_out": False,
+            "geofence_status": "unknown",
+            "lateness_status": "not_checked_in",
+            "reliability_score": 0,
             "first_seen": None,
             "last_seen": None,
             "on_site_minutes": 0,
@@ -257,9 +279,15 @@ def agent_presence_today(request):
             "scheduled_end": None,
         })
     
+    summary = presence_summary(work_log)
     return JsonResponse({
         "ok": True,
         "has_logged_in": work_log.first_seen_at is not None,
+        "checked_in": summary["checked_in"],
+        "checked_out": summary["checked_out"],
+        "geofence_status": summary["geofence_status"],
+        "lateness_status": summary["lateness_status"],
+        "reliability_score": summary["reliability_score"],
         "first_seen": work_log.first_seen_at.isoformat() if work_log.first_seen_at else None,
         "last_seen": work_log.last_seen_at.isoformat() if work_log.last_seen_at else None,
         "on_site_minutes": work_log.total_on_site_minutes,
@@ -286,11 +314,8 @@ def manager_presence_dashboard(request):
     if not business:
         return JsonResponse({"ok": False, "error": "No active business"}, status=400)
     
-    # Check if user is manager
-    membership = get_membership(user, business)
-    if not membership or membership.role.upper() != "MANAGER":
-        if not user.is_superuser and not user.is_staff:
-            return JsonResponse({"ok": False, "error": "Manager access required"}, status=403)
+    if not user_can_manage_timelogs(user, business):
+        return JsonResponse({"ok": False, "error": "Manager access required"}, status=403)
     
     today = timezone.localdate()
     work_logs = AgentWorkLog.objects.filter(
@@ -300,12 +325,18 @@ def manager_presence_dashboard(request):
     
     agents = []
     for wl in work_logs:
+        summary = presence_summary(wl)
         agents.append({
             "agent_id": wl.agent.id,
             "agent_name": wl.agent.get_full_name() or wl.agent.username,
             "location": wl.location.name if wl.location else None,
             "first_seen": wl.first_seen_at.isoformat() if wl.first_seen_at else None,
             "last_seen": wl.last_seen_at.isoformat() if wl.last_seen_at else None,
+            "checked_in": summary["checked_in"],
+            "checked_out": summary["checked_out"],
+            "geofence_status": summary["geofence_status"],
+            "lateness_status": summary["lateness_status"],
+            "reliability_score": summary["reliability_score"],
             "on_site_minutes": wl.total_on_site_minutes,
             "idle_minutes": wl.total_idle_minutes,
             "status": "active" if wl.first_seen_at else "not_seen",
@@ -397,45 +428,81 @@ def gps_ping(request, timelog_id):
 def time_logs_dashboard(request):
     """
     Rich Time Logs UI showing work vs idle time for the selected day.
+    Shows all agents in the business with their work/idle metrics.
     """
     business = get_active_business(request)
     if not business:
         return render(request, "timelogs/no_business.html")
     
-    # Get date from query param or default to today
-    date_str = request.GET.get("date")
-    if date_str:
-        try:
-            from datetime import datetime
-            selected_date = datetime.strptime(date_str, "%Y-%m-%d").date()
-        except ValueError:
-            selected_date = timezone.localdate()
-    else:
-        selected_date = timezone.localdate()
+    # Check if user is manager (can see all agents)
+    user_is_manager = user_can_manage_timelogs(request.user, business)
     
-    # Get work log for the selected date
-    try:
-        work_log = AgentWorkLog.objects.get(
-            agent=request.user,
+    # Get date from query param or default to today
+    selected_date = parse_date(request.GET.get("date"), timezone.localdate())
+    
+    # Get selected agent (for managers, default to "all"; for agents, only themselves)
+    selected_agent_id = request.GET.get("agent")
+    
+    selected_agent = resolve_selected_agent(request, business)
+
+    if user_is_manager:
+        agent_memberships = available_business_agents(business)
+        dashboard_agents = [m.user for m in agent_memberships]
+        available_agents = [
+            {
+                'id': m.user.id,
+                'name': m.user.get_full_name() or m.user.username,
+                'role': m.role,
+            }
+            for m in agent_memberships
+        ]
+    else:
+        available_agents = []
+        dashboard_agents = [request.user]
+    
+    # Get work logs
+    if selected_agent:
+        # Single agent view
+        try:
+            work_log = AgentWorkLog.objects.get(
+                agent=selected_agent,
+                business=business,
+                work_date=selected_date,
+            )
+            pings = work_log.pings.order_by("timestamp")
+            work_log.presence = presence_summary(work_log)
+        except AgentWorkLog.DoesNotExist:
+            work_log = None
+            pings = []
+        
+        # Calculate battery segments for visualization
+        battery_segments = []
+        if work_log:
+            total_minutes = work_log.total_on_site_minutes + work_log.total_idle_minutes
+            if total_minutes > 0:
+                work_percent = (work_log.total_on_site_minutes / total_minutes) * 100
+                idle_percent = (work_log.total_idle_minutes / total_minutes) * 100
+                battery_segments = [
+                    {"type": "work", "percent": work_percent, "label": f"{work_log.total_on_site_minutes} min"},
+                    {"type": "idle", "percent": idle_percent, "label": f"{work_log.total_idle_minutes} min"},
+                ]
+        
+        agent_work_logs = [work_log] if work_log else []
+        attendance_rows = attendance_rows_for_agents([selected_agent], agent_work_logs, selected_date)
+    else:
+        # All agents view (managers only)
+        agent_work_logs = AgentWorkLog.objects.filter(
             business=business,
             work_date=selected_date,
-        )
-        pings = work_log.pings.order_by("timestamp")
-    except AgentWorkLog.DoesNotExist:
+        ).select_related('agent', 'location').order_by('-total_on_site_minutes')
+        agent_work_logs = attach_presence_summaries(agent_work_logs.prefetch_related("pings"))
+        attendance_rows = attendance_rows_for_agents(dashboard_agents, agent_work_logs, selected_date)
+        
         work_log = None
         pings = []
-    
-    # Calculate battery segments for visualization
-    battery_segments = []
-    if work_log:
-        total_minutes = work_log.total_on_site_minutes + work_log.total_idle_minutes
-        if total_minutes > 0:
-            work_percent = (work_log.total_on_site_minutes / total_minutes) * 100
-            idle_percent = (work_log.total_idle_minutes / total_minutes) * 100
-            battery_segments = [
-                {"type": "work", "percent": work_percent, "label": f"{work_log.total_on_site_minutes} min"},
-                {"type": "idle", "percent": idle_percent, "label": f"{work_log.total_idle_minutes} min"},
-            ]
+        battery_segments = []
+
+    kpis = attendance_kpis(attendance_rows)
     
     context = {
         "selected_date": selected_date,
@@ -444,6 +511,14 @@ def time_logs_dashboard(request):
         "pings": pings,
         "battery_segments": battery_segments,
         "total_pings": pings.count() if work_log else 0,
+        "user_is_manager": user_is_manager,
+        "available_agents": available_agents,
+        "selected_agent": selected_agent,
+        "selected_agent_id": selected_agent_id,
+        "agent_work_logs": agent_work_logs,
+        "attendance_rows": attendance_rows,
+        "kpis": kpis,
+        "presence": presence_summary(work_log) if work_log else None,
     }
     
     return render(request, "timelogs/dashboard.html", context)
@@ -458,24 +533,12 @@ def export_time_logs_csv(request):
     if not business:
         return HttpResponseBadRequest("No active business")
     
-    # Get date range from query params
-    from_date = request.GET.get("from_date", timezone.localdate())
-    to_date = request.GET.get("to_date", timezone.localdate())
-    
-    if isinstance(from_date, str):
-        from datetime import datetime
-        from_date = datetime.strptime(from_date, "%Y-%m-%d").date()
-    if isinstance(to_date, str):
-        from datetime import datetime
-        to_date = datetime.strptime(to_date, "%Y-%m-%d").date()
-    
-    # Query work logs
-    work_logs = AgentWorkLog.objects.filter(
-        agent=request.user,
-        business=business,
-        work_date__gte=from_date,
-        work_date__lte=to_date,
-    ).order_by("work_date")
+    from_date = parse_date(request.GET.get("from_date"), timezone.localdate())
+    to_date = parse_date(request.GET.get("to_date"), timezone.localdate())
+    if to_date < from_date:
+        return HttpResponseBadRequest("Invalid date range")
+
+    work_logs = permitted_work_logs_for_export(request, business, from_date, to_date).prefetch_related("pings")
     
     # Create CSV response
     response = HttpResponse(content_type="text/csv")
@@ -484,6 +547,12 @@ def export_time_logs_csv(request):
     writer = csv.writer(response)
     writer.writerow([
         "Date",
+        "Agent",
+        "Check-In",
+        "Check-Out",
+        "Geofence Status",
+        "Lateness Status",
+        "Reliability Score",
         "First Seen",
         "Last Seen",
         "On-Site Minutes",
@@ -495,8 +564,15 @@ def export_time_logs_csv(request):
     ])
     
     for wl in work_logs:
+        summary = presence_summary(wl)
         writer.writerow([
             wl.work_date.strftime("%Y-%m-%d"),
+            wl.agent.get_full_name() or wl.agent.username,
+            wl.first_seen_at.strftime("%H:%M:%S") if wl.first_seen_at else "-",
+            wl.last_seen_at.strftime("%H:%M:%S") if wl.last_seen_at else "-",
+            summary["geofence_status"],
+            summary["lateness_status"],
+            summary["reliability_score"],
             wl.first_seen_at.strftime("%H:%M:%S") if wl.first_seen_at else "-",
             wl.last_seen_at.strftime("%H:%M:%S") if wl.last_seen_at else "-",
             wl.total_on_site_minutes,

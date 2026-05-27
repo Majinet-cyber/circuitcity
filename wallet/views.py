@@ -5,7 +5,7 @@ import csv
 import io
 import json
 from calendar import monthrange
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from typing import Tuple, Any
 
@@ -16,7 +16,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.mail import send_mail
 from django.core.serializers.json import DjangoJSONEncoder
-from django.db.models import Sum, QuerySet
+from django.db.models import Q, Sum, QuerySet
 from django.http import HttpRequest, JsonResponse, HttpResponseBadRequest, HttpResponse, Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
@@ -34,12 +34,19 @@ try:
 except Exception:  # pragma: no cover
     from django.contrib.auth.decorators import login_required as otp_required  # type: ignore
 
-# Optional tenant helper (donâ€™t hard-fail if tenants app is unavailable)
+# Optional tenant helper (don't hard-fail if tenants app is unavailable)
 try:
     from tenants.utils import get_active_business  # type: ignore
 except Exception:  # pragma: no cover
     def get_active_business(_request):  # type: ignore
         return None
+
+# IDOR-safe scoping helper
+try:
+    from tenants.scoping import scoped_get_object_or_404  # type: ignore
+except ImportError:  # pragma: no cover
+    # Fallback to unsafe get_object_or_404 if scoping not available
+    scoped_get_object_or_404 = None  # type: ignore
 
 from .models import (
     AdminPurchaseOrder,
@@ -49,11 +56,14 @@ from .models import (
     Payment,
     PaymentMethod,
     Payslip,
+    PayslipStatus,
     PayoutSchedule,
     PurchaseOrderStatus,
     TxnType,
     WalletTransaction,
 )
+from .money import q2
+from .business_memory import record_cash_bank_transaction, record_company_expense_once
 from .services import add_txn, agent_wallet_summary, ranking
 
 # Optional: PO forms come from inventory.forms if available
@@ -83,6 +93,27 @@ def _month_bounds(year: int, month: int) -> Tuple[date, date]:
     first = date(year, month, 1)
     last = date(year, month, monthrange(year, month)[1])
     return first, last
+
+
+def _record_purchase_order_payable(po: AdminPurchaseOrder, created_by=None) -> None:
+    if not getattr(po, "business_id", None) or not getattr(po, "total", None):
+        return
+    if po.status not in {PurchaseOrderStatus.SENT, PurchaseOrderStatus.COMPLETED}:
+        return
+    record_company_expense_once(
+        business=po.business,
+        amount=po.total,
+        note=f"Purchase order payable PO-{po.id:05d}",
+        reference=f"PO-{po.id}",
+        created_by=created_by,
+        effective_date=timezone.localdate(),
+        meta={
+            "purchase_order_id": po.id,
+            "supplier_name": po.supplier_name,
+            "payable": True,
+            "status": po.status,
+        },
+    )
 
 
 def _sum(qs, **filters) -> Decimal:
@@ -117,6 +148,19 @@ def business_users_qs(business):
     U = get_user_model()
     if not business:
         return U.objects.none()
+
+    try:
+        from tenants.models import Membership
+        member_ids = (
+            Membership.objects.filter(business=business, status="ACTIVE", user__is_active=True)
+            .values_list("user_id", flat=True)
+            .distinct()
+        )
+        qs = U.objects.filter(id__in=list(member_ids), is_active=True).order_by("first_name", "last_name", "username")
+        if qs.exists():
+            return qs
+    except Exception:
+        pass
 
     # Try the most likely relations first
     candidates = (
@@ -192,6 +236,38 @@ def scope_qs_to_user(qs: QuerySet, request: Any) -> QuerySet:
             pass
 
     return qs.none()
+
+
+def _staff_options_for_request(request: HttpRequest):
+    biz = get_active_business(request)
+    qs = business_users_qs(biz)
+    if getattr(request.user, "is_superuser", False) and not qs.exists():
+        qs = get_user_model().objects.filter(is_active=True).order_by("first_name", "last_name", "username")[:200]
+    rows = []
+    for user in qs:
+        try:
+            membership = user.memberships.filter(business=biz, status="ACTIVE").first() if biz else None
+        except Exception:
+            membership = None
+        role = getattr(membership, "role", "") or getattr(getattr(user, "profile", None), "role", "") or ""
+        phone = (
+            getattr(getattr(user, "profile", None), "phone", "")
+            or getattr(getattr(user, "agent_profile", None), "phone", "")
+            or ""
+        )
+        name = user.get_full_name() or user.get_username()
+        rows.append(
+            {
+                "id": user.id,
+                "name": name,
+                "role": role,
+                "email": user.email or "",
+                "phone": phone,
+                "identifier": str(user.id),
+                "label": f"{name} ({role})" if role else name,
+            }
+        )
+    return rows
 
 def _agent_belongs_to_business(agent: Any, business: Any) -> bool:
     """
@@ -362,91 +438,308 @@ def api_add_txn(request: HttpRequest):
     return JsonResponse({"ok": True})
 
 
+def _decimal_post(request: HttpRequest, key: str) -> Decimal | None:
+    if key not in request.POST:
+        return None
+    raw = request.POST.get(key)
+    if raw in (None, ""):
+        return Decimal("0.00")
+    return q2(raw)
+
+
+def _invalid_decimal_fields(request: HttpRequest, keys: tuple[str, ...]) -> list[str]:
+    invalid: list[str] = []
+    for key in keys:
+        raw = request.POST.get(key)
+        if raw in (None, ""):
+            continue
+        try:
+            Decimal(str(raw).replace(",", "").strip())
+        except (InvalidOperation, ValueError, TypeError):
+            invalid.append(key.replace("_", " "))
+    return invalid
+
+
+def _payslip_components_from_post(request: HttpRequest) -> dict[str, Decimal]:
+    keys = ("base_salary", "allowances", "bonuses", "commission", "other_earnings", "advances", "penalties", "other_deductions")
+    components: dict[str, Decimal] = {}
+    for key in keys:
+        value = _decimal_post(request, key)
+        if value is not None:
+            components[key] = value
+    return components
+
+
+def _employee_snapshot_from_post(request: HttpRequest, agent=None) -> dict[str, str]:
+    full_name = (request.POST.get("employee_name") or "").strip()
+    role = (request.POST.get("employee_role") or "").strip()
+    email = (request.POST.get("employee_email") or "").strip()
+    phone = (request.POST.get("employee_phone") or "").strip()
+    identifier = (request.POST.get("employee_identifier") or "").strip()
+    if agent is not None:
+        full_name = full_name or agent.get_full_name() or agent.get_username()
+        email = email or getattr(agent, "email", "") or ""
+        identifier = identifier or str(agent.id)
+        if not role:
+            try:
+                biz = get_active_business(request)
+                membership = agent.memberships.filter(business=biz, status="ACTIVE").first() if biz else None
+                role = getattr(membership, "role", "") or ""
+            except Exception:
+                role = ""
+    return {
+        "employee_name": full_name,
+        "employee_role": role,
+        "employee_email": email,
+        "employee_phone": phone,
+        "employee_identifier": identifier,
+    }
+
+
+def _period_from_post(request: HttpRequest, year: int, month: int) -> tuple[date, date]:
+    first, last = _month_bounds(year, month)
+    start_raw = request.POST.get("period_start") or ""
+    end_raw = request.POST.get("period_end") or ""
+    try:
+        start = datetime.strptime(start_raw, "%Y-%m-%d").date() if start_raw else first
+    except ValueError:
+        start = first
+    try:
+        end = datetime.strptime(end_raw, "%Y-%m-%d").date() if end_raw else last
+    except ValueError:
+        end = last
+    return start, end
+
+
+def _attendance_summary_for_payslip(agent, business, year: int, month: int) -> dict[str, Any]:
+    if agent is None:
+        return {}
+    try:
+        from inventory.models_attendance import TimeLog
+        from inventory.views_time import _pair_work_seconds
+    except Exception:
+        return {}
+    first, last = _month_bounds(year, month)
+    start = timezone.make_aware(datetime.combine(first, datetime.min.time()))
+    end = timezone.make_aware(datetime.combine(last + timedelta(days=1), datetime.min.time()))
+    qs = TimeLog.objects.filter(user=agent, ts__gte=start, ts__lt=end).order_by("ts", "id")
+    if business is not None:
+        qs = qs.filter(business=business)
+    events = list(qs)
+    if not events:
+        return {"days_worked": 0, "hours_worked": "0.00", "open_shifts": 0}
+    grouped: dict[date, list[Any]] = {}
+    for event in events:
+        grouped.setdefault(timezone.localtime(event.ts).date(), []).append(event)
+    total_seconds = 0
+    open_shifts = 0
+    for day_events in grouped.values():
+        worked, open_shift, _ = _pair_work_seconds(day_events, timezone.now())
+        total_seconds += int(worked or 0)
+        open_shifts += 1 if open_shift else 0
+    return {
+        "days_worked": len(grouped),
+        "hours_worked": str(q2(Decimal(total_seconds) / Decimal("3600"))),
+        "open_shifts": open_shifts,
+    }
+
+
 # ---------------------------------------------------------------------
 # Payslip builder (helper)
 # ---------------------------------------------------------------------
 def _create_or_update_payslip_and_txn(
     *,
-    agent,
+    agent=None,
     year: int,
     month: int,
     created_by,
     send_now: bool = False,
     payment_method: str | None = None,
+    components: dict[str, Decimal] | None = None,
+    business=None,
+    employee_snapshot: dict[str, str] | None = None,
+    period_start: date | None = None,
+    period_end: date | None = None,
 ) -> Payslip:
     """
     Compute totals -> create/update Payslip -> post wallet/company mirror txns (for net)
     -> optionally send email now. Returns the Payslip.
     """
     first, last = _month_bounds(year, month)
-    breakdown = _compute_breakdown(agent, first, last)
+    breakdown = _compute_breakdown(agent, first, last) if agent is not None else {
+        "pos_total": Decimal("0"),
+        "neg_total": Decimal("0"),
+        "commission": Decimal("0"),
+        "bonus": Decimal("0"),
+        "advances": Decimal("0"),
+        "penalties": Decimal("0"),
+    }
 
-    # Components â€” base salary default can be configured via settings
-    base_salary = Decimal(getattr(settings, "WALLET_BASE_SALARY", "40000") or "0")
-    commission = breakdown["commission"]
-    bonuses_fees = breakdown["bonus"]
-    deductions = -(breakdown["neg_total"])  # convert to positive
+    components = components or {}
+    # Components - base salary is computed from wallet transactions unless explicitly supplied
+    # For Phones agents, this will include the MWK 50,000 base salary transaction
+    # For others, falls back to settings default
+    from .utils_salary import get_base_salary_for_month
+    from tenants.utils import get_active_business
+    
+    # Try to get business from agent's profile/membership
+    try:
+        from tenants.models import Membership
+        membership = Membership.objects.filter(user=agent, status="ACTIVE").first() if agent is not None else None
+        biz = business or (membership.business if membership else None)
+    except Exception:
+        biz = business
+    
+    base_salary = get_base_salary_for_month(biz, agent, year, month) if biz and agent is not None else Decimal("0")
+    
+    if "base_salary" in components:
+        base_salary = components["base_salary"]
+    # Fallback to settings default if no base salary transaction exists
+    elif base_salary == Decimal("0"):
+        base_salary = Decimal(getattr(settings, "WALLET_BASE_SALARY", "40000") or "0")
+    
+    commission = components.get("commission", breakdown["commission"])
+    allowances = components.get("allowances", Decimal("0"))
+    bonuses = components.get("bonuses", breakdown["bonus"])
+    other_earnings = components.get("other_earnings", Decimal("0"))
+    advances = components.get("advances", breakdown["advances"])
+    penalties = components.get("penalties", breakdown["penalties"])
+    other_deductions = components.get("other_deductions", Decimal("0"))
+    bonuses_fees = allowances + bonuses
+    deductions = advances + penalties + other_deductions
 
-    gross = base_salary + commission + bonuses_fees
+    gross = base_salary + commission + bonuses_fees + other_earnings
     net = gross - deductions
+    attendance = _attendance_summary_for_payslip(agent, biz, year, month)
+    employee_snapshot = employee_snapshot or {}
+    period_start = period_start or first
+    period_end = period_end or last
 
     # Create / update payslip record
-    p, created = Payslip.objects.get_or_create(
-        agent=agent,
-        year=year,
-        month=month,
-        defaults=dict(
+    defaults = dict(
+            business=biz,
             base_salary=base_salary,
             commission=commission,
             bonuses_fees=bonuses_fees,
+            other_earnings=other_earnings,
             deductions=deductions,
             gross=gross,
             net=net,
             created_by=created_by,
-            email_to=getattr(agent, "email", "") or "",
+            email_to=employee_snapshot.get("employee_email") or getattr(agent, "email", "") if agent is not None else employee_snapshot.get("employee_email", ""),
+            period_start=period_start,
+            period_end=period_end,
+            payment_method_label=payment_method or "",
+            **employee_snapshot,
             meta={
                 "calc": {
                     "pos_total": str(breakdown["pos_total"]),
                     "neg_total": str(breakdown["neg_total"]),
                     "advances": str(breakdown["advances"]),
                     "penalties": str(breakdown["penalties"]),
-                }
+                    "allowances": str(allowances),
+                    "bonuses": str(bonuses),
+                    "commission": str(commission),
+                    "other_earnings": str(other_earnings),
+                    "other_deductions": str(other_deductions),
+                },
+                "attendance": attendance,
             },
-        ),
     )
+    if agent is not None:
+        p, created = Payslip.objects.get_or_create(
+            agent=agent,
+            year=year,
+            month=month,
+            defaults=defaults,
+        )
+    else:
+        p = Payslip.objects.create(agent=None, year=year, month=month, **defaults)
+        created = True
     if not created:
+        p.business = biz or p.business
+        p.period_start = period_start
+        p.period_end = period_end
+        for key, value in employee_snapshot.items():
+            if value:
+                setattr(p, key, value)
         p.base_salary = base_salary
         p.commission = commission
         p.bonuses_fees = bonuses_fees
+        p.other_earnings = other_earnings
         p.deductions = deductions
         p.gross = gross
         p.net = net
-        if not getattr(p, "email_to", ""):
+        p.payment_method_label = payment_method or p.payment_method_label
+        meta = dict(p.meta or {})
+        meta["calc"] = {
+            "pos_total": str(breakdown["pos_total"]),
+            "neg_total": str(breakdown["neg_total"]),
+            "advances": str(advances),
+            "penalties": str(penalties),
+            "allowances": str(allowances),
+            "bonuses": str(bonuses),
+            "commission": str(commission),
+            "other_earnings": str(other_earnings),
+            "other_deductions": str(other_deductions),
+        }
+        meta["attendance"] = attendance
+        p.meta = meta
+        if employee_snapshot.get("employee_email"):
+            p.email_to = employee_snapshot["employee_email"]
+        if not getattr(p, "email_to", "") and agent is not None:
             p.email_to = getattr(agent, "email", "") or ""
         if not getattr(p, "created_by", None):
             p.created_by = created_by
         p.save()
 
     # Post wallet/company transactions only when net != 0 (avoid noise)
-    if net != 0:
-        # Agent wallet reduces by net (payment out)
-        add_txn(
-            agent=agent,
-            amount=-net,
-            type=TxnType.PAYSLIP,
-            note=f"Payslip {year}-{month:02d}",
-            created_by=created_by,
-            meta={"gross": str(gross), "deductions": str(deductions)},
-        )
-        # Company mirror increases by net (payout made)
+    existing_payout = WalletTransaction.objects.filter(
+        type=TxnType.PAYSLIP,
+        business=biz,
+        effective_date__gte=first,
+        effective_date__lte=last,
+        meta__payslip_id=p.id,
+    ).exists()
+    if net != 0 and not existing_payout:
+        if agent is not None:
+            # Agent wallet reduces by net (payment out)
+            add_txn(
+                agent=agent,
+                amount=-net,
+                type=TxnType.PAYSLIP,
+                note=f"Payslip {year}-{month:02d}",
+                created_by=created_by,
+                business=biz,
+                meta={"gross": str(gross), "deductions": str(deductions), "payslip_id": p.id},
+            )
+        # Company ledger records payroll as a business expense for backup/health checks.
         WalletTransaction.objects.create(
             ledger=Ledger.COMPANY,
             agent=agent,
-            amount=net,
+            amount=-abs(net),
             type=TxnType.PAYSLIP,
-            note=f"[Agent {agent.id}] Payslip {year}-{month:02d}",
+            note=f"[{p.display_employee_name}] Payslip {year}-{month:02d}",
             created_by=created_by,
+            business=biz,
+            reference=f"PAYSLIP-{p.id}",
+            effective_date=period_end,
+            meta={"payslip_id": p.id, "gross": str(gross), "deductions": str(deductions)},
         )
+        if biz:
+            from .models import CashBankTransaction
+
+            record_cash_bank_transaction(
+                business=biz,
+                amount=net,
+                direction=CashBankTransaction.Direction.CASH_OUT,
+                category="Salary",
+                payment_method=payment_method or "cash",
+                tx_date=period_end,
+                description=f"Payslip payment for {p.display_employee_name}",
+                related_sale_reference=f"payslip:{p.id}",
+                created_by=created_by,
+            )
 
     # Optional: record a Payment row (future integrations)
     if payment_method:
@@ -490,16 +783,155 @@ class AgentWalletView(LoginRequiredMixin, TemplateView):
         u = self.request.user
         biz = get_active_business(self.request)
 
+        # Ensure base salary for Phones agents (idempotent)
+        from .utils_salary import ensure_monthly_base_salary_for_agent
+        ensure_monthly_base_salary_for_agent(biz, u)
+
+        # Parse date range from query params for filtered earnings view
+        from datetime import datetime, timedelta
+        
+        now = timezone.now()
+        today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        
+        range_param = self.request.GET.get('range', 'month').lower()
+        
+        if range_param == 'today':
+            filter_start = today_start
+            filter_end = now
+            range_label = 'Today'
+        elif range_param == '7d':
+            filter_start = today_start - timedelta(days=7)
+            filter_end = now
+            range_label = 'Last 7 Days'
+        elif range_param == 'custom':
+            start_str = self.request.GET.get('start', '')
+            end_str = self.request.GET.get('end', '')
+            try:
+                start_d = datetime.strptime(start_str, '%Y-%m-%d').date()
+                end_d = datetime.strptime(end_str, '%Y-%m-%d').date()
+                filter_start = timezone.make_aware(datetime.combine(start_d, datetime.min.time()))
+                filter_end = timezone.make_aware(datetime.combine(end_d, datetime.max.time()))
+                range_label = f"{start_d.strftime('%b %d')} – {end_d.strftime('%b %d, %Y')}"
+            except (ValueError, TypeError):
+                # Fallback to this month
+                month_start = today_start.replace(day=1)
+                filter_start = month_start
+                filter_end = now
+                range_label = 'This Month'
+        else:
+            # Default: this month
+            month_start = today_start.replace(day=1)
+            filter_start = month_start
+            filter_end = now
+            range_label = 'This Month'
+        
+        # Get agent's earnings for the filtered period
+        try:
+            from inventory.services.agent_earnings import get_agent_earnings
+            
+            earnings_data = get_agent_earnings(
+                business=biz,
+                start_date=filter_start.date() if hasattr(filter_start, 'date') else filter_start,
+                end_date=filter_end.date() if hasattr(filter_end, 'date') else filter_end,
+                agent_id=u.id,
+            )
+            
+            # Extract this agent's data
+            my_earnings = earnings_data[0] if earnings_data else None
+        except Exception:
+            my_earnings = None
+
         # Summary is already per-user; txns also per-user
         txns = WalletTransaction.objects.filter(ledger=Ledger.AGENT, agent=u)
         ctx["agent_summary"] = agent_wallet_summary(u)
         ctx["txns"] = txns.order_by("-effective_date", "-id")[:50]
+        
+        # Add filtered earnings data
+        ctx["my_earnings"] = my_earnings
+        ctx["range_key"] = range_param
+        ctx["range_label"] = range_label
+        ctx["filter_start"] = filter_start.date() if hasattr(filter_start, 'date') else filter_start
+        ctx["filter_end"] = filter_end.date() if hasattr(filter_end, 'date') else filter_end
+
+        # Check if commissions are enabled
+        commissions_enabled = True
+        try:
+            from sales.models import CommissionConfig
+            config = CommissionConfig.get_active(biz)
+            if config:
+                commissions_enabled = config.commissions_enabled
+        except Exception:
+            pass
+        ctx["commissions_enabled"] = commissions_enabled
 
         # Scope tenant-aware lists where possible
         bqs = BudgetRequest.objects.filter(agent=u).order_by("-created_at")
-        pqs = Payslip.objects.filter(agent=u).order_by("-year", "-month")
         ctx["budgets"] = bqs[:5]
-        ctx["payslips"] = pqs[:5]
+        
+        # Compute dynamic payslips from wallet transactions (so they update immediately)
+        # This provides real-time visibility into earnings without waiting for manager to issue payslip
+        from datetime import datetime
+        from collections import defaultdict
+        
+        # Get all positive transactions (commissions + bonuses including base salary) grouped by month
+        earning_txns = WalletTransaction.objects.filter(
+            ledger=Ledger.AGENT,
+            agent=u,
+            type__in=[TxnType.COMMISSION, TxnType.BONUS],
+            amount__gt=0
+        ).order_by('-effective_date')[:200]  # Last 200 transactions
+        
+        # Get all deductions
+        deduction_txns = WalletTransaction.objects.filter(
+            ledger=Ledger.AGENT,
+            agent=u,
+            amount__lt=0
+        ).order_by('-effective_date')[:100]  # Last 100 deductions
+        
+        # Group by year-month
+        monthly_earnings = defaultdict(lambda: {'gross': Decimal('0'), 'deductions': Decimal('0'), 'count': 0})
+        
+        for txn in earning_txns:
+            year_month = (txn.effective_date.year, txn.effective_date.month)
+            monthly_earnings[year_month]['gross'] += txn.amount
+            monthly_earnings[year_month]['count'] += 1
+        
+        for txn in deduction_txns:
+            year_month = (txn.effective_date.year, txn.effective_date.month)
+            monthly_earnings[year_month]['deductions'] += abs(txn.amount)
+        
+        # Also check for formal Payslip records (manager-issued)
+        formal_payslips = Payslip.objects.filter(agent=u).order_by("-year", "-month")[:5]
+        
+        # Build unified payslip list
+        payslip_list = []
+        
+        # Add formal payslips first
+        formal_months = set()
+        for p in formal_payslips:
+            payslip_list.append(p)
+            formal_months.add((p.year, p.month))
+        
+        # Add dynamic computed payslips for months without formal payslips
+        for (year, month), data in sorted(monthly_earnings.items(), reverse=True)[:5]:
+            if (year, month) not in formal_months:
+                # Create a temporary payslip-like object
+                class DynamicPayslip:
+                    def __init__(self, year, month, gross, deductions, count):
+                        self.year = year
+                        self.month = month
+                        self.gross = gross
+                        self.deductions = deductions
+                        self.net = gross - deductions
+                        self.pdf = None
+                        self.is_dynamic = True
+                        self.txn_count = count
+                
+                payslip_list.append(DynamicPayslip(year, month, data['gross'], data['deductions'], data['count']))
+        
+        # Sort by year/month descending and limit to 5
+        payslip_list.sort(key=lambda p: (p.year, p.month), reverse=True)
+        ctx["payslips"] = payslip_list[:5]
 
         # For ranking chart on the wallet page, prefer tenant scope if supported by service
         try:
@@ -525,13 +957,61 @@ class AgentTxnListView(LoginRequiredMixin, ListView):
 
 @login_required
 def api_ranking(request: HttpRequest):
+    """
+    API endpoint for agent earnings rankings.
+    Returns top agents by commission for the specified period.
+    """
     period = request.GET.get("period", "month")
     biz = get_active_business(request)
+    
+    if not biz:
+        return JsonResponse({"period": period, "rows": []})
+    
+    # Use the agent_earnings service for consistent ranking
     try:
-        rows = ranking(period, business=biz)  # type: ignore[arg-type]
-    except TypeError:
-        rows = ranking(period)
-    return JsonResponse({"rows": rows})
+        from inventory.services.agent_earnings import get_agent_earnings
+        from datetime import date, timedelta
+        from django.utils import timezone
+        
+        today = timezone.localdate()
+        
+        if period == "all":
+            start_date = None
+            end_date = today
+        else:  # month
+            start_date = today.replace(day=1)
+            end_date = today
+        
+        # Get earnings data
+        earnings_data = get_agent_earnings(
+            business=biz,
+            start_date=start_date,
+            end_date=end_date,
+        )
+        
+        # Convert to format expected by frontend
+        rows = []
+        for earning in earnings_data[:20]:  # Top 20
+            rows.append({
+                "agent__id": earning.agent_id,
+                "agent__first_name": earning.agent_name.split()[0] if " " in earning.agent_name else earning.agent_name,
+                "agent__last_name": " ".join(earning.agent_name.split()[1:]) if " " in earning.agent_name else "",
+                "total": float(earning.total_commission),
+            })
+        
+        return JsonResponse({"period": period, "rows": rows})
+        
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error in api_ranking: {e}")
+        
+        # Fallback to old ranking function
+        try:
+            rows = ranking(period, business=biz)  # type: ignore[arg-type]
+        except TypeError:
+            rows = ranking(period)
+        return JsonResponse({"rows": rows})
 
 
 # ---------------------------------------------------------------------
@@ -540,12 +1020,27 @@ def api_ranking(request: HttpRequest):
 @login_required
 def entry_detail(request: HttpRequest, pk: int) -> HttpResponse:
     """
-    Transaction drill-down. Agents can see their own; staff can see any.
+    Transaction drill-down. Agents can see their own; staff can see their business's.
+    
+    SECURITY: Always scoped to active business to prevent IDOR.
     """
+    business = get_active_business(request)
+    
     if _staff(request.user):
-        entry = get_object_or_404(WalletTransaction, pk=pk)
+        # Staff can see any transaction within their business
+        if business:
+            entry = get_object_or_404(WalletTransaction, pk=pk, business=business)
+        else:
+            # Superuser with no business context can see any
+            entry = get_object_or_404(WalletTransaction, pk=pk)
     else:
-        entry = get_object_or_404(WalletTransaction, pk=pk, agent=request.user, ledger=Ledger.AGENT)
+        # Agents can only see their own transactions
+        if business:
+            entry = get_object_or_404(
+                WalletTransaction, pk=pk, agent=request.user, ledger=Ledger.AGENT, business=business
+            )
+        else:
+            entry = get_object_or_404(WalletTransaction, pk=pk, agent=request.user, ledger=Ledger.AGENT)
     return render(request, "wallet/entry_detail.html", {"entry": entry})
 
 
@@ -575,6 +1070,131 @@ def payslip_download(request: HttpRequest, year: int, month: int) -> HttpRespons
     resp = HttpResponse(html)
     resp["Content-Disposition"] = f'attachment; filename="payslip-{p.year}-{p.month:02d}.html"'
     return resp
+
+
+def _render_payslip_pdf(p: Payslip, requester) -> HttpResponse:
+    attendance = (p.meta or {}).get("attendance") or {}
+    calc = (p.meta or {}).get("calc") or {}
+    try:
+        from reportlab.lib import colors
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+    except Exception:
+        html = render(requester, "wallet/payslip_pdf.html", {"payslip": p, "p": p, "attendance": attendance})
+        html["Content-Disposition"] = f'attachment; filename="payslip-{p.reference or p.id}.html"'
+        return html
+
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4, leftMargin=40, rightMargin=40, topMargin=38, bottomMargin=32)
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle("PayslipTitle", parent=styles["Heading1"], fontSize=18, textColor=colors.HexColor("#065f46"))
+    employee_name = p.display_employee_name
+    business_name = getattr(p.business, "name", "") or getattr(get_active_business(requester), "name", "") or "Emajinet"
+    period = (
+        f"{p.period_start:%Y-%m-%d} to {p.period_end:%Y-%m-%d}"
+        if p.period_start and p.period_end
+        else f"{p.year}-{p.month:02d}"
+    )
+    rows = [
+        ["Business", business_name],
+        ["Employee", employee_name],
+        ["Role / position", p.employee_role or ""],
+        ["Employee ID", p.employee_identifier or ""],
+        ["Pay period", period],
+        ["Issue date", timezone.localtime(p.issued_at).strftime("%Y-%m-%d") if p.issued_at else ""],
+        ["Days worked", attendance.get("days_worked", "")],
+        ["Hours worked", attendance.get("hours_worked", "")],
+        ["Payment method", p.payment_method_label or "Manual"],
+        ["Prepared by", getattr(p.created_by, "get_username", lambda: "")() if p.created_by_id else ""],
+        ["Status", p.display_status],
+    ]
+    earnings_rows = [
+        ["Earnings", "Amount"],
+        ["Basic salary", f"MWK {p.base_salary:,.2f}"],
+        ["Commission", f"MWK {p.commission:,.2f}"],
+        ["Allowances", f"MWK {Decimal(str(calc.get('allowances') or 0)):,.2f}"],
+        ["Bonuses", f"MWK {Decimal(str(calc.get('bonuses') or 0)):,.2f}"],
+        ["Other earnings", f"MWK {p.other_earnings:,.2f}"],
+        ["Gross pay", f"MWK {p.gross:,.2f}"],
+    ]
+    deduction_rows = [
+        ["Deductions", "Amount"],
+        ["Advances", f"MWK {Decimal(str(calc.get('advances') or 0)):,.2f}"],
+        ["Penalties", f"MWK {Decimal(str(calc.get('penalties') or 0)):,.2f}"],
+        ["Other deductions", f"MWK {Decimal(str(calc.get('other_deductions') or 0)):,.2f}"],
+        ["Total deductions", f"MWK {p.deductions:,.2f}"],
+        ["Net pay", f"MWK {p.net:,.2f}"],
+    ]
+    table = Table(rows, colWidths=[150, 330])
+    table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#dcfce7")),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.HexColor("#064e3b")),
+        ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
+        ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#d1fae5")),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f8fafc")]),
+        ("PADDING", (0, 0), (-1, -1), 7),
+    ]))
+    earnings = Table(earnings_rows, colWidths=[230, 250])
+    deductions_table = Table(deduction_rows, colWidths=[230, 250])
+    for t in (earnings, deductions_table):
+        t.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#ecfdf5")),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#d1fae5")),
+            ("PADDING", (0, 0), (-1, -1), 7),
+        ]))
+    doc.build([
+        Paragraph("Payslip", title_style),
+        Paragraph(f"{business_name} | Reference: {p.reference}", styles["Normal"]),
+        Spacer(1, 14),
+        table,
+        Spacer(1, 14),
+        earnings,
+        Spacer(1, 14),
+        deductions_table,
+        Spacer(1, 28),
+        Paragraph("Prepared by: ____________________    Employee signature: ____________________", styles["Normal"]),
+    ])
+    resp = HttpResponse(buffer.getvalue(), content_type="application/pdf")
+    resp["Content-Disposition"] = f'attachment; filename="payslip-{p.reference or p.id}.pdf"'
+    return resp
+
+
+@login_required
+def payslip_download_by_id(request: HttpRequest, pk: int) -> HttpResponse:
+    p = get_object_or_404(Payslip.objects.select_related("agent", "created_by", "business"), pk=pk)
+    if not (_staff(request.user) or p.agent_id == request.user.id):
+        return HttpResponse("Not allowed", status=403)
+    if _staff(request.user) and not request.user.is_superuser:
+        biz = get_active_business(request)
+        same_business = bool(biz and getattr(p, "business_id", None) == getattr(biz, "id", None))
+        if not same_business and (not p.agent_id or not _agent_belongs_to_business(p.agent, biz)):
+            return HttpResponse("Not allowed", status=403)
+    return _render_payslip_pdf(p, request)
+
+
+@otp_required
+@require_POST
+def payslip_set_status(request: HttpRequest, pk: int, action: str) -> HttpResponse:
+    if not _staff(request.user):
+        return redirect("wallet:agent_wallet")
+    p = get_object_or_404(Payslip.objects.select_related("agent", "business"), pk=pk)
+    biz = get_active_business(request)
+    same_business = bool(biz and getattr(p, "business_id", None) == getattr(biz, "id", None))
+    if not request.user.is_superuser and not same_business and (not p.agent_id or not _agent_belongs_to_business(p.agent, biz)):
+        return HttpResponse("Not allowed", status=403)
+    if action == "issued":
+        p.status = PayslipStatus.SENT
+        p.sent_at = p.sent_at or timezone.now()
+    elif action == "paid":
+        p.status = PayslipStatus.PAID
+    else:
+        messages.error(request, "Invalid payslip action.")
+        return redirect("wallet:admin_agent", agent_id=p.agent_id) if p.agent_id else redirect("wallet:admin_payslips")
+    p.save(update_fields=["status", "sent_at"] if action == "issued" else ["status"])
+    messages.success(request, f"Payslip marked as {p.get_status_display()}.")
+    return redirect("wallet:admin_agent", agent_id=p.agent_id) if p.agent_id else redirect("wallet:admin_payslips")
 
 
 @login_required
@@ -770,8 +1390,9 @@ class AdminIssueTxnView(LoginRequiredMixin, TemplateView):
     def post(self, request):
         U = get_user_model()
         agent = get_object_or_404(U, id=request.POST.get("agent_id"))
+        biz = get_active_business(request)
         # Ensure manager can only issue to agents in their business
-        if not request.user.is_superuser and not _agent_belongs_to_business(agent, get_active_business(request)):
+        if not request.user.is_superuser and not _agent_belongs_to_business(agent, biz):
             return HttpResponse("Not allowed for this agent.", status=403)
 
         amount = Decimal(request.POST.get("amount", "0"))
@@ -786,6 +1407,7 @@ class AdminIssueTxnView(LoginRequiredMixin, TemplateView):
             note=note,
             created_by=request.user,
             ledger=Ledger.AGENT,
+            business=biz,
         )
 
         # Mirror to company ledger for a full business trail
@@ -796,6 +1418,7 @@ class AdminIssueTxnView(LoginRequiredMixin, TemplateView):
             type=ttype,
             note=f"[Agent {agent.id}] {note}",
             created_by=request.user,
+            business=biz,
         )
         return redirect("wallet:admin_agent", agent_id=agent.id)
 
@@ -830,13 +1453,19 @@ class AdminBudgetsView(LoginRequiredMixin, TemplateView):
     def post(self, request):
         bid = int(request.POST["budget_id"])
         action = request.POST["action"]  # approve / reject / pay
-        b = get_object_or_404(BudgetRequest, id=bid)
-
-        # Enforce manager scope on the object
-        if not request.user.is_superuser:
-            biz = get_active_business(request)
-            if not _agent_belongs_to_business(b.agent, biz):
-                return HttpResponse("Not allowed for this budget.", status=403)
+        
+        # SECURITY: Scope to business BEFORE fetching to prevent IDOR
+        biz = get_active_business(request)
+        if request.user.is_superuser and not biz:
+            # Superuser without business context can access any
+            b = get_object_or_404(BudgetRequest, id=bid)
+        else:
+            # Scope via agent membership - only get budgets from agents in our business
+            from tenants.models import Membership
+            agent_ids = Membership.objects.filter(
+                business=biz, status="ACTIVE"
+            ).values_list("user_id", flat=True)
+            b = get_object_or_404(BudgetRequest, id=bid, agent_id__in=list(agent_ids))
 
         if action == "approve":
             b.status = BudgetRequest.Status.APPROVED
@@ -850,6 +1479,7 @@ class AdminBudgetsView(LoginRequiredMixin, TemplateView):
                 type=TxnType.BUDGET,
                 note=f"Budget: {getattr(b, 'title', 'Approved budget')}",
                 created_by=request.user,
+                business=biz,
             )
             WalletTransaction.objects.create(
                 ledger=Ledger.COMPANY,
@@ -858,6 +1488,7 @@ class AdminBudgetsView(LoginRequiredMixin, TemplateView):
                 type=TxnType.BUDGET,
                 note=f"[Agent {b.agent_id}] {getattr(b, 'title', 'Approved budget')}",
                 created_by=request.user,
+                business=biz,
             )
 
         b.decided_by = request.user
@@ -887,10 +1518,21 @@ def admin_budget_set_status(request: HttpRequest, pk: int, action: str) -> HttpR
     if not _staff(request.user):
         return redirect("wallet:agent_wallet")
 
-    b = get_object_or_404(BudgetRequest, pk=pk)
-    # Enforce scope
-    if not request.user.is_superuser and not _agent_belongs_to_business(b.agent, get_active_business(request)):
-        return HttpResponse("Not allowed for this budget.", status=403)
+    # SECURITY: Scope to business BEFORE fetching to prevent IDOR
+    biz = get_active_business(request)
+    if request.user.is_superuser and not biz:
+        # Superuser without business context can access any
+        b = get_object_or_404(BudgetRequest, pk=pk)
+    else:
+        # Scope via agent membership - only get budgets from agents in our business
+        from tenants.models import Membership
+        agent_ids = Membership.objects.filter(
+            business=biz, status="ACTIVE"
+        ).values_list("user_id", flat=True)
+        try:
+            b = BudgetRequest.objects.get(pk=pk, agent_id__in=list(agent_ids))
+        except BudgetRequest.DoesNotExist:
+            raise Http404("Budget request not found")
 
     action = (action or "").lower()
     if action == "approve":
@@ -970,6 +1612,7 @@ def issue_payslip(request, agent_id: int, year: int, month: int):
         created_by=request.user,
         send_now=bool(request.GET.get("send") == "1" or request.POST.get("send_now")),
         payment_method=request.POST.get("method") if request.method == "POST" else None,
+        components=_payslip_components_from_post(request) if request.method == "POST" else None,
     )
     if _json_requested(request):
         return JsonResponse(
@@ -992,19 +1635,9 @@ class AdminIssuePayslipView(LoginRequiredMixin, TemplateView):
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
-        U = get_user_model()
-        agents_qs = U.objects.filter(is_active=True).order_by("first_name", "last_name", "username")
-        # Managers see only their business agents in the dropdown
-        if not self.request.user.is_superuser:
-            biz = get_active_business(self.request)
-            try:
-                agents_qs = agents_qs.filter(profile__business=biz)
-            except Exception:
-                try:
-                    agents_qs = agents_qs.filter(business=biz)
-                except Exception:
-                    agents_qs = agents_qs.none()
-        ctx["agents"] = agents_qs
+        staff_options = _staff_options_for_request(self.request)
+        ctx["staff_options"] = staff_options
+        ctx["agents"] = [row["id"] for row in staff_options]
         today = timezone.localdate()
         ctx["year"] = int(self.request.GET.get("year", today.year))
         ctx["month"] = int(self.request.GET.get("month", today.month))
@@ -1012,15 +1645,68 @@ class AdminIssuePayslipView(LoginRequiredMixin, TemplateView):
 
     def post(self, request: HttpRequest):
         U = get_user_model()
-        agent = get_object_or_404(U, id=request.POST.get("agent_id"))
+        agent_id = (request.POST.get("agent_id") or "").strip()
+        agent = get_object_or_404(U, id=agent_id) if agent_id else None
         # Enforce manager scope
-        if not request.user.is_superuser and not _agent_belongs_to_business(agent, get_active_business(request)):
+        if agent is not None and not request.user.is_superuser and not _agent_belongs_to_business(agent, get_active_business(request)):
             return HttpResponse("Not allowed for this agent.", status=403)
 
-        year = int(request.POST.get("year"))
-        month = int(request.POST.get("month"))
+        try:
+            year = int(request.POST.get("year"))
+            month = int(request.POST.get("month"))
+            if month < 1 or month > 12:
+                raise ValueError
+        except (TypeError, ValueError):
+            messages.error(request, "Choose a valid payslip month and year.")
+            return redirect("wallet:admin_issue_payslip")
         send_now = request.POST.get("send_now") in ("1", "true", "on", "yes")
         method = request.POST.get("method")  # optional
+        invalid_money = _invalid_decimal_fields(
+            request,
+            ("base_salary", "allowances", "bonuses", "commission", "other_earnings", "advances", "penalties", "other_deductions"),
+        )
+        if invalid_money:
+            messages.error(request, f"Enter valid money values for: {', '.join(invalid_money)}.")
+            return redirect("wallet:admin_issue_payslip")
+        components = _payslip_components_from_post(request)
+        employee_snapshot = _employee_snapshot_from_post(request, agent)
+        if not employee_snapshot.get("employee_name"):
+            messages.error(request, "Employee name is required. Select staff or enter employee details manually.")
+            return redirect("wallet:admin_issue_payslip")
+        provided_earnings = sum(
+            components.get(key, Decimal("0"))
+            for key in ("base_salary", "allowances", "bonuses", "commission", "other_earnings")
+        )
+        if agent is None and provided_earnings <= 0:
+            messages.error(request, "Enter basic salary or another earnings amount before issuing.")
+            return redirect("wallet:admin_issue_payslip")
+        period_start, period_end = _period_from_post(request, year, month)
+        action = (request.POST.get("action") or "issue").lower()
+
+        if action == "preview":
+            preview = Payslip(
+                business=get_active_business(request),
+                agent=agent,
+                year=year,
+                month=month,
+                period_start=period_start,
+                period_end=period_end,
+                base_salary=components.get("base_salary", Decimal("0")),
+                commission=components.get("commission", Decimal("0")),
+                bonuses_fees=components.get("allowances", Decimal("0")) + components.get("bonuses", Decimal("0")),
+                other_earnings=components.get("other_earnings", Decimal("0")),
+                deductions=components.get("advances", Decimal("0")) + components.get("penalties", Decimal("0")) + components.get("other_deductions", Decimal("0")),
+                payment_method_label=method or "Manual",
+                created_by=request.user,
+                meta={"calc": {k: str(v) for k, v in components.items()}},
+                **employee_snapshot,
+            )
+            preview.save = lambda *args, **kwargs: None  # type: ignore[method-assign]
+            preview.gross = q2(preview.base_salary + preview.commission + preview.bonuses_fees + preview.other_earnings)
+            preview.net = q2(preview.gross - preview.deductions)
+            ctx = self.get_context_data()
+            ctx.update({"preview_payslip": preview, "preview_calc": components})
+            return render(request, self.template_name, ctx)
 
         p = _create_or_update_payslip_and_txn(
             agent=agent,
@@ -1029,12 +1715,24 @@ class AdminIssuePayslipView(LoginRequiredMixin, TemplateView):
             created_by=request.user,
             send_now=send_now,
             payment_method=method,
+            components=components,
+            business=get_active_business(request),
+            employee_snapshot=employee_snapshot,
+            period_start=period_start,
+            period_end=period_end,
         )
+        if action == "issue" and p.status != PayslipStatus.SENT:
+            p.status = PayslipStatus.SENT
+            p.sent_at = p.sent_at or timezone.now()
+            p.save(update_fields=["status", "sent_at"])
+        if action in {"generate_pdf", "download_pdf"}:
+            return _render_payslip_pdf(p, request)
         if _json_requested(request):
             return JsonResponse(
-                {"ok": True, "agent": agent.id, "reference": p.reference, "net": float(p.net)}
+                {"ok": True, "agent": getattr(agent, "id", None), "reference": p.reference, "net": float(p.net)}
             )
-        return redirect("wallet:admin_agent", agent_id=agent.id)
+        messages.success(request, f"Payslip {p.reference} issued for {p.display_employee_name}.")
+        return redirect("wallet:admin_agent", agent_id=agent.id) if agent is not None else redirect("wallet:admin_payslips")
 
 
 @method_decorator([otp_required, ensure_csrf_cookie], name="dispatch")
@@ -1052,21 +1750,19 @@ class AdminPayslipBulkView(LoginRequiredMixin, TemplateView):
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
-        U = get_user_model()
-        agents_qs = U.objects.filter(is_active=True).order_by("first_name", "last_name", "username")
-        if not self.request.user.is_superuser:
-            biz = get_active_business(self.request)
-            try:
-                agents_qs = agents_qs.filter(profile__business=biz)
-            except Exception:
-                try:
-                    agents_qs = agents_qs.filter(business=biz)
-                except Exception:
-                    agents_qs = agents_qs.none()
-        ctx["agents"] = agents_qs
+        staff_options = _staff_options_for_request(self.request)
+        ctx["staff_options"] = staff_options
+        ctx["agents"] = [row["id"] for row in staff_options]
         today = timezone.localdate()
         ctx["year"] = int(self.request.GET.get("year", today.year))
         ctx["month"] = int(self.request.GET.get("month", today.month))
+        recent = Payslip.objects.select_related("agent", "created_by", "business")
+        biz = get_active_business(self.request)
+        if biz is not None:
+            recent = recent.filter(Q(business=biz) | Q(agent__in=business_users_qs(biz)))
+        elif not self.request.user.is_superuser:
+            recent = recent.none()
+        ctx["recent_payslips"] = recent.order_by("-issued_at")[:50]
         return ctx
 
     def post(self, request: HttpRequest):
@@ -1080,11 +1776,27 @@ class AdminPayslipBulkView(LoginRequiredMixin, TemplateView):
 
         if not agent_ids and _json_requested(request):
             return JsonResponse({"ok": False, "error": "No agents selected."}, status=400)
+        if not agent_ids:
+            messages.error(request, "Select at least one active staff member, or use the single payslip form for manual entry.")
+            return redirect("wallet:admin_payslips")
 
-        year = int(request.POST.get("year"))
-        month = int(request.POST.get("month"))
+        try:
+            year = int(request.POST.get("year"))
+            month = int(request.POST.get("month"))
+            if month < 1 or month > 12:
+                raise ValueError
+        except (TypeError, ValueError):
+            messages.error(request, "Choose a valid payslip month and year.")
+            return redirect("wallet:admin_payslips")
         send_now = request.POST.get("send_now") in ("1", "true", "on", "yes")
         method = request.POST.get("method")  # optional
+        invalid_money = _invalid_decimal_fields(
+            request,
+            ("base_salary", "allowances", "bonuses", "commission", "other_earnings", "advances", "penalties", "other_deductions"),
+        )
+        if invalid_money:
+            messages.error(request, f"Enter valid money values for: {', '.join(invalid_money)}.")
+            return redirect("wallet:admin_payslips")
 
         agents = list(U.objects.filter(id__in=agent_ids, is_active=True))
         # Enforce scope: managers can only act on their business agents
@@ -1093,7 +1805,10 @@ class AdminPayslipBulkView(LoginRequiredMixin, TemplateView):
             agents = [a for a in agents if _agent_belongs_to_business(a, biz)]
 
         results = []
+        components = _payslip_components_from_post(request)
+        period_start, period_end = _period_from_post(request, year, month)
         for a in agents:
+            employee_snapshot = _employee_snapshot_from_post(request, a)
             p = _create_or_update_payslip_and_txn(
                 agent=a,
                 year=year,
@@ -1101,12 +1816,22 @@ class AdminPayslipBulkView(LoginRequiredMixin, TemplateView):
                 created_by=request.user,
                 send_now=send_now,
                 payment_method=method,
+                components=components,
+                business=get_active_business(request),
+                employee_snapshot=employee_snapshot,
+                period_start=period_start,
+                period_end=period_end,
             )
+            if p.status != PayslipStatus.SENT:
+                p.status = PayslipStatus.SENT
+                p.sent_at = p.sent_at or timezone.now()
+                p.save(update_fields=["status", "sent_at"])
             results.append({"agent": a.id, "net": float(p.net), "reference": p.reference, "sent": p.sent_to_email})
 
         # JSON if requested; otherwise go home
         if _json_requested(request):
             return JsonResponse({"ok": True, "count": len(results), "results": results})
+        messages.success(request, f"Issued {len(results)} payslip{'' if len(results) == 1 else 's'}.")
         return redirect("wallet:admin_home")
 
 
@@ -1179,11 +1904,23 @@ def run_payout_schedule(request: HttpRequest, schedule_id: int):
     """
     Manual trigger: issues payslips for all users on the schedule for
     the previous month. Useful for testing before wiring Celery.
+    
+    SECURITY: PayoutSchedule is a global entity scoped by created_by.
     """
     if not _staff(request.user):
         return redirect("wallet:agent_wallet")
 
-    sch = get_object_or_404(PayoutSchedule, id=schedule_id, active=True)
+    # SECURITY: Only allow schedules created by users in the same business
+    biz = get_active_business(request)
+    if request.user.is_superuser and not biz:
+        sch = get_object_or_404(PayoutSchedule, id=schedule_id, active=True)
+    else:
+        # Scope to schedules created by users in this business
+        from tenants.models import Membership
+        user_ids = Membership.objects.filter(
+            business=biz, status="ACTIVE"
+        ).values_list("user_id", flat=True)
+        sch = get_object_or_404(PayoutSchedule, id=schedule_id, active=True, created_by_id__in=list(user_ids))
     today = timezone.localdate()
     prev_year = today.year if today.month > 1 else (today.year - 1)
     prev_month = today.month - 1 if today.month > 1 else 12
@@ -1256,6 +1993,8 @@ def admin_po_new(request: HttpRequest):
         form = PurchaseOrderHeaderForm(request.POST)
         if form.is_valid():
             po = form.save(commit=False)
+            if hasattr(po, "business"):
+                po.business = get_active_business(request)
             po.created_by = request.user
             po.status = PurchaseOrderStatus.DRAFT
             po.save()
@@ -1270,11 +2009,22 @@ def admin_po_new(request: HttpRequest):
 def admin_po_detail(request: HttpRequest, po_id: int):
     """
     View/edit a PO: add items, recompute totals, and move simple statuses.
+    
+    SECURITY: Scoped by created_by membership to prevent cross-tenant access.
     """
     if not _staff(request.user):
         return redirect("wallet:agent_wallet")
 
-    po = get_object_or_404(AdminPurchaseOrder, id=po_id)
+    # SECURITY: Scope to POs created by users in the same business
+    biz = get_active_business(request)
+    if request.user.is_superuser and not biz:
+        po = get_object_or_404(AdminPurchaseOrder, id=po_id)
+    else:
+        from tenants.models import Membership
+        user_ids = Membership.objects.filter(
+            business=biz, status="ACTIVE"
+        ).values_list("user_id", flat=True)
+        po = get_object_or_404(AdminPurchaseOrder, id=po_id, created_by_id__in=list(user_ids))
 
     ItemForm = PurchaseOrderItemForm  # alias
     if ItemForm is None:
@@ -1284,7 +2034,7 @@ def admin_po_detail(request: HttpRequest, po_id: int):
         action = request.POST.get("action") or "add_item"
 
         if action == "add_item":
-            form = ItemForm(request.POST)
+            form = ItemForm(request.POST, business=biz)
             if form.is_valid():
                 AdminPurchaseOrderItem.objects.create(po=po, **form.to_model_kwargs())
                 po.recompute_totals(save=True)
@@ -1304,16 +2054,115 @@ def admin_po_detail(request: HttpRequest, po_id: int):
             if new_status in PurchaseOrderStatus.values:
                 po.status = new_status
                 po.save(update_fields=["status"])
+                po.recompute_totals(save=True)
+                _record_purchase_order_payable(po, created_by=request.user)
             return redirect("wallet:admin_po_detail", po_id=po.id)
 
     # GET or invalid POST -> render page
-    form = ItemForm()
+    form = ItemForm(business=biz)
     items = po.items.select_related("product").all().order_by("id")
+    product_catalog = []
+    try:
+        for product in form.fields["product"].queryset:
+            product_catalog.append(
+                {
+                    "id": product.id,
+                    "code": getattr(product, "code", "") or "",
+                    "model": getattr(product, "model", "") or getattr(product, "name", "") or str(product),
+                    "cost_price": str(q2(getattr(product, "cost_price", Decimal("0.00")))),
+                    "sale_price": str(q2(getattr(product, "sale_price", Decimal("0.00")))),
+                }
+            )
+    except Exception:
+        product_catalog = []
     return render(
         request,
         "wallet/admin_po_detail.html",
-        {"po": po, "form": form, "items": items, "status_choices": PurchaseOrderStatus.choices},
+        {
+            "po": po,
+            "form": form,
+            "items": items,
+            "status_choices": PurchaseOrderStatus.choices,
+            "product_catalog_json": json.dumps(product_catalog, cls=DjangoJSONEncoder),
+        },
     )
+
+
+@otp_required
+def admin_po_pdf(request: HttpRequest, po_id: int):
+    if not _staff(request.user):
+        return redirect("wallet:agent_wallet")
+    biz = get_active_business(request)
+    qs = AdminPurchaseOrder.objects.all()
+    if biz is not None and hasattr(AdminPurchaseOrder, "business"):
+        qs = qs.filter(business=biz)
+    elif not request.user.is_superuser:
+        from tenants.models import Membership
+        user_ids = Membership.objects.filter(business=biz, status="ACTIVE").values_list("user_id", flat=True)
+        qs = qs.filter(created_by_id__in=list(user_ids))
+    po = get_object_or_404(qs.select_related("created_by", "business"), id=po_id)
+    po.recompute_totals(save=True)
+    items = list(po.items.select_related("product").all().order_by("id"))
+
+    try:
+        from reportlab.lib import colors
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+    except Exception:
+        return render(request, "wallet/admin_po_pdf.html", {"po": po, "items": items})
+
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4, leftMargin=38, rightMargin=38, topMargin=36, bottomMargin=30)
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle("POTitle", parent=styles["Heading1"], textColor=colors.HexColor("#065f46"), fontSize=18)
+    business_name = getattr(getattr(po, "business", None), "name", None) or getattr(biz, "name", None) or "Emajinet"
+    header = [
+        Paragraph("Purchase Order", title_style),
+        Paragraph(f"{business_name} | PO-{po.id:05d} | {timezone.localtime(po.created_at):%Y-%m-%d}", styles["Normal"]),
+        Spacer(1, 12),
+        Table(
+            [
+                ["Supplier", po.supplier_name or "Not specified"],
+                ["Contact", " | ".join([v for v in [po.supplier_email, po.supplier_phone] if v]) or "Not specified"],
+                ["Expected delivery", po.expected_delivery_date or "Not specified"],
+                ["Payment terms", po.payment_terms or "Not specified"],
+                ["Prepared by", getattr(po.created_by, "get_username", lambda: "")() if po.created_by_id else ""],
+            ],
+            colWidths=[140, 360],
+            style=[
+                ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
+                ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#d1fae5")),
+                ("PADDING", (0, 0), (-1, -1), 6),
+            ],
+        ),
+        Spacer(1, 14),
+    ]
+    rows = [["Item", "Qty", "Unit Cost", "Line Total"]]
+    for item in items:
+        rows.append([
+            str(item.product),
+            item.quantity,
+            f"{po.currency} {item.unit_price:,.2f}",
+            f"{po.currency} {item.line_total:,.2f}",
+        ])
+    rows.extend([["", "", "Subtotal", f"{po.currency} {po.subtotal:,.2f}"], ["", "", "Tax", f"{po.currency} {po.tax:,.2f}"], ["", "", "Total", f"{po.currency} {po.total:,.2f}"]])
+    table = Table(rows, repeatRows=1, colWidths=[230, 55, 100, 115])
+    table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#065f46")),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("ALIGN", (1, 1), (-1, -1), "RIGHT"),
+        ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#e2e8f0")),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -4), [colors.white, colors.HexColor("#f8fafc")]),
+        ("FONTNAME", (2, -3), (-1, -1), "Helvetica-Bold"),
+        ("PADDING", (0, 0), (-1, -1), 6),
+    ]))
+    footer = Paragraph("Signature: ____________________________    Date: __________________", styles["Normal"])
+    doc.build(header + [table, Spacer(1, 18), Paragraph(po.notes or "", styles["Normal"]), Spacer(1, 18), footer])
+    resp = HttpResponse(buffer.getvalue(), content_type="application/pdf")
+    resp["Content-Disposition"] = f'attachment; filename="purchase-order-{po.id:05d}.pdf"'
+    return resp
 
 
 # ---------------------------------------------------------------------
@@ -1343,6 +2192,19 @@ def agent_earnings(request: HttpRequest) -> HttpResponse:
     
     def total(qs):
         return qs.aggregate(s=Sum("amount"))["s"] or Decimal("0")
+    
+    # Check if commissions are enabled for this business
+    commissions_enabled = True
+    try:
+        from tenants.utils import get_active_business
+        biz = get_active_business(request)
+        if biz:
+            from sales.models import CommissionConfig
+            config = CommissionConfig.get_active(biz)
+            if config:
+                commissions_enabled = config.commissions_enabled
+    except Exception:
+        pass
     
     # Summary stats
     summary = {
@@ -1377,6 +2239,7 @@ def agent_earnings(request: HttpRequest) -> HttpResponse:
         "chart_labels": json.dumps(chart_labels),
         "chart_data": json.dumps(chart_data),
         "txns": txns,
+        "commissions_enabled": commissions_enabled,
     })
 
 
@@ -1510,18 +2373,21 @@ def admin_cost_create(request: HttpRequest):
 def admin_cost_edit(request: HttpRequest, cost_id: int):
     """
     Edit an existing cost transaction.
+    
+    SECURITY: Scoped to business BEFORE fetch to prevent IDOR.
     """
     if not _staff(request.user):
         messages.error(request, "Access denied.")
         return redirect("wallet:agent_wallet")
     
-    cost = get_object_or_404(WalletTransaction, id=cost_id)
     biz = get_active_business(request)
     
-    # Ensure cost belongs to the active business
-    if biz and cost.business_id != biz.id:
-        messages.error(request, "You cannot edit costs from another business.")
-        return redirect("wallet:admin_costs")
+    # SECURITY: Scope to business BEFORE fetching to prevent IDOR
+    if biz:
+        cost = get_object_or_404(WalletTransaction, id=cost_id, business=biz)
+    else:
+        # Superuser without business context
+        cost = get_object_or_404(WalletTransaction, id=cost_id)
     
     if request.method == "POST":
         from .forms import AdminCostForm
@@ -1568,18 +2434,21 @@ def admin_cost_edit(request: HttpRequest, cost_id: int):
 def admin_cost_delete(request: HttpRequest, cost_id: int):
     """
     Delete a cost transaction.
+    
+    SECURITY: Scoped to business BEFORE fetch to prevent IDOR.
     """
     if not _staff(request.user):
         messages.error(request, "Access denied.")
         return redirect("wallet:agent_wallet")
     
-    cost = get_object_or_404(WalletTransaction, id=cost_id)
     biz = get_active_business(request)
     
-    # Ensure cost belongs to the active business
-    if biz and cost.business_id != biz.id:
-        messages.error(request, "You cannot delete costs from another business.")
-        return redirect("wallet:admin_costs")
+    # SECURITY: Scope to business BEFORE fetching to prevent IDOR
+    if biz:
+        cost = get_object_or_404(WalletTransaction, id=cost_id, business=biz)
+    else:
+        # Superuser without business context
+        cost = get_object_or_404(WalletTransaction, id=cost_id)
     
     # Only allow deletion of cost transactions
     if cost.type not in [TxnType.COST_ONCE_OFF, TxnType.COST_RECURRING]:
@@ -1606,20 +2475,21 @@ def wallet_adjust_agent(request: HttpRequest, membership_id: int):
         messages.error(request, "Access denied. Only managers/admins can adjust agent wallets.")
         return redirect("dashboard:agent_dashboard")
     
-    # Get membership
-    try:
-        from tenants.models import Membership
-        membership = get_object_or_404(Membership, pk=membership_id)
-    except ImportError:
-        messages.error(request, "Tenants app not available.")
-        return redirect("dashboard:admin_dashboard")
-    
-    # Get business (for scoping)
+    # SECURITY: Scope membership to business BEFORE fetching to prevent IDOR
     biz = get_active_business(request)
     
-    # Ensure membership belongs to the active business
-    if biz and membership.business_id != biz.id:
-        messages.error(request, "You cannot adjust wallets from another business.")
+    try:
+        from tenants.models import Membership
+        if request.user.is_superuser and not biz:
+            # Superuser without business context can access any
+            membership = get_object_or_404(Membership, pk=membership_id)
+        elif biz:
+            # Scope to this business
+            membership = get_object_or_404(Membership, pk=membership_id, business=biz)
+        else:
+            raise Http404("Membership not found")
+    except ImportError:
+        messages.error(request, "Tenants app not available.")
         return redirect("dashboard:admin_dashboard")
     
     # Get agent's current wallet

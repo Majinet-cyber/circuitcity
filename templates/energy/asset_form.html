@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}{{ action }} Asset – {{ business.name }}{% endblock %}
+{% block content %}
+<div class="container py-4" style="max-width:680px;">
+  <div class="d-flex align-items-center gap-2 mb-4">
+    <a href="{% url 'verticals:energy_assets' %}" class="btn btn-outline-secondary btn-sm rounded-pill">← Back</a>
+    <h4 class="fw-bold mb-0">{{ action }} Energy Asset</h4>
+  </div>
+  {% if messages %}{% for m in messages %}<div class="alert alert-{{ m.tags|default:'info' }} rounded-3 mb-3">{{ m }}</div>{% endfor %}{% endif %}
+  <div class="card border-0 shadow-sm rounded-4">
+    <div class="card-body p-4">
+      <form method="post">
+        {% csrf_token %}
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">Site *</label>
+            <select name="site" class="form-select rounded-3" required>
+              <option value="">Select site…</option>
+              {% for site in sites %}
+                <option value="{{ site.id }}" {% if request.GET.site == site.id|stringformat:"s" %}selected{% endif %}>{{ site.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">Asset Type *</label>
+            <select name="asset_type" class="form-select rounded-3" required>
+              <option value="">Select type…</option>
+              {% for val, label in asset_types %}
+                <option value="{{ val }}"{% if val == prefill_type %} selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">Brand</label>
+            <input type="text" name="brand" class="form-control rounded-3" placeholder="e.g. Victron, SolarEdge">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">Model</label>
+            <input type="text" name="model_name" class="form-control rounded-3" placeholder="e.g. MultiPlus II">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">Serial Number</label>
+            <input type="text" name="serial_number" class="form-control rounded-3">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label fw-semibold">Capacity</label>
+            <input type="number" name="capacity" class="form-control rounded-3" step="0.01" min="0">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label fw-semibold">Unit</label>
+            <input type="text" name="capacity_unit" class="form-control rounded-3" value="kW" placeholder="kW / kWh / W">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">Install Date</label>
+            <input type="date" name="install_date" class="form-control rounded-3">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">Warranty Expiry</label>
+            <input type="date" name="warranty_expiry" class="form-control rounded-3">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">Expected Lifespan (years)</label>
+            <input type="number" name="expected_lifespan_years" class="form-control rounded-3" min="1" max="50">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">Maintenance Interval (days)</label>
+            <input type="number" name="maintenance_interval_days" class="form-control rounded-3" value="180" min="1">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">Asset Cost ({{ business.currency }})</label>
+            <input type="number" name="asset_cost" class="form-control rounded-3" step="0.01" min="0">
+          </div>
+          <div class="col-12">
+            <label class="form-label fw-semibold">Notes</label>
+            <textarea name="notes" class="form-control rounded-3" rows="2"></textarea>
+          </div>
+        </div>
+        <div class="d-flex gap-2 mt-4">
+          <button type="submit" class="btn btn-primary rounded-pill px-4">{{ action }} Asset</button>
+          <a href="{% url 'verticals:energy_assets' %}" class="btn btn-outline-secondary rounded-pill">Cancel</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

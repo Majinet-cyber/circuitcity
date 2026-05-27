@@ -71,9 +71,7 @@ class Command(BaseCommand):
             businesses = Business.objects.all()
             # Filter by business_kind if available
             if hasattr(Business, "business_kind"):
-                businesses = businesses.filter(
-                    business_kind__in=["phones", "electronics", "phone", "mobile"]
-                )
+                businesses = businesses.filter(business_kind__in=["phones", "electronics", "phone", "mobile"])
 
         total_created = 0
         businesses_seeded = 0
@@ -81,9 +79,7 @@ class Command(BaseCommand):
         for biz in businesses:
             # Check if already has products (unless --force)
             if not force:
-                existing_count = Product.objects.filter(
-                    brand__in=["Tecno", "Itel", "Samsung"]
-                ).count()
+                existing_count = Product.objects.filter(brand__in=["Tecno", "Itel", "Samsung"]).count()
                 if existing_count > 0:
                     self.stdout.write(
                         self.style.WARNING(
@@ -96,20 +92,14 @@ class Command(BaseCommand):
             if created > 0:
                 total_created += created
                 businesses_seeded += 1
-                self.stdout.write(
-                    self.style.SUCCESS(f"[{biz.name}] Seeded {created} products.")
-                )
+                self.stdout.write(self.style.SUCCESS(f"[{biz.name}] Seeded {created} products."))
 
         if total_created > 0:
             self.stdout.write(
-                self.style.SUCCESS(
-                    f"✅ Done! Seeded {total_created} products across {businesses_seeded} business(es)."
-                )
+                self.style.SUCCESS(f"✅ Done! Seeded {total_created} products across {businesses_seeded} business(es).")
             )
         else:
-            self.stdout.write(
-                self.style.WARNING("No products created (all businesses already have phone products).")
-            )
+            self.stdout.write(self.style.WARNING("No products created (all businesses already have phone products)."))
 
     def _build_catalog(self) -> List[Dict]:
         """
@@ -158,9 +148,7 @@ class Command(BaseCommand):
             {"brand": "Apple", "model": "iPhone SE 2022", "variant": "", "cost": 380000, "price": 480000},
         ]
 
-    def _seed_for_business(
-        self, business, catalog: List[Dict], force: bool = False
-    ) -> int:
+    def _seed_for_business(self, business, catalog: List[Dict], force: bool = False) -> int:
         """
         Seed products for a single business. Returns count created.
         """
@@ -205,9 +193,7 @@ class Command(BaseCommand):
                         if not existing.name:
                             existing.name = name
                         existing.save()
-                        self.stdout.write(
-                            self.style.WARNING(f"  Updated: {name}")
-                        )
+                        self.stdout.write(self.style.WARNING(f"  Updated: {name}"))
                     continue
 
                 # Create new product
@@ -224,4 +210,3 @@ class Command(BaseCommand):
                 created_count += 1
 
         return created_count
-

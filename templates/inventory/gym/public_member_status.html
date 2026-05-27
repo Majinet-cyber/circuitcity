@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex, nofollow">
+    <title>Member Status - {{ gym_name }}</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .container {
+            background: #1e293b;
+            border-radius: 24px;
+            box-shadow: 0 25px 80px rgba(0,0,0,0.5);
+            max-width: 420px;
+            width: 100%;
+            padding: 32px;
+            text-align: center;
+            border: 1px solid #334155;
+        }
+        .gym-name {
+            color: #94a3b8;
+            font-size: 14px;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-bottom: 8px;
+        }
+        h1 {
+            color: #f1f5f9;
+            font-size: 26px;
+            margin-bottom: 24px;
+            font-weight: 700;
+        }
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 14px 28px;
+            border-radius: 50px;
+            font-weight: 700;
+            font-size: 18px;
+            margin-bottom: 28px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .status-active {
+            background: linear-gradient(135deg, #059669, #10b981);
+            color: #fff;
+            box-shadow: 0 4px 20px rgba(16, 185, 129, 0.4);
+        }
+        .status-expired {
+            background: linear-gradient(135deg, #dc2626, #ef4444);
+            color: #fff;
+            box-shadow: 0 4px 20px rgba(239, 68, 68, 0.4);
+        }
+        .status-suspended {
+            background: linear-gradient(135deg, #d97706, #f59e0b);
+            color: #fff;
+            box-shadow: 0 4px 20px rgba(245, 158, 11, 0.4);
+        }
+        .status-pending {
+            background: linear-gradient(135deg, #6366f1, #8b5cf6);
+            color: #fff;
+            box-shadow: 0 4px 20px rgba(99, 102, 241, 0.4);
+        }
+        .info-grid {
+            display: grid;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        .info-item {
+            padding: 16px 20px;
+            background: #0f172a;
+            border-radius: 12px;
+            border: 1px solid #334155;
+        }
+        .info-label {
+            font-size: 11px;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            margin-bottom: 6px;
+        }
+        .info-value {
+            font-size: 16px;
+            color: #e2e8f0;
+            font-weight: 600;
+        }
+        .reason {
+            color: #64748b;
+            font-size: 13px;
+            margin-top: 16px;
+            line-height: 1.5;
+        }
+        .footer {
+            margin-top: 24px;
+            padding-top: 20px;
+            border-top: 1px solid #334155;
+            color: #475569;
+            font-size: 12px;
+        }
+        .footer a {
+            color: #6366f1;
+            text-decoration: none;
+        }
+        .check-icon {
+            width: 22px;
+            height: 22px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="gym-name">{{ gym_name }}</div>
+        <h1>{{ member.name }}</h1>
+
+        <div class="status-badge {% if status_code == 'ACTIVE' %}status-active{% elif status_code == 'SUSPENDED' %}status-suspended{% elif status_code == 'PENDING' or status_code == 'PENDING_PAYMENT' %}status-pending{% else %}status-expired{% endif %}">
+            {% if status_code == 'ACTIVE' %}
+                <svg class="check-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                </svg>
+            {% endif %}
+            {{ status_label }}
+        </div>
+
+        <div class="info-grid">
+            {% if membership_start %}
+            <div class="info-item">
+                <div class="info-label">Valid From</div>
+                <div class="info-value">{{ membership_start|date:"M d, Y" }}</div>
+            </div>
+            {% endif %}
+
+            {% if membership_end %}
+            <div class="info-item">
+                <div class="info-label">{% if status_code == 'ACTIVE' %}Valid Until{% else %}Expired On{% endif %}</div>
+                <div class="info-value">{{ membership_end|date:"M d, Y" }}</div>
+            </div>
+            {% endif %}
+
+            {% if next_payment_date and status_code == 'ACTIVE' %}
+            <div class="info-item">
+                <div class="info-label">Next Payment Due</div>
+                <div class="info-value">{{ next_payment_date|date:"M d, Y" }}</div>
+            </div>
+            {% endif %}
+
+            {% if last_checkin_date %}
+            <div class="info-item">
+                <div class="info-label">Last Check-in</div>
+                <div class="info-value">{{ last_checkin_date|date:"M d, Y" }}</div>
+            </div>
+            {% endif %}
+        </div>
+
+        {% if reason %}
+        <div class="reason">{{ reason }}</div>
+        {% endif %}
+
+        <div class="footer">
+            Powered by <a href="https://emajinet.africa">Emajinet</a>
+        </div>
+    </div>
+</body>
+</html>
+

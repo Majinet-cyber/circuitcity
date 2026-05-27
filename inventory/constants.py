@@ -15,8 +15,12 @@ except Exception:  # pragma: no cover
 try:
     from .utils_status import sold_choice_for, in_stock_choice_for
 except Exception:  # pragma: no cover
-    def sold_choice_for(model): return "SOLD"        # type: ignore
-    def in_stock_choice_for(model): return "IN_STOCK"  # type: ignore
+
+    def sold_choice_for(model):
+        return "SOLD"  # type: ignore
+
+    def in_stock_choice_for(model):
+        return "IN_STOCK"  # type: ignore
 
 
 def _has(model: Optional[Type[models.Model]], field: str) -> bool:

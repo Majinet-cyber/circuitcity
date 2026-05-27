@@ -1,0 +1,421 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Add {{ liquor_type_display }} - Step 2{% endblock %}
+
+{% block extra_css %}
+<style>
+.liquor-wizard-container {
+  max-width: 700px;
+  margin: 2rem auto;
+  padding: 0 1rem;
+}
+
+.wizard-progress {
+  height: 4px;
+  background: #e9ecef;
+  border-radius: 2px;
+  margin-bottom: 2rem;
+  overflow: hidden;
+}
+
+.wizard-progress-bar {
+  height: 100%;
+  background: linear-gradient(135deg, #10b981, #059669);
+  transition: width 0.3s ease;
+}
+
+.wizard-header {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.wizard-header h1 {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #1f2937;
+  margin-bottom: 0.5rem;
+}
+
+.wizard-header p {
+  color: #6b7280;
+  font-size: 1.1rem;
+}
+
+.product-form {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 2rem;
+  margin-bottom: 2rem;
+}
+
+.form-section {
+  margin-bottom: 2rem;
+}
+
+.form-section:last-child {
+  margin-bottom: 0;
+}
+
+.form-section-title {
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid #e5e7eb;
+}
+
+.form-group {
+  margin-bottom: 1.5rem;
+}
+
+.form-group label {
+  font-weight: 500;
+  color: #374151;
+  margin-bottom: 0.5rem;
+  display: block;
+}
+
+.form-control {
+  border-radius: 8px;
+  border: 1px solid #d1d5db;
+  padding: 0.75rem;
+  font-size: 1rem;
+}
+
+.form-control:focus {
+  border-color: #10b981;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+}
+
+.form-check {
+  padding: 1rem;
+  background: #f9fafb;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  margin-bottom: 1rem;
+}
+
+.form-check-input:checked {
+  background-color: #10b981;
+  border-color: #10b981;
+}
+
+.form-text {
+  color: #6b7280;
+  font-size: 0.875rem;
+  margin-top: 0.25rem;
+}
+
+.invalid-feedback {
+  display: block;
+  color: #ef4444;
+  font-size: 0.875rem;
+  margin-top: 0.25rem;
+}
+
+.wizard-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.btn-wizard {
+  padding: 0.75rem 2rem;
+  font-size: 1.1rem;
+  font-weight: 600;
+  border-radius: 8px;
+}
+
+.alert {
+  border-radius: 8px;
+  margin-bottom: 1.5rem;
+}
+
+#submit-btn {
+  position: relative;
+}
+
+#submit-btn:disabled {
+  opacity: 0.7;
+}
+
+.spinner-border-sm {
+  width: 1rem;
+  height: 1rem;
+  margin-left: 0.5rem;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="liquor-wizard-container">
+  <!-- Progress Bar -->
+  <div class="wizard-progress">
+    <div class="wizard-progress-bar" style="width: 100%;"></div>
+  </div>
+
+  <!-- Header -->
+  <div class="wizard-header">
+    <h1>{{ liquor_type_display }} Product</h1>
+    <p>Step 2 of 2: Enter product details</p>
+  </div>
+
+  <!-- Messages -->
+  {% if messages %}
+    {% for message in messages %}
+    <div class="alert alert-{{ message.tags }}">
+      {{ message }}
+    </div>
+    {% endfor %}
+  {% endif %}
+
+  <!-- Form Errors -->
+  {% if form.errors %}
+  <div class="alert alert-danger">
+    <strong>Please fix the following errors:</strong>
+    <ul class="mb-0 mt-2">
+      {% for field, errors in form.errors.items %}
+        {% for error in errors %}
+          <li>{{ error }}</li>
+        {% endfor %}
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
+  <!-- Form -->
+  <form method="post" id="product-form" class="product-form">
+    {% csrf_token %}
+    
+    <!-- Basic Details -->
+    <div class="form-section">
+      <div class="form-section-title">Basic Details</div>
+      
+      <div class="form-group">
+        <label for="{{ form.product_name.id_for_label }}">Product Name *</label>
+        {{ form.product_name }}
+        {% if form.product_name.errors %}
+          <div class="invalid-feedback">{{ form.product_name.errors.0 }}</div>
+        {% endif %}
+      </div>
+
+      <div class="row">
+        <div class="col-md-6">
+          <div class="form-group">
+            <label for="{{ form.cost_per_unit.id_for_label }}">Cost per Bottle (MWK)</label>
+            {{ form.cost_per_unit }}
+            <div class="form-text">Optional - for profit tracking</div>
+            {% if form.cost_per_unit.errors %}
+              <div class="invalid-feedback">{{ form.cost_per_unit.errors.0 }}</div>
+            {% endif %}
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="form-group">
+            <label for="{{ form.sell_per_unit.id_for_label }}">Sell per Bottle (MWK) *</label>
+            {{ form.sell_per_unit }}
+            {% if form.sell_per_unit.errors %}
+              <div class="invalid-feedback">{{ form.sell_per_unit.errors.0 }}</div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Beer-specific -->
+    {% if liquor_type == 'beer' %}
+    <div class="form-section">
+      <div class="form-section-title">📦 Crate Sales (Optional)</div>
+      
+      <div class="form-check">
+        {{ form.enable_pack }}
+        <label class="form-check-label" for="{{ form.enable_pack.id_for_label }}">
+          Enable crate sales
+        </label>
+        <div class="form-text">Allow selling by crate (wholesale pricing)</div>
+      </div>
+
+      <div id="pack-options">
+        <div class="row">
+          <div class="col-md-6">
+            <div class="form-group">
+              <label for="{{ form.pack_size.id_for_label }}">Bottles per Crate</label>
+              {{ form.pack_size }}
+              <div class="form-text">Malawi default: 20</div>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="form-group">
+              <label for="{{ form.sell_per_pack.id_for_label }}">Sell per Crate (MWK)</label>
+              {{ form.sell_per_pack }}
+              <div class="form-text">Optional discount price</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Cider-specific -->
+    {% if liquor_type == 'cider' %}
+    <div class="form-section">
+      <div class="form-section-title">📦 6-Pack Sales (Optional)</div>
+      
+      <div class="form-check">
+        {{ form.enable_pack }}
+        <label class="form-check-label" for="{{ form.enable_pack.id_for_label }}">
+          Enable 6-pack sales
+        </label>
+      </div>
+
+      <div id="pack-options">
+        <div class="row">
+          <div class="col-md-6">
+            <div class="form-group">
+              <label for="{{ form.pack_size.id_for_label }}">Bottles per 6-Pack</label>
+              {{ form.pack_size }}
+              <div class="form-text">Malawi default: 6</div>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="form-group">
+              <label for="{{ form.sell_per_pack.id_for_label }}">Sell per 6-Pack (MWK)</label>
+              {{ form.sell_per_pack }}
+              <div class="form-text">Optional discount price</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Wine-specific -->
+    {% if liquor_type == 'wine' %}
+    <div class="form-section">
+      <div class="form-section-title">🍷 Glass Sales (Optional)</div>
+      
+      <div class="form-check">
+        {{ form.enable_glass }}
+        <label class="form-check-label" for="{{ form.enable_glass.id_for_label }}">
+          Enable glass sales
+        </label>
+        <div class="form-text">Sell wine by the glass</div>
+      </div>
+
+      <div id="glass-options">
+        <div class="row">
+          <div class="col-md-6">
+            <div class="form-group">
+              <label for="{{ form.glasses_per_bottle.id_for_label }}">Glasses per Bottle</label>
+              {{ form.glasses_per_bottle }}
+              <div class="form-text">Malawi default: 5</div>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="form-group">
+              <label for="{{ form.sell_per_glass.id_for_label }}">Sell per Glass (MWK)</label>
+              {{ form.sell_per_glass }}
+              <div class="form-text">Auto-calculated if empty</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Spirits/Whisky-specific -->
+    {% if liquor_type == 'spirits' or liquor_type == 'whisky' %}
+    <div class="form-section">
+      <div class="form-section-title">🥃 Shot Sales (Optional)</div>
+      
+      <div class="form-check">
+        {{ form.enable_shot }}
+        <label class="form-check-label" for="{{ form.enable_shot.id_for_label }}">
+          Enable shot sales
+        </label>
+        <div class="form-text">Sell by shot (bar mode)</div>
+      </div>
+
+      <div id="shot-options">
+        <div class="row">
+          <div class="col-md-6">
+            <div class="form-group">
+              <label for="{{ form.shots_per_bottle.id_for_label }}">Shots per Bottle</label>
+              {{ form.shots_per_bottle }}
+              <div class="form-text">Malawi default: 30</div>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="form-group">
+              <label for="{{ form.sell_per_shot.id_for_label }}">Sell per Shot (MWK)</label>
+              {{ form.sell_per_shot }}
+              <div class="form-text">Auto-calculated if empty</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Actions -->
+    <div class="wizard-actions">
+      <a href="{% url 'inventory:liquor_wizard_step1' %}" class="btn btn-outline-secondary btn-wizard">← Back</a>
+      <button type="submit" id="submit-btn" class="btn btn-success btn-wizard">
+        Create Product
+      </button>
+    </div>
+  </form>
+</div>
+
+<script>
+// Disable submit button on click to prevent double submission
+document.getElementById('product-form').addEventListener('submit', function() {
+  const btn = document.getElementById('submit-btn');
+  btn.disabled = true;
+  btn.innerHTML = 'Creating... <span class="spinner-border spinner-border-sm"></span>';
+});
+
+// Toggle pack/glass/shot options based on checkbox
+{% if liquor_type == 'beer' or liquor_type == 'cider' %}
+const packCheckbox = document.getElementById('{{ form.enable_pack.id_for_label }}');
+const packOptions = document.getElementById('pack-options');
+if (packCheckbox) {
+  function togglePackOptions() {
+    packOptions.style.display = packCheckbox.checked ? 'block' : 'none';
+  }
+  packCheckbox.addEventListener('change', togglePackOptions);
+  togglePackOptions();
+}
+{% endif %}
+
+{% if liquor_type == 'wine' %}
+const glassCheckbox = document.getElementById('{{ form.enable_glass.id_for_label }}');
+const glassOptions = document.getElementById('glass-options');
+if (glassCheckbox) {
+  function toggleGlassOptions() {
+    glassOptions.style.display = glassCheckbox.checked ? 'block' : 'none';
+  }
+  glassCheckbox.addEventListener('change', toggleGlassOptions);
+  toggleGlassOptions();
+}
+{% endif %}
+
+{% if liquor_type == 'spirits' or liquor_type == 'whisky' %}
+const shotCheckbox = document.getElementById('{{ form.enable_shot.id_for_label }}');
+const shotOptions = document.getElementById('shot-options');
+if (shotCheckbox) {
+  function toggleShotOptions() {
+    shotOptions.style.display = shotCheckbox.checked ? 'block' : 'none';
+  }
+  shotCheckbox.addEventListener('change', toggleShotOptions);
+  toggleShotOptions();
+}
+{% endif %}
+</script>
+{% endblock %}
+
+
+
+

@@ -1,0 +1,212 @@
+{
+  "phones": {
+    "key": "phones",
+    "displayName": "Phones & Electronics",
+    "signupBusinessKindValue": "phones",
+    "dashboardPath": "/inventory/",
+    "stockInPath": "/inventory/scan-in/",
+    "sellPath": "/inventory/sell/",
+    "sidebarItems": [
+      { "testid": "sidebar-dashboard", "path": "/inventory/verticals/phones/", "readyTestid": "dashboard-heading" },
+      { "testid": "sidebar-analytics", "path": "/app/analytics", "readyTestid": "analytics-heading" },
+      { "testid": "sidebar-stock", "path": "/inventory/list/", "readyTestid": "stock-heading" },
+      { "testid": "sidebar-scan-in", "path": "/inventory/scan", "readyTestid": "stockin-form" },
+      { "testid": "sidebar-sell", "path": "/inventory/phone-sale-wizard/", "readyTestid": "sell-form" },
+      { "testid": "sidebar-sales-history", "path": "/sales/", "readyTestid": "sales-heading" },
+      { "testid": "sidebar-agents", "path": "/tenants/manager/agents/", "readyTestid": "agents-heading" },
+      { "testid": "sidebar-reports", "path": "/reports/", "readyTestid": "reports-heading" }
+    ],
+    "stockInPayload": {
+      "brand": "Samsung",
+      "model": "Galaxy A50",
+      "cost": "5000",
+      "price": "7500"
+    }
+  },
+  "clothing": {
+    "key": "clothing",
+    "displayName": "Clothing",
+    "signupBusinessKindValue": "clothing",
+    "dashboardPath": "/inventory/verticals/clothing/",
+    "stockInPath": "/inventory/verticals/clothing/scan-in/",
+    "sellPath": "/inventory/verticals/clothing/sell/",
+    "sidebarItems": [
+      { "testid": "sidebar-dashboard", "path": "/inventory/verticals/clothing/", "readyTestid": "dashboard-heading" },
+      { "testid": "sidebar-analytics", "path": "/inventory/verticals/clothing/analytics/", "readyTestid": "analytics-heading" },
+      { "testid": "sidebar-stock", "path": "/inventory/verticals/clothing/stock/", "readyTestid": "stock-heading" },
+      { "testid": "sidebar-scan-in", "path": "/inventory/verticals/clothing/scan-in/", "readyTestid": "stockin-form" },
+      { "testid": "sidebar-sell", "path": "/inventory/verticals/clothing/sell/", "readyTestid": "sell-form" },
+      { "testid": "sidebar-sales-history", "path": "/inventory/verticals/clothing/sales/", "readyTestid": "sales-heading" }
+    ],
+    "stockInPayload": {
+      "name": "E2E Test Shirt",
+      "size": "M",
+      "color": "Blue",
+      "qty": "10",
+      "cost": "200",
+      "price": "350"
+    }
+  },
+  "liquor": {
+    "key": "liquor",
+    "displayName": "Liquor / Bar",
+    "signupBusinessKindValue": "liquor",
+    "dashboardPath": "/inventory/verticals/liquor/",
+    "stockInPath": "/inventory/verticals/liquor/scan-in/",
+    "sellPath": "/inventory/verticals/liquor/sell/",
+    "sidebarItems": [
+      { "testid": "sidebar-dashboard", "path": "/inventory/verticals/liquor/", "readyTestid": "dashboard-heading" },
+      { "testid": "sidebar-stock", "path": "/inventory/verticals/liquor/stock/", "readyTestid": "stock-heading" },
+      { "testid": "sidebar-scan-in", "path": "/inventory/verticals/liquor/scan-in/", "readyTestid": "stockin-form" },
+      { "testid": "sidebar-sell", "path": "/inventory/verticals/liquor/sell/", "readyTestid": "sell-form" },
+      { "testid": "sidebar-sales-history", "path": "/inventory/verticals/liquor/sales/", "readyTestid": "sales-heading" }
+    ],
+    "stockInPayload": {
+      "name": "E2E Test Whiskey",
+      "qty": "12",
+      "cost": "500",
+      "price": "750"
+    }
+  },
+  "grocery": {
+    "key": "grocery",
+    "displayName": "Grocery / General",
+    "signupBusinessKindValue": "grocery",
+    "dashboardPath": "/groceries/",
+    "stockInPath": "/groceries/scan-in/",
+    "sellPath": "/groceries/sell/",
+    "sidebarItems": [
+      { "testid": "sidebar-dashboard", "path": "/groceries/", "readyTestid": "dashboard-heading" },
+      { "testid": "sidebar-stock", "path": "/groceries/stock/", "readyTestid": "stock-heading" },
+      { "testid": "sidebar-scan-in", "path": "/groceries/scan-in/", "readyTestid": "stockin-form" },
+      { "testid": "sidebar-sell", "path": "/groceries/sell/", "readyTestid": "sell-form" }
+    ],
+    "stockInPayload": {
+      "name": "E2E Test Rice",
+      "qty": "50",
+      "cost": "25",
+      "price": "35"
+    }
+  },
+  "pharmacy": {
+    "key": "pharmacy",
+    "displayName": "Cosmetics & Pharmacy",
+    "signupBusinessKindValue": "pharmacy",
+    "dashboardPath": "/inventory/verticals/pharmacy/",
+    "stockInPath": "/inventory/verticals/pharmacy/scan-in/",
+    "sellPath": "/inventory/verticals/pharmacy/sell/",
+    "sidebarItems": [
+      { "testid": "sidebar-dashboard", "path": "/inventory/verticals/pharmacy/", "readyTestid": "dashboard-heading" },
+      { "testid": "sidebar-stock", "path": "/inventory/verticals/pharmacy/stock/", "readyTestid": "stock-heading" },
+      { "testid": "sidebar-scan-in", "path": "/inventory/verticals/pharmacy/scan-in/", "readyTestid": "stockin-form" },
+      { "testid": "sidebar-sell", "path": "/inventory/verticals/pharmacy/sell/", "readyTestid": "sell-form" },
+      { "testid": "sidebar-sales-history", "path": "/inventory/verticals/pharmacy/sales/", "readyTestid": "sales-heading" }
+    ],
+    "stockInPayload": {
+      "name": "E2E Test Cream",
+      "qty": "20",
+      "cost": "150",
+      "price": "250"
+    }
+  },
+  "gym": {
+    "key": "gym",
+    "displayName": "Gym / Fitness",
+    "signupBusinessKindValue": "gym",
+    "dashboardPath": "/inventory/verticals/gym/",
+    "stockInPath": "/inventory/verticals/gym/scan-in/",
+    "sellPath": "/inventory/verticals/gym/sell/",
+    "sidebarItems": [
+      { "testid": "sidebar-dashboard", "path": "/inventory/verticals/gym/", "readyTestid": "dashboard-heading" },
+      { "testid": "sidebar-members", "path": "/inventory/verticals/gym/members/", "readyTestid": "members-heading" },
+      { "testid": "sidebar-checkin", "path": "/inventory/verticals/gym/check-in/", "readyTestid": "checkin-heading" },
+      { "testid": "sidebar-stock", "path": "/inventory/verticals/gym/stock/", "readyTestid": "stock-heading" },
+      { "testid": "sidebar-sell", "path": "/inventory/verticals/gym/sell/", "readyTestid": "sell-form" }
+    ],
+    "stockInPayload": {
+      "name": "E2E Protein Powder",
+      "qty": "10",
+      "cost": "800",
+      "price": "1200"
+    }
+  },
+  "hardware": {
+    "key": "hardware",
+    "displayName": "Hardware & General Dealers",
+    "signupBusinessKindValue": "hardware",
+    "dashboardPath": "/inventory/",
+    "stockInPath": "/inventory/scan-in/",
+    "sellPath": "/inventory/sell/",
+    "sidebarItems": [
+      { "testid": "sidebar-dashboard", "path": "/inventory/", "readyTestid": "dashboard-heading" },
+      { "testid": "sidebar-stock", "path": "/inventory/stock/", "readyTestid": "stock-heading" },
+      { "testid": "sidebar-scan-in", "path": "/inventory/scan-in/", "readyTestid": "stockin-form" },
+      { "testid": "sidebar-sell", "path": "/inventory/sell/", "readyTestid": "sell-form" }
+    ],
+    "stockInPayload": {
+      "name": "E2E Test Hammer",
+      "qty": "15",
+      "cost": "100",
+      "price": "150"
+    }
+  },
+  "cement": {
+    "key": "cement",
+    "displayName": "Cement / Building Materials",
+    "signupBusinessKindValue": "cement",
+    "dashboardPath": "/verticals/cement/",
+    "stockInPath": "/verticals/cement/scan-in/",
+    "sellPath": "/verticals/cement/sell/",
+    "sidebarItems": [
+      { "testid": "sidebar-dashboard", "path": "/verticals/cement/", "readyTestid": "dashboard-heading" },
+      { "testid": "sidebar-stock", "path": "/verticals/cement/stock/", "readyTestid": "stock-heading" },
+      { "testid": "sidebar-scan-in", "path": "/verticals/cement/scan-in/", "readyTestid": "stockin-form" },
+      { "testid": "sidebar-sell", "path": "/verticals/cement/sell/", "readyTestid": "sell-form" }
+    ],
+    "stockInPayload": {
+      "name": "E2E Test Cement",
+      "qty": "100",
+      "cost": "75",
+      "price": "95"
+    }
+  },
+  "farm": {
+    "key": "farm",
+    "displayName": "Farm Manager",
+    "signupBusinessKindValue": "farm",
+    "dashboardPath": "/verticals/farm/",
+    "stockInPath": "/verticals/farm/stock-in/",
+    "sellPath": "/verticals/farm/sell/",
+    "sidebarItems": [
+      { "testid": "sidebar-dashboard", "path": "/verticals/farm/", "readyTestid": "dashboard-heading" },
+      { "testid": "sidebar-crops", "path": "/verticals/farm/crops/", "readyTestid": "crops-heading" },
+      { "testid": "sidebar-livestock", "path": "/verticals/farm/livestock/", "readyTestid": "livestock-heading" }
+    ],
+    "stockInPayload": {
+      "name": "E2E Test Seeds",
+      "qty": "500",
+      "cost": "5",
+      "price": "10"
+    }
+  },
+  "welding": {
+    "key": "welding",
+    "displayName": "Welding Workshop",
+    "signupBusinessKindValue": "welding",
+    "dashboardPath": "/verticals/welding/",
+    "stockInPath": "/verticals/welding/stock-in/",
+    "sellPath": "/verticals/welding/jobs/",
+    "sidebarItems": [
+      { "testid": "sidebar-dashboard", "path": "/verticals/welding/", "readyTestid": "dashboard-heading" },
+      { "testid": "sidebar-jobs", "path": "/verticals/welding/jobs/", "readyTestid": "jobs-heading" },
+      { "testid": "sidebar-estimates", "path": "/verticals/welding/estimates/", "readyTestid": "estimates-heading" }
+    ],
+    "stockInPayload": {
+      "name": "E2E Test Welding Rod",
+      "qty": "100",
+      "cost": "10",
+      "price": "15"
+    }
+  }
+}
+

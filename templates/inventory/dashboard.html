@@ -1,653 +1,328 @@
 {% extends "base.html" %}
-{% load static %}
 {% load humanize %}
+{% load static %}
+{% load math_extras %}
 
-{% block title %}Dashboard � Emajinet{% endblock %}
-{% block header_title %}Dashboard{% endblock %}
+{% block title %}Inventory Dashboard · Emajinet{% endblock %}
 
-{% block extra_css %}
-<style>
-  :root{ --chart-h:260px; --chart-h-sm:210px; }
-  .panel{ border-radius:var(--radius,12px); border:1px solid var(--cc-border); background:var(--cc-panel); box-shadow:var(--cc-shadow); padding:1rem; }
-  .panel h5,.card-head>div{ font-weight:900; letter-spacing:.01em }
-  .kpi-row{ display:grid; gap:12px; grid-template-columns:repeat(4,1fr); margin-bottom:12px; }
-  @media (max-width:992px){ .kpi-row{ grid-template-columns:repeat(2,1fr); } }
-  .kpi .label{ color:var(--cc-muted); font-weight:800 }
-  .kpi .value{ font-size:1.6rem; font-weight:900 }
-  .chart-canvas{ width:100% !important; height:var(--chart-h) !important }
-  .chart-canvas--sm{ height:var(--chart-h-sm) !important }
-  .dash-grid{ display:grid; gap:12px; grid-template-columns:2fr 1fr; grid-template-rows:minmax(0,1fr) minmax(0,1fr); height:clamp(540px,62vh,760px); }
-  .dash-grid .left{ grid-row:1 / span 2; }
-  .equal-grid{ display:grid; gap:12px; grid-template-columns:7fr 5fr; align-items:stretch; }
-  @media (max-width:992px){ .dash-grid,.equal-grid{ display:block; height:auto; } .chart-canvas{ height:220px !important } }
-  .ai-item{ display:flex; gap:.5rem; align-items:flex-start; }
-  .ai-item .badge{ margin-top:.15rem }
-  .empty-hint{ color:var(--cc-muted); font-weight:700; padding:.5rem 0 .2rem }
-  .filters .form-select{ min-width:160px; }
-
-  /* CFO band layout */
-  .cfo-band{ display:grid; gap:12px; grid-template-columns: 2fr 1fr; margin-bottom:12px; }
-  @media (max-width:992px){ .cfo-band{ grid-template-columns:1fr; } }
-
-  /* Simulation quick actions */
-  .sim-actions .btn{ min-width: 160px; }
-  .muted-note{ color:var(--cc-muted); }
-
-  /* ---- persistent action bar (always show Add Product) ---- */
-  .actionbar{
-    position: sticky; top: 0; z-index: 20;
-    background: color-mix(in oklab, var(--cc-panel) 92%, transparent);
-    backdrop-filter: saturate(1.2) blur(6px);
-    border: 1px solid var(--cc-border);
-    border-radius: var(--radius,12px);
-    padding: .6rem .8rem; margin-bottom: 12px;
-    box-shadow: var(--cc-shadow);
-  }
-  .actionbar .btn{ white-space: nowrap; }
-  @media (max-width: 480px){
-    .actionbar .btn span{ display:none; } /* compact label on tiny screens */
-  }
-</style>
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 {% endblock %}
 
 {% block content %}
 
-  <!-- ?? Always-visible dashboard actions -->
-  <div class="actionbar d-flex align-items-center justify-content-between">
-    <div class="fw-semibold">Welcome to {{ request.business.name|default:"Emajinet" }}</div>
-    <div class="d-flex gap-2">
-      <a href="{% url 'inventory:merch_product_create' %}" class="btn primary">
-        ? <span>1) Add your first product</span>
-      </a>
-      <a href="{% url 'inventory:scan_in' %}" class="btn muted">
-        <i class="bi bi-upc-scan"></i> <span>Scan IN</span>
-      </a>
+{% comment %}Branded header with greeting{% endcomment %}
+{% include "partials/dashboard_brand_header.html" %}
+
+{% comment %}Daily wisdom quotes{% endcomment %}
+{% include "partials/dashboard_quotes.html" %}
+
+{% comment %}Yesterday summary (shows once per day){% endcomment %}
+{% include "partials/dashboard_yesterday_summary.html" %}
+
+<style>
+  .vertical-page{display:flex;flex-direction:column;gap:18px;padding:18px}
+  .vertical-hero{background:linear-gradient(120deg,#10b981,#059669);padding:24px;border-radius:20px;color:#fff;display:flex;flex-wrap:wrap;gap:18px;align-items:center;justify-content:space-between;box-shadow:0 20px 50px rgba(16,185,129,0.3)}
+  .vertical-hero h1{margin:0;font-size:clamp(28px,3.5vw,36px);font-weight:900}
+  .vertical-hero p{margin:4px 0 0;opacity:.95}
+  .hero-actions{display:flex;gap:12px;flex-wrap:wrap}
+  .hero-actions a{border-radius:999px;padding:12px 20px;font-weight:700;text-decoration:none;transition:all 0.2s}
+  .hero-actions .primary{background:#fff;color:#10b981}
+  .hero-actions .primary:hover{background:#f0fdf4;transform:translateY(-2px);box-shadow:0 8px 20px rgba(255,255,255,0.3)}
+  .hero-actions .ghost{border:2px solid rgba(255,255,255,.9);color:#fff}
+  .hero-actions .ghost:hover{background:rgba(255,255,255,.15)}
+  
+  .metrics-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:18px}
+  .metric-card{background:linear-gradient(135deg,#ffffff,#f8fafc);border-radius:20px;padding:20px;box-shadow:0 10px 30px rgba(15,23,42,.1);border:1px solid rgba(148,163,184,0.1);transition:all 0.3s}
+  .metric-card:hover{transform:translateY(-4px);box-shadow:0 20px 50px rgba(15,23,42,.15)}
+  .metric-card h3{margin:0;font-size:.95rem;text-transform:uppercase;color:#64748b;letter-spacing:0.05em;font-weight:600}
+  .metric-card p{margin:8px 0 0;font-size:2rem;font-weight:900;color:#0f172a}
+  .metric-card small{display:block;margin-top:6px;font-size:.9rem;color:#64748b}
+  
+  .section-title{font-size:1.3rem;font-weight:800;color:#0f172a;margin:0 0 16px;display:flex;align-items:center;gap:10px}
+  .section-title i{color:#10b981}
+  
+  .recent-block{background:linear-gradient(135deg,#ffffff,#f8fafc);border-radius:22px;padding:22px;box-shadow:0 10px 30px rgba(15,23,42,.1);border:1px solid rgba(148,163,184,0.1)}
+  
+  .badge{display:inline-flex;align-items:center;gap:6px;border-radius:20px;padding:5px 12px;font-size:.8rem;font-weight:700}
+  .badge.green{background:#dcfce7;color:#166534}
+  .badge.yellow{background:#fef9c3;color:#854d0e}
+  .badge.red{background:#fee2e2;color:#991b1b}
+  
+  .chart-container{position:relative;height:280px;margin-top:16px}
+  .alert-list{display:grid;gap:12px}
+  .alert-item{display:flex;justify-content:space-between;align-items:center;padding:14px;background:linear-gradient(135deg,#fef2f2,#fee2e2);border-radius:14px;border-left:4px solid #ef4444}
+  .alert-item.out{background:linear-gradient(135deg,#fee2e2,#fecaca);border-left-color:#dc2626}
+  .alert-item.low{background:linear-gradient(135deg,#fef9c3,#fef3c7);border-left-color:#f59e0b}
+  .alert-name{flex:1;font-weight:600;color:#0f172a}
+  .alert-status{font-weight:700;color:#dc2626;font-size:0.9rem}
+  
+  .top-list{display:grid;gap:12px}
+  .top-item{display:flex;justify-content:space-between;align-items:center;padding:14px;background:linear-gradient(135deg,#f1f5f9,#e2e8f0);border-radius:14px;transition:all 0.2s}
+  .top-item:hover{background:linear-gradient(135deg,#e2e8f0,#cbd5e1);transform:translateX(4px)}
+  .top-rank{font-weight:900;font-size:1.2rem;color:#10b981;min-width:40px}
+  .top-name{flex:1;font-weight:600;color:#0f172a}
+  .top-value{font-weight:700;color:#10b981}
+</style>
+
+<div class="vertical-page">
+  <header class="vertical-hero">
+    <div>
+      <p style="margin:0;opacity:.9;text-transform:uppercase;letter-spacing:.08em;font-size:.85rem">{{ business.name }} · {{ location_label|default:"All Locations" }}</p>
+      <h1 data-testid="dashboard-heading">Inventory Dashboard</h1>
+      <p>Comprehensive view of your inventory performance, low stock alerts, and top products.</p>
     </div>
+    <div class="hero-actions">
+      <a class="primary" href="{% url 'inventory:scan_in' %}"><i class="bi bi-box-arrow-in-down"></i> Scan IN</a>
+      <a class="primary" href="{% url 'inventory:scan_sold' %}"><i class="bi bi-phone"></i> Sell</a>
+      <a class="ghost" href="{% url 'inventory:stock_list' %}"><i class="bi bi-list-ul"></i> Stock List</a>
+    </div>
+  </header>
+
+  <!-- DATE RANGE FILTER BAR -->
+  <section class="recent-block" style="padding:16px 22px">
+    <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <span style="font-weight:700;color:#64748b;margin-right:8px">Date Range:</span>
+        <a href="?range=today" class="btn {% if range_key == 'today' %}btn-primary{% else %}btn-outline-secondary{% endif %}" style="border-radius:20px;padding:8px 16px;font-size:.9rem">
+          <i class="bi bi-calendar-day"></i> Today
+        </a>
+        <a href="?range=7d" class="btn {% if range_key == '7d' %}btn-primary{% else %}btn-outline-secondary{% endif %}" style="border-radius:20px;padding:8px 16px;font-size:.9rem">
+          <i class="bi bi-calendar-week"></i> Last 7 Days
+        </a>
+        <a href="?range=mtd" class="btn {% if range_key == 'mtd' %}btn-primary{% else %}btn-outline-secondary{% endif %}" style="border-radius:20px;padding:8px 16px;font-size:.9rem">
+          <i class="bi bi-calendar-month"></i> This Month
+        </a>
+        <button type="button" class="btn {% if range_key == 'custom' %}btn-primary{% else %}btn-outline-secondary{% endif %}" style="border-radius:20px;padding:8px 16px;font-size:.9rem" onclick="toggleCustomRange()">
+          <i class="bi bi-calendar-range"></i> Custom
+        </button>
+      </div>
+      <div style="font-size:.9rem;color:#64748b">
+        <strong>Showing:</strong> {{ range_label }}
+      </div>
+    </div>
+    
+    <!-- CUSTOM DATE RANGE FORM (hidden by default) -->
+    <form method="get" id="customRangeForm" style="display:{% if range_key == 'custom' %}flex{% else %}none{% endif %};gap:12px;margin-top:16px;padding-top:16px;border-top:1px solid #e2e8f0;flex-wrap:wrap;align-items:end">
+      <input type="hidden" name="range" value="custom">
+      <div>
+        <label for="startDate" style="display:block;font-size:.85rem;font-weight:600;color:#64748b;margin-bottom:4px">Start Date</label>
+        <input type="date" id="startDate" name="start" value="{% if range_key == 'custom' %}{{ start_date|date:'Y-m-d' }}{% endif %}" class="form-control" required style="border-radius:10px">
+      </div>
+      <div>
+        <label for="endDate" style="display:block;font-size:.85rem;font-weight:600;color:#64748b;margin-bottom:4px">End Date</label>
+        <input type="date" id="endDate" name="end" value="{% if range_key == 'custom' %}{{ end_date|date:'Y-m-d' }}{% endif %}" class="form-control" required style="border-radius:10px">
+      </div>
+      <button type="submit" class="btn btn-primary" style="border-radius:10px">
+        <i class="bi bi-check-circle"></i> Apply
+      </button>
+      <button type="button" class="btn btn-outline-secondary" style="border-radius:10px" onclick="toggleCustomRange()">
+        Cancel
+      </button>
+    </form>
+  </section>
+
+  <!-- BUSINESS KPI CARDS -->
+  <section class="recent-block">
+    <h2 class="section-title">
+      <i class="bi bi-graph-up-arrow"></i> Business KPIs
+      <span style="font-size:.85rem;font-weight:600;color:#64748b;margin-left:12px">{{ range_label }}</span>
+    </h2>
+    
+    <div class="metrics-grid">
+      <!-- STOCK ON HAND -->
+      <article class="metric-card">
+        <h3><i class="bi bi-box-seam"></i> Active Stock</h3>
+        <p style="color:#0f172a">{{ items_in_stock|intcomma }}</p>
+        <small>units available</small>
+      </article>
+      
+      <!-- UNITS SOLD -->
+      <article class="metric-card">
+        <h3><i class="bi bi-cart-check"></i> Units Sold</h3>
+        <p style="color:#3b82f6">{{ total_units|intcomma }}</p>
+        <small>in selected period</small>
+      </article>
+      
+      <!-- REVENUE -->
+      <article class="metric-card">
+        <h3><i class="bi bi-cash-stack"></i> Revenue</h3>
+        <p style="color:#16a34a">MK {{ total_revenue|floatformat:0|intcomma }}</p>
+        <small>total sales amount</small>
+      </article>
+      
+      <!-- COSTS (with breakdown) -->
+      <article class="metric-card">
+        <h3><i class="bi bi-receipt"></i> Costs</h3>
+        <p style="color:#f59e0b">MK {{ costs_total|floatformat:0|intcomma }}</p>
+        <small style="display:block;margin-top:4px;line-height:1.5">
+          Cost of goods: MK {{ cost_of_goods|floatformat:0|intcomma }}<br>
+          Business costs: MK {{ business_costs|floatformat:0|intcomma }}
+        </small>
+      </article>
+      
+      <!-- PROFIT -->
+      <article class="metric-card" style="border:2px solid {% if profit_total >= 0 %}#16a34a{% else %}#dc2626{% endif %}">
+        <h3><i class="bi bi-trophy"></i> Profit</h3>
+        <p style="color:{% if profit_total >= 0 %}#16a34a{% else %}#dc2626{% endif %}">
+          {% if profit_total < 0 %}-{% endif %}MK {{ profit_total|abs|floatformat:0|intcomma }}
+        </p>
+        <small>
+          <span class="badge {% if profit_margin >= 20 %}green{% elif profit_margin >= 10 %}yellow{% else %}red{% endif %}">
+            {% if profit_margin < 0 %}-{% endif %}{{ profit_margin|abs|floatformat:1 }}% margin
+          </span>
+        </small>
+      </article>
+    </div>
+    
+    <div style="margin-top:16px;padding:14px;background:linear-gradient(135deg,#dbeafe,#e0e7ff);border-radius:12px;border-left:4px solid #3b82f6">
+      <p style="margin:0;color:#1e40af;font-size:.95rem">
+        <strong>💡 Insight:</strong> 
+        {% if total_units == 0 %}
+          No sales recorded in this period. Check your date range or start selling!
+        {% elif profit_margin < 10 %}
+          Your profit margin is low ({{ profit_margin|floatformat:1 }}%). Consider reviewing pricing or reducing costs.
+        {% elif profit_margin < 20 %}
+          Good profit margin of {{ profit_margin|floatformat:1 }}%. Keep optimizing to reach 20%+.
+        {% else %}
+          Excellent profit margin of {{ profit_margin|floatformat:1 }}%! Your business is performing great.
+        {% endif %}
+      </p>
+    </div>
+  </section>
+
+  <!-- PROFIT VS COSTS CHART & LOW STOCK ALERTS -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px">
+    <!-- PROFIT VS COSTS CHART -->
+    <section class="recent-block">
+      <h2 class="section-title"><i class="bi bi-bar-chart-line"></i> Profit vs Costs (Last 30 Days)</h2>
+      <div class="chart-container">
+        <canvas id="profitCostChart"></canvas>
+      </div>
+    </section>
+    
+    <!-- LOW STOCK ALERTS -->
+    <section class="recent-block">
+      <h2 class="section-title">
+        <i class="bi bi-exclamation-triangle"></i> Low Stock Alerts
+      </h2>
+      {% if low_stock_items %}
+        <div class="alert-list">
+          {% for item in low_stock_items %}
+            <div class="alert-item {% if item.status == 'OUT' %}out{% else %}low{% endif %}">
+              <div class="alert-name">
+                <strong>{{ item.name }}</strong>
+                <div style="font-size:.85rem;color:#64748b">{{ item.stock_count }} unit{{ item.stock_count|pluralize }} left</div>
+              </div>
+              <div class="alert-status">
+                {% if item.status == 'OUT' %}OUT OF STOCK{% else %}LOW STOCK{% endif %}
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p style="color:#64748b;text-align:center;padding:40px 0">All products are well stocked! 🎉</p>
+      {% endif %}
+    </section>
   </div>
 
-  <!-- KPI band -->
-  <section class="kpi-row">
-    <div class="kpi">
-      <div class="label">Revenue ({{ period|default:"month"|title }})</div>
-      {# If no units sold, force MK 0 so agents don�t see phantom revenue #}
-      <div class="value">
-        MK
-        {% if total_units|default:0 %}
-          {{ total_revenue|default:0|floatformat:0|intcomma }}
-        {% else %}
-          0
-        {% endif %}
-      </div>
-      {% if revenue_delta is not None %}
-        <span class="delta {% if revenue_delta >= 0 %}up{% else %}down{% endif %}">{{ revenue_delta|floatformat:1 }}%</span>
-      {% endif %}
-    </div>
-    <div class="kpi">
-      <div class="label">Units Sold</div>
-      <div class="value">{{ total_units|default:0|intcomma }}</div>
-      {% if units_delta is not None %}
-        <span class="delta {% if units_delta >= 0 %}up{% else %}down{% endif %}">{{ units_delta|floatformat:1 }}%</span>
-      {% endif %}
-    </div>
-    <div class="kpi">
-      <div class="label">Active Stock</div>
-      <div class="value">{{ active_stock_count|default:items_in_stock|default:0|intcomma }}</div>
-      <small style="color:var(--cc-muted);font-size:0.75rem;margin-top:4px">items available</small>
-    </div>
-    <div class="kpi">
-      <div class="label">Low / Out Items</div>
-      <div class="value">{{ low_items|default:0|intcomma }}</div>
-    </div>
-  </section>
-
-  <!-- Profit & Payment Mix Panels -->
-  {% include "partials/profit_panel.html" %}
-  {% include "partials/payment_mix_panel.html" %}
-
-  <!-- Agent Ranking Widget (for agents only) -->
-  {% if is_agent and agent_ranking %}
-  <section class="panel mb-3" style="background: linear-gradient(135deg, color-mix(in oklab, var(--cc-accent) 8%, var(--cc-panel)) 0%, var(--cc-panel) 100%);">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-      <h5 class="m-0 fw-bold"><i class="bi bi-trophy"></i> Your Sales Ranking</h5>
-      <span class="badge" style="background: var(--cc-accent); color: white; font-size: 0.9rem; padding: 0.4rem 0.75rem;">{{ agent_ranking.period }}</span>
-    </div>
-
-    <div class="row g-3">
-      <!-- Agent's Rank Card -->
-      <div class="col-md-4">
-        <div style="background: white; border: 2px solid var(--cc-accent); border-radius: 12px; padding: 1.5rem; text-align: center;">
-          <div style="color: var(--cc-muted); font-size: 0.85rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Your Rank</div>
-          <div style="font-size: 2.5rem; font-weight: 900; color: var(--cc-accent); margin: 0.5rem 0;">
-            {% if agent_ranking.agent_rank %}
-              {{ agent_ranking.agent_rank_formatted|default:agent_ranking.agent_rank }}
-            {% else %}
-              <span style="font-size: 1.2rem; color: var(--cc-muted);">Not ranked</span>
-            {% endif %}
-          </div>
-          <div style="color: var(--cc-muted); font-size: 0.85rem;">
-            {% if agent_ranking.rankings|length > 0 %}
-              out of {{ agent_ranking.rankings|length }} agent{{ agent_ranking.rankings|length|pluralize }}
-            {% endif %}
-          </div>
-        </div>
-      </div>
-
-      <!-- Agent's Total Sales Card -->
-      <div class="col-md-4">
-        <div style="background: white; border: 1px solid var(--cc-line); border-radius: 12px; padding: 1.5rem; text-align: center;">
-          <div style="color: var(--cc-muted); font-size: 0.85rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Your Total Sales</div>
-          <div style="font-size: 2rem; font-weight: 900; color: var(--cc-ink); margin: 0.5rem 0;">
-            MK {{ agent_ranking.agent_total|default:0|floatformat:0|intcomma }}
-          </div>
-          <div style="color: var(--cc-muted); font-size: 0.85rem;">Total sales amount</div>
-        </div>
-      </div>
-
-      <!-- Next Rank Motivation Card -->
-      <div class="col-md-4">
-        <div style="background: white; border: 1px solid var(--cc-line); border-radius: 12px; padding: 1.5rem;">
-          {% if agent_ranking.agent_above %}
-            <div style="color: var(--cc-muted); font-size: 0.85rem; font-weight: 700; margin-bottom: 0.5rem;">
-              <i class="bi bi-arrow-up-circle text-success"></i> Beat this to climb:
+  <!-- TOP MODELS / TOP SKUS -->
+  <section class="recent-block">
+    <h2 class="section-title">
+      <i class="bi bi-trophy-fill"></i> Top Products
+      <span style="font-size:.85rem;font-weight:600;color:#64748b;margin-left:8px">({{ range_label }})</span>
+    </h2>
+    {% if top_models %}
+      <div class="top-list">
+        {% for product in top_models %}
+          <div class="top-item">
+            <div class="top-rank">{{ forloop.counter }}</div>
+            <div class="top-name">
+              <strong>{{ product.product_name }}</strong>
+              <div style="font-size:.85rem;color:#64748b">{{ product.units_sold }} unit{{ product.units_sold|pluralize }} sold</div>
             </div>
-            <div style="font-weight: 700; color: var(--cc-ink);">{{ agent_ranking.agent_above.name }}</div>
-            <div style="font-size: 1.2rem; font-weight: 800; color: var(--success, #10b981);">
-              MK {{ agent_ranking.agent_above.total_sales|floatformat:0|intcomma }}
-            </div>
-            <div style="color: var(--cc-muted); font-size: 0.8rem; margin-top: 0.25rem;">
-              Rank #{{ agent_ranking.agent_above.rank }}
-            </div>
-          {% elif agent_ranking.agent_rank == 1 %}
-            <div style="text-align: center; padding: 0.5rem;">
-              <i class="bi bi-trophy-fill" style="font-size: 2rem; color: gold;"></i>
-              <div style="font-weight: 700; color: var(--cc-ink); margin-top: 0.5rem;">You're #1!</div>
-              <div style="color: var(--cc-muted); font-size: 0.85rem;">Keep up the great work!</div>
-            </div>
-          {% else %}
-            <div style="text-align: center; color: var(--cc-muted); font-size: 0.9rem;">
-              No ranking data available
-            </div>
-          {% endif %}
-        </div>
-      </div>
-    </div>
-
-    <!-- Top 5 Leaderboard -->
-    {% if agent_ranking.rankings %}
-    <div style="margin-top: 1.5rem; border-top: 1px solid var(--cc-line); padding-top: 1.5rem;">
-      <h6 class="fw-bold mb-3"><i class="bi bi-list-ol"></i> Top 5 Leaderboard</h6>
-      <div class="list-group list-group-flush">
-        {% for agent in agent_ranking.rankings|slice:":5" %}
-        <div class="list-group-item d-flex align-items-center gap-3 {% if agent.agent_id == user.id %}bg-light border-primary border-2{% endif %}" style="border-radius: 8px; margin-bottom: 0.5rem; padding: 0.75rem 1rem;">
-          <div style="width: 32px; height: 32px; border-radius: 50%; background: {% if agent.rank == 1 %}gold{% elif agent.rank == 2 %}silver{% elif agent.rank == 3 %}#cd7f32{% else %}var(--cc-accent){% endif %}; color: white; display: grid; place-items: center; font-weight: 900; font-size: 0.9rem;">
-            {{ agent.rank }}
+            <div class="top-value">MK {{ product.revenue|floatformat:0|intcomma }}</div>
           </div>
-          <div class="flex-grow-1">
-            <div class="fw-bold">{{ agent.name }}{% if agent.agent_id == user.id %} <span class="badge bg-primary">You</span>{% endif %}</div>
-            <div style="font-size: 0.85rem; color: var(--cc-muted);">{{ agent.sales_count }} sale{{ agent.sales_count|pluralize }}</div>
-          </div>
-          <div class="text-end">
-            <div class="fw-bold" style="font-size: 1.1rem;">MK {{ agent.total_sales|floatformat:0|intcomma }}</div>
-          </div>
-        </div>
         {% endfor %}
       </div>
-    </div>
+    {% else %}
+      <p style="color:#64748b;text-align:center;padding:40px 0">No sales data for {{ range_label|lower }}</p>
     {% endif %}
   </section>
-  {% endif %}
+</div>
 
-  <!-- Filters -->
-  <form method="get" class="filters d-flex flex-wrap gap-2 mb-3">
-    <label class="visually-hidden" for="f-period">Period</label>
-    <select id="f-period" name="period" class="form-select" aria-label="Period">
-      <option value="month" {% if period == "month" %}selected{% endif %}>This month</option>
-      <option value="all" {% if period == "all" %}selected{% endif %}>All time</option>
-    </select>
-
-    <label class="visually-hidden" for="f-model">Filter by model</label>
-    <select id="f-model" name="model" class="form-select" aria-label="Filter by model">
-      <option value="">All models</option>
-      {% for p in products %}
-        <option value="{{ p.id }}" {% if model_id == p.id %}selected{% endif %}>{{ p.brand }} {{ p.model }}{% if p.variant %} {{ p.variant }}{% endif %}</option>
-      {% endfor %}
-    </select>
-
-    <button class="btn primary" type="submit"><i class="bi bi-sliders"></i> Apply</button>
-    <a href="." class="btn muted"><i class="bi bi-arrow-counterclockwise"></i> Reset</a>
-  </form>
-
-  <!-- ? Financial Overview (AI-CFO) -->
-  <section class="cfo-band">
-    <div class="panel">
-      {% include "dashboard/partials/cfo_tiles.html" %}
-    </div>
-    <div class="panel">
-      {% include "dashboard/partials/cfo_alerts.html" %}
-    </div>
-  </section>
-
-  <!-- Band 1 -->
-  <section class="dash-grid mb-3">
-    <!-- Sales Trend -->
-    <div class="panel card header left" id="salesCard">
-      <div class="card-head d-flex justify-content-between align-items-center">
-        <div>Sales Trend</div>
-        <div class="d-flex gap-2">
-          <label class="visually-hidden" for="trendPeriod">Trend period</label>
-          <select id="trendPeriod" class="form-select" style="width:auto">
-            <option value="7d">Last 7 days</option>
-            <option value="month" selected>This month</option>
-          </select>
-          <label class="visually-hidden" for="trendMetric">Trend metric</label>
-          <select id="trendMetric" class="form-select" style="width:auto">
-            <option value="count" selected>Count</option>
-            <option value="amount">Amount</option>
-          </select>
-        </div>
-      </div>
-      <div class="card-body">
-        <canvas id="salesTrend" class="chart-canvas" aria-label="Sales trend"></canvas>
-        <div id="salesEmpty" class="empty-hint d-none">No sales yet for this selection. Try switching the metric/period.</div>
-        <div id="errSales" class="text-danger small mt-2 d-none"></div>
-      </div>
-    </div>
-
-    <!-- AI Insights -->
-    <div class="panel card header" id="aiCard">
-      <div class="card-head d-flex justify-content-between align-items-center">
-        <div>AI-Driven Insights</div>
-        <button id="ai-recs-refresh" type="button" class="btn icon"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
-      </div>
-      <div class="card-body">
-        <div id="ai-viewport" class="small"></div>
-        <div class="d-flex justify-content-between align-items-center mt-2">
-          <div id="ai-recs-overall" class="small" style="color:var(--cc-muted)"></div>
-          <div class="small" style="color:var(--cc-muted)">Auto-rotates every 5s</div>
-        </div>
-        <div id="errAI" class="text-danger small mt-2 d-none"></div>
-      </div>
-    </div>
-
-    <!-- Value Trend -->
-    <div class="panel card header" id="valueCard">
-      <div class="card-head d-flex justify-content-between align-items-center">
-        <div>Value Trend</div>
-        <div class="d-flex gap-2">
-          <label class="visually-hidden" for="vtMetric">Value metric</label>
-          <select id="vtMetric" class="form-select" style="width:auto">
-            <option value="revenue" selected>Revenue</option>
-            <option value="cost">Cost</option>
-            <option value="profit">Profit</option>
-          </select>
-          <label class="visually-hidden" for="vtPeriod">Value period</label>
-          <select id="vtPeriod" class="form-select" style="width:auto">
-            <option value="today">Today</option>
-            <option value="7d" selected>Last 7 days</option>
-            <option value="all">All time</option>
-          </select>
-        </div>
-      </div>
-      <div class="card-body">
-        <canvas id="valueTrend" class="chart-canvas chart-canas--sm" aria-label="Value trend"></canvas>
-        <div id="valueEmpty" class="empty-hint d-none">No values to plot.</div>
-        <div id="errValue" class="text-danger small mt-2 d-none"></div>
-      </div>
-    </div>
-  </section>
-
-  <!-- Band 2 -->
-  <section class="equal-grid mb-3">
-    <div>
-      <div class="panel card header h-100" id="topCard">
-        <div class="card-head d-flex justify-content-between align-items-center">
-          <div>Top-Selling Models</div>
-          <label class="visually-hidden" for="topPeriod">Top models period</label>
-          <select id="topPeriod" class="form-select" style="width:auto">
-            <option value="today">Today</option>
-            <option value="month" selected>This month</option>
-          </select>
-        </div>
-        <div class="card-body">
-          <canvas id="topModels" class="chart-canvas chart-canvas--sm" aria-label="Top models"></canvas>
-          <div id="topEmpty" class="empty-hint d-none">No model sales yet.</div>
-          <div id="errTop" class="text-danger small mt-2 d-none"></div>
-        </div>
-      </div>
-    </div>
-
-    <div>
-      <div class="panel card h-100" id="alertCard">
-        <h5 class="m-0 mb-2">Stock Alerts</h5>
-        <ul id="alertsList" class="list-group list-group-flush">
-          <li class="list-group-item" style="color:var(--cc-muted)">Loading�</li>
-        </ul>
-      </div>
-    </div>
-  </section>
-
-  <!-- ? New: Simulation & Scenarios quick panel -->
-  <section class="mb-3">
-    <div class="panel card">
-      <div class="card-head d-flex justify-content-between align-items-center">
-        <div>Simulation &amp; Scenarios</div>
-        <span class="small muted-note">Model growth, profit, and breakeven with saved scenarios</span>
-      </div>
-      <div class="card-body sim-actions">
-        <div class="d-flex flex-wrap gap-2">
-          <a class="btn btn-outline-primary" href="/simulator/new/">
-            <i class="bi bi-magic me-1"></i> New Scenario
-          </a>
-          <a class="btn btn-primary" href="/simulator/">
-            <i class="bi bi-graph-up me-1"></i> Open Simulator
-          </a>
-          <a class="btn btn-outline-secondary" href="/simulator/compare/?id=1&id=2">
-            <i class="bi bi-bar-chart-line me-1"></i> Compare (sample)
-          </a>
-        </div>
-        <div class="small mt-2 muted-note">
-          Tip: Use �Compare� like <code>/simulator/compare/?id=12&amp;id=15</code> to overlay Net Profit curves across scenarios.
-        </div>
-      </div>
-    </div>
-  </section>
-
-{% endblock %}
-
-{% block extra_js %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 <script>
-  const nf = new Intl.NumberFormat();
-  const CURRENT_MODEL = {{ model_id|default:"null" }};
-  const MODEL_QS = (CURRENT_MODEL !== null) ? `&model=${encodeURIComponent(CURRENT_MODEL)}` : '';
-
-  // helpers
-  const $id = (id)=>document.getElementById(id);
-  const show = (id)=>$id(id)?.classList.remove('d-none');
-  const hide = (id)=>$id(id)?.classList.add('d-none');
-  const cssVar=(name,fb)=> (getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fb);
-  const GRID_CLR=()=> cssVar('--chart-grid','#d8e3ff');
-  const BRAND  =()=> cssVar('--cc-accent','#3b82f6');
-
-  // ?? NEW: normalize API shapes (unwrap {ok,data} and series/values)
-  const unwrap = (d)=> (d && typeof d==='object' && d.ok && d.data) ? d.data : d || {};
-  const pickLabels = (d)=> (unwrap(d).labels || []);
-  const pickValues = (d)=>{
-    const u = unwrap(d);
-    if (Array.isArray(u.values)) return u.values.map(v=>Number(v)||0);
-    if (Array.isArray(u.series)) {
-      const s = u.series.find(s=>Array.isArray(s.data)) || u.series[0];
-      return (s?.data || []).map(v=>Number(v)||0);
-    }
-    return [];
-  };
-  const pickCurrencySign = (d)=> (unwrap(d)?.currency?.sign || 'MK');
-
-  // axis helpers
-  function chooseMoneyStep(max){
-    const c=[100000,200000,250000,500000,1000000,2000000,5000000];
-    for(const s of c){ if(max/s<=6) return s; }
-    return Math.pow(10, Math.max(2, Math.ceil(Math.log10(max||1))-1));
+// Toggle custom date range form
+function toggleCustomRange() {
+  const form = document.getElementById('customRangeForm');
+  if (form) {
+    form.style.display = form.style.display === 'none' ? 'flex' : 'none';
   }
-  function axisMoney(values){
-    const m=Math.max(0,...(values||[0]));
-    const step=chooseMoneyStep(m||100000);
-    const niceMax=Math.max(step*2, Math.ceil((m||(step*1.5))/step)*step);
-    return {min:0, max:niceMax, stepSize:step};
-  }
-  function axisCount(values){
-    const m=Math.max(0,...(values||[0]));
-    const nice=Math.max(1, Math.ceil(m));
-    return {min:0, max:Math.max(1,nice), stepSize:1};
-  }
+}
 
-  async function fetchJSON(url,{legacy=[]}={}){
-    const doFetch = (u)=> fetch(u,{credentials:'same-origin', headers:{Accept:'application/json'}});
-    const tryOnce = async (u)=>{
-      const r = await doFetch(u);
-      if(!r.ok) throw new Error(`HTTP ${r.status}`);
-      const ct=(r.headers.get('content-type')||'').toLowerCase();
-      if(!ct.includes('application/json')) throw new Error('Not JSON');
-      return r.json();
-    };
-    try{ return await tryOnce(url); }
-    catch(e){ for(const alt of legacy){ try{ return await tryOnce(alt); }catch(_){} } throw e; }
-  }
-
-  // ---------- Sales Trend ----------
-  let salesChart=null;
-  async function loadTrend(){
-    const metricSel=$id('trendMetric'); const periodSel=$id('trendPeriod');
-    if(!metricSel||!periodSel) return;
-
-    hide('errSales'); hide('salesEmpty');
-
-    const period=periodSel.value;
-    let metric =metricSel.value;
-
-    const getData=(m)=> fetchJSON(
-      `/inventory/api/sales-trend/?period=${encodeURIComponent(period)}&metric=${encodeURIComponent(m)}${MODEL_QS}`,
-      { legacy:[`/inventory/api_sales_trend/?period=${encodeURIComponent(period)}&metric=${encodeURIComponent(m)}${MODEL_QS}`] }
-    );
-
-    let raw;
-    try{ raw=await getData(metric); }
-    catch(e){ show('errSales'); $id('errSales').textContent=`Sales trend error: ${e.message}`; return; }
-
-    let labels=pickLabels(raw);
-    let values=pickValues(raw);
-    const isAmount=(metric==='amount');
-    const sign=isAmount?pickCurrencySign(raw):'';
-
-    // If "amount" is all zeros, auto-switch to "count"
-    if(isAmount && labels.length && values.every(v=>v===0)){
-      try{
-        const alt=await getData('count');
-        const altLabels=pickLabels(alt);
-        const altVals=pickValues(alt);
-        if(altLabels.length && altVals.some(v=>v>0)){ labels=altLabels; values=altVals; metric='count'; metricSel.value='count'; }
-      }catch{}
-    }
-
-    const el=$id('salesTrend'); salesChart?.destroy();
-    if(!labels.length || values.every(v=>v===0)){ show('salesEmpty'); return; }
-
-    const yCfg=(metric==='count')?axisCount(values):axisMoney(values);
-    const ctx=el.getContext('2d');
-    const blue=BRAND();
-    salesChart = new Chart(ctx,{
-      type:'line',
-      data:{ labels, datasets:[{ label: metric==='count'?'Sales (count)':`Sales (${sign})`, data:values, borderColor:blue, backgroundColor:blue+'20', fill:true, pointRadius:2, tension:.35 }]},
-      options:{
-        responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}},
-        animation:{ duration:500, easing:'easeOutCubic' },
-        scales:{
-          x:{ type:'category', grid:{ color:GRID_CLR() }, ticks:{ autoSkip:false, maxRotation:0, callback:(v)=> labels[v] }},
-          y:{ min:yCfg.min, max:yCfg.max, grid:{ color:GRID_CLR() }, ticks:{ stepSize:yCfg.stepSize, callback:(v)=> metric==='count'?v:`${sign} ${nf.format(v)}` } }
+// Profit vs Costs Chart
+(function() {
+  const chartData = {{ profit_cost_json|safe }};
+  const ctx = document.getElementById('profitCostChart');
+  
+  if (ctx && chartData && chartData.length > 0) {
+    new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: chartData.map(d => d.date_short),
+        datasets: [
+          {
+            label: 'Profit',
+            data: chartData.map(d => d.profit),
+            borderColor: '#10b981',
+            backgroundColor: 'rgba(16, 185, 129, 0.1)',
+            fill: true,
+            tension: 0.4,
+            pointRadius: 3,
+            pointHoverRadius: 5,
+          },
+          {
+            label: 'Costs',
+            data: chartData.map(d => d.costs),
+            borderColor: '#f59e0b',
+            backgroundColor: 'rgba(245, 158, 11, 0.1)',
+            fill: true,
+            tension: 0.4,
+            pointRadius: 3,
+            pointHoverRadius: 5,
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            display: true,
+            position: 'top',
+          },
+          tooltip: {
+            callbacks: {
+              label: function(context) {
+                return context.dataset.label + ': MK ' + context.parsed.y.toLocaleString();
+              }
+            }
+          }
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            ticks: {
+              callback: function(value) {
+                return 'MK ' + value.toLocaleString();
+              }
+            }
+          }
         }
       }
     });
   }
-
-  // ---------- Top Models ----------
-  let topChart=null;
-  async function loadTop(){
-    const periodSel=$id('topPeriod'); if(!periodSel) return;
-    hide('errTop'); hide('topEmpty');
-
-    const p=periodSel.value;
-    let raw=null;
-    try{
-      raw=await fetchJSON(`/inventory/api/top-models/?period=${encodeURIComponent(p)}${MODEL_QS}`,
-              { legacy:[`/inventory/api_top_models/?period=${encodeURIComponent(p)}${MODEL_QS}`] });
-    }catch(e){ show('errTop'); $id('errTop').textContent=`Top models error: ${e.message}`; return; }
-
-    const labels=pickLabels(raw), values=pickValues(raw);
-    topChart?.destroy();
-    const el=$id('topModels');
-    if(!labels.length || values.every(v=>v===0)){ show('topEmpty'); return; }
-
-    const y=axisCount(values); const blue=BRAND();
-    topChart = new Chart(el,{
-      type:'bar',
-      data:{ labels, datasets:[{ label:'Units', data:values, backgroundColor:blue, borderColor:blue }]},
-      options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:false } },
-        animation:{ duration:500, easing:'easeOutCubic' },
-        scales:{ x:{ grid:{ display:false }}, y:{ min:y.min, max:y.max, grid:{ color:GRID_CLR() }, ticks:{ stepSize:y.stepSize } } }
-      }
-    });
-  }
-
-  // ---------- Alerts ----------
-  async function loadAlerts(){
-    const ul=$id('alertsList'); if(!ul) return;
-    try{
-      const d=await fetchJSON(`/inventory/api/alerts/?_=${Date.now()}${MODEL_QS}`);
-      const dd = unwrap(d);
-      const items=(dd.alerts||[]).map(a=>{
-        const sev=a.severity==='high'?'danger':(a.severity==='warn'?'warning':'secondary');
-        return `<li class="list-group-item d-flex align-items-center gap-2">
-                  <span class="badge text-bg-${sev}">${a.type||'Alert'}</span>
-                  <span>${a.message||''}</span>
-                </li>`;
-      }).join('');
-      ul.innerHTML = items || '<li class="list-group-item" style="color:var(--cc-muted)">No alerts ??</li>';
-    }catch{ ul.innerHTML = `<li class="list-group-item" style="color:var(--cc-muted)">Alerts unavailable</li>`; }
-  }
-
-  // ---------- AI (rotating) ----------
-  let aiSlides=[]; let aiTimer=null; let aiIdx=0;
-  const renderAISlide=(i)=>{ const vp=$id('ai-viewport'); if(vp) vp.innerHTML=aiSlides[i] || '<div class="text-muted">No insights</div>'; };
-  const startAIRotation=()=>{ stopAIRotation(); if(aiSlides.length<=1) return; aiTimer=setInterval(()=>{ aiIdx=(aiIdx+1)%aiSlides.length; renderAISlide(aiIdx); },5000); };
-  const stopAIRotation =()=>{ if(aiTimer){ clearInterval(aiTimer); aiTimer=null; } };
-
-  async function loadAI(){
-    const viewport=$id('ai-viewport'); const overallEl=$id('ai-recs-overall'); if(!viewport) return;
-    hide('errAI'); viewport.innerHTML='<span class="text-muted">Loading�</span>'; if(overallEl) overallEl.textContent='';
-    try{
-      const raw=await fetchJSON(`/inventory/api/predictions/?_=${Date.now()}${MODEL_QS}`,
-        { legacy:[`/inventory/api/predictions?_=${Date.now()}${MODEL_QS}`, `/inventory/api-predictions/?_=${Date.now()}${MODEL_QS}`, `/inventory/api_predictions/?_=${Date.now()}${MODEL_QS}`] });
-
-      const data=unwrap(raw);
-      const risky=(data.risky||[]);
-      aiSlides = risky.length ? risky.map(x=>`
-          <div class="ai-item">
-            <span class="badge text-bg-danger">Risk</span>
-            <div><b>${x.product}</b> likely stockout by ${x.stockout_date}. On-hand ${x.on_hand}. Restock <b>${x.suggested_restock}</b>.</div>
-          </div>`)
-        : [`<div class="ai-item"><span class="badge text-bg-success">OK</span><div>All good � no stockouts predicted.</div></div>`];
-
-      aiIdx=0; renderAISlide(aiIdx); startAIRotation();
-
-      if(overallEl){
-        const total=(data.overall||[]).reduce((s,x)=>s+(x.predicted_units||0),0);
-        const rev=(data.overall||[]).reduce((s,x)=>s+(+x.predicted_revenue||0),0);
-        const sign=data?.currency?.sign||'MK';
-        overallEl.innerHTML = `Next 7 days: <b>${nf.format(total)}</b> units � <b>${sign} ${nf.format(Math.round(rev))}</b>`;
-      }
-    }catch(e){
-      show('errAI'); $id('errAI').textContent=`Insights error: ${e.message}`;
-      aiSlides=['<div class="text-danger">No insights</div>']; renderAISlide(0); stopAIRotation();
-    }
-  }
-
-  // ---------- Value Trend ----------
-  let vtChart=null;
-
-  function mergeByLabel(aLabels, aVals, bLabels, bVals){
-    const mapA=new Map(aLabels.map((l,i)=>[l, Number(aVals[i])||0]));
-    const lbls=[...new Set([...aLabels, ...bLabels])].sort();
-    const outA=lbls.map(l=>mapA.get(l)||0);
-    const mapB=new Map(bLabels.map((l,i)=>[l, Number(bVals[i])||0]));
-    const outB=lbls.map(l=>mapB.get(l)||0);
-    return {labels:lbls, A:outA, B:outB};
-  }
-  function mapVtToSalesPeriod(vt){ return (vt==='7d'||vt==='today') ? '7d' : 'month'; }
-
-  async function tryValueTrend(metric, period){
-    try{
-      const raw = await fetchJSON(`/inventory/api/value-trend/?metric=${encodeURIComponent(metric)}&period=${encodeURIComponent(period)}${MODEL_QS}`,
-        { legacy:[`/inventory/api/value_trend/?metric=${encodeURIComponent(metric)}&period=${encodeURIComponent(period)}${MODEL_QS}`] });
-      const labels = pickLabels(raw), values = pickValues(raw);
-      if (labels.length) return { labels, values, currency:{sign:pickCurrencySign(raw)} };
-    }catch(_){}
-
-    if(metric==='profit'){
-      try{
-        const raw = await fetchJSON(`/inventory/api/profit-bar/?period=${encodeURIComponent(period)}${MODEL_QS}`,
-                                   { legacy:[`/inventory/api_profit_bar/?period=${encodeURIComponent(period)}${MODEL_QS}`] });
-        const labels = pickLabels(raw), values = pickValues(raw);
-        if(labels.length) return { labels, values, currency:{sign:pickCurrencySign(raw)} };
-      }catch(_){}
-    }
-
-    if(metric==='revenue' || metric==='cost'){
-      let revRaw=null;
-      try{
-        const p = mapVtToSalesPeriod(period);
-        revRaw = await fetchJSON(`/inventory/api/sales-trend/?period=${encodeURIComponent(p)}&metric=amount${MODEL_QS}`,
-                              { legacy:[`/inventory/api_sales_trend/?period=${encodeURIComponent(p)}&metric=amount${MODEL_QS}`] });
-      }catch(_){}
-
-      const revLabels = pickLabels(revRaw), revValues = pickValues(revRaw);
-      if(metric==='revenue' && revLabels.length) return { labels:revLabels, values:revValues, currency:{sign:pickCurrencySign(revRaw)} };
-
-      try{
-        const prRaw = await fetchJSON(`/inventory/api/profit-bar/?period=${encodeURIComponent(period)}${MODEL_QS}`,
-                                    { legacy:[`/inventory/api_profit_bar/?period=${encodeURIComponent(period)}${MODEL_QS}`] });
-        const prLabels = pickLabels(prRaw), prValues = pickValues(prRaw);
-        if(revLabels.length && prLabels.length){
-          const merged=mergeByLabel(revLabels, revValues, prLabels, prValues);
-          const cost=merged.labels.map((_,i)=> (merged.A[i]||0) - (merged.B[i]||0));
-          return { labels:merged.labels, values:cost, currency:{sign:pickCurrencySign(revRaw)} };
-        }
-      }catch(_){}
-    }
-    return null;
-  }
-
-  async function loadValueTrend(){
-    const mSel=$id('vtMetric'); const pSel=$id('vtPeriod'); if(!mSel||!pSel) return;
-    hide('errValue'); hide('valueEmpty');
-
-    const metric=mSel.value; const period=pSel.value;
-    let data=null;
-    try{ data = await tryValueTrend(metric, period); }catch{}
-
-    const el=$id('valueTrend'); vtChart?.destroy();
-    const labels=data?.labels||[]; const values=(data?.values||[]).map(v=>Number(v)||0);
-    const sign = data?.currency?.sign || 'MK';
-
-    if(!labels.length || values.every(v=>v===0)){ show('valueEmpty'); return; }
-
-    const y=axisMoney(values);
-    const ctx=el.getContext('2d');
-    const blue=BRAND();
-
-    vtChart = new Chart(ctx,{
-      type:'line',
-      data:{ labels, datasets:[{ label:(metric.charAt(0).toUpperCase()+metric.slice(1))+` (${sign})`, data:values, borderColor:blue, backgroundColor:blue+'20', fill:true, pointRadius:2, tension:.35 }]},
-      options:{ responsive:true, maintainAspectRatio:false,
-        plugins:{ legend:{ display:true }, tooltip:{ callbacks:{ label:(c)=> `${sign} ${nf.format(c.parsed.y||0)}` } } },
-        animation:{ duration:500, easing:'easeOutCubic' },
-        scales:{
-          x:{ type:'category', grid:{ color:GRID_CLR() }, ticks:{ autoSkip:false, maxRotation:0, callback:(v, i, ticks)=> labels[v] }},
-          y:{ min:y.min, max:y.max, grid:{ color:GRID_CLR() }, ticks:{ stepSize:y.stepSize, callback:(v)=> `${sign} ${nf.format(v)}` } }
-        }
-      }
-    });
-  }
-
-  // Wire up
-  $id('trendPeriod')?.addEventListener('change', loadTrend);
-  $id('trendMetric')?.addEventListener('change', loadTrend);
-  $id('topPeriod')?.addEventListener('change', loadTop);
-  $id('ai-recs-refresh')?.addEventListener('click', loadAI);
-  $id('vtMetric')?.addEventListener('change', loadValueTrend);
-  $id('vtPeriod')?.addEventListener('change', loadValueTrend);
-
-  (async function init(){
-    await Promise.allSettled([loadTrend(), loadTop(), loadAlerts(), loadAI(), loadValueTrend()]);
-  })();
+})();
 </script>
+
 {% endblock %}

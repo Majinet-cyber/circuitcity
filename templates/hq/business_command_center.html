@@ -1,0 +1,855 @@
+{% extends "hq/base_hq.html" %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}{{ business.name }} - Command Center - HQ Admin{% endblock %}
+
+{% block extra_head %}
+{{ block.super }}
+<style>
+    .command-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 48px 0;
+        margin: -24px -24px 32px -24px;
+    }
+    .business-title {
+        font-size: 32px;
+        font-weight: 800;
+        margin-bottom: 8px;
+    }
+    .business-meta {
+        opacity: 0.9;
+        font-size: 16px;
+    }
+    .tabs-nav {
+        display: flex;
+        gap: 4px;
+        margin-bottom: 32px;
+        border-bottom: 2px solid #e2e8f0;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    .tab-item {
+        padding: 12px 24px;
+        border: none;
+        background: transparent;
+        color: #4a5568;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        border-bottom: 3px solid transparent;
+        white-space: nowrap;
+    }
+    .tab-item:hover {
+        color: #2d3748;
+        background: #f7fafc;
+    }
+    .tab-item.active {
+        color: #667eea;
+        border-bottom-color: #667eea;
+    }
+    .kpi-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 20px;
+        margin-bottom: 32px;
+    }
+    .kpi-card {
+        background: white;
+        border-radius: 16px;
+        padding: 24px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        transition: all 0.3s ease;
+    }
+    .kpi-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+    }
+    .kpi-value {
+        font-size: 36px;
+        font-weight: 700;
+        color: #1a202c;
+        margin: 8px 0;
+    }
+    .kpi-label {
+        font-size: 14px;
+        color: #718096;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        font-weight: 600;
+    }
+    .kpi-icon {
+        font-size: 32px;
+        opacity: 0.8;
+    }
+    .content-card {
+        background: white;
+        border-radius: 16px;
+        padding: 32px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        margin-bottom: 24px;
+    }
+    .section-title {
+        font-size: 20px;
+        font-weight: 700;
+        color: #1a202c;
+        margin-bottom: 20px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+    .status-badge {
+        display: inline-block;
+        padding: 6px 12px;
+        border-radius: 8px;
+        font-size: 13px;
+        font-weight: 600;
+        color: white;
+    }
+    .badge-active { background: #16a34a; }
+    .badge-trial { background: #06b6d4; }
+    .badge-suspended { background: #ef4444; }
+    .badge-expired { background: #6b7280; }
+    .badge-grace { background: #f59e0b; }
+    .data-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+    .data-table th {
+        text-align: left;
+        padding: 12px;
+        background: #f7fafc;
+        font-weight: 600;
+        color: #4a5568;
+        font-size: 14px;
+        border-bottom: 2px solid #e2e8f0;
+    }
+    .data-table td {
+        padding: 12px;
+        border-bottom: 1px solid #e2e8f0;
+        color: #2d3748;
+    }
+    .data-table tr:hover {
+        background: #f7fafc;
+    }
+    .empty-state {
+        text-align: center;
+        padding: 48px 24px;
+        color: #718096;
+    }
+    .empty-state-icon {
+        font-size: 64px;
+        margin-bottom: 16px;
+        opacity: 0.5;
+    }
+    /* Chart containers now use .cc-chart-container from mobile-system.css */
+    .quick-actions {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+        margin-bottom: 24px;
+    }
+    .pinned-note {
+        background: #fffbeb;
+        border-left: 4px solid #f59e0b;
+        padding: 16px;
+        margin-bottom: 16px;
+        border-radius: 8px;
+    }
+    .note-title {
+        font-weight: 700;
+        color: #78350f;
+        margin-bottom: 8px;
+    }
+    .note-content {
+        color: #92400e;
+        line-height: 1.6;
+    }
+</style>
+{% endblock %}
+
+{% block page_content %}
+<div class="command-header">
+    <div class="container">
+        <div class="business-title">🏢 {{ business.name }}</div>
+        <div class="business-meta">
+            <span class="status-badge badge-{{ sub_state.status|default:"none" }}">
+                {{ sub_state.status|title|default:"No Subscription" }}
+            </span>
+            {% if sub_state.days_remaining is not None %}
+            • {{ sub_state.days_remaining }} days remaining
+            {% endif %}
+            • Created {{ business.created_at|date:"M d, Y" }}
+        </div>
+    </div>
+</div>
+
+<div class="container">
+    <!-- Tabs -->
+    {% with active_tab|default:"overview" as current_tab %}
+    <div class="tabs-nav">
+        <a href="?tab=overview" class="tab-item {% if current_tab == 'overview' %}active{% endif %}">
+            <i class="bi bi-grid-3x3-gap me-1"></i>Overview
+        </a>
+        <a href="?tab=subscription" class="tab-item {% if current_tab == 'subscription' %}active{% endif %}">
+            <i class="bi bi-credit-card me-1"></i>Subscription
+        </a>
+        <a href="?tab=users" class="tab-item {% if current_tab == 'users' %}active{% endif %}">
+            <i class="bi bi-people me-1"></i>Users
+        </a>
+        <a href="?tab=data" class="tab-item {% if current_tab == 'data' %}active{% endif %}">
+            <i class="bi bi-box-seam me-1"></i>Data &amp; Inventory
+        </a>
+        <a href="?tab=sales" class="tab-item {% if current_tab == 'sales' %}active{% endif %}">
+            <i class="bi bi-cash-stack me-1"></i>Sales &amp; Wallet
+        </a>
+        <a href="?tab=health" class="tab-item {% if current_tab == 'health' %}active{% endif %}">
+            <i class="bi bi-heart-pulse me-1"></i>Health
+        </a>
+        <a href="?tab=tickets" class="tab-item {% if current_tab == 'tickets' %}active{% endif %}">
+            <i class="bi bi-ticket me-1"></i>Tickets
+        </a>
+        <a href="?tab=audit" class="tab-item {% if current_tab == 'audit' %}active{% endif %}">
+            <i class="bi bi-journal-text me-1"></i>Audit Log
+        </a>
+    </div>
+
+    <!-- Tab Content -->
+    {% if current_tab == 'overview' %}
+        <!-- Overview Tab -->
+        <div class="quick-actions">
+            <a href="{% url 'hq:business_command_center' business.id %}?tab=subscription" class="btn btn-primary">
+                💳 Manage Subscription
+            </a>
+            <a href="{% url 'hq:account_support' business.id %}" class="btn btn-outline-primary">
+                🔧 Account Support
+            </a>
+            <a href="{% url 'hq:business_detail' business.id %}" class="btn btn-outline-secondary">
+                👀 Legacy View
+            </a>
+        </div>
+
+        <!-- Pinned Notes -->
+        {% if pinned_notes %}
+        <div class="content-card">
+            <div class="section-title">📌 Pinned Notes</div>
+            {% for note in pinned_notes %}
+            <div class="pinned-note">
+                <div class="note-title">{{ note.title }}</div>
+                <div class="note-content">{{ note.content }}</div>
+                <div class="text-muted small mt-2">
+                    By {{ note.author.get_full_name|default:note.author.email }} • {{ note.created_at|date:"M d, Y H:i" }}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- KPIs -->
+        <div class="kpi-grid">
+            <div class="kpi-card">
+                <div class="kpi-icon">💵</div>
+                <div class="kpi-value">{{ paid_total|intcomma }}</div>
+                <div class="kpi-label">Total Paid</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-icon">📄</div>
+                <div class="kpi-value">{{ total_invoices }}</div>
+                <div class="kpi-label">Total Invoices</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-icon">🛒</div>
+                <div class="kpi-value">{{ sales_count_30d }}</div>
+                <div class="kpi-label">Sales (30d)</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-icon"><i class="bi bi-cash-coin"></i></div>
+                <div class="kpi-value">{{ sales_total_30d|intcomma }}</div>
+                <div class="kpi-label">Revenue (30d)</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-icon">👤</div>
+                <div class="kpi-value">{{ agents_count }}</div>
+                <div class="kpi-label">Team Members</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-icon">📦</div>
+                <div class="kpi-value">{{ stock_count }}</div>
+                <div class="kpi-label">Stock Items</div>
+            </div>
+        </div>
+
+
+        <div class="content-card">
+            <div class="section-title">📈 Sales Trend (Last 30 Days)</div>
+            <div class="cc-chart-container" style="height:300px">
+                <canvas id="salesTrendChart"></canvas>
+            </div>
+        </div>
+
+    {% elif current_tab == 'subscription' %}
+        <!-- Subscription Tab -->
+        <div class="content-card">
+            <div class="section-title">💳 Subscription Details</div>
+            {% if subscription %}
+                <div class="data-table-wrapper">
+                    <table class="data-table">
+                        <tr>
+                            <th>Status</th>
+                            <td><span class="status-badge badge-{{ subscription.status }}">{{ subscription.get_status_display }}</span></td>
+                        </tr>
+                        <tr>
+                            <th>Current Period</th>
+                            <td>{{ subscription.current_period_start|date:"M d, Y" }} - {{ subscription.current_period_end|date:"M d, Y" }}</td>
+                        </tr>
+                        <tr>
+                            <th>Plan</th>
+                            <td>{{ subscription.plan_name|default:"Not set" }}</td>
+                        </tr>
+                        <tr>
+                            <th>Created</th>
+                            <td>{{ subscription.created_at|date:"M d, Y H:i" }}</td>
+                        </tr>
+                    </table>
+                </div>
+            {% else %}
+                <div class="empty-state">
+                    <div class="empty-state-icon">💳</div>
+                    <p>No subscription found for this business.</p>
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- Payment History -->
+        <div class="content-card">
+            <div class="section-title"><i class="bi bi-clock-history me-1"></i>Payment History</div>
+            {% if invoices %}
+                <div class="cc-table-scroll">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Amount</th>
+                                <th>Status</th>
+                                <th>Description</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for invoice in invoices %}
+                            <tr>
+                                <td>{{ invoice.created_at|date:"M d, Y" }}</td>
+                                <td>{{ invoice.amount_due|intcomma }}</td>
+                                <td><span class="badge bg-{{ invoice.status|lower }}">{{ invoice.get_status_display }}</span></td>
+                                <td>{{ invoice.description|default:"-" }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="empty-state">
+                    <div class="empty-state-icon"><i class="bi bi-receipt" style="font-size:2.5rem;color:#94a3b8;"></i></div>
+                    <p>No payment history available.</p>
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- Subscription Change History -->
+        {% if subscription_history %}
+        <div class="content-card">
+            <div class="section-title">📜 Subscription Change History</div>
+            <div class="cc-table-scroll">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Action</th>
+                            <th>Actor</th>
+                            <th>Reason</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for log in subscription_history %}
+                        <tr>
+                            <td>{{ log.created_at|date:"M d, Y H:i" }}</td>
+                            <td>{{ log.get_action_type_display }}</td>
+                            <td>{{ log.actor.get_full_name|default:log.actor.email }}</td>
+                            <td>{{ log.reason|truncatewords:20 }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+
+    {% elif current_tab == 'users' %}
+        <!-- Users Tab -->
+        <div class="content-card">
+            <div class="section-title">👥 Team Members</div>
+            {% if users_with_sec %}
+                <div class="cc-table-scroll">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>User</th>
+                                <th>Role</th>
+                                <th>Status</th>
+                                <th>Last Login</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in users_with_sec %}
+                            <tr>
+                                <td>
+                                    <div>{{ item.user.get_full_name|default:item.user.email }}</div>
+                                    <div class="text-muted small">{{ item.user.email }}</div>
+                                </td>
+                                <td><span class="badge bg-primary">{{ item.membership.get_role_display }}</span></td>
+                                <td>
+                                    {% if item.is_locked %}
+                                        <span class="badge bg-danger">🔒 Locked</span>
+                                    {% else %}
+                                        <span class="badge bg-success">✅ Active</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ item.user.last_login|date:"M d, Y H:i"|default:"Never" }}</td>
+                                <td>
+                                    <a href="{% url 'hq:account_support' business.id %}" class="btn btn-sm btn-outline-primary">Manage</a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="empty-state">
+                    <div class="empty-state-icon">👥</div>
+                    <p>No team members found.</p>
+                </div>
+            {% endif %}
+        </div>
+
+    {% elif current_tab == 'data' %}
+        <!-- Data & Inventory Tab -->
+        <div class="content-card">
+            <div class="section-title">📦 Recent Stock Items</div>
+            {% if stock_items %}
+                <div class="cc-table-scroll">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Item</th>
+                                <th>SKU</th>
+                                <th>Quantity</th>
+                                <th>Added</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in stock_items %}
+                            <tr>
+                                <td>{{ item.name|default:item.product_name|default:"Unnamed Item" }}</td>
+                                <td>{{ item.sku|default:"-" }}</td>
+                                <td>{{ item.quantity|default:0 }}</td>
+                                <td>{{ item.created_at|date:"M d, Y" }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                <p class="text-muted mt-3">
+                    Total archived items: {{ archived_count }}
+                </p>
+            {% else %}
+                <div class="empty-state">
+                    <div class="empty-state-icon">📦</div>
+                    <p>No stock items found.</p>
+                </div>
+            {% endif %}
+        </div>
+
+    {% elif current_tab == 'sales' %}
+        <!-- Sales & Wallet Tab -->
+        <div class="kpi-grid">
+            <div class="kpi-card">
+                <div class="kpi-icon"><i class="bi bi-cash-coin"></i></div>
+                <div class="kpi-value">{{ wallet_total_income|intcomma }}</div>
+                <div class="kpi-label">Total Income</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-icon">💸</div>
+                <div class="kpi-value">{{ wallet_total_expense|intcomma }}</div>
+                <div class="kpi-label">Total Expenses</div>
+            </div>
+        </div>
+
+        <!-- Charts Row -->
+        <div class="row mb-4">
+            <div class="col-md-6 mb-3">
+                <div class="content-card">
+                    <h5 class="section-title"><i class="bi bi-pie-chart me-1"></i>Transaction Types</h5>
+                    <div class="cc-chart-container" style="height:300px">
+                        <canvas id="transactionTypesChart"></canvas>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6 mb-3">
+                <div class="content-card">
+                    <h5 class="section-title">💵 Sale Amounts Distribution</h5>
+                    <div class="cc-chart-container" style="height:300px">
+                        <canvas id="saleDistributionChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tickets Mini Chart -->
+        <div class="content-card mb-4">
+            <h5 class="section-title">🎫 Tickets Trend (Last 30 Days)</h5>
+            <div class="cc-chart-container" style="height: 200px;">
+                <canvas id="ticketsTrendChart"></canvas>
+            </div>
+        </div>
+
+        <div class="content-card">
+            <div class="section-title">🛒 Recent Sales</div>
+            {% if recent_sales %}
+                <div class="cc-table-scroll">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Amount</th>
+                                <th>Customer</th>
+                                <th>Agent</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for sale in recent_sales %}
+                            <tr>
+                                <td>{{ sale.created_at|date:"M d, Y H:i" }}</td>
+                                <td>{{ sale.amount|intcomma }}</td>
+                                <td>{{ sale.customer_name|default:"-" }}</td>
+                                <td>{{ sale.agent.get_full_name|default:sale.agent.email|default:"-" }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="empty-state">
+                    <div class="empty-state-icon">🛒</div>
+                    <p>No recent sales.</p>
+                </div>
+            {% endif %}
+        </div>
+
+        <div class="content-card">
+            <div class="section-title">💳 Wallet Transactions</div>
+            {% if wallet_txns %}
+                <div class="cc-table-scroll">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Amount</th>
+                                <th>Type</th>
+                                <th>Description</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for txn in wallet_txns %}
+                            <tr>
+                                <td>{{ txn.created_at|date:"M d, Y H:i" }}</td>
+                                <td class="{% if txn.amount > 0 %}text-success{% else %}text-danger{% endif %}">
+                                    {{ txn.amount|intcomma }}
+                                </td>
+                                <td>{{ txn.transaction_type|default:"-" }}</td>
+                                <td>{{ txn.description|truncatewords:15|default:"-" }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="empty-state">
+                    <div class="empty-state-icon">💳</div>
+                    <p>No wallet transactions.</p>
+                </div>
+            {% endif %}
+        </div>
+
+    {% elif current_tab == 'health' %}
+        <!-- Health Tab -->
+        <div class="content-card">
+            <div class="section-title">❤️ System Health</div>
+            <div class="kpi-grid">
+                <div class="kpi-card">
+                    <div class="kpi-icon">✅</div>
+                    <div class="kpi-value">{{ health_status|title }}</div>
+                    <div class="kpi-label">Status</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-icon">🕐</div>
+                    <div class="kpi-value">{{ last_activity|date:"H:i" }}</div>
+                    <div class="kpi-label">Last Activity</div>
+                </div>
+            </div>
+            <div class="empty-state">
+                <div class="empty-state-icon">❤️</div>
+                <p>System health monitoring is active.</p>
+            </div>
+        </div>
+
+    {% elif current_tab == 'tickets' %}
+        <!-- Tickets Tab -->
+        <div class="content-card">
+            <div class="section-title">🎫 Support Tickets</div>
+            {% if tickets %}
+                <div class="cc-table-scroll">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Ticket #</th>
+                                <th>Title</th>
+                                <th>Status</th>
+                                <th>Priority</th>
+                                <th>Created</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for ticket in tickets %}
+                            <tr>
+                                <td>{{ ticket.ticket_number }}</td>
+                                <td>{{ ticket.title }}</td>
+                                <td><span class="badge bg-{{ ticket.status }}">{{ ticket.get_status_display }}</span></td>
+                                <td><span class="badge bg-{{ ticket.priority }}">{{ ticket.get_priority_display }}</span></td>
+                                <td>{{ ticket.created_at|date:"M d, Y" }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                <p class="text-muted mt-3">Open tickets: {{ open_tickets_count }}</p>
+            {% else %}
+                <div class="empty-state">
+                    <div class="empty-state-icon">🎫</div>
+                    <p>No support tickets.</p>
+                </div>
+            {% endif %}
+        </div>
+
+    {% elif current_tab == 'audit' %}
+        <!-- Audit Log Tab -->
+        <div class="content-card">
+            <div class="section-title">📝 Audit Trail</div>
+            {% if audit_logs %}
+                <div class="cc-table-scroll">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Action</th>
+                                <th>Actor</th>
+                                <th>Reason</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for log in audit_logs %}
+                            <tr>
+                                <td>{{ log.created_at|date:"M d, Y H:i" }}</td>
+                                <td>{{ log.get_action_type_display }}</td>
+                                <td>{{ log.actor.get_full_name|default:log.actor.email }}</td>
+                                <td>{{ log.reason|truncatewords:20 }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="empty-state">
+                    <div class="empty-state-icon">📝</div>
+                    <p>No audit logs available.</p>
+                </div>
+            {% endif %}
+        </div>
+    {% endif %}
+    {% endwith %}
+
+</div>
+{% endblock %}
+
+<!-- Chart Data -->
+{{ chart_data|json_script:"command-center-chart-data" }}
+
+{% block extra_js %}
+{{ block.super }}
+<script src="{% static 'vendor/chartjs/chart.umd.min.js' %}" onerror="this.onerror=null; this.src='https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js';"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Check if Chart.js loaded
+    if (typeof Chart === 'undefined') {
+        console.warn('Chart.js not available');
+        return;
+    }
+
+    // Parse chart data from server
+    let chartData = {
+        sales_trend: { labels: [], data: [] },
+        transactions_by_type: {},
+        sale_distribution: {},
+        tickets: { opened: 0, closed: 0 }
+    };
+
+    try {
+        const dataEl = document.getElementById('command-center-chart-data');
+        if (dataEl) {
+            chartData = JSON.parse(dataEl.textContent);
+        }
+    } catch (e) {
+        console.warn('Failed to parse chart data:', e);
+    }
+
+    // Sales Trend Chart (Overview tab)
+    const salesTrendCanvas = document.getElementById('salesTrendChart');
+    if (salesTrendCanvas) {
+        try {
+            new Chart(salesTrendCanvas, {
+                type: 'line',
+                data: {
+                    labels: chartData.sales_trend?.labels || ['No data'],
+                    datasets: [{
+                        label: 'Revenue',
+                        data: chartData.sales_trend?.data || [0],
+                        borderColor: '#667eea',
+                        backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        y: { beginAtZero: true }
+                    }
+                }
+            });
+        } catch (e) {
+            console.error('Failed to create sales trend chart:', e);
+        }
+    }
+
+    // Transaction Types Chart
+    const txnTypesCanvas = document.getElementById('transactionTypesChart');
+    if (txnTypesCanvas) {
+        try {
+            const txnData = chartData.transactions_by_type || {};
+            new Chart(txnTypesCanvas, {
+                type: 'bar',
+                data: {
+                    labels: Object.keys(txnData),
+                    datasets: [{
+                        label: 'Transactions',
+                        data: Object.values(txnData),
+                        backgroundColor: 'rgba(16, 185, 129, 0.7)',
+                        borderColor: 'rgb(16, 185, 129)',
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        y: { beginAtZero: true }
+                    }
+                }
+            });
+        } catch (e) {
+            console.error('Failed to create transaction types chart:', e);
+        }
+    }
+
+    // Sale Distribution Chart
+    const saleDistCanvas = document.getElementById('saleDistributionChart');
+    if (saleDistCanvas) {
+        try {
+            const distData = chartData.sale_distribution || {};
+            new Chart(saleDistCanvas, {
+                type: 'bar',
+                data: {
+                    labels: Object.keys(distData),
+                    datasets: [{
+                        label: 'Sales Count',
+                        data: Object.values(distData),
+                        backgroundColor: 'rgba(245, 158, 11, 0.7)',
+                        borderColor: 'rgb(245, 158, 11)',
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        y: { beginAtZero: true }
+                    }
+                }
+            });
+        } catch (e) {
+            console.error('Failed to create sale distribution chart:', e);
+        }
+    }
+
+    // Tickets Trend Chart
+    const ticketsCanvas = document.getElementById('ticketsTrendChart');
+    if (ticketsCanvas) {
+        try {
+            const tickets = chartData.tickets || { opened: 0, closed: 0 };
+            new Chart(ticketsCanvas, {
+                type: 'bar',
+                data: {
+                    labels: ['Opened', 'Closed'],
+                    datasets: [{
+                        label: 'Tickets',
+                        data: [tickets.opened, tickets.closed],
+                        backgroundColor: [
+                            'rgba(239, 68, 68, 0.7)',
+                            'rgba(16, 185, 129, 0.7)'
+                        ],
+                        borderColor: [
+                            'rgb(239, 68, 68)',
+                            'rgb(16, 185, 129)'
+                        ],
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        y: { beginAtZero: true }
+                    }
+                }
+            });
+        } catch (e) {
+            console.error('Failed to create tickets chart:', e);
+        }
+    }
+});
+</script>
+{% endblock %}
+

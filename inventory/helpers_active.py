@@ -3,6 +3,7 @@ from typing import Tuple, Dict
 from .scope import active_scope
 from .models import Business, Location  # adjust if your names differ
 
+
 def resolve_active_context(request) -> Tuple[Dict, Dict]:
     biz_id, loc_id = active_scope(request)
 
@@ -17,9 +18,7 @@ def resolve_active_context(request) -> Tuple[Dict, Dict]:
 
     locations = []
     if biz:
-        locations = list(
-            Location.objects.filter(business=biz).values("id", "name")
-        )
+        locations = list(Location.objects.filter(business=biz).values("id", "name"))
 
     today = timezone.now().date().isoformat()
 
@@ -43,5 +42,3 @@ def resolve_active_context(request) -> Tuple[Dict, Dict]:
         "auto_submit_default": False,
     }
     return boot, ctx
-
-

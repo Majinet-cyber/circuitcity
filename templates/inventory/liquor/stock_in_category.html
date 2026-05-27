@@ -1,0 +1,594 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{{ category_display }} Stock In{% endblock %}
+
+{% block extra_css %}
+<style>
+/* PART D: Gamified Premium UX */
+.stock-in-wizard {
+  max-width: 900px;
+  margin: 2rem auto;
+  padding: 0 1rem;
+}
+
+/* Progress Indicator */
+.progress-steps {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+  position: relative;
+}
+
+.progress-steps::before {
+  content: '';
+  position: absolute;
+  top: 20px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: #e5e7eb;
+  z-index: 0;
+}
+
+.step {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+}
+
+.step-circle {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #e5e7eb;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  color: #6b7280;
+  margin-bottom: 0.5rem;
+  transition: all 0.3s ease;
+}
+
+.step.active .step-circle {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: white;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+
+.step.completed .step-circle {
+  background: #10b981;
+  color: white;
+}
+
+.step-label {
+  font-size: 0.875rem;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.step.active .step-label {
+  color: #10b981;
+  font-weight: 600;
+}
+
+/* Product Cards */
+.products-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.product-card {
+  background: white;
+  border: 2px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 1.5rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.product-card:hover {
+  border-color: #10b981;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.15);
+  transform: translateY(-2px);
+}
+
+.product-card.selected {
+  border-color: #10b981;
+  background: #f0fdf4;
+}
+
+.product-icon {
+  font-size: 2.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.product-name {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 0.5rem;
+}
+
+.product-stock {
+  font-size: 0.875rem;
+  color: #6b7280;
+}
+
+/* Calculator Panel (Sticky on desktop) */
+.calculator-panel {
+  position: sticky;
+  top: 20px;
+  background: linear-gradient(135deg, #f0fdf4, #ecfdf5);
+  border: 2px solid #10b981;
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.calculator-panel h3 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #065f46;
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.calc-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid #d1fae5;
+}
+
+.calc-row:last-child {
+  border-bottom: none;
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: #065f46;
+}
+
+.calc-label {
+  color: #047857;
+  font-weight: 500;
+}
+
+.calc-value {
+  font-weight: 600;
+  color: #065f46;
+  font-size: 1.1rem;
+}
+
+/* Form Styles */
+.form-card {
+  background: white;
+  border-radius: 12px;
+  padding: 2rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.form-group {
+  margin-bottom: 1.5rem;
+}
+
+.form-label {
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 0.5rem;
+  display: block;
+}
+
+.form-control {
+  border-radius: 8px;
+  border: 1px solid #d1d5db;
+  padding: 0.75rem;
+  font-size: 1rem;
+  transition: all 0.2s ease;
+}
+
+.form-control:focus {
+  border-color: #10b981;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+  outline: none;
+}
+
+.form-control-lg {
+  padding: 1rem;
+  font-size: 1.125rem;
+}
+
+.btn-submit {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: white;
+  border: none;
+  padding: 1rem 2rem;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 1.125rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  width: 100%;
+}
+
+.btn-submit:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(16, 185, 129, 0.3);
+}
+
+.btn-submit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.btn-submit.loading {
+  position: relative;
+  color: transparent;
+}
+
+.btn-submit.loading::after {
+  content: '';
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  top: 50%;
+  left: 50%;
+  margin-left: -10px;
+  margin-top: -10px;
+  border: 3px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  border-top-color: white;
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Mobile optimizations */
+@media (max-width: 768px) {
+  .progress-steps {
+    font-size: 0.75rem;
+  }
+  
+  .step-circle {
+    width: 32px;
+    height: 32px;
+    font-size: 0.875rem;
+  }
+  
+  .calculator-panel {
+    position: static;
+    margin-top: 1rem;
+  }
+  
+  .form-card {
+    padding: 1.5rem 1rem;
+  }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="stock-in-wizard">
+  <!-- Progress Indicator (PART D) -->
+  <div class="progress-steps">
+    <div class="step completed">
+      <div class="step-circle">1</div>
+      <div class="step-label">Choose Category</div>
+    </div>
+    <div class="step {% if selected_product %}completed{% else %}active{% endif %}">
+      <div class="step-circle">2</div>
+      <div class="step-label">Select Product</div>
+    </div>
+    <div class="step {% if selected_product %}active{% endif %}">
+      <div class="step-circle">3</div>
+      <div class="step-label">Enter Details</div>
+    </div>
+  </div>
+
+  <!-- Messages -->
+  {% if messages %}
+    {% for message in messages %}
+    <div class="alert alert-{{ message.tags }} alert-dismissible fade show">
+      {{ message }}
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    {% endfor %}
+  {% endif %}
+
+  {% if not selected_product %}
+    <!-- Step 2: Product Selection -->
+    <div class="mb-4">
+      <h2 class="h3 mb-1">Select {{ category_display }} Product</h2>
+      <p class="text-muted">Choose the product you want to stock in</p>
+    </div>
+
+    {% if has_products %}
+      <div class="products-grid">
+        {% for product in products %}
+        <div class="product-card" onclick="selectProduct({{ product.id }})">
+          <div class="product-icon">
+            {% if category == 'beer' %}🍺
+            {% elif category == 'cider' %}🍎
+            {% elif category == 'wine' %}🍷
+            {% elif category == 'spirits' or category == 'whisky' %}🥃
+            {% else %}🍾{% endif %}
+          </div>
+          <div class="product-name">{{ product.name }}</div>
+          <div class="product-stock">Stock: {{ product.quantity_in_stock|default:0 }} units</div>
+        </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="alert alert-warning">
+        No {{ category_display }} products found. <a href="{% url 'verticals:liquor_dashboard' %}">Add products first</a>.
+      </div>
+    {% endif %}
+
+    <div class="mt-4">
+      <a href="{% url 'verticals:liquor_dashboard' %}" class="btn btn-outline-secondary">
+        ← Back to Dashboard
+      </a>
+    </div>
+
+  {% else %}
+    <!-- Step 3: Enter Stock Details -->
+    <div class="mb-4">
+      <h2 class="h3 mb-1">Step 3: Enter Stock Details</h2>
+      <p class="text-muted">Product: <strong>{{ selected_product.name }}</strong></p>
+    </div>
+
+    <div class="row">
+      <div class="col-md-7">
+        <div class="form-card">
+          <form method="post" action="{% url 'inventory:liquor_stock_in_submit_v2' %}" id="stock-in-form">
+            {% csrf_token %}
+            <input type="hidden" name="product_id" value="{{ selected_product.id }}">
+
+            {% if category == 'beer' %}
+              <!-- Beer Form (PART B1) -->
+              <div class="form-group">
+                <label for="id_number_of_crates" class="form-label">Number of Crates *</label>
+                <input type="number" class="form-control form-control-lg" name="number_of_crates" id="id_number_of_crates" min="0" required>
+              </div>
+              
+              <div class="form-group">
+                <label for="id_cost_per_crate" class="form-label">Cost per Crate (MWK) *</label>
+                <input type="number" class="form-control form-control-lg" name="cost_per_crate" id="id_cost_per_crate" step="0.01" min="0.01" required>
+              </div>
+              
+              <div class="form-group">
+                <label for="id_loose_bottles" class="form-label">Loose Bottles (Optional)</label>
+                <input type="number" class="form-control" name="loose_bottles" id="id_loose_bottles" value="0" min="0">
+              </div>
+
+            {% elif category == 'cider' %}
+              <!-- Cider Form (PART B2) -->
+              <div class="form-group">
+                <label for="id_quantity_bottles" class="form-label">Number of Bottles *</label>
+                <input type="number" class="form-control form-control-lg" name="quantity_bottles" id="id_quantity_bottles" min="1" required>
+              </div>
+              
+              <div class="form-group">
+                <label for="id_cost_per_bottle" class="form-label">Cost per Bottle (MWK) *</label>
+                <input type="number" class="form-control form-control-lg" name="cost_per_bottle" id="id_cost_per_bottle" step="0.01" min="0.01" required>
+              </div>
+
+            {% elif category == 'wine' %}
+              <!-- Wine Form (PART B3) -->
+              <div class="form-group">
+                <label for="id_number_of_bottles" class="form-label">Number of Bottles *</label>
+                <input type="number" class="form-control form-control-lg" name="number_of_bottles" id="id_number_of_bottles" min="1" required>
+                <small class="text-muted">System will calculate glasses (5 per bottle)</small>
+              </div>
+              
+              <div class="form-group">
+                <label for="id_cost_per_bottle" class="form-label">Cost per Bottle (MWK) *</label>
+                <input type="number" class="form-control form-control-lg" name="cost_per_bottle" id="id_cost_per_bottle" step="0.01" min="0.01" required>
+              </div>
+
+            {% elif category == 'spirits' or category == 'whisky' %}
+              <!-- Spirits/Whisky Form (PART B4/B5) -->
+              <div class="form-group">
+                <label for="id_quantity_of_shots_added" class="form-label">Total Shots Added *</label>
+                <input type="number" class="form-control form-control-lg" name="quantity_of_shots_added" id="id_quantity_of_shots_added" min="1" required>
+              </div>
+              
+              <div class="form-group">
+                <label for="id_cost_per_shot" class="form-label">Cost per Shot (MWK) *</label>
+                <input type="number" class="form-control form-control-lg" name="cost_per_shot" id="id_cost_per_shot" step="0.01" min="0.01" required>
+              </div>
+              
+              <div class="form-group">
+                <label for="id_reserved_barman_shots" class="form-label">Reserved for Barman (Optional)</label>
+                <input type="number" class="form-control" name="reserved_barman_shots" id="id_reserved_barman_shots" value="0" min="0">
+                <small class="text-muted">These shots will not be added to sellable inventory</small>
+              </div>
+            {% endif %}
+
+            <!-- Common fields for all categories -->
+            <div class="form-group">
+              <label for="date_received" class="form-label">Date Received</label>
+              <input type="date" class="form-control" name="date_received" id="date_received">
+            </div>
+
+            <div class="form-group">
+              <label for="notes" class="form-label">Notes (Optional)</label>
+              <textarea class="form-control" name="notes" id="notes" rows="2" placeholder="Supplier, invoice #, etc."></textarea>
+            </div>
+
+            <div class="d-flex gap-2">
+              <a href="?category={{ category }}" class="btn btn-outline-secondary">← Change Product</a>
+              <button type="submit" class="btn-submit" id="submit-btn">
+                <i class="bi bi-check-circle"></i> Add to Stock
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <div class="col-md-5">
+        <!-- Live Calculator Panel (PART D) -->
+        <div class="calculator-panel">
+          <h3>
+            <i class="bi bi-calculator"></i> Live Calculator
+          </h3>
+          
+          <div id="calculator-content">
+            {% if category == 'beer' %}
+              <div class="calc-row">
+                <span class="calc-label">Total Bottles</span>
+                <span class="calc-value" id="calc-total-bottles">0</span>
+              </div>
+              <div class="calc-row">
+                <span class="calc-label">Cost per Bottle</span>
+                <span class="calc-value" id="calc-cost-per-bottle">MK 0.00</span>
+              </div>
+              <div class="calc-row">
+                <span class="calc-label">Total Cost</span>
+                <span class="calc-value" id="calc-total-cost">MK 0.00</span>
+              </div>
+            {% elif category == 'cider' %}
+              <div class="calc-row">
+                <span class="calc-label">Total Cost</span>
+                <span class="calc-value" id="calc-total-cost">MK 0.00</span>
+              </div>
+            {% elif category == 'wine' %}
+              <div class="calc-row">
+                <span class="calc-label">Total Glasses</span>
+                <span class="calc-value" id="calc-total-glasses">0</span>
+              </div>
+              <div class="calc-row">
+                <span class="calc-label">Cost per Glass</span>
+                <span class="calc-value" id="calc-cost-per-glass">MK 0.00</span>
+              </div>
+              <div class="calc-row">
+                <span class="calc-label">Total Cost</span>
+                <span class="calc-value" id="calc-total-cost">MK 0.00</span>
+              </div>
+            {% elif category == 'spirits' or category == 'whisky' %}
+              <div class="calc-row">
+                <span class="calc-label">Sellable Shots</span>
+                <span class="calc-value" id="calc-sellable-shots">0</span>
+              </div>
+              <div class="calc-row">
+                <span class="calc-label">Equivalent Bottles</span>
+                <span class="calc-value" id="calc-equiv-bottles">0</span>
+              </div>
+              <div class="calc-row">
+                <span class="calc-label">Total Cost</span>
+                <span class="calc-value" id="calc-total-cost">MK 0.00</span>
+              </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+  {% endif %}
+</div>
+
+<script>
+// Product selection
+function selectProduct(productId) {
+  window.location.href = `?product=${productId}`;
+}
+
+// Live calculator (PART D)
+{% if selected_product %}
+const category = '{{ category }}';
+
+function formatCurrency(value) {
+  return `MK ${parseFloat(value).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",")}`;
+}
+
+function updateCalculator() {
+  const inputs = {};
+  
+  {% if category == 'beer' %}
+    inputs.number_of_crates = parseInt(document.getElementById('id_number_of_crates').value) || 0;
+    inputs.cost_per_crate = document.getElementById('id_cost_per_crate').value || '0';
+    inputs.loose_bottles = parseInt(document.getElementById('id_loose_bottles').value) || 0;
+    
+    const totalBottles = inputs.number_of_crates * 20 + inputs.loose_bottles;
+    const totalCost = inputs.number_of_crates * parseFloat(inputs.cost_per_crate);
+    const costPerBottle = totalBottles > 0 ? totalCost / totalBottles : 0;
+    
+    document.getElementById('calc-total-bottles').textContent = totalBottles;
+    document.getElementById('calc-cost-per-bottle').textContent = formatCurrency(costPerBottle);
+    document.getElementById('calc-total-cost').textContent = formatCurrency(totalCost);
+    
+  {% elif category == 'cider' %}
+    inputs.quantity_bottles = parseInt(document.getElementById('id_quantity_bottles').value) || 0;
+    inputs.cost_per_bottle = document.getElementById('id_cost_per_bottle').value || '0';
+    
+    const totalCost = inputs.quantity_bottles * parseFloat(inputs.cost_per_bottle);
+    document.getElementById('calc-total-cost').textContent = formatCurrency(totalCost);
+    
+  {% elif category == 'wine' %}
+    inputs.number_of_bottles = parseInt(document.getElementById('id_number_of_bottles').value) || 0;
+    inputs.cost_per_bottle = document.getElementById('id_cost_per_bottle').value || '0';
+    
+    const totalGlasses = inputs.number_of_bottles * 5;
+    const costPerGlass = inputs.number_of_bottles > 0 ? parseFloat(inputs.cost_per_bottle) / 5 : 0;
+    const totalCost = inputs.number_of_bottles * parseFloat(inputs.cost_per_bottle);
+    
+    document.getElementById('calc-total-glasses').textContent = totalGlasses;
+    document.getElementById('calc-cost-per-glass').textContent = formatCurrency(costPerGlass);
+    document.getElementById('calc-total-cost').textContent = formatCurrency(totalCost);
+    
+  {% elif category == 'spirits' or category == 'whisky' %}
+    inputs.quantity_of_shots_added = parseInt(document.getElementById('id_quantity_of_shots_added').value) || 0;
+    inputs.cost_per_shot = document.getElementById('id_cost_per_shot').value || '0';
+    inputs.reserved_barman_shots = parseInt(document.getElementById('id_reserved_barman_shots').value) || 0;
+    
+    const sellableShots = Math.max(0, inputs.quantity_of_shots_added - inputs.reserved_barman_shots);
+    const equivBottles = (inputs.quantity_of_shots_added / 30).toFixed(2);
+    const totalCost = inputs.quantity_of_shots_added * parseFloat(inputs.cost_per_shot);
+    
+    document.getElementById('calc-sellable-shots').textContent = sellableShots;
+    document.getElementById('calc-equiv-bottles').textContent = equivBottles;
+    document.getElementById('calc-total-cost').textContent = formatCurrency(totalCost);
+  {% endif %}
+}
+
+// Attach event listeners
+document.addEventListener('DOMContentLoaded', function() {
+  const form = document.getElementById('stock-in-form');
+  const inputs = form.querySelectorAll('input[type="number"]');
+  
+  inputs.forEach(input => {
+    input.addEventListener('input', updateCalculator);
+  });
+  
+  // Set today's date as default
+  const dateField = document.getElementById('date_received');
+  if (dateField) {
+    const today = new Date().toISOString().split('T')[0];
+    dateField.value = today;
+  }
+  
+  // Prevent double submission
+  form.addEventListener('submit', function(e) {
+    const btn = document.getElementById('submit-btn');
+    btn.disabled = true;
+    btn.classList.add('loading');
+  });
+});
+{% endif %}
+</script>
+{% endblock %}
+
+
+
+

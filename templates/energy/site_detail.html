@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}{{ site.name }} – Energy Site{% endblock %}
+{% block content %}
+<style>
+  .kpi-sm{background:#f8fafc;border-radius:10px;padding:.8rem;border:1.5px solid #e2e8f0;}
+  .kpi-sm .val{font-size:1.3rem;font-weight:800;color:#0f172a;}
+  .kpi-sm .lbl{font-size:.7rem;font-weight:700;color:#64748b;text-transform:uppercase;}
+  .asset-row{display:flex;align-items:center;gap:.6rem;padding:.5rem 0;border-bottom:1px solid #f1f5f9;}
+  .asset-row:last-child{border-bottom:none;}
+</style>
+<div class="container-fluid py-4">
+  <div class="d-flex align-items-center gap-2 mb-4 flex-wrap">
+    <a href="{% url 'verticals:energy_sites' %}" class="btn btn-outline-secondary btn-sm rounded-pill">← Sites</a>
+    <h4 class="fw-bold mb-0">⚡ {{ site.name }}</h4>
+    <span class="badge rounded-pill ms-1" style="font-size:.75rem;background:#dcfce7;color:#15803d;">{{ site.get_status_display }}</span>
+  </div>
+  {% if messages %}{% for m in messages %}<div class="alert alert-{{ m.tags|default:'info' }} rounded-3 mb-3">{{ m }}</div>{% endfor %}{% endif %}
+
+  {# Site meta #}
+  <div class="row g-3 mb-4">
+    <div class="col-12 col-md-4">
+      <div class="card border-0 shadow-sm rounded-4 p-3">
+        <div class="fw-bold mb-2" style="font-size:.85rem;color:#475569;text-transform:uppercase;">Site Details</div>
+        <div class="d-flex flex-column gap-1" style="font-size:.85rem;">
+          <div><span class="text-muted">Type:</span> <b>{{ site.get_site_type_display }}</b></div>
+          {% if site.location %}<div><span class="text-muted">Location:</span> {{ site.location }}</div>{% endif %}
+          {% if site.customer_name %}<div><span class="text-muted">Customer:</span> {{ site.customer_name }}</div>{% endif %}
+          {% if site.customer_phone %}<div><span class="text-muted">Phone:</span> {{ site.customer_phone }}</div>{% endif %}
+          {% if site.commissioning_date %}<div><span class="text-muted">Commissioned:</span> {{ site.commissioning_date|date:"M j, Y" }}</div>{% endif %}
+          {% if site.installed_capacity_kw %}<div><span class="text-muted">Capacity:</span> {{ site.installed_capacity_kw }} kW</div>{% endif %}
+          {% if site.energy_sources %}<div><span class="text-muted">Sources:</span> {{ site.energy_sources|join:", " }}</div>{% endif %}
+        </div>
+      </div>
+    </div>
+    <div class="col-12 col-md-8">
+      <div class="row g-2">
+        <div class="col-6 col-md-3"><div class="kpi-sm text-center"><div class="val">{{ assets.count }}</div><div class="lbl">Assets</div></div></div>
+        <div class="col-6 col-md-3"><div class="kpi-sm text-center"><div class="val" style="color:#15803d;">{{ business.currency }} {{ total_savings|floatformat:0 }}</div><div class="lbl">Lifetime Savings</div></div></div>
+        {% if roi_pct is not None %}<div class="col-6 col-md-3"><div class="kpi-sm text-center"><div class="val" style="color:#4f46e5;">{{ roi_pct }}%</div><div class="lbl">ROI</div></div></div>{% endif %}
+        {% if payback_months %}<div class="col-6 col-md-3"><div class="kpi-sm text-center"><div class="val">{{ payback_months }}mo</div><div class="lbl">Payback Est.</div></div></div>{% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-4">
+    {# Assets #}
+    <div class="col-12 col-lg-6">
+      <div class="card border-0 shadow-sm rounded-4">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <div class="fw-bold" style="font-size:.85rem;color:#475569;text-transform:uppercase;">Assets</div>
+            <a href="{% url 'verticals:energy_asset_create' %}?site={{ site.id }}" class="btn btn-sm btn-success rounded-pill">+ Add</a>
+          </div>
+          {% if assets %}
+          {% for asset in assets %}
+          <div class="asset-row">
+            <div style="width:34px;height:34px;border-radius:8px;background:#f1f5f9;display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0;">
+              {% if asset.asset_type == "solar_panel" %}☀️{% elif asset.asset_type == "battery" %}🔋{% elif asset.asset_type == "inverter" %}⚡{% else %}🔩{% endif %}
+            </div>
+            <div style="flex:1;min-width:0;">
+              <div class="fw-semibold text-truncate" style="font-size:.85rem;">{{ asset.get_asset_type_display }}{% if asset.brand %} – {{ asset.brand }}{% endif %}</div>
+              <div class="text-muted" style="font-size:.72rem;">Health: {{ asset.health_score }}% · {{ asset.get_status_display }}</div>
+            </div>
+            {% if asset.is_maintenance_overdue %}<span class="badge bg-danger rounded-pill" style="font-size:.65rem;">Overdue</span>{% endif %}
+          </div>
+          {% endfor %}
+          {% else %}
+          <div class="text-muted small text-center py-3">No assets registered yet</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    {# Alerts #}
+    <div class="col-12 col-lg-6">
+      <div class="card border-0 shadow-sm rounded-4">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <div class="fw-bold" style="font-size:.85rem;color:#475569;text-transform:uppercase;">Active Alerts</div>
+            <a href="{% url 'verticals:energy_alerts' %}" style="font-size:.78rem;color:#6366f1;" class="text-decoration-none">All →</a>
+          </div>
+          {% if recent_alerts %}
+          {% for alert in recent_alerts %}
+          <div class="d-flex gap-2 mb-2 p-2 rounded-2" style="background:#fff7ed;border:1px solid #fed7aa;">
+            <div>{% if alert.severity == "critical" %}🔴{% elif alert.severity == "high" %}🟠{% else %}🟡{% endif %}</div>
+            <div style="font-size:.82rem;">
+              <div class="fw-semibold">{{ alert.title }}</div>
+              <div class="text-muted" style="font-size:.72rem;">{{ alert.created_at|timesince }} ago</div>
+            </div>
+          </div>
+          {% endfor %}
+          {% else %}
+          <div class="text-muted small text-center py-3">No active alerts ✅</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    {# Recent Readings #}
+    <div class="col-12">
+      <div class="card border-0 shadow-sm rounded-4">
+        <div class="card-body">
+          <div class="fw-bold mb-3" style="font-size:.85rem;color:#475569;text-transform:uppercase;">Recent Energy Readings</div>
+          {% if recent_readings %}
+          <div class="table-responsive">
+            <table class="table table-sm" style="font-size:.85rem;">
+              <thead><tr style="color:#94a3b8;font-size:.72rem;text-transform:uppercase;"><th>Date</th><th>Generation (kWh)</th><th>Consumption (kWh)</th><th>Battery %</th></tr></thead>
+              <tbody>
+                {% for r in recent_readings %}
+                <tr>
+                  <td>{{ r.reading_date|date:"M d" }}</td>
+                  <td>{{ r.generation_kwh|default:"–"|floatformat:1 }}</td>
+                  <td>{{ r.consumption_kwh|default:"–"|floatformat:1 }}</td>
+                  <td>{% if r.battery_soc_pct %}{{ r.battery_soc_pct }}%{% else %}–{% endif %}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% else %}
+          <div class="text-muted small text-center py-3">No readings yet — <a href="#" class="text-decoration-none">log a reading</a></div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

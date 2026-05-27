@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Post Welding Job to Marketplace{% endblock %}
+
+{% block content %}
+<style>
+  .weld-marketplace-shell {
+    background: linear-gradient(135deg, #eff6ff 0%, #ffffff 54%, #f8fafc 100%);
+    border-radius: 22px;
+  }
+  .weld-marketplace-card {
+    border: 1px solid #dbeafe;
+    border-radius: 20px;
+    box-shadow: 0 18px 48px rgba(37, 99, 235, 0.10);
+    overflow: hidden;
+  }
+  .weld-marketplace-head {
+    background: linear-gradient(135deg, #1d4ed8, #2563eb 55%, #0ea5e9);
+    color: #fff;
+    border: 0;
+  }
+  .weld-marketplace-card .form-control,
+  .weld-marketplace-card .form-select {
+    border-color: #bfdbfe;
+    border-radius: 12px;
+  }
+  .weld-marketplace-card .form-control:focus,
+  .weld-marketplace-card .form-select:focus {
+    border-color: #2563eb;
+    box-shadow: 0 0 0 .22rem rgba(37, 99, 235, .14);
+  }
+</style>
+<div class="container py-4 weld-marketplace-shell" style="max-width: 920px;">
+  <nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="/verticals/welding/dashboard/">Dashboard</a></li>
+      <li class="breadcrumb-item active">Post to Marketplace</li>
+    </ol>
+  </nav>
+
+  <div class="card weld-marketplace-card">
+    <div class="card-header weld-marketplace-head d-flex justify-content-between flex-wrap gap-2">
+      <h5 class="mb-0"><i class="bi bi-shop"></i> Upload Welding Job to Marketplace</h5>
+      {% if source %}<span class="badge bg-light text-primary">From {{ source_type|title }} #{{ source.id }}</span>{% endif %}
+    </div>
+    <div class="card-body p-4">
+      <form method="post" enctype="multipart/form-data" class="row g-3">
+        {% csrf_token %}
+        <input type="hidden" name="source_type" value="{{ source_type }}">
+        <input type="hidden" name="source_id" value="{{ form_data.source_id }}">
+        <div class="col-md-8">
+          <label class="form-label">Title</label>
+          <input type="text" name="title" class="form-control" maxlength="200" value="{{ form_data.title }}" required>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Status</label>
+          <select name="status" class="form-select">
+            <option value="draft">Draft</option>
+            <option value="live">Published</option>
+            <option value="offline">Hidden</option>
+          </select>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Category / Job Type</label>
+          <select name="category" class="form-select">
+            {% for value,label in category_choices %}
+            <option value="{{ value }}" {% if form_data.category == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Price / Estimated Price</label>
+          <input type="number" min="0" step="0.01" name="price" class="form-control" value="{{ form_data.price|default:'' }}">
+        </div>
+        <div class="col-12">
+          <label class="form-label">Description</label>
+          <textarea name="description" class="form-control" rows="6" required>{{ form_data.description }}</textarea>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Location</label>
+          <input type="text" name="location_text" class="form-control" value="{{ form_data.location_text }}">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Contact Phone</label>
+          <input type="tel" name="contact_phone" class="form-control" value="{{ form_data.contact_phone }}">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Contact Email</label>
+          <input type="email" name="contact_email" class="form-control" value="{{ form_data.contact_email }}">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Primary Image</label>
+          <input type="file" name="media_file" class="form-control" accept="image/*,video/mp4,video/webm">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">More Job Photos</label>
+          <input type="file" name="images" class="form-control" accept="image/*" multiple>
+        </div>
+        <div class="col-12 d-grid d-md-flex gap-2">
+          <button type="submit" class="btn btn-primary btn-lg"><i class="bi bi-shop"></i> Save Marketplace Listing</button>
+          <a href="/verticals/welding/dashboard/" class="btn btn-outline-secondary btn-lg">Cancel</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

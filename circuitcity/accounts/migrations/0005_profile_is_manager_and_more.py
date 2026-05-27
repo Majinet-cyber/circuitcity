@@ -4,19 +4,18 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('accounts', '0004_profile_country_profile_display_name_and_more'),
+        ("accounts", "0004_profile_country_profile_display_name_and_more"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='profile',
-            name='is_manager',
+            model_name="profile",
+            name="is_manager",
             field=models.BooleanField(default=False),
         ),
         migrations.AddIndex(
-            model_name='profile',
-            index=models.Index(fields=['is_manager'], name='accounts_pr_is_mana_e87dfc_idx'),
+            model_name="profile",
+            index=models.Index(fields=["is_manager"], name="accounts_pr_is_mana_e87dfc_idx"),
         ),
     ]

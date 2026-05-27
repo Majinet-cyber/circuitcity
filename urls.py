@@ -1,13 +1,17 @@
 ﻿# circuitcity/urls.py
-from django.contrib import admin
-from django.urls import path, include, re_path
 from importlib import import_module
-from django.http import JsonResponse
-from django.views.generic.base import RedirectView
+
+from django.contrib import admin
 from django.contrib.staticfiles.storage import staticfiles_storage
+from django.http import JsonResponse
+from django.urls import include, path, re_path
+from django.views.generic.base import RedirectView
 
 # Import inventory views for fallbacks
 from inventory import views as inv_views
+
+# Import whoami view for debugging/Cypress E2E
+from core import views_whoami
 
 # =========================
 # Inventory API fallbacks
@@ -15,30 +19,22 @@ from inventory import views as inv_views
 try:
     api_mod = import_module("inventory.api")
 
-    prediction_view    = getattr(api_mod, "predictions_summary",
-                          getattr(inv_views, "api_predictions"))
+    prediction_view = getattr(api_mod, "predictions_summary", getattr(inv_views, "api_predictions"))
 
-    value_trend_view   = getattr(api_mod, "api_value_trend",
-                          getattr(inv_views, "api_value_trend", prediction_view))
+    value_trend_view = getattr(api_mod, "api_value_trend", getattr(inv_views, "api_value_trend", prediction_view))
 
-    sales_trend_view   = getattr(api_mod, "api_sales_trend",
-                          getattr(inv_views, "api_sales_trend", prediction_view))
+    sales_trend_view = getattr(api_mod, "api_sales_trend", getattr(inv_views, "api_sales_trend", prediction_view))
 
-    top_models_view    = getattr(api_mod, "api_top_models",
-                          getattr(inv_views, "api_top_models", prediction_view))
+    top_models_view = getattr(api_mod, "api_top_models", getattr(inv_views, "api_top_models", prediction_view))
 
-    alerts_feed_view   = getattr(api_mod, "alerts_feed",
-                          getattr(inv_views, "alerts_feed", prediction_view))
+    alerts_feed_view = getattr(api_mod, "alerts_feed", getattr(inv_views, "alerts_feed", prediction_view))
 
-    stock_health_view  = getattr(api_mod, "api_stock_health",
-                          getattr(inv_views, "api_stock_health", alerts_feed_view))
+    stock_health_view = getattr(api_mod, "api_stock_health", getattr(inv_views, "api_stock_health", alerts_feed_view))
 
     # Newly surfaced APIs used by the scanner & time check-in pages
-    mark_sold_view     = getattr(api_mod, "api_mark_sold",
-                          getattr(inv_views, "api_mark_sold"))
+    mark_sold_view = getattr(api_mod, "api_mark_sold", getattr(inv_views, "api_mark_sold"))
 
-    time_checkin_view  = getattr(api_mod, "api_time_checkin",
-                          getattr(inv_views, "api_time_checkin"))
+    time_checkin_view = getattr(api_mod, "api_time_checkin", getattr(inv_views, "api_time_checkin"))
 
     # Wallet chip on dashboard (optional in some repos)
     wallet_summary_view = (
@@ -49,25 +45,23 @@ try:
     )
 except Exception:
     # Extremely defensive fallbacks (no api module or import error)
-    prediction_view    = getattr(inv_views, "api_predictions")
-    value_trend_view   = getattr(inv_views, "api_value_trend", prediction_view)
-    sales_trend_view   = getattr(inv_views, "api_sales_trend", prediction_view)
-    top_models_view    = getattr(inv_views, "api_top_models", prediction_view)
-    alerts_feed_view   = getattr(inv_views, "alerts_feed", prediction_view)
-    stock_health_view  = getattr(inv_views, "api_stock_health", alerts_feed_view)
+    prediction_view = getattr(inv_views, "api_predictions")
+    value_trend_view = getattr(inv_views, "api_value_trend", prediction_view)
+    sales_trend_view = getattr(inv_views, "api_sales_trend", prediction_view)
+    top_models_view = getattr(inv_views, "api_top_models", prediction_view)
+    alerts_feed_view = getattr(inv_views, "alerts_feed", prediction_view)
+    stock_health_view = getattr(inv_views, "api_stock_health", alerts_feed_view)
 
     # Scanner & time check-in fallbacks
-    mark_sold_view     = getattr(inv_views, "api_mark_sold")
-    time_checkin_view  = getattr(inv_views, "api_time_checkin")
+    mark_sold_view = getattr(inv_views, "api_mark_sold")
+    time_checkin_view = getattr(inv_views, "api_time_checkin")
 
     # Wallet summary optional fallback
-    wallet_summary_view = (
-        getattr(inv_views, "wallet_summary", None)
-        or getattr(inv_views, "api_wallet_summary", None)
-    )
+    wallet_summary_view = getattr(inv_views, "wallet_summary", None) or getattr(inv_views, "api_wallet_summary", None)
 
 # If wallet endpoint truly doesn't exist, provide a tiny safe stub so the UI doesn't 404
 if wallet_summary_view is None:
+
     def wallet_summary_view(_request):
         return JsonResponse({"balance": 0})
 
@@ -78,16 +72,14 @@ if wallet_summary_view is None:
 try:
     acc_views = import_module("accounts.views")
     # Prefer new names; fall back to legacy if present
-    login_view_alias        = getattr(acc_views, "login_view", None)
+    login_view_alias = getattr(acc_views, "login_view", None)
 
-    forgot_request_view     = (
-        getattr(acc_views, "forgot_password_request_view", None)
-        or getattr(acc_views, "forgot_password_request", None)
+    forgot_request_view = getattr(acc_views, "forgot_password_request_view", None) or getattr(
+        acc_views, "forgot_password_request", None
     )
 
-    forgot_verify_view      = (
-        getattr(acc_views, "forgot_password_verify_view", None)
-        or getattr(acc_views, "forgot_password_reset", None)
+    forgot_verify_view = getattr(acc_views, "forgot_password_verify_view", None) or getattr(
+        acc_views, "forgot_password_reset", None
     )
 except Exception:
     acc_views = None
@@ -97,21 +89,25 @@ except Exception:
 
 # Define safe stubs if accounts views are missing so routes never 404
 if login_view_alias is None:
+
     def login_view_alias(_request):
         return JsonResponse({"ok": False, "error": "login view unavailable"}, status=501)
 
+
 if forgot_request_view is None:
+
     def forgot_request_view(_request):
         return JsonResponse({"ok": False, "error": "forgot-password view unavailable"}, status=501)
 
+
 if forgot_verify_view is None:
+
     def forgot_verify_view(_request):
         return JsonResponse({"ok": False, "error": "password reset verify view unavailable"}, status=501)
 
 
 urlpatterns = [
     path("admin/", admin.site.urls),
-
     # Public root assets (stop auth redirects & noisy logs)
     path(
         "favicon.ico",
@@ -123,54 +119,57 @@ urlpatterns = [
         RedirectView.as_view(url=staticfiles_storage.url("robots.txt"), permanent=True),
         name="robots",
     ),
-
     # App (namespaced include so {% url 'inventory:...' %} works)
     path("inventory/", include(("inventory.urls", "inventory"), namespace="inventory")),
-
+    # Layby app
+    path("layby/", include(("layby.urls", "layby"), namespace="layby")),
+    # Sales app (rollback, commissions, etc.)
+    path("sales/", include(("sales.urls", "sales"), namespace="sales")),
     # Accounts app (login, password reset, avatars, etc.)
     path("accounts/", include("accounts.urls")),
-
+    # Corrections framework (vertical-aware data corrections)
+    path("corrections/", include(("corrections.urls", "corrections"), namespace="corrections")),
     # Global hard aliases so these NEVER 404 even if the app's urls module differs
-    re_path(r"^login/?$",                    login_view_alias),
-    path(   "password/forgot/",              forgot_request_view),
-    path(   "password/reset/",               forgot_verify_view),
-
+    re_path(r"^login/?$", login_view_alias),
+    path("password/forgot/", forgot_request_view),
+    path("password/reset/", forgot_verify_view),
+    # Settings root alias (used by sidebar/nav templates)
+    path(
+        "settings/",
+        RedirectView.as_view(pattern_name="accounts:settings_unified", permanent=False),
+        name="settings_root",
+    ),
     # Insights app
     path("", include("insights.urls")),
-
+    # Business-aware router endpoints (prevent vertical leakage)
+    path("app/", include(("inventory.urls_router", "app_router"), namespace="app_router")),
     # ---- Hard aliases so these NEVER 404 even if the app's urls module differs ----
-    re_path(r"^inventory/api/predictions/?$",        prediction_view),
-    re_path(r"^inventory/api/predictions/v2/?$",     inv_views.api_predictions),
-    re_path(r"^inventory/api/cash[-_]overview/?$",   inv_views.api_cash_overview),
-
+    re_path(r"^inventory/api/predictions/?$", prediction_view),
+    re_path(r"^inventory/api/predictions/v2/?$", inv_views.api_predictions),
+    re_path(r"^inventory/api/cash[-_]overview/?$", inv_views.api_cash_overview),
     # New: Value/Profit/Cost/Revenue trend series (support several spellings)
-    path(   "inventory/api/value_trend/",            value_trend_view),
-    re_path(r"^inventory/api/value[_-]trend/?$",     value_trend_view),
-
+    path("inventory/api/value_trend/", value_trend_view),
+    re_path(r"^inventory/api/value[_-]trend/?$", value_trend_view),
     # Sales trend â€“ support both legacy underscore and REST-y path with optional hyphen
-    re_path(r"^inventory/api_sales_trend/?$",        sales_trend_view),
-    path(   "inventory/api/sales_trend/",            sales_trend_view),
-    re_path(r"^inventory/api/sales[-_]trend/?$",     sales_trend_view),
-
+    re_path(r"^inventory/api_sales_trend/?$", sales_trend_view),
+    path("inventory/api/sales_trend/", sales_trend_view),
+    re_path(r"^inventory/api/sales[-_]trend/?$", sales_trend_view),
     # Top models â€“ support both variants
-    re_path(r"^inventory/api_top_models/?$",         top_models_view),
-    path(   "inventory/api/top_models/",             top_models_view),
-    re_path(r"^inventory/api/top[-_]models/?$",      top_models_view),
-
+    re_path(r"^inventory/api_top_models/?$", top_models_view),
+    path("inventory/api/top_models/", top_models_view),
+    re_path(r"^inventory/api/top[-_]models/?$", top_models_view),
     # Alerts
-    re_path(r"^inventory/api/alerts/?$",             alerts_feed_view),
-
+    re_path(r"^inventory/api/alerts/?$", alerts_feed_view),
     # Stock Health battery
-    path(   "inventory/api/stock_health/",           stock_health_view),
-    re_path(r"^inventory/api/stock[-_]health/?$",    stock_health_view),
-
+    path("inventory/api/stock_health/", stock_health_view),
+    re_path(r"^inventory/api/stock[-_]health/?$", stock_health_view),
     # Wallet summary
-    path(   "inventory/api/wallet-summary/",         wallet_summary_view),
-    re_path(r"^inventory/api/wallet[-_]summary/?$",  wallet_summary_view),
-
+    path("inventory/api/wallet-summary/", wallet_summary_view),
+    re_path(r"^inventory/api/wallet[-_]summary/?$", wallet_summary_view),
     # Scanner + time check-in
-    re_path(r"^inventory/api/mark[-_]sold/?$",       mark_sold_view),
-    re_path(r"^inventory/api/time[-_]checkin/?$",    time_checkin_view),
+    re_path(r"^inventory/api/mark[-_]sold/?$", mark_sold_view),
+    re_path(r"^inventory/api/time[-_]checkin/?$", time_checkin_view),
+    # Whoami endpoint (for Cypress E2E tests) - support both slash and no-slash
+    path("__whoami__", views_whoami.whoami, name="__whoami__"),
+    path("__whoami__/", views_whoami.whoami, name="__whoami__slash"),
 ]
-
-

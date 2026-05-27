@@ -1,0 +1,69 @@
+{% comment %}
+    Clickable KPI Card Component
+    
+    Every KPI must be clickable and navigate to its breakdown page.
+    
+    Usage:
+    {% include "partials/kpi_card_clickable.html" with 
+        kpi_type="revenue" 
+        kpi_label="Revenue" 
+        kpi_value=total_revenue 
+        kpi_icon="💵" 
+        kpi_subtitle="Total sales in period"
+        breakdown_url="/inventory/breakdown/revenue/"
+        currency="MWK"
+    %}
+{% endcomment %}
+{% load humanize %}
+
+<a href="{{ breakdown_url }}" class="kpi-card-glass {{ kpi_type }} no-underline" aria-label="View {{ kpi_label }} breakdown">
+    <div class="kpi-label-glass">
+        <span class="kpi-icon-glass">{{ kpi_icon }}</span>
+        <span>{{ kpi_label }}</span>
+    </div>
+    
+    <div class="kpi-value-glass num-value">
+        {% if currency %}
+            {{ kpi_value|money:currency }}
+        {% else %}
+            {{ kpi_value|intcomma }}
+        {% endif %}
+    </div>
+    
+    {% if kpi_subtitle %}
+        <div class="kpi-subtitle-glass">{{ kpi_subtitle }}</div>
+    {% endif %}
+    
+    <!-- Click indicator -->
+    <div class="kpi-click-hint" style="margin-top: 0.5rem; font-size: 0.75rem; color: var(--text-muted); display: flex; align-items: center; gap: 0.25rem;">
+        <span>Click to see breakdown</span>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M5 12h14M12 5l7 7-7 7"/>
+        </svg>
+    </div>
+</a>
+
+<style>
+.no-underline {
+    text-decoration: none !important;
+}
+
+.no-underline:hover {
+    text-decoration: none !important;
+}
+
+.kpi-click-hint {
+    opacity: 0.6;
+    transition: opacity var(--transition-base);
+}
+
+.kpi-card-glass:hover .kpi-click-hint {
+    opacity: 1;
+}
+
+.kpi-card-glass:focus {
+    outline: 3px solid var(--color-primary);
+    outline-offset: 2px;
+}
+</style>
+

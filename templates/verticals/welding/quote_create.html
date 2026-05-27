@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Create Quote - Welding Workshop{% endblock %}
+
+{% block content %}
+<div class="container py-4" style="max-width: 700px;">
+    <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="/verticals/welding/dashboard/">Dashboard</a></li>
+            <li class="breadcrumb-item"><a href="/verticals/welding/quotes/">Quotes</a></li>
+            <li class="breadcrumb-item active">Create Quote</li>
+        </ol>
+    </nav>
+
+    <div class="card border-0 shadow-sm">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0"><i class="bi bi-file-earmark-plus"></i> Create New Quote</h5>
+        </div>
+        <div class="card-body">
+            <div class="alert alert-info" role="alert">
+                <i class="bi bi-info-circle"></i>
+                <strong>New Quote Builder:</strong> Create an empty quote shell, then add materials, costs, and profit manually on the next page.
+            </div>
+
+            <form method="post" action="{% url 'verticals:welding_quote_create' %}" data-testid="welding-quote-form">
+                {% csrf_token %}
+
+                <!-- Customer Info -->
+                <div class="mb-4">
+                    <h6 class="text-muted mb-3"><i class="bi bi-person"></i> Customer Information</h6>
+                    
+                    <div class="mb-3">
+                        <label for="customer_name" class="form-label">Customer / Company Name <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="customer_name" name="customer_name" required placeholder="Customer or company name">
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="customer_contact_person" class="form-label">Contact Person</label>
+                        <input type="text" class="form-control" id="customer_contact_person" name="customer_contact_person" placeholder="Person to contact">
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="customer_phone" class="form-label">Phone Number</label>
+                        <input type="tel" class="form-control" id="customer_phone" name="customer_phone" placeholder="+265 991 234 567">
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="customer_email" class="form-label">Email</label>
+                        <input type="email" class="form-control" id="customer_email" name="customer_email" placeholder="customer@example.com">
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="customer_address" class="form-label">Address / Location</label>
+                        <textarea class="form-control" id="customer_address" name="customer_address" rows="2" placeholder="Customer address or site location"></textarea>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="customer_notes" class="form-label">Customer Notes</label>
+                        <textarea class="form-control" id="customer_notes" name="customer_notes" rows="2" placeholder="Measurements, access notes, delivery notes, or special requests"></textarea>
+                    </div>
+                </div>
+
+                <!-- Optional Template Selection -->
+                <div class="mb-4">
+                    <h6 class="text-muted mb-3"><i class="bi bi-tag"></i> Job Type (Optional)</h6>
+                    
+                    <div class="alert alert-warning" role="alert">
+                        <small>
+                            <i class="bi bi-lightbulb"></i>
+                            Selecting a job template is <strong>optional</strong> and will <strong>NOT auto-add materials</strong>. 
+                            It's only for labeling/guidance.
+                        </small>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="template_id" class="form-label">Job Template</label>
+                        <select class="form-select" id="template_id" name="template_id" data-testid="welding-template-grid">
+                            <option value="">Custom Quote (no template)</option>
+                            {% for template in templates %}
+                            <option value="{{ template.id }}">{{ template.name }}</option>
+                            {% endfor %}
+                        </select>
+                        <small class="form-text text-muted">This is for labeling only. You'll pick materials manually.</small>
+                    </div>
+                </div>
+
+                <!-- Quote Terms -->
+                <div class="mb-4">
+                    <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-3">
+                        <h6 class="text-muted mb-0"><i class="bi bi-receipt"></i> Terms & Payment</h6>
+                        <a href="{% url 'verticals:welding_branding_settings' %}" class="btn btn-sm btn-outline-warning">
+                            <i class="bi bi-patch-check"></i> Quotation Branding
+                        </a>
+                    </div>
+
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-4">
+                            <label for="milestone_1_percent" class="form-label">Deposit %</label>
+                            <input type="number" min="0" max="100" step="0.01" class="form-control" id="milestone_1_percent" name="milestone_1_percent" value="50">
+                            <input type="hidden" name="milestone_1_label" value="Deposit">
+                        </div>
+                        <div class="col-md-4">
+                            <label for="milestone_2_percent" class="form-label">Progress %</label>
+                            <input type="number" min="0" max="100" step="0.01" class="form-control" id="milestone_2_percent" name="milestone_2_percent" value="25">
+                            <input type="hidden" name="milestone_2_label" value="Fabrication progress">
+                        </div>
+                        <div class="col-md-4">
+                            <label for="milestone_3_percent" class="form-label">Completion %</label>
+                            <input type="number" min="0" max="100" step="0.01" class="form-control" id="milestone_3_percent" name="milestone_3_percent" value="25">
+                            <input type="hidden" name="milestone_3_label" value="Completion / delivery">
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="payment_details" class="form-label">Payment Details</label>
+                        <textarea class="form-control" id="payment_details" name="payment_details" rows="2" placeholder="Bank, mobile money, or cash instructions">{% if branding_profile.payment_instructions %}{{ branding_profile.payment_instructions }}{% endif %}</textarea>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="terms" class="form-label">Terms & Conditions</label>
+                        <textarea class="form-control" id="terms" name="terms" rows="4">{{ branding_profile.terms }}</textarea>
+                    </div>
+                </div>
+
+                <div class="d-grid gap-2">
+                    <button type="submit" class="btn btn-primary btn-lg">
+                        <i class="bi bi-arrow-right-circle"></i> Create Quote & Add Materials
+                    </button>
+                    <a href="/verticals/welding/quotes/" class="btn btn-outline-secondary">
+                        <i class="bi bi-x-circle"></i> Cancel
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Info Cards -->
+    <div class="row g-3 mt-4">
+        <div class="col-md-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <h6 class="card-title"><i class="bi bi-1-circle-fill text-primary"></i> Step 1: Basic Info</h6>
+                    <p class="card-text small">Enter customer details and optionally select a job template.</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <h6 class="card-title"><i class="bi bi-2-circle-fill text-primary"></i> Step 2: Build Quote</h6>
+                    <p class="card-text small">Pick materials, enter quantities/prices, add labour/transport/profit.</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <h6 class="card-title"><i class="bi bi-3-circle-fill text-primary"></i> Step 3: Preview</h6>
+                    <p class="card-text small">Review the quote summary with live totals.</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <h6 class="card-title"><i class="bi bi-4-circle-fill text-primary"></i> Step 4: Generate PDF</h6>
+                    <p class="card-text small">Download a professional PDF quote to send to your customer.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

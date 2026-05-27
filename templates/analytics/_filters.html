@@ -1,0 +1,428 @@
+{% comment %}
+  Unified Analytics Filters Component
+  
+  Usage:
+  {% include "analytics/_filters.html" with 
+    current_range=date_params.active_range
+    custom_start=date_params.start_date
+    custom_end=date_params.end_date
+  %}
+  
+  This component provides consistent date filtering across all vertical analytics pages.
+{% endcomment %}
+
+<style>
+.analytics-filters-bar {
+  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+  border: 2px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 16px 20px;
+  margin-bottom: 24px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.filters-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+  color: #fff;
+  border: none;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.filters-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
+}
+
+.filters-btn i {
+  font-size: 16px;
+}
+
+.filters-summary {
+  display: inline-block;
+  margin-left: 12px;
+  padding: 8px 16px;
+  background: #f1f5f9;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #475569;
+}
+
+.filters-modal {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 9999;
+  align-items: center;
+  justify-content: center;
+  animation: fadeIn 0.2s;
+}
+
+.filters-modal.active {
+  display: flex;
+}
+
+.filters-modal-content {
+  background: #fff;
+  border-radius: 20px;
+  padding: 0;
+  max-width: 500px;
+  width: 90%;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  animation: slideUp 0.3s;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { transform: translateY(40px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.filters-modal-header {
+  padding: 24px 24px 16px;
+  border-bottom: 2px solid #e2e8f0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.filters-modal-header h3 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.filters-close-btn {
+  background: none;
+  border: none;
+  font-size: 24px;
+  color: #64748b;
+  cursor: pointer;
+  padding: 4px 8px;
+  line-height: 1;
+  transition: color 0.2s;
+}
+
+.filters-close-btn:hover {
+  color: #0f172a;
+}
+
+.filters-modal-body {
+  padding: 24px;
+}
+
+.filter-section {
+  margin-bottom: 24px;
+}
+
+.filter-section-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 12px;
+}
+
+.filter-options {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.filter-option {
+  padding: 14px 16px;
+  background: #f8fafc;
+  border: 2px solid #e2e8f0;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: center;
+}
+
+.filter-option:hover {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+}
+
+.filter-option.active {
+  background: linear-gradient(135deg, #dbeafe, #e0e7ff);
+  border-color: #3b82f6;
+  color: #1e40af;
+}
+
+.custom-date-inputs {
+  display: none;
+  margin-top: 16px;
+  padding: 16px;
+  background: #f8fafc;
+  border-radius: 12px;
+  border: 2px solid #e2e8f0;
+}
+
+.custom-date-inputs.active {
+  display: block;
+}
+
+.custom-date-inputs label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: #64748b;
+  margin-bottom: 6px;
+}
+
+.custom-date-inputs input {
+  width: 100%;
+  padding: 12px;
+  border: 2px solid #e2e8f0;
+  border-radius: 10px;
+  font-size: 14px;
+  margin-bottom: 12px;
+  transition: all 0.2s;
+}
+
+.custom-date-inputs input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.filters-modal-footer {
+  padding: 16px 24px;
+  border-top: 2px solid #e2e8f0;
+  display: flex;
+  gap: 12px;
+}
+
+.btn-filter-reset {
+  flex: 1;
+  padding: 14px 20px;
+  background: #fff;
+  color: #64748b;
+  border: 2px solid #e2e8f0;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-filter-reset:hover {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+}
+
+.btn-filter-apply {
+  flex: 2;
+  padding: 14px 20px;
+  background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+  color: #fff;
+  border: none;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.btn-filter-apply:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
+}
+
+@media (max-width: 640px) {
+  .filters-modal-content {
+    width: 95%;
+    border-radius: 16px;
+  }
+  
+  .filter-options {
+    grid-template-columns: 1fr;
+  }
+}
+</style>
+
+<div class="analytics-filters-bar">
+  <button type="button" class="filters-btn" id="analyticsFiltersBtn">
+    <i class="bi bi-funnel-fill"></i>
+    Filters
+  </button>
+  <span class="filters-summary" id="filtersSummary">
+    {% if current_range == 'today' %}Today
+    {% elif current_range == 'yesterday' %}Yesterday
+    {% elif current_range == '7d' or current_range == 'last_7_days' %}Last 7 days
+    {% elif current_range == '30d' or current_range == 'last_30_days' %}Last 30 days
+    {% elif current_range == 'this_month' or current_range == 'mtd' %}This month
+    {% elif current_range == 'last_month' %}Last month
+    {% elif current_range == 'custom' and custom_start and custom_end %}{{ custom_start|date:"M d" }} - {{ custom_end|date:"M d, Y" }}
+    {% else %}All time{% endif %}
+  </span>
+</div>
+
+<div class="filters-modal" id="filtersModal">
+  <div class="filters-modal-content">
+    <div class="filters-modal-header">
+      <h3>📊 Filter Analytics</h3>
+      <button type="button" class="filters-close-btn" id="filtersCloseBtn">&times;</button>
+    </div>
+    
+    <form method="get" id="filtersForm">
+      <div class="filters-modal-body">
+        <div class="filter-section">
+          <div class="filter-section-title">Date Range</div>
+          <div class="filter-options">
+            <div class="filter-option {% if current_range == 'today' %}active{% endif %}" data-range="today">
+              Today
+            </div>
+            <div class="filter-option {% if current_range == 'yesterday' %}active{% endif %}" data-range="yesterday">
+              Yesterday
+            </div>
+            <div class="filter-option {% if current_range == '7d' or current_range == 'last_7_days' %}active{% endif %}" data-range="7d">
+              Last 7 days
+            </div>
+            <div class="filter-option {% if current_range == '30d' or current_range == 'last_30_days' %}active{% endif %}" data-range="30d">
+              Last 30 days
+            </div>
+            <div class="filter-option {% if current_range == 'this_month' or current_range == 'mtd' %}active{% endif %}" data-range="this_month">
+              This month
+            </div>
+            <div class="filter-option {% if current_range == 'last_month' %}active{% endif %}" data-range="last_month">
+              Last month
+            </div>
+            <div class="filter-option {% if current_range == 'custom' %}active{% endif %}" data-range="custom">
+              Custom range
+            </div>
+          </div>
+          
+          <div class="custom-date-inputs {% if current_range == 'custom' %}active{% endif %}" id="customDateInputs">
+            <label for="filter_start_date">Start Date</label>
+            <input type="date" name="start" id="filter_start_date" value="{{ custom_start|date:'Y-m-d' }}">
+            
+            <label for="filter_end_date">End Date</label>
+            <input type="date" name="end" id="filter_end_date" value="{{ custom_end|date:'Y-m-d' }}">
+          </div>
+        </div>
+      </div>
+      
+      <div class="filters-modal-footer">
+        <button type="button" class="btn-filter-reset" id="btnFilterReset">
+          Reset
+        </button>
+        <button type="submit" class="btn-filter-apply">
+          Apply Filters
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+(function() {
+  const filtersBtn = document.getElementById('analyticsFiltersBtn');
+  const filtersModal = document.getElementById('filtersModal');
+  const filtersCloseBtn = document.getElementById('filtersCloseBtn');
+  const filtersForm = document.getElementById('filtersForm');
+  const filterOptions = document.querySelectorAll('.filter-option');
+  const customDateInputs = document.getElementById('customDateInputs');
+  const btnFilterReset = document.getElementById('btnFilterReset');
+  const filtersSummary = document.getElementById('filtersSummary');
+  
+  let selectedRange = '{{ current_range|default:"all" }}';
+  
+  // Open modal
+  filtersBtn.addEventListener('click', function() {
+    filtersModal.classList.add('active');
+  });
+  
+  // Close modal
+  filtersCloseBtn.addEventListener('click', function() {
+    filtersModal.classList.remove('active');
+  });
+  
+  // Close on backdrop click
+  filtersModal.addEventListener('click', function(e) {
+    if (e.target === filtersModal) {
+      filtersModal.classList.remove('active');
+    }
+  });
+  
+  // Handle filter option selection
+  filterOptions.forEach(option => {
+    option.addEventListener('click', function() {
+      filterOptions.forEach(opt => opt.classList.remove('active'));
+      this.classList.add('active');
+      selectedRange = this.dataset.range;
+      
+      if (selectedRange === 'custom') {
+        customDateInputs.classList.add('active');
+      } else {
+        customDateInputs.classList.remove('active');
+      }
+    });
+  });
+  
+  // Handle form submission
+  filtersForm.addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(this);
+    const params = new URLSearchParams(window.location.search);
+    
+    // Clear existing range/date params
+    params.delete('range');
+    params.delete('preset');
+    params.delete('start');
+    params.delete('end');
+    
+    // Add new range
+    if (selectedRange === 'custom') {
+      params.set('range', 'custom');
+      const startDate = document.getElementById('filter_start_date').value;
+      const endDate = document.getElementById('filter_end_date').value;
+      if (startDate) params.set('start', startDate);
+      if (endDate) params.set('end', endDate);
+    } else {
+      params.set('range', selectedRange);
+    }
+    
+    // Redirect with new params
+    window.location.href = window.location.pathname + '?' + params.toString();
+  });
+  
+  // Reset filters
+  btnFilterReset.addEventListener('click', function() {
+    const params = new URLSearchParams(window.location.search);
+    params.delete('range');
+    params.delete('preset');
+    params.delete('start');
+    params.delete('end');
+    window.location.href = window.location.pathname + (params.toString() ? '?' + params.toString() : '');
+  });
+})();
+</script>
+

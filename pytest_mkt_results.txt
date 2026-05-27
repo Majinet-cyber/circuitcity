@@ -1,0 +1,13 @@
+﻿============================= test session starts =============================
+platform win32 -- Python 3.12.9, pytest-8.3.2, pluggy-1.6.0
+django: version: 5.2.5, settings: cc.settings (from ini)
+rootdir: C:\Users\CHRIS PAUL MWALE\PycharmProjects\circuitcity_clean
+configfile: pytest.ini
+plugins: Faker-26.0.0, cov-5.0.0, django-4.8.0
+collected 62 items
+
+tests\test_marketplace_home.py ............................              [ 45%]
+tests\test_marketplace_upgrade.py ...................                    [ 75%]
+inventory\tests_marketplace.py ...............                           [100%]
+
+======================== 62 passed in 71.98s (0:01:11) ========================

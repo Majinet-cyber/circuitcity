@@ -1,0 +1,282 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Confirm Member - {{ business.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+.wizard-container {
+    max-width: 600px;
+    margin: 0 auto;
+    padding: 1rem;
+}
+
+.progress-bar {
+    height: 8px;
+    background: #e5e7eb;
+    border-radius: 4px;
+    margin-bottom: 2rem;
+    overflow: hidden;
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #3b82f6, #10b981);
+    transition: width 0.3s ease;
+}
+
+.wizard-card {
+    background: rgba(255, 255, 255, 0.98);
+    border-radius: 24px;
+    padding: 2.5rem 2rem;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.12);
+}
+
+.step-badge {
+    display: inline-block;
+    background: #3b82f6;
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+}
+
+.wizard-title {
+    font-size: 1.75rem;
+    font-weight: bold;
+    margin-bottom: 0.5rem;
+    color: #1e293b;
+}
+
+.wizard-subtitle {
+    color: #64748b;
+    margin-bottom: 2rem;
+}
+
+.summary-card {
+    background: #f8fafc;
+    border: 2px solid #e5e7eb;
+    border-radius: 16px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.summary-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.summary-row:last-child {
+    border-bottom: none;
+}
+
+.summary-label {
+    color: #64748b;
+    font-weight: 500;
+}
+
+.summary-value {
+    color: #1e293b;
+    font-weight: 600;
+}
+
+.fee-card {
+    background: white;
+    border: 2px solid #e5e7eb;
+    border-radius: 16px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.fee-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.5rem 0;
+}
+
+.fee-label {
+    color: #64748b;
+}
+
+.fee-value {
+    color: #1e293b;
+    font-weight: 600;
+}
+
+.total-row {
+    border-top: 2px solid #e5e7eb;
+    margin-top: 1rem;
+    padding-top: 1rem;
+    font-size: 1.25rem;
+}
+
+.total-row .fee-label {
+    color: #1e293b;
+    font-weight: 700;
+}
+
+.total-row .fee-value {
+    color: #10b981;
+    font-weight: 700;
+}
+
+.payment-option {
+    background: #fef3c7;
+    border: 2px solid #fbbf24;
+    border-radius: 12px;
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.payment-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    cursor: pointer;
+}
+
+.payment-checkbox input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+    cursor: pointer;
+}
+
+.wizard-actions {
+    display: flex;
+    gap: 1rem;
+    margin-top: 2rem;
+    flex-wrap: wrap;
+}
+
+.wizard-btn {
+    flex: 1;
+    padding: 0.875rem 2rem;
+    border-radius: 12px;
+    font-weight: 600;
+    font-size: 1.1rem;
+    transition: all 0.3s ease;
+}
+
+.wizard-btn:hover {
+    transform: translateY(-2px);
+}
+
+.wizard-btn-success {
+    background: linear-gradient(135deg, #10b981, #059669);
+    border: none;
+    color: white;
+}
+
+.wizard-btn-success:hover {
+    background: linear-gradient(135deg, #059669, #047857);
+}
+
+@media (max-width: 576px) {
+    .wizard-card {
+        padding: 2rem 1.5rem;
+    }
+    
+    .wizard-actions {
+        flex-direction: column;
+    }
+    
+    .wizard-btn {
+        width: 100%;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="wizard-container">
+    <!-- Progress Bar -->
+    <div class="progress-bar">
+        <div class="progress-fill" style="width: 100%;"></div>
+    </div>
+    
+    <div class="wizard-card">
+        <div class="step-badge">Step 3 of {{ total_steps }}</div>
+        <h1 class="wizard-title">Review & Confirm</h1>
+        <p class="wizard-subtitle">Please review the member details before creating</p>
+        
+        <!-- Member Summary -->
+        <div class="summary-card">
+            <h5 class="mb-3 fw-bold">Member Information</h5>
+            <div class="summary-row">
+                <span class="summary-label">Name</span>
+                <span class="summary-value">{{ wizard_data.name }}</span>
+            </div>
+            <div class="summary-row">
+                <span class="summary-label">Phone</span>
+                <span class="summary-value">{{ wizard_data.phone }}</span>
+            </div>
+            {% if wizard_data.email %}
+            <div class="summary-row">
+                <span class="summary-label">Email</span>
+                <span class="summary-value">{{ wizard_data.email }}</span>
+            </div>
+            {% endif %}
+            <div class="summary-row">
+                <span class="summary-label">Trainer</span>
+                <span class="summary-value">
+                    {% if wizard_data.trainer_name %}
+                        {{ wizard_data.trainer_name }} 💪
+                    {% else %}
+                        No trainer assigned
+                    {% endif %}
+                </span>
+            </div>
+        </div>
+        
+        <!-- Fee Breakdown -->
+        <div class="fee-card">
+            <h5 class="mb-3 fw-bold">Membership Fees</h5>
+            <div class="fee-row">
+                <span class="fee-label">Membership Fee (30 days)</span>
+                <span class="fee-value">MWK {{ membership_fee|floatformat:2 }}</span>
+            </div>
+            {% if trainer_fee > 0 %}
+            <div class="fee-row">
+                <span class="fee-label">Trainer Fee</span>
+                <span class="fee-value">MWK {{ trainer_fee|floatformat:2 }}</span>
+            </div>
+            {% endif %}
+            <div class="fee-row total-row">
+                <span class="fee-label">Total Amount</span>
+                <span class="fee-value">MWK {{ total_fee|floatformat:2 }}</span>
+            </div>
+        </div>
+        
+        <form method="post">
+            {% csrf_token %}
+            
+            <!-- Payment Option -->
+            <div class="payment-option">
+                <label class="payment-checkbox">
+                    <input type="checkbox" name="mark_as_paid" value="yes" id="markPaid">
+                    <span class="fw-semibold">
+                        ✓ Mark as paid now and activate membership
+                    </span>
+                </label>
+                <div class="small text-muted mt-2 ms-4">
+                    If checked, the member's 30-day membership starts today
+                </div>
+            </div>
+            
+            <div class="wizard-actions">
+                <a href="?step=2" class="btn btn-outline-secondary wizard-btn">
+                    <i class="bi bi-arrow-left"></i> Back
+                </a>
+                <button type="submit" class="wizard-btn wizard-btn-success">
+                    <i class="bi bi-check-circle"></i> Create Member
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+

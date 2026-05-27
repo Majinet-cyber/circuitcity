@@ -7,7 +7,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("inventory", "0041_add_gympayment_payment_method"),
         ("tenants", "0012_add_business_logo"),

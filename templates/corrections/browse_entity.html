@@ -1,0 +1,481 @@
+{% extends "base.html" %}
+{% load static %}
+{% load corrections_tags %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Premium Corrections Styling - Gym-inspired */
+    .corrections-page {
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+        padding: 18px;
+    }
+    
+    .corrections-hero {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 24px;
+        border-radius: 20px;
+        color: #fff;
+        box-shadow: 0 8px 24px rgba(102, 126, 234, 0.25);
+    }
+    
+    .corrections-hero h1 {
+        margin: 0;
+        font-size: clamp(24px, 3vw, 32px);
+        font-weight: 700;
+    }
+    
+    .corrections-hero p {
+        margin: 8px 0 0;
+        opacity: 0.95;
+        font-size: 1rem;
+    }
+    
+    .corrections-hero .breadcrumb {
+        background: rgba(255, 255, 255, 0.15);
+        padding: 8px 16px;
+        border-radius: 8px;
+        margin-bottom: 12px;
+    }
+    
+    .corrections-hero .breadcrumb-item + .breadcrumb-item::before {
+        color: rgba(255, 255, 255, 0.7);
+    }
+    
+    .corrections-hero .breadcrumb-item a {
+        color: #fff;
+        text-decoration: none;
+        font-weight: 600;
+    }
+    
+    .corrections-hero .breadcrumb-item.active {
+        color: rgba(255, 255, 255, 0.9);
+    }
+    
+    /* Safety Banner */
+    .safety-banner {
+        background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+        border-left: 5px solid #f59e0b;
+        padding: 16px 20px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        box-shadow: 0 2px 8px rgba(245, 158, 11, 0.15);
+    }
+    
+    .safety-banner i {
+        font-size: 1.5rem;
+        color: #d97706;
+        flex-shrink: 0;
+    }
+    
+    .safety-banner-text {
+        color: #92400e;
+        font-size: 0.9rem;
+        line-height: 1.5;
+    }
+    
+    .safety-banner-text strong {
+        display: block;
+        margin-bottom: 4px;
+        font-size: 1rem;
+    }
+    
+    /* Filter Card */
+    .premium-filter-card {
+        background: white;
+        border-radius: 16px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+        border: 1px solid #e2e8f0;
+        padding: 20px;
+        transition: all 0.3s ease;
+    }
+    
+    .premium-filter-card:hover {
+        box-shadow: 0 6px 24px rgba(0, 0, 0, 0.08);
+    }
+    
+    .filter-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 16px;
+        color: #475569;
+        font-weight: 600;
+    }
+    
+    /* Table Container */
+    .premium-table-container {
+        background: white;
+        border-radius: 20px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+        overflow: hidden;
+        border: 1px solid #e2e8f0;
+    }
+    
+    .premium-table {
+        margin-bottom: 0;
+        width: 100%;
+    }
+    
+    .premium-table thead th {
+        background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+        color: #475569;
+        font-weight: 700;
+        text-transform: uppercase;
+        font-size: 0.75rem;
+        letter-spacing: 0.05em;
+        padding: 1.25rem 1rem;
+        border: none;
+        white-space: nowrap;
+    }
+    
+    .premium-table tbody tr {
+        border-bottom: 1px solid #f1f5f9;
+        transition: all 0.2s ease;
+    }
+    
+    .premium-table tbody tr:hover {
+        background: linear-gradient(90deg, #f8fafc 0%, #ffffff 100%);
+        transform: scale(1.002);
+        box-shadow: 0 2px 8px rgba(102, 126, 234, 0.1);
+    }
+    
+    .premium-table tbody tr:last-child {
+        border-bottom: none;
+    }
+    
+    .premium-table tbody td {
+        padding: 1.25rem 1rem;
+        vertical-align: middle;
+        border: none;
+        color: #334155;
+    }
+    
+    /* Action Buttons */
+    .action-btn-edit {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 0.5rem 1rem;
+        border-radius: 8px;
+        font-weight: 600;
+        font-size: 0.875rem;
+        transition: all 0.3s ease;
+        border: none;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+    }
+    
+    .action-btn-edit:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        color: white;
+    }
+
+    .action-btn-delete {
+        background: #fff;
+        color: #dc2626;
+        padding: 0.5rem 0.875rem;
+        border-radius: 8px;
+        font-weight: 600;
+        font-size: 0.875rem;
+        transition: all 0.3s ease;
+        border: 2px solid #fecaca;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+    }
+
+    .action-btn-delete:hover {
+        background: #fef2f2;
+        border-color: #dc2626;
+        color: #dc2626;
+        transform: translateY(-2px);
+    }
+
+    .record-id-link {
+        color: #667eea;
+        font-weight: 700;
+        text-decoration: none;
+    }
+
+    .record-id-link:hover {
+        text-decoration: underline;
+    }
+    
+    /* Empty State */
+    .empty-state-premium {
+        text-align: center;
+        padding: 4rem 2rem;
+    }
+    
+    .empty-state-icon {
+        font-size: 4rem;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        opacity: 0.4;
+        margin-bottom: 1rem;
+    }
+    
+    /* Pagination */
+    .pagination {
+        margin-top: 20px;
+        margin-bottom: 0;
+    }
+    
+    .pagination .page-link {
+        border-radius: 8px;
+        margin: 0 4px;
+        border: 1px solid #e2e8f0;
+        color: #667eea;
+        font-weight: 600;
+    }
+    
+    .pagination .page-link:hover {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-color: #667eea;
+    }
+    
+    .pagination .page-item.disabled .page-link {
+        background: #f1f5f9;
+        border-color: #e2e8f0;
+        color: #94a3b8;
+    }
+    
+    /* Issue Filters */
+    .issue-filter-pills {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-top: 12px;
+    }
+    
+    .issue-pill {
+        padding: 6px 14px;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        border: 2px solid #e2e8f0;
+        background: white;
+        color: #64748b;
+        text-decoration: none;
+        transition: all 0.2s ease;
+    }
+    
+    .issue-pill:hover {
+        border-color: #667eea;
+        color: #667eea;
+        background: #f8fafc;
+    }
+    
+    .issue-pill.active {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-color: #667eea;
+    }
+    
+    @media (max-width: 768px) {
+        .corrections-page {
+            padding: 12px;
+        }
+        
+        .premium-table-container {
+            overflow-x: auto;
+        }
+        
+        .premium-table {
+            min-width: 800px;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="corrections-page">
+    <!-- Hero Header -->
+    <header class="corrections-hero">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb mb-0">
+                <li class="breadcrumb-item"><a href="{% url 'corrections:dashboard' vertical=vertical %}">Data Corrections</a></li>
+                <li class="breadcrumb-item active">{{ entity_config.label }}</li>
+            </ol>
+        </nav>
+        <h1>{{ hero_title }}</h1>
+        <p>{{ hero_blurb }}</p>
+    </header>
+    
+    <!-- Safety Banner -->
+    <div class="safety-banner">
+        <i class="bi bi-shield-check"></i>
+        <div class="safety-banner-text">
+            <strong>Changes are logged</strong>
+            All corrections are tracked in the audit trail for accountability and can be reviewed by managers.
+        </div>
+    </div>
+    
+    <!-- Search & Filters -->
+    <div class="premium-filter-card">
+        <div class="filter-header">
+            <i class="bi bi-funnel"></i>
+            Search & Filter
+        </div>
+        <form method="get" class="row g-3">
+            <div class="col-md-6">
+                <label class="form-label fw-semibold" style="color: #475569;">Search Records</label>
+                <input type="text" name="q" class="form-control form-control-lg" 
+                       placeholder="Search by name, phone, or other fields..." 
+                       value="{{ search_query }}"
+                       style="border-radius: 10px; border-color: #e2e8f0;">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label fw-semibold" style="color: #475569;">Filter</label>
+                <div class="form-check" style="padding-top: 0.5rem;">
+                    <input class="form-check-input" type="checkbox" name="errors_only" value="1" 
+                           id="errors_only" {% if show_errors_only %}checked{% endif %}
+                           style="width: 20px; height: 20px; cursor: pointer;">
+                    <label class="form-check-label" for="errors_only" style="padding-left: 8px; cursor: pointer; font-weight: 600; color: #64748b;">
+                        <i class="bi bi-exclamation-triangle text-warning"></i> Common Issues Only
+                    </label>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label" style="opacity: 0;">Search</label>
+                <button type="submit" class="btn btn-lg w-100" 
+                        style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 10px; font-weight: 700;">
+                    <i class="bi bi-search"></i> Search
+                </button>
+            </div>
+        </form>
+        
+        <!-- Quick Issue Filters (Optional) -->
+        {% comment %}
+        <div class="issue-filter-pills">
+            <a href="?issue=missing_phone" class="issue-pill">Missing Phone</a>
+            <a href="?issue=duplicate_code" class="issue-pill">Duplicate Code</a>
+            <a href="?issue=invalid_fee" class="issue-pill">Invalid Fee</a>
+            <a href="?" class="issue-pill">Clear Filters</a>
+        </div>
+        {% endcomment %}
+    </div>
+    
+    <!-- Records Table -->
+    <div class="premium-table-container">
+        {% if records %}
+            <div class="table-responsive">
+                <table class="premium-table table mb-0">
+                    <thead>
+                        <tr>
+                            <th style="width: 80px;">ID</th>
+                            {% for field_name, field_config in entity_config.fields.items %}
+                            <th>{{ field_config.label }}</th>
+                            {% endfor %}
+                            <th style="width: 120px;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for record in records %}
+                        <tr data-href="{% url 'corrections:edit_record' vertical=vertical entity_label=entity_label object_id=record.pk %}"
+                            onclick="window.location='{% url 'corrections:edit_record' vertical=vertical entity_label=entity_label object_id=record.pk %}'"
+                            style="cursor:pointer;">
+                            <td>
+                                <a href="{% url 'corrections:edit_record' vertical=vertical entity_label=entity_label object_id=record.pk %}"
+                                   class="record-id-link"
+                                   onclick="event.stopPropagation()">
+                                    #{{ record.pk }}
+                                </a>
+                            </td>
+                            {% for field_name, field_config in entity_config.fields.items %}
+                            <td>
+                                {% with value=record|lookup:field_name %}
+                                    {{ value|default:"—" }}
+                                {% endwith %}
+                            </td>
+                            {% endfor %}
+                            <td onclick="event.stopPropagation()">
+                                <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+                                    <a href="{% url 'corrections:edit_record' vertical=vertical entity_label=entity_label object_id=record.pk %}"
+                                       class="action-btn-edit">
+                                        <i class="bi bi-pencil"></i> Edit
+                                    </a>
+                                    {% if entity_label == 'pharmacy_sale' or entity_label == 'gym_payment' %}
+                                    <a href="{% url 'corrections:edit_record' vertical=vertical entity_label=entity_label object_id=record.pk %}#delete-section"
+                                       class="action-btn-delete"
+                                       title="Delete this record"
+                                       onclick="event.stopPropagation()">
+                                        <i class="bi bi-trash"></i>
+                                    </a>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- Pagination -->
+            {% if records.has_other_pages %}
+            <div style="padding: 20px;">
+                <nav>
+                    <ul class="pagination justify-content-center mb-0">
+                        {% if records.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ records.previous_page_number }}{% if search_query %}&q={{ search_query }}{% endif %}{% if show_errors_only %}&errors_only=1{% endif %}">
+                                <i class="bi bi-chevron-left"></i> Previous
+                            </a>
+                        </li>
+                        {% endif %}
+                        
+                        <li class="page-item disabled">
+                            <span class="page-link">Page {{ records.number }} of {{ records.paginator.num_pages }}</span>
+                        </li>
+                        
+                        {% if records.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ records.next_page_number }}{% if search_query %}&q={{ search_query }}{% endif %}{% if show_errors_only %}&errors_only=1{% endif %}">
+                                Next <i class="bi bi-chevron-right"></i>
+                            </a>
+                        </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+            </div>
+            {% endif %}
+        {% else %}
+            <!-- Empty State -->
+            <div class="empty-state-premium">
+                <div class="empty-state-icon">
+                    <i class="bi bi-inbox"></i>
+                </div>
+                <h4 style="font-weight: 700; color: #1e293b; margin-bottom: 0.75rem;">No Records Found</h4>
+                <p class="text-muted mb-4" style="font-size: 1.125rem;">
+                    {% if search_query %}
+                        No records match your search criteria. Try adjusting your filters.
+                    {% elif show_errors_only %}
+                        No records with common issues found. Great job keeping your data clean!
+                    {% else %}
+                        No {{ entity_config.label|lower }} records available yet.
+                    {% endif %}
+                </p>
+                {% if search_query or show_errors_only %}
+                <a href="{% url 'corrections:browse_entity' vertical=vertical entity_label=entity_label %}" 
+                   class="action-btn-edit" style="padding: 0.875rem 2rem; font-size: 1rem;">
+                    <i class="bi bi-arrow-counterclockwise me-2"></i> Clear Filters
+                </a>
+                {% endif %}
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

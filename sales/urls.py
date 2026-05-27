@@ -1,0 +1,27 @@
+# sales/urls.py
+"""
+Sales app URL patterns
+"""
+from django.urls import path
+from sales import views, views_rollback, views_commission, views_export, views_price_adjust
+
+app_name = "sales"
+
+urlpatterns = [
+    # Sales list view (main sales page)
+    path("", views.sales_list, name="list"),
+    # Sale rollback URLs
+    path("rollback/", views_rollback.rollback_home, name="rollback_home"),
+    path("rollback/search/", views_rollback.rollback_search, name="rollback_search"),
+    path("rollback/<int:sale_id>/confirm/", views_rollback.rollback_confirm, name="rollback_confirm"),
+    path("rollback/<int:rollback_id>/detail/", views_rollback.rollback_detail, name="rollback_detail"),
+    # Phone sale edit URL
+    path("phones/<int:sale_id>/edit/", views_rollback.edit_phone_sale, name="edit_phone_sale"),
+    # PHASE 4: Price adjustment (manager-only, audited)
+    path("<int:sale_id>/adjust-price/", views_price_adjust.adjust_sale_price, name="adjust_sale_price"),
+    # Commission URLs
+    path("commission/settings/", views_commission.commission_settings, name="commission_settings"),
+    path("commission/settings/json/", views_commission.commission_settings_json, name="commission_settings_json"),
+    # Export URLs (if they exist)
+    # path('export/', views_export.export_sales, name='export_sales'),
+]

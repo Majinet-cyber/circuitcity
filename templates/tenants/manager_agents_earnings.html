@@ -1,0 +1,203 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}{% if BUSINESS_VERTICAL == "gym" %}Trainer{% else %}Agent{% endif %} Earnings · {{ business.name }}{% endblock %}
+{% block header_title %}<i class="bi bi-trophy me-2"></i>{% if BUSINESS_VERTICAL == "gym" %}Trainer{% else %}Agent{% endif %} Earnings{% endblock %}
+
+{% block extra_css %}
+<style>
+  .earnings-page{max-width:1400px;margin:0 auto;padding:24px}
+  .filter-bar{background:linear-gradient(135deg,#ffffff,#f8fafc);border-radius:16px;padding:20px;margin-bottom:24px;box-shadow:0 4px 20px rgba(15,23,42,.08);border:1px solid rgba(148,163,184,0.1)}
+  .filter-pills{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  .filter-pills .pill{border-radius:24px;padding:10px 20px;font-weight:600;font-size:.9rem;text-decoration:none;transition:all 0.2s;border:2px solid #e2e8f0;background:#fff}
+  .filter-pills .pill.active{background:#3b82f6;color:#fff;border-color:#3b82f6;box-shadow:0 4px 12px rgba(59,130,246,0.3)}
+  .filter-pills .pill:hover:not(.active){background:#f1f5f9;border-color:#cbd5e1}
+  .custom-range{display:flex;gap:12px;margin-top:16px;padding-top:16px;border-top:1px solid #e2e8f0;flex-wrap:wrap;align-items:end}
+  .custom-range input[type="date"]{border-radius:8px;padding:8px 12px;border:2px solid #e2e8f0;font-size:.9rem}
+  .custom-range button{border-radius:20px;padding:10px 24px;font-weight:600;background:#3b82f6;color:#fff;border:none;cursor:pointer}
+  .custom-range button:hover{background:#2563eb}
+  
+  .summary-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:24px}
+  .summary-card{background:linear-gradient(135deg,#ffffff,#f8fafc);border-radius:16px;padding:20px;box-shadow:0 4px 20px rgba(15,23,42,.08);border:1px solid rgba(148,163,184,0.1)}
+  .summary-card .label{color:#64748b;font-weight:600;font-size:.85rem;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px}
+  .summary-card .value{font-size:1.8rem;font-weight:900;color:#0f172a}
+  
+  .earnings-table{background:#fff;border-radius:16px;box-shadow:0 4px 20px rgba(15,23,42,.08);border:1px solid rgba(148,163,184,0.1);overflow:hidden}
+  .earnings-table table{width:100%;border-collapse:collapse}
+  .earnings-table thead{background:linear-gradient(135deg,#f1f5f9,#e2e8f0)}
+  .earnings-table th{padding:16px;text-align:left;font-weight:700;color:#475569;font-size:.9rem;text-transform:uppercase;letter-spacing:0.05em}
+  .earnings-table th.text-end{text-align:right}
+  .earnings-table tbody tr{border-bottom:1px solid #f1f5f9;transition:all 0.15s}
+  .earnings-table tbody tr:hover{background:#f8fafc}
+  .earnings-table td{padding:14px 16px;color:#0f172a}
+  .earnings-table td.text-end{text-align:right}
+  .earnings-table .rank{font-weight:900;color:#3b82f6;font-size:1.1rem}
+  .earnings-table .agent-name{font-weight:600}
+  .earnings-table .commission{font-weight:700;color:#16a34a}
+  .earnings-table .revenue{color:#64748b}
+  .earnings-table .empty-state{padding:60px 20px;text-align:center;color:#94a3b8}
+  .earnings-table .empty-state i{font-size:3rem;opacity:0.3;display:block;margin-bottom:16px}
+  
+  .totals-row{background:linear-gradient(135deg,#f8fafc,#f1f5f9);font-weight:700}
+  
+  @media (max-width: 768px) {
+    .earnings-page{padding:16px}
+    .summary-cards{grid-template-columns:1fr}
+    .earnings-table{overflow-x:auto}
+    .filter-pills{flex-direction:column;align-items:stretch}
+    .filter-pills .pill{text-align:center}
+  }
+</style>
+{% endblock %}
+
+{% block body %}
+<div class="earnings-page">
+  
+  <!-- BREADCRUMB / BACK NAV -->
+  <div style="margin-bottom:20px">
+    <a href="{% url 'tenants:manager_review_agents' %}" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-arrow-left"></i> Back to {% if BUSINESS_VERTICAL == "gym" %}Trainers{% else %}Agents{% endif %}
+    </a>
+  </div>
+  
+  <!-- PAGE HEADER -->
+  <div style="margin-bottom:24px">
+    <h1 style="font-size:2rem;font-weight:900;color:#0f172a;margin:0 0 8px">
+      <i class="bi bi-trophy" style="color:#3b82f6"></i> {% if BUSINESS_VERTICAL == "gym" %}Trainer{% else %}Agent{% endif %} Earnings
+    </h1>
+    <p style="color:#64748b;margin:0">Performance rankings by commission for {{ range_label|lower }}</p>
+  </div>
+  
+  <!-- DATE RANGE FILTER BAR -->
+  <section class="filter-bar">
+    <div class="filter-pills">
+      <span style="font-weight:700;color:#64748b;margin-right:8px">Period:</span>
+      <a href="?range=today" class="pill {% if range_key == 'today' %}active{% endif %}">
+        <i class="bi bi-calendar-day"></i> Today
+      </a>
+      <a href="?range=7d" class="pill {% if range_key == '7d' %}active{% endif %}">
+        <i class="bi bi-calendar-week"></i> Last 7 Days
+      </a>
+      <a href="?range=month" class="pill {% if range_key == 'month' %}active{% endif %}">
+        <i class="bi bi-calendar-month"></i> This Month
+      </a>
+      <button type="button" class="pill {% if range_key == 'custom' %}active{% endif %}" onclick="toggleCustomRange()" style="border:none;background:#fff;cursor:pointer">
+        <i class="bi bi-calendar-range"></i> Custom
+      </button>
+    </div>
+    
+    <!-- CUSTOM DATE RANGE FORM (hidden by default) -->
+    <form method="get" id="customRangeForm" class="custom-range" style="display:{% if range_key == 'custom' %}flex{% else %}none{% endif %}">
+      <div>
+        <label style="display:block;font-size:.85rem;color:#64748b;margin-bottom:4px;font-weight:600">Start Date</label>
+        <input type="date" name="start" value="{{ start_date|date:'Y-m-d' }}" required>
+      </div>
+      <div>
+        <label style="display:block;font-size:.85rem;color:#64748b;margin-bottom:4px;font-weight:600">End Date</label>
+        <input type="date" name="end" value="{{ end_date|date:'Y-m-d' }}" required>
+      </div>
+      <button type="submit">
+        <i class="bi bi-check-circle"></i> Apply
+      </button>
+      <input type="hidden" name="range" value="custom">
+    </form>
+  </section>
+  
+  <!-- SUMMARY CARDS -->
+  <section class="summary-cards">
+    <div class="summary-card">
+      <div class="label">Total Agents</div>
+      <div class="value" data-cy="total-agents">{{ agent_count }}</div>
+    </div>
+    <div class="summary-card">
+      <div class="label">Units Sold</div>
+      <div class="value" data-cy="total-units">{{ total_units }}</div>
+    </div>
+    <div class="summary-card">
+      <div class="label">Total Revenue</div>
+      <div class="value" data-cy="total-revenue">MK {{ total_revenue|floatformat:0|intcomma }}</div>
+    </div>
+    <div class="summary-card">
+      <div class="label">Total Commissions</div>
+      <div class="value" data-cy="total-commissions">MK {{ total_commission|floatformat:0|intcomma }}</div>
+    </div>
+  </section>
+  
+  <!-- EARNINGS TABLE -->
+  <section class="earnings-table">
+    {% if earnings_data %}
+      <table>
+        <thead>
+          <tr>
+            <th style="width:60px">Rank</th>
+            <th>Agent</th>
+            <th class="text-end">Units Sold</th>
+            <th class="text-end">Revenue (MK)</th>
+            <th class="text-end">Commission (MK)</th>
+            <th class="text-end">Last Sale</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in earnings_data %}
+            <tr data-cy="agent-earnings-row">
+              <td class="rank">
+                {% if row.rank == 1 %}🥇
+                {% elif row.rank == 2 %}🥈
+                {% elif row.rank == 3 %}🥉
+                {% else %}{{ row.rank }}{% endif %}
+              </td>
+              <td class="agent-name">
+                <div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:300px" title="{{ row.agent_name }}">
+                  {{ row.agent_name }}
+                </div>
+                <small style="color:#64748b;font-size:.85rem">@{{ row.agent_username }}</small>
+              </td>
+              <td class="text-end">{{ row.units_sold }}</td>
+              <td class="text-end revenue">{{ row.total_revenue|floatformat:0|intcomma }}</td>
+              <td class="text-end commission">{{ row.total_commission|floatformat:0|intcomma }}</td>
+              <td class="text-end" style="font-size:.9rem;color:#64748b">
+                {% if row.last_sale_at %}
+                  {{ row.last_sale_at|date:"M j, g:i A" }}
+                {% else %}
+                  <span style="opacity:0.5">—</span>
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+        <tfoot class="totals-row">
+          <tr>
+            <td colspan="2" style="padding:16px;font-weight:700">TOTALS</td>
+            <td class="text-end" style="padding:16px;font-weight:700">{{ total_units }}</td>
+            <td class="text-end" style="padding:16px;font-weight:700">MK {{ total_revenue|floatformat:0|intcomma }}</td>
+            <td class="text-end" style="padding:16px;font-weight:700;color:#16a34a">MK {{ total_commission|floatformat:0|intcomma }}</td>
+            <td></td>
+          </tr>
+        </tfoot>
+      </table>
+    {% else %}
+      <div class="empty-state">
+        <i class="bi bi-inbox"></i>
+        <p style="margin:0;font-size:1.1rem;font-weight:600">No earnings data for {{ range_label|lower }}</p>
+        <p style="margin:8px 0 0;font-size:.95rem">Agent earnings will appear here once sales are recorded.</p>
+      </div>
+    {% endif %}
+  </section>
+  
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function toggleCustomRange() {
+  const form = document.getElementById('customRangeForm');
+  const isHidden = form.style.display === 'none';
+  form.style.display = isHidden ? 'flex' : 'none';
+  // If showing, focus the first input
+  if (isHidden) {
+    form.querySelector('input[type="date"]').focus();
+  }
+}
+</script>
+{% endblock %}
+

@@ -1,0 +1,27 @@
+Welcome to {{ business_name }}!
+
+Hi {{ agent_name }},
+
+We're excited to have you join the team at {{ business_name }}!
+
+Your agent account has been activated. Here's what to do next:
+
+- Set your location - Make sure your default location is set correctly
+- Stock products - Scan in products to your inventory
+- Record your first sale - Start selling and earning commissions!
+- Track your earnings - View your commissions and wallet balance
+
+{% if support_contact %}
+If you need any help getting started or have questions about using the system, please reach out:
+
+Support: {{ support_contact }}
+{% endif %}
+
+Welcome aboard and happy selling! 🚀
+
+Best regards,
+The {{ business_name }} Team
+
+---
+This is an automated email. Please do not reply directly to this message.
+

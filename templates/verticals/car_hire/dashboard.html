@@ -1,0 +1,2235 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Car Hire Dashboard - {{ business.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+/* ===== Car Hire Premium Dashboard (Jan 2026) ===== */
+/* PREMIUM BLUE THEME - matches Clothing/Welding premium feel */
+
+.car-hire-dashboard {
+    --hire-primary: #0ea5e9;
+    --hire-primary-light: #e0f2fe;
+    --hire-primary-rgb: 14, 165, 233;
+    --hire-blue: #2563eb;
+    --hire-blue-light: #dbeafe;
+    --hire-amber: #d97706;
+    --hire-amber-light: #fef3c7;
+    --hire-red: #dc2626;
+    --hire-red-light: #fee2e2;
+    --hire-green: #16a34a;
+    --hire-green-light: #dcfce7;
+}
+
+/* ===== PREMIUM BLUE HERO CARD (like Clothing/Welding) ===== */
+.vertical-hero {
+    background: linear-gradient(135deg, #0ea5e9 0%, #38bdf8 50%, #60a5fa 100%);
+    padding: 28px;
+    border-radius: 24px;
+    color: #fff;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    align-items: center;
+    justify-content: space-between;
+    box-shadow: 0 20px 60px rgba(14, 165, 233, 0.2);
+    position: relative;
+    overflow: hidden;
+    margin-bottom: 1.5rem;
+}
+
+.vertical-hero::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    right: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.1) 0%, transparent 70%);
+    pointer-events: none;
+}
+
+.vertical-hero .eyebrow {
+    opacity: 0.9;
+    text-transform: uppercase;
+    font-size: 0.8rem;
+    letter-spacing: 0.15em;
+    margin: 0;
+    font-weight: 600;
+}
+
+.vertical-hero h1 {
+    margin: 6px 0;
+    font-size: clamp(26px, 4vw, 36px);
+    font-weight: 800;
+    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.vertical-hero p {
+    margin: 0;
+    opacity: 0.95;
+    font-size: 1rem;
+}
+
+.hero-actions {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    z-index: 1;
+    position: relative;
+}
+
+.hero-actions a, .hero-actions button {
+    border-radius: 30px;
+    padding: 12px 20px;
+    font-weight: 700;
+    text-decoration: none;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    border: none;
+    cursor: pointer;
+    font-size: 0.9375rem;
+}
+
+.hero-actions .primary {
+    background: #fff;
+    color: #0f172a;
+}
+
+.hero-actions .primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+    background: #f8fafc;
+}
+
+.hero-actions .ghost {
+    border: 2px solid rgba(255, 255, 255, 0.9);
+    color: #fff;
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+}
+
+.hero-actions .ghost:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(255, 255, 255, 0.2);
+}
+
+/* ===== ANIMATIONS ===== */
+@keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+}
+
+@keyframes countUp {
+    from { opacity: 0; transform: scale(0.8); }
+    to { opacity: 1; transform: scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
+/* Staggered entrance animations */
+.animate-in { animation: fadeInUp 0.4s ease-out both; }
+.animate-in-1 { animation-delay: 0.05s; }
+.animate-in-2 { animation-delay: 0.1s; }
+.animate-in-3 { animation-delay: 0.15s; }
+.animate-in-4 { animation-delay: 0.2s; }
+
+/* ===== FILTER SECTION ===== */
+.filter-section-bar {
+    background: #fff;
+    border-radius: 16px;
+    padding: 16px 20px;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 4px 20px rgba(15, 23, 42, 0.08);
+    border: 1px solid rgba(226, 232, 240, 0.5);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: center;
+    justify-content: space-between;
+    /* NOTE: Filter panel uses portal pattern (moves to #cc-overlay-root),
+       so no special overflow/z-index needed here */
+}
+
+.filter-showing {
+    font-size: 0.9rem;
+    color: #64748b;
+}
+
+.filter-showing strong {
+    color: #0f172a;
+}
+
+.filter-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.filter-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    background: rgba(14, 165, 233, 0.1);
+    color: #0ea5e9;
+    border-radius: 999px;
+    font-size: 0.8125rem;
+    font-weight: 600;
+}
+
+.filter-chip .remove {
+    cursor: pointer;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+}
+
+.filter-chip .remove:hover {
+    opacity: 1;
+}
+
+.filter-dot {
+    width: 8px;
+    height: 8px;
+    background: #ef4444;
+    border-radius: 50%;
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    animation: pulse 1.5s infinite;
+}
+
+/* ===== DASHBOARD HEADER (LEGACY) ===== */
+.dashboard-header {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.dashboard-header-text h1 {
+    font-size: clamp(1.5rem, 4vw, 1.875rem);
+    font-weight: 800;
+    margin: 0 0 0.25rem 0;
+    background: linear-gradient(135deg, var(--hire-primary) 0%, #38bdf8 50%, #60a5fa 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.dashboard-header-text p {
+    color: var(--muted);
+    margin: 0;
+    font-size: 0.875rem;
+}
+
+.period-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    background: var(--hire-primary-light);
+    border: 1px solid rgba(var(--hire-primary-rgb), 0.3);
+    border-radius: 999px;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--hire-primary);
+    box-shadow: var(--shadow-xs);
+}
+
+/* ===== FLEET HEALTH BAR ===== */
+.fleet-health-bar {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1rem 1.25rem;
+    margin-bottom: 1.5rem;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 1rem;
+}
+
+.fleet-health-label {
+    font-size: 0.875rem;
+    font-weight: 700;
+    color: var(--ink);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.fleet-health-label i { color: var(--hire-primary); }
+
+.fleet-health-progress {
+    flex: 1;
+    min-width: 200px;
+    height: 12px;
+    background: #e5e7eb;
+    border-radius: 999px;
+    overflow: hidden;
+    position: relative;
+}
+
+.fleet-health-fill {
+    height: 100%;
+    border-radius: 999px;
+    transition: width 0.8s ease-out;
+    background: linear-gradient(90deg, var(--hire-green) 0%, var(--hire-primary) 100%);
+}
+
+.fleet-health-fill.warning {
+    background: linear-gradient(90deg, var(--hire-amber) 0%, #f59e0b 100%);
+}
+
+.fleet-health-fill.danger {
+    background: linear-gradient(90deg, var(--hire-red) 0%, #ef4444 100%);
+}
+
+.fleet-health-score {
+    font-size: 1.125rem;
+    font-weight: 800;
+    color: var(--hire-primary);
+}
+
+.availability-streak {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.375rem 0.75rem;
+    background: var(--hire-green-light);
+    color: var(--hire-green);
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
+/* ===== KPI CARDS ===== */
+.kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+}
+
+@media (min-width: 768px) {
+    .kpi-grid {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 1rem;
+    }
+}
+
+@media (min-width: 1024px) {
+    .kpi-grid {
+        grid-template-columns: repeat(6, 1fr);
+        gap: 1rem;
+    }
+}
+
+.kpi-card {
+    background: var(--surface);
+    border-radius: var(--radius);
+    padding: 1rem 1.25rem;
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-sm);
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    /* BUG FIX: Prevent content overflow */
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.kpi-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+}
+
+.kpi-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: var(--hire-primary);
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.kpi-card:hover::before { opacity: 1; }
+
+.kpi-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 0.75rem;
+    min-width: 0;
+    flex-shrink: 0;
+}
+
+.kpi-label {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--muted);
+    /* BUG FIX: Ensure label wraps on small cards */
+    overflow-wrap: break-word;
+    word-break: break-word;
+    max-width: 100%;
+    line-height: 1.3;
+}
+
+.kpi-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+}
+
+.kpi-icon.bookings { background: var(--hire-blue-light); color: var(--hire-blue); }
+.kpi-icon.available { background: var(--hire-green-light); color: var(--hire-green); }
+.kpi-icon.utilization { background: var(--hire-amber-light); color: var(--hire-amber); }
+.kpi-icon.revenue { background: var(--hire-primary-light); color: var(--hire-primary); }
+.kpi-icon.costs { background: var(--hire-red-light); color: var(--hire-red); }
+.kpi-icon.profit { background: var(--hire-green-light); color: var(--hire-green); }
+
+.kpi-value {
+    font-size: clamp(1.1rem, 2.2vw, 1.5rem);
+    font-weight: 800;
+    color: var(--ink);
+    line-height: 1.2;
+    /* BUG FIX: Ensure values never overflow card boundaries */
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    white-space: normal;
+    max-width: 100%;
+    min-width: 0;
+    display: block;
+}
+
+@media (min-width: 768px) {
+    .kpi-value { 
+        font-size: clamp(1.25rem, 2.5vw, 1.75rem); 
+    }
+}
+
+@media (min-width: 1024px) {
+    .kpi-value { 
+        font-size: clamp(1.3rem, 2.2vw, 2rem); 
+    }
+}
+
+.kpi-trend {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    margin-top: 0.25rem;
+    padding: 0.125rem 0.375rem;
+    border-radius: 4px;
+}
+
+.kpi-trend.positive { background: var(--hire-green-light); color: var(--hire-green); }
+.kpi-trend.negative { background: var(--hire-red-light); color: var(--hire-red); }
+.kpi-trend.neutral { background: #f3f4f6; color: #6b7280; }
+
+/* ===== CHARTS SECTION ===== */
+.charts-grid {
+    display: grid;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+@media (min-width: 768px) {
+    .charts-grid { grid-template-columns: 2fr 1fr; }
+}
+
+.chart-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+}
+
+.chart-card-header {
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.chart-title {
+    font-size: 0.9375rem;
+    font-weight: 700;
+    color: var(--ink);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.chart-title i { color: var(--hire-primary); }
+
+.chart-card-body {
+    padding: 1rem 1.25rem;
+    /* BUG FIX: Remove unwanted scrollbars */
+    overflow: visible;
+    min-height: 200px;
+}
+
+.chart-container {
+    position: relative;
+    height: 260px;
+    /* BUG FIX: Ensure canvas renders properly */
+    width: 100%;
+    min-height: 200px;
+}
+
+.chart-container canvas {
+    max-width: 100%;
+    max-height: 100%;
+}
+
+.chart-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 200px;
+    color: var(--muted);
+    text-align: center;
+}
+
+.chart-empty i {
+    font-size: 2.5rem;
+    margin-bottom: 0.75rem;
+    opacity: 0.5;
+}
+
+/* ===== FLEET CARDS ===== */
+.section-header {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.section-title {
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: var(--ink);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.section-title i { color: var(--hire-primary); }
+
+.fleet-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.vehicle-card {
+    background: var(--surface);
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    overflow: hidden;
+    transition: all 0.25s ease;
+    box-shadow: var(--shadow-sm);
+}
+
+.vehicle-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 24px rgba(0,0,0,0.12);
+    border-color: var(--hire-primary);
+}
+
+.vehicle-card-header {
+    padding: 1rem 1.25rem;
+    background: linear-gradient(135deg, rgba(var(--hire-primary-rgb), 0.08) 0%, transparent 100%);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+}
+
+.vehicle-card-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--ink);
+    margin: 0 0 0.25rem 0;
+}
+
+.vehicle-card-plate {
+    font-size: 0.8125rem;
+    color: var(--muted);
+    font-family: var(--font-mono);
+}
+
+.vehicle-card-body { padding: 1rem 1.25rem; }
+
+.vehicle-info-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--border);
+}
+
+.vehicle-info-row:last-child { border-bottom: none; }
+
+.vehicle-info-label { font-size: 0.8125rem; color: var(--muted); }
+.vehicle-info-value { font-size: 0.875rem; font-weight: 600; color: var(--ink); }
+
+/* ===== STATUS BADGES ===== */
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.25rem 0.625rem;
+    border-radius: 999px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+.status-badge.available { background: var(--hire-green-light); color: var(--hire-green); }
+.status-badge.on-trip { background: var(--hire-blue-light); color: var(--hire-blue); }
+.status-badge.maintenance { background: var(--hire-amber-light); color: var(--hire-amber); }
+.status-badge.upcoming { background: var(--hire-blue-light); color: var(--hire-blue); }
+.status-badge.active { background: var(--hire-primary-light); color: var(--hire-primary); }
+.status-badge.completed { background: var(--hire-green-light); color: var(--hire-green); }
+.status-badge.cancelled { background: #f3f4f6; color: #6b7280; }
+
+/* ===== TRIPS TIMELINE ===== */
+.trips-timeline {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+.trip-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+    padding: 1rem;
+    border-left: 3px solid var(--hire-primary);
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    transition: all 0.2s ease;
+    text-decoration: none;
+    color: inherit;
+}
+
+.trip-item:hover {
+    background: var(--hire-primary-light);
+    border-left-color: var(--hire-green);
+}
+
+.trip-item:first-child { border-radius: var(--radius) var(--radius) 0 0; }
+.trip-item:last-child { border-radius: 0 0 var(--radius) var(--radius); border-bottom: none; }
+
+.trip-timeline-marker {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--hire-blue-light);
+    color: var(--hire-blue);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    flex-shrink: 0;
+}
+
+.trip-item.active .trip-timeline-marker {
+    background: var(--hire-primary);
+    color: white;
+    animation: pulse 2s infinite;
+}
+
+.trip-info { flex: 1; min-width: 0; }
+
+.trip-customer {
+    font-weight: 700;
+    color: var(--ink);
+    margin-bottom: 0.25rem;
+}
+
+.trip-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    font-size: 0.8125rem;
+    color: var(--muted);
+}
+
+.trip-meta span {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+/* ===== MAINTENANCE ALERTS ===== */
+.maintenance-alerts { display: flex; flex-direction: column; gap: 0.5rem; }
+
+.maintenance-alert {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.875rem 1rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    transition: all 0.2s;
+}
+
+.maintenance-alert:hover { transform: translateX(4px); }
+
+.maintenance-alert.overdue {
+    background: var(--hire-red-light);
+    border-color: rgba(220, 38, 38, 0.3);
+}
+
+.maintenance-alert.due-soon {
+    background: var(--hire-amber-light);
+    border-color: rgba(217, 119, 6, 0.3);
+}
+
+.maintenance-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+}
+
+.maintenance-alert.overdue .maintenance-icon { background: var(--hire-red); color: white; }
+.maintenance-alert.due-soon .maintenance-icon { background: var(--hire-amber); color: white; }
+
+.maintenance-text { flex: 1; }
+.maintenance-vehicle { font-weight: 700; color: var(--ink); font-size: 0.9375rem; }
+.maintenance-details { font-size: 0.75rem; color: var(--muted); }
+
+/* ===== BUTTONS ===== */
+.btn-action {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    border-radius: var(--radius);
+    font-size: 0.875rem;
+    font-weight: 600;
+    text-decoration: none;
+    transition: all 0.2s ease;
+    border: none;
+    cursor: pointer;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, var(--hire-primary) 0%, #10b981 100%);
+    color: white;
+    box-shadow: 0 4px 12px rgba(5, 150, 105, 0.3);
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(5, 150, 105, 0.4);
+}
+
+.btn-outline {
+    background: transparent;
+    color: var(--hire-primary);
+    border: 1px solid var(--hire-primary);
+}
+
+.btn-outline:hover { background: var(--hire-primary-light); }
+
+/* ===== EMPTY STATE ===== */
+.empty-state {
+    padding: 3rem 2rem;
+    text-align: center;
+    background: var(--surface);
+    border: 2px dashed var(--border);
+    border-radius: var(--radius);
+}
+
+.empty-state-icon {
+    font-size: 3.5rem;
+    margin-bottom: 1rem;
+    animation: fadeInUp 0.5s ease-out;
+}
+
+.empty-state-title {
+    font-size: 1.25rem;
+    font-weight: 800;
+    color: var(--ink);
+    margin-bottom: 0.5rem;
+}
+
+.empty-state-text {
+    color: var(--muted);
+    margin-bottom: 1.5rem;
+    max-width: 400px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.empty-state-suggestions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    justify-content: center;
+    margin-top: 1rem;
+}
+
+.suggestion-chip {
+    padding: 0.375rem 0.75rem;
+    background: var(--hire-primary-light);
+    color: var(--hire-primary);
+    border-radius: 999px;
+    font-size: 0.8125rem;
+    font-weight: 600;
+}
+
+/* ===== DASHBOARD CARDS LAYOUT ===== */
+.dashboard-cards {
+    display: grid;
+    gap: 1.5rem;
+}
+
+@media (min-width: 768px) {
+    .dashboard-cards { grid-template-columns: 2fr 1fr; }
+}
+
+.dashboard-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+}
+
+.dashboard-card-header {
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.dashboard-card-body { padding: 1rem 1.25rem; }
+
+/* ===== LOADING SKELETON ===== */
+.skeleton {
+    background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+    border-radius: 4px;
+}
+
+@keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+}
+
+/* ===== FILTER PANEL STYLES (SSOT PORTAL PATTERN - Jan 2026) ===== */
+/* 
+ * STACKING CONTEXT FIX:
+ * - Filter panel & backdrop are rendered INSIDE the page content initially
+ * - JavaScript moves them to #cc-overlay-root (outside .cc-main stacking context)
+ * - This ensures they appear above KPI cards, sidebar, and all content
+ * 
+ * Z-INDEX HIERARCHY (defined in base.html):
+ * - .cc-main: 0
+ * - sidebar: 1030  
+ * - filter backdrop: 1055
+ * - filter panel: 1056
+ * - modals: 1060
+ */
+
+.unified-date-filter {
+    position: relative;
+    display: inline-block;
+}
+
+.filter-trigger-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 18px;
+    border: 1px solid rgba(14, 165, 233, 0.3);
+    border-radius: 12px;
+    background: linear-gradient(135deg, rgba(14, 165, 233, 0.1), rgba(56, 189, 248, 0.05));
+    color: #0ea5e9;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+}
+
+.filter-trigger-btn:hover {
+    background: linear-gradient(135deg, rgba(14, 165, 233, 0.2), rgba(56, 189, 248, 0.1));
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(14, 165, 233, 0.15);
+}
+
+/* Filter Panel - ALWAYS uses position: fixed for portal pattern */
+.filter-panel {
+    position: fixed;
+    z-index: 1056;
+    width: 380px;
+    max-width: calc(100vw - 32px);
+    background: rgba(255, 255, 255, 0.98);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    border-radius: 16px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18), 0 4px 12px rgba(0, 0, 0, 0.08);
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-12px) scale(0.98);
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    pointer-events: none;
+}
+
+.filter-panel.open {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0) scale(1);
+    pointer-events: auto;
+}
+
+.filter-panel-content { padding: 20px; }
+
+.filter-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.filter-header h3 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 700;
+    color: #0f172a;
+}
+
+.filter-close {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border: none;
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.05);
+    color: #64748b;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.filter-close:hover {
+    background: rgba(0, 0, 0, 0.1);
+    color: #0f172a;
+}
+
+.filter-section { margin-bottom: 16px; }
+
+.filter-section-title {
+    margin: 0 0 10px 0;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #64748b;
+}
+
+.filter-mode-options {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+}
+
+.filter-mode-option {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 12px 10px;
+    border: 2px solid rgba(0, 0, 0, 0.08);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.6);
+    color: #64748b;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.filter-mode-option:hover {
+    background: rgba(14, 165, 233, 0.08);
+    border-color: rgba(14, 165, 233, 0.3);
+    color: #0ea5e9;
+}
+
+.filter-mode-option.active {
+    background: linear-gradient(135deg, #0ea5e9, #38bdf8);
+    border-color: #0ea5e9;
+    color: #fff;
+    box-shadow: 0 4px 12px rgba(14, 165, 233, 0.3);
+}
+
+.filter-conditional-form {
+    padding-top: 12px;
+    margin-top: 8px;
+}
+
+.filter-form-group {
+    margin-bottom: 12px;
+}
+
+.filter-form-group label {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #64748b;
+}
+
+.filter-select, .filter-input {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid rgba(0, 0, 0, 0.12);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.8);
+    font-size: 14px;
+    font-family: inherit;
+    transition: all 0.2s ease;
+}
+
+.filter-select:focus, .filter-input:focus {
+    outline: none;
+    border-color: #0ea5e9;
+    box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.15);
+}
+
+.filter-actions { display: flex; gap: 8px; }
+
+.btn-filter-apply {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 12px 16px;
+    border: none;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #0ea5e9, #38bdf8);
+    color: #fff;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(14, 165, 233, 0.25);
+    transition: all 0.2s ease;
+}
+
+.btn-filter-apply:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(14, 165, 233, 0.35);
+}
+
+.btn-filter-reset:hover {
+    background: rgba(0, 0, 0, 0.1);
+    color: #0f172a;
+}
+
+/* Filter Backdrop - ALWAYS position: fixed */
+.filter-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 1055;
+    background: rgba(0, 0, 0, 0.35);
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.25s ease, visibility 0.25s ease;
+    pointer-events: none;
+}
+
+.filter-backdrop.open {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+}
+
+/* === RESPONSIVE: Mobile bottom sheet, Desktop dropdown === */
+
+/* Desktop: position near trigger button */
+@media (min-width: 769px) {
+    .filter-panel {
+        /* Desktop: positioned by JS near trigger */
+        max-height: 80vh;
+        overflow-y: auto;
+    }
+}
+
+/* Mobile: bottom sheet */
+@media (max-width: 768px) {
+    .filter-panel {
+        top: auto;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        width: 100%;
+        max-width: 100%;
+        border-radius: 24px 24px 0 0;
+        transform: translateY(100%);
+    }
+    
+    .filter-panel.open {
+        transform: translateY(0);
+    }
+    
+    .filter-panel-content {
+        max-height: 85vh;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    
+    .vertical-hero {
+        flex-direction: column;
+        text-align: center;
+    }
+    
+    .hero-actions {
+        width: 100%;
+        justify-content: center;
+    }
+    
+    .hero-actions a, .hero-actions button {
+        flex: 1;
+        text-align: center;
+        min-width: 100px;
+    }
+    
+    .filter-section-bar {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .filter-chips {
+        margin-top: 8px;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="car-hire-dashboard" data-testid="car-hire-dashboard">
+    <!-- Premium Blue Hero Card (like Clothing/Welding) -->
+    <header class="vertical-hero animate-in" data-testid="car-hire-hero-card">
+        <div>
+            <p class="eyebrow">{{ business.name }}</p>
+            <h1>🚗 Car Hire Service</h1>
+            <p>Manage your fleet and track bookings</p>
+        </div>
+        <div class="hero-actions">
+            <a class="primary" href="/verticals/car_hire/vehicles/new/" data-testid="btn-add-vehicle-hero">
+                <i class="bi bi-plus-circle"></i> Add Vehicle
+            </a>
+            <a class="ghost" href="/verticals/car_hire/trips/new/" data-testid="btn-book-trip-hero">
+                <i class="bi bi-calendar-plus"></i> Book Trip
+            </a>
+        </div>
+    </header>
+    
+    <!-- Filter Section Bar -->
+    <section class="filter-section-bar animate-in animate-in-1" data-testid="car-hire-filter-section">
+        <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;flex:1;">
+            <!-- Filter Button (includes unified date filter + vehicle/driver) -->
+            <div class="unified-date-filter" data-date-filter data-car-hire-filter>
+                <button type="button" class="filter-trigger-btn" data-filter-trigger data-testid="car-hire-filter-button" style="position:relative;">
+                    <i class="bi bi-funnel"></i>
+                    <span>Filter</span>
+                    {% if filter_mode != 'mtd' or selected_vehicle or selected_agent %}
+                    <span class="filter-dot" data-testid="filter-active-dot"></span>
+                    {% endif %}
+                </button>
+                
+                <!-- Filter Panel (Desktop: dropdown, Mobile: bottom sheet) -->
+                <div class="filter-panel" data-filter-panel data-testid="dashboard-filter-overlay">
+                    <div class="filter-panel-content">
+                        <div class="filter-header">
+                            <h3>Filters</h3>
+                            <button type="button" class="filter-close" data-filter-close aria-label="Close">
+                                <i class="bi bi-x-lg"></i>
+                            </button>
+                        </div>
+                        
+                        <form method="get" id="carHireFilterForm" class="filter-body">
+                            <!-- Date Filter -->
+                            <div class="filter-section">
+                                <h4 class="filter-section-title">Period</h4>
+                                <div class="filter-mode-options">
+                                    <button type="submit" name="period" value="all" class="filter-mode-option {% if filter_mode == 'all' %}active{% endif %}" data-testid="filter-period-all">
+                                        <i class="bi bi-infinity"></i> All time
+                                    </button>
+                                    <button type="button" class="filter-mode-option {% if filter_mode == 'month' %}active{% endif %}" data-mode="month" data-mode-toggle data-testid="filter-period-month">
+                                        <i class="bi bi-calendar-month"></i> Month
+                                    </button>
+                                    <button type="submit" name="range" value="mtd" class="filter-mode-option {% if filter_mode == 'mtd' %}active{% endif %}" data-testid="filter-period-mtd">
+                                        <i class="bi bi-calendar-event"></i> MTD
+                                    </button>
+                                    <button type="submit" name="range" value="last7" class="filter-mode-option {% if filter_mode == 'last7' %}active{% endif %}" data-testid="filter-period-last7">
+                                        <i class="bi bi-calendar-week"></i> Last 7d
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <!-- Month Picker (shown when Month is selected) -->
+                            <div class="filter-conditional-form" data-form="month" style="display:{% if filter_mode == 'month' %}block{% else %}none{% endif %}">
+                                <div class="filter-form-group">
+                                    <label for="filterMonth">Select month</label>
+                                    <select id="filterMonth" name="month" class="filter-select" data-testid="filter-month-select">
+                                        <option value="">Choose...</option>
+                                        <option value="1" {% if month == 1 %}selected{% endif %}>January</option>
+                                        <option value="2" {% if month == 2 %}selected{% endif %}>February</option>
+                                        <option value="3" {% if month == 3 %}selected{% endif %}>March</option>
+                                        <option value="4" {% if month == 4 %}selected{% endif %}>April</option>
+                                        <option value="5" {% if month == 5 %}selected{% endif %}>May</option>
+                                        <option value="6" {% if month == 6 %}selected{% endif %}>June</option>
+                                        <option value="7" {% if month == 7 %}selected{% endif %}>July</option>
+                                        <option value="8" {% if month == 8 %}selected{% endif %}>August</option>
+                                        <option value="9" {% if month == 9 %}selected{% endif %}>September</option>
+                                        <option value="10" {% if month == 10 %}selected{% endif %}>October</option>
+                                        <option value="11" {% if month == 11 %}selected{% endif %}>November</option>
+                                        <option value="12" {% if month == 12 %}selected{% endif %}>December</option>
+                                    </select>
+                                </div>
+                                <div class="filter-form-group">
+                                    <label for="filterYear">Year</label>
+                                    <input type="number" id="filterYear" name="year" value="{{ year|default:'' }}" placeholder="Current year" min="2000" max="2100" class="filter-input" data-testid="filter-year-input">
+                                </div>
+                                <input type="hidden" name="period" value="month">
+                            </div>
+                            
+                            <!-- Vehicle Filter -->
+                            <div class="filter-section" style="margin-top:16px;padding-top:16px;border-top:1px solid rgba(0,0,0,0.06);">
+                                <h4 class="filter-section-title">Vehicle</h4>
+                                <div class="filter-form-group">
+                                    <select name="vehicle_id" class="filter-select" data-testid="filter-vehicle-select">
+                                        <option value="">All vehicles</option>
+                                        {% for vehicle in all_vehicles %}
+                                        <option value="{{ vehicle.id }}" {% if selected_vehicle.id == vehicle.id %}selected{% endif %}>
+                                            {{ vehicle.name }} ({{ vehicle.plate_number }})
+                                        </option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+                            
+                            <!-- Driver/Agent Filter -->
+                            <div class="filter-section" style="margin-top:16px;padding-top:16px;border-top:1px solid rgba(0,0,0,0.06);">
+                                <h4 class="filter-section-title">Driver/Agent</h4>
+                                <div class="filter-form-group">
+                                    <select name="agent_id" class="filter-select" data-testid="filter-agent-select">
+                                        <option value="">All agents</option>
+                                        {% for agent in all_agents %}
+                                        <option value="{{ agent.id }}" {% if selected_agent.id == agent.id %}selected{% endif %}>
+                                            {{ agent.get_full_name|default:agent.username }}
+                                        </option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+                            
+                            <!-- Apply Button -->
+                            <div class="filter-actions" style="margin-top:20px;">
+                                <button type="submit" class="btn-filter-apply" data-testid="filter-apply-btn">
+                                    <i class="bi bi-check-circle"></i> Apply Filters
+                                </button>
+                            </div>
+                            
+                            <!-- Reset -->
+                            <div class="filter-actions" style="margin-top:12px;">
+                                <a href="?" class="btn-filter-reset" style="text-decoration:none;display:flex;align-items:center;justify-content:center;gap:6px;flex:1;padding:12px 16px;background:rgba(0,0,0,0.05);border-radius:10px;color:#64748b;font-weight:600;font-size:14px;" data-testid="filter-reset-btn">
+                                    <i class="bi bi-arrow-counterclockwise"></i> Reset Filters
+                                </a>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+                
+                <!-- Backdrop -->
+                <div class="filter-backdrop" data-filter-backdrop></div>
+            </div>
+            
+            <div class="filter-showing">
+                <strong>Showing:</strong> {{ range_label|default:"Month to Date" }}
+                {% if selected_vehicle %} · {{ selected_vehicle.name }}{% endif %}
+                {% if selected_agent %} · {{ selected_agent.get_full_name|default:selected_agent.username }}{% endif %}
+            </div>
+        </div>
+        
+        <!-- Filter Chips (shown when filters are active) -->
+        {% if filter_mode != 'mtd' or selected_vehicle or selected_agent %}
+        <div class="filter-chips">
+            {% if filter_mode != 'mtd' %}
+            <span class="filter-chip">
+                <i class="bi bi-calendar3"></i> {{ range_label }}
+            </span>
+            {% endif %}
+            {% if selected_vehicle %}
+            <span class="filter-chip">
+                <i class="bi bi-truck"></i> {{ selected_vehicle.name }}
+                <a href="?{% if filter_mode == 'all' %}period=all{% elif filter_mode == 'month' %}period=month&month={{ month }}&year={{ year }}{% else %}range={{ filter_mode }}{% endif %}{% if selected_agent %}&agent_id={{ selected_agent.id }}{% endif %}" class="remove" title="Remove"><i class="bi bi-x"></i></a>
+            </span>
+            {% endif %}
+            {% if selected_agent %}
+            <span class="filter-chip">
+                <i class="bi bi-person"></i> {{ selected_agent.get_full_name|default:selected_agent.username }}
+                <a href="?{% if filter_mode == 'all' %}period=all{% elif filter_mode == 'month' %}period=month&month={{ month }}&year={{ year }}{% else %}range={{ filter_mode }}{% endif %}{% if selected_vehicle %}&vehicle_id={{ selected_vehicle.id }}{% endif %}" class="remove" title="Remove"><i class="bi bi-x"></i></a>
+            </span>
+            {% endif %}
+            <a href="?" class="filter-chip" style="background:rgba(239,68,68,0.1);color:#dc2626;" data-testid="clear-all-filters">
+                <i class="bi bi-x-circle"></i> Clear all
+            </a>
+        </div>
+        {% endif %}
+    </section>
+    
+    <!-- Fleet Health Bar -->
+    {% if total_vehicles > 0 %}
+    <div class="fleet-health-bar animate-in animate-in-1" data-testid="fleet-health-bar">
+        <div class="fleet-health-label">
+            <i class="fas fa-heartbeat"></i>
+            Fleet Health
+        </div>
+        <div class="fleet-health-progress">
+            <div class="fleet-health-fill {% if fleet_health_score < 50 %}danger{% elif fleet_health_score < 80 %}warning{% endif %}" 
+                 style="width: {{ fleet_health_score }}%"></div>
+        </div>
+        <div class="fleet-health-score">{{ fleet_health_score }}%</div>
+        {% if availability_streak and availability_streak > 1 %}
+        <div class="availability-streak" data-testid="availability-streak">
+            <i class="fas fa-fire"></i>
+            {{ availability_streak }}-day streak!
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+    
+    <!-- KPI Cards -->
+    <div class="kpi-grid">
+        <div class="kpi-card animate-in animate-in-1" data-testid="kpi-active-bookings">
+            <div class="kpi-card-header">
+                <span class="kpi-label">Active Bookings</span>
+                <div class="kpi-icon bookings">
+                    <i class="fas fa-clipboard-list"></i>
+                </div>
+            </div>
+            <div class="kpi-value">{{ active_bookings_count|default:0 }}</div>
+            {% if bookings_trend != 0 %}
+            <div class="kpi-trend {% if bookings_trend > 0 %}positive{% elif bookings_trend < 0 %}negative{% else %}neutral{% endif %}">
+                <i class="fas fa-arrow-{% if bookings_trend > 0 %}up{% elif bookings_trend < 0 %}down{% else %}right{% endif %}"></i>
+                {% if bookings_trend > 0 %}+{% endif %}{{ bookings_trend }} vs last week
+            </div>
+            {% else %}
+            <div class="kpi-trend neutral">
+                <i class="fas fa-route"></i> Trips in progress
+            </div>
+            {% endif %}
+        </div>
+        
+        <div class="kpi-card animate-in animate-in-2" data-testid="kpi-available">
+            <div class="kpi-card-header">
+                <span class="kpi-label">Vehicles Available</span>
+                <div class="kpi-icon available">
+                    <i class="fas fa-check-circle"></i>
+                </div>
+            </div>
+            <div class="kpi-value">{{ available_count|default:0 }} / {{ total_vehicles|default:0 }}</div>
+            <div class="kpi-trend {% if available_count == total_vehicles %}positive{% elif on_trip_count > 0 %}neutral{% else %}negative{% endif %}">
+                <i class="fas fa-car"></i>
+                {% if available_count == total_vehicles %}All ready{% else %}{{ on_trip_count }} on trip{% endif %}
+            </div>
+        </div>
+        
+        <div class="kpi-card animate-in animate-in-3" data-testid="kpi-utilization">
+            <div class="kpi-card-header">
+                <span class="kpi-label">Utilization</span>
+                <div class="kpi-icon utilization">
+                    <i class="fas fa-chart-pie"></i>
+                </div>
+            </div>
+            <div class="kpi-value">{{ utilization_rate|default:0 }}%</div>
+            <div class="kpi-trend {% if utilization_rate >= 50 %}positive{% elif utilization_rate > 0 %}neutral{% else %}negative{% endif %}">
+                <i class="fas fa-tachometer-alt"></i>
+                Fleet efficiency
+            </div>
+        </div>
+        
+        <div class="kpi-card animate-in animate-in-4" data-testid="kpi-revenue">
+            <div class="kpi-card-header">
+                <span class="kpi-label">Revenue ({{ range_label_short|default:"MTD" }})</span>
+                <div class="kpi-icon revenue">
+                    <i class="fas fa-wallet"></i>
+                </div>
+            </div>
+            <div class="kpi-value">MK {{ total_revenue_filtered|default:revenue_filtered|intcomma }}</div>
+            {% if revenue_today > 0 and filter_mode == 'mtd' %}
+            <div class="kpi-trend positive">
+                <i class="fas fa-coins"></i> +MK {{ revenue_today|intcomma }} today
+            </div>
+            {% else %}
+            <div class="kpi-trend neutral">
+                <i class="fas fa-calendar"></i> {{ range_label|default:"This month" }}
+            </div>
+            {% endif %}
+        </div>
+        
+        <div class="kpi-card animate-in animate-in-4" data-testid="kpi-costs">
+            <div class="kpi-card-header">
+                <span class="kpi-label">Costs ({{ range_label_short|default:"MTD" }})</span>
+                <div class="kpi-icon costs">
+                    <i class="fas fa-receipt"></i>
+                </div>
+            </div>
+            <div class="kpi-value" style="color: var(--hire-red);">MK {{ costs_filtered|default:0|intcomma }}</div>
+            <div class="kpi-trend neutral">
+                <i class="fas fa-chart-line"></i> 
+                <a href="{% url 'verticals:car_hire_costs' %}" style="color: inherit; text-decoration: none;">View costs</a>
+            </div>
+        </div>
+        
+        <div class="kpi-card animate-in animate-in-4" data-testid="kpi-profit">
+            <div class="kpi-card-header">
+                <span class="kpi-label">Net Profit ({{ range_label_short|default:"MTD" }})</span>
+                <div class="kpi-icon profit">
+                    <i class="fas fa-chart-pie"></i>
+                </div>
+            </div>
+            <div class="kpi-value" style="color: {% if net_profit_filtered >= 0 %}var(--hire-green){% else %}var(--hire-red){% endif %};">
+                MK {{ net_profit_filtered|default:0|intcomma }}
+            </div>
+            <div class="kpi-trend {% if net_profit_filtered >= 0 %}positive{% else %}negative{% endif %}">
+                <i class="fas fa-{% if net_profit_filtered >= 0 %}arrow-up{% else %}arrow-down{% endif %}"></i>
+                {% if net_profit_filtered >= 0 %}Profit{% else %}Loss{% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <!-- Charts Section -->
+    <div class="charts-grid animate-in animate-in-2">
+        <!-- Bookings & Revenue Trend -->
+        <div class="chart-card">
+            <div class="chart-card-header">
+                <h3 class="chart-title">
+                    <i class="fas fa-chart-line"></i>
+                    Bookings & Revenue (Last 14 Days)
+                </h3>
+            </div>
+            <div class="chart-card-body">
+                <div class="chart-container" data-testid="bookings-chart">
+                    <canvas id="bookingsRevenueChart"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Fleet Status Donut -->
+        <div class="chart-card">
+            <div class="chart-card-header">
+                <h3 class="chart-title">
+                    <i class="fas fa-car"></i>
+                    Fleet Status
+                </h3>
+            </div>
+            <div class="chart-card-body">
+                {% if total_vehicles > 0 %}
+                <div class="chart-container" data-testid="fleet-status-chart">
+                    <canvas id="fleetStatusChart"></canvas>
+                </div>
+                {% else %}
+                <div class="chart-empty">
+                    <i class="fas fa-car"></i>
+                    <p>Add vehicles to see fleet status</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <!-- Finance Snapshot Section -->
+    <div class="charts-grid animate-in animate-in-3" style="margin-top: 1.5rem;" data-testid="finance-snapshot">
+        <!-- Revenue vs Costs Chart -->
+        <div class="chart-card">
+            <div class="chart-card-header">
+                <h3 class="chart-title">
+                    <i class="fas fa-balance-scale"></i>
+                    Revenue vs Costs (Last 14 Days)
+                </h3>
+                <div style="display: flex; gap: 0.75rem;">
+                    <a href="{% url 'verticals:car_hire_revenue' %}" style="font-size: 0.8125rem; color: var(--hire-green); text-decoration: none; font-weight: 600;">
+                        <i class="fas fa-plus"></i> Revenue
+                    </a>
+                    <a href="{% url 'verticals:car_hire_costs' %}" style="font-size: 0.8125rem; color: var(--hire-red); text-decoration: none; font-weight: 600;">
+                        <i class="fas fa-plus"></i> Costs
+                    </a>
+                </div>
+            </div>
+            <div class="chart-card-body">
+                <div class="chart-container" data-testid="finance-chart">
+                    <canvas id="financeChart"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Top Cost Categories -->
+        <div class="chart-card">
+            <div class="chart-card-header">
+                <h3 class="chart-title">
+                    <i class="fas fa-tags"></i>
+                    Top Cost Categories
+                </h3>
+                <a href="{% url 'verticals:car_hire_costs_add' %}" style="font-size: 0.8125rem; color: var(--hire-primary); text-decoration: none; font-weight: 600;">
+                    <i class="fas fa-plus"></i> Add Cost
+                </a>
+            </div>
+            <div class="chart-card-body">
+                {% if cost_categories %}
+                <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+                    {% for cat in cost_categories %}
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; background: var(--border); border-radius: 10px;">
+                        <div style="display: flex; align-items: center; gap: 0.625rem;">
+                            <span style="font-size: 1.25rem;">
+                                {% if cat.category == 'fuel' %}⛽{% elif cat.category == 'maintenance' %}🔧{% elif cat.category == 'driver' %}👤{% elif cat.category == 'insurance' %}🛡️{% elif cat.category == 'cleaning' %}🧼{% elif cat.category == 'taxes' %}📋{% elif cat.category == 'parking' %}🅿️{% elif cat.category == 'rent' %}🏢{% else %}📦{% endif %}
+                            </span>
+                            <div>
+                                <div style="font-weight: 700; font-size: 0.9375rem;">{{ cat.category|title }}</div>
+                                <div style="font-size: 0.75rem; color: var(--muted);">{{ cat.count }} {{ cat.count|pluralize:"entry,entries" }}</div>
+                            </div>
+                        </div>
+                        <div style="font-weight: 800; color: var(--hire-red);">MK {{ cat.total|intcomma }}</div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="chart-empty">
+                    <i class="fas fa-receipt"></i>
+                    <p>No costs recorded in this period</p>
+                    <a href="{% url 'verticals:car_hire_costs_add' %}" class="btn-action btn-primary" style="margin-top: 0.75rem; display: inline-flex; padding: 0.5rem 1rem; font-size: 0.875rem;">
+                        <i class="fas fa-plus"></i> Add Cost
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <!-- Fleet Overview Section -->
+    <div class="section-header">
+        <h2 class="section-title">
+            <i class="fas fa-car"></i>
+            Fleet Overview
+        </h2>
+        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+            <a href="/verticals/car_hire/vehicles/new/" class="btn-action btn-primary" data-testid="btn-add-vehicle">
+                <i class="fas fa-plus"></i> Add Vehicle
+            </a>
+            <a href="/verticals/car_hire/vehicles/" class="btn-action btn-outline">
+                <i class="fas fa-list"></i> View All
+            </a>
+        </div>
+    </div>
+    
+    {% if vehicles %}
+    <div class="fleet-grid">
+        {% for vehicle in vehicles %}
+        <div class="vehicle-card animate-in" style="animation-delay: {{ forloop.counter0|add:3 }}00ms" data-testid="vehicle-card">
+            <div class="vehicle-card-header">
+                <div>
+                    <h3 class="vehicle-card-title">{{ vehicle.display_name }}</h3>
+                    <span class="vehicle-card-plate">{{ vehicle.plate_number }}</span>
+                </div>
+                <span class="status-badge {% if vehicle.status == 'available' %}available{% elif vehicle.status == 'on_trip' %}on-trip{% else %}maintenance{% endif %}">
+                    {% if vehicle.status == 'available' %}
+                    <i class="fas fa-check-circle"></i> Available
+                    {% elif vehicle.status == 'on_trip' %}
+                    <i class="fas fa-route"></i> On Trip
+                    {% else %}
+                    <i class="fas fa-tools"></i> Maintenance
+                    {% endif %}
+                </span>
+            </div>
+            <div class="vehicle-card-body">
+                <div class="vehicle-info-row">
+                    <span class="vehicle-info-label">Daily Rate</span>
+                    <span class="vehicle-info-value">MK {{ vehicle.daily_rate|intcomma }}</span>
+                </div>
+                <div class="vehicle-info-row">
+                    <span class="vehicle-info-label">Odometer</span>
+                    <span class="vehicle-info-value">{{ vehicle.current_odometer|intcomma }} km</span>
+                </div>
+                {% if vehicle.next_maintenance_km %}
+                <div class="vehicle-info-row">
+                    <span class="vehicle-info-label">Next Service</span>
+                    <span class="vehicle-info-value">
+                        {% if vehicle.is_maintenance_due %}
+                        <span style="color: var(--hire-red); font-weight: 700;">⚠️ OVERDUE</span>
+                        {% else %}
+                        {{ vehicle.km_until_maintenance|intcomma }} km
+                        {% endif %}
+                    </span>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state" data-testid="empty-vehicles">
+        <div class="empty-state-icon">🚗</div>
+        <h3 class="empty-state-title">No vehicles yet</h3>
+        <p class="empty-state-text">Add your first vehicle to start managing your fleet. Start with popular Malawian fleet vehicles:</p>
+        <div class="empty-state-suggestions">
+            <span class="suggestion-chip">🚙 Toyota Fortuner</span>
+            <span class="suggestion-chip">🛻 Ford Ranger</span>
+            <span class="suggestion-chip">🚐 Toyota Hiace</span>
+            <span class="suggestion-chip">🚚 Mazda Bongo</span>
+        </div>
+        <a href="/verticals/car_hire/vehicles/new/" class="btn-action btn-primary" style="margin-top: 1.5rem;">
+            <i class="fas fa-plus"></i> Add Vehicle
+        </a>
+    </div>
+    {% endif %}
+    
+    <!-- ===== SMART RECOMMENDATIONS ===== -->
+    <div style="background:linear-gradient(135deg,#0f172a,#1e3a5f);border-radius:20px;padding:1.5rem;margin-top:1.5rem;color:#fff;position:relative;overflow:hidden;" data-testid="car-hire-recommendations">
+      <div style="position:absolute;top:-30%;right:-5%;width:250px;height:250px;background:radial-gradient(circle,rgba(14,165,233,.12) 0%,transparent 70%);pointer-events:none;"></div>
+      <div style="position:relative;z-index:1;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:8px;">
+          <h3 style="margin:0;font-size:1.1rem;font-weight:800;" data-testid="recommendations-title">💡 Smart Fleet Recommendations</h3>
+          <span style="background:rgba(14,165,233,.2);border:1px solid rgba(14,165,233,.3);color:#38bdf8;border-radius:999px;padding:3px 12px;font-size:.72rem;font-weight:700;">AI Assist</span>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px;" data-testid="recommendations-grid">
+          {% if total_vehicles == 0 %}
+          <div style="background:rgba(255,255,255,.07);border-radius:12px;padding:14px;border-left:3px solid #6366f1;">
+            <div style="font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:rgba(255,255,255,.5);margin-bottom:6px;">Get Started</div>
+            <div style="font-weight:700;margin-bottom:4px;">Add your first vehicle</div>
+            <div style="font-size:.82rem;color:rgba(255,255,255,.6);">Start by registering your fleet vehicles to unlock booking management and revenue tracking.</div>
+          </div>
+          {% else %}
+          {% if utilization_rate < 50 %}
+          <div style="background:rgba(255,255,255,.07);border-radius:12px;padding:14px;border-left:3px solid #f59e0b;">
+            <div style="font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:rgba(255,255,255,.5);margin-bottom:6px;">Low Utilization</div>
+            <div style="font-weight:700;margin-bottom:4px;">{{ utilization_rate }}% fleet utilization</div>
+            <div style="font-size:.82rem;color:rgba(255,255,255,.6);">Consider promotional pricing or partnerships to increase bookings.</div>
+          </div>
+          {% endif %}
+          {% if overdue_count > 0 %}
+          <div style="background:rgba(239,68,68,.1);border-radius:12px;padding:14px;border-left:3px solid #ef4444;">
+            <div style="font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:rgba(255,255,255,.5);margin-bottom:6px;">Urgent</div>
+            <div style="font-weight:700;margin-bottom:4px;">{{ overdue_count }} maintenance overdue</div>
+            <div style="font-size:.82rem;color:rgba(255,255,255,.6);">Schedule service now to prevent breakdowns and protect your fleet.</div>
+          </div>
+          {% endif %}
+          {% if available_count == total_vehicles %}
+          <div style="background:rgba(16,185,129,.1);border-radius:12px;padding:14px;border-left:3px solid #10b981;">
+            <div style="font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:rgba(255,255,255,.5);margin-bottom:6px;">Opportunity</div>
+            <div style="font-weight:700;margin-bottom:4px;">All {{ total_vehicles }} vehicles available</div>
+            <div style="font-size:.82rem;color:rgba(255,255,255,.6);">Your full fleet is ready. Consider reaching out to customers for weekend bookings.</div>
+          </div>
+          {% endif %}
+          <div style="background:rgba(255,255,255,.07);border-radius:12px;padding:14px;border-left:3px solid #6366f1;">
+            <div style="font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:rgba(255,255,255,.5);margin-bottom:6px;">Revenue Tip</div>
+            <div style="font-weight:700;margin-bottom:4px;">Track all income sources</div>
+            <div style="font-size:.82rem;color:rgba(255,255,255,.6);">Add fuel costs, driver payments and insurance to get accurate profit reports.</div>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Dashboard Cards -->
+    <div class="dashboard-cards" style="margin-top: 1.5rem;">
+        <!-- Upcoming Trips -->
+        <div class="dashboard-card">
+            <div class="dashboard-card-header">
+                <h2 class="section-title">
+                    <i class="fas fa-calendar-check"></i>
+                    Upcoming Trips
+                </h2>
+                <a href="/verticals/car_hire/trips/new/" class="btn-action btn-primary" data-testid="btn-add-trip">
+                    <i class="fas fa-plus"></i> Book
+                </a>
+            </div>
+            <div class="dashboard-card-body" style="padding: 0;">
+                {% if upcoming_trips %}
+                <div class="trips-timeline">
+                    {% for trip in upcoming_trips %}
+                    <a href="/verticals/car_hire/trips/{{ trip.id }}/" class="trip-item {% if trip.status == 'active' %}active{% endif %}" data-testid="trip-item">
+                        <div class="trip-timeline-marker">
+                            {% if trip.status == 'active' %}
+                            <i class="fas fa-play"></i>
+                            {% else %}
+                            <i class="fas fa-clock"></i>
+                            {% endif %}
+                        </div>
+                        <div class="trip-info">
+                            <div class="trip-customer">{{ trip.customer_name }}</div>
+                            <div class="trip-meta">
+                                <span><i class="fas fa-car"></i> {{ trip.vehicle.name }}</span>
+                                <span><i class="fas fa-map-marker-alt"></i> {{ trip.destination|truncatechars:25 }}</span>
+                                <span><i class="fas fa-clock"></i> {{ trip.start_datetime|date:"M j, H:i" }}</span>
+                            </div>
+                        </div>
+                        <span class="status-badge {% if trip.status == 'upcoming' %}upcoming{% elif trip.status == 'active' %}active{% endif %}">
+                            {{ trip.get_status_display }}
+                        </span>
+                    </a>
+                    {% endfor %}
+                </div>
+                <div style="padding: 1rem; text-align: center; border-top: 1px solid var(--border);">
+                    <a href="/verticals/car_hire/trips/" class="btn-action btn-outline">
+                        <i class="fas fa-list"></i> View All Trips
+                    </a>
+                </div>
+                {% else %}
+                <div class="empty-state" style="padding: 2rem; border: none;">
+                    <div class="empty-state-icon" style="font-size: 2.5rem;">📅</div>
+                    <h3 class="empty-state-title">No upcoming trips</h3>
+                    <p class="empty-state-text" style="margin-bottom: 1rem;">Create a new booking to get started.</p>
+                    <a href="/verticals/car_hire/trips/new/" class="btn-action btn-primary">
+                        <i class="fas fa-plus"></i> Book Trip
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- Maintenance Alerts -->
+        <div class="dashboard-card">
+            <div class="dashboard-card-header">
+                <h2 class="section-title">
+                    <i class="fas fa-tools"></i>
+                    Maintenance
+                    {% if overdue_count > 0 %}
+                    <span class="status-badge" style="background: var(--hire-red-light); color: var(--hire-red); margin-left: 0.5rem;">
+                        {{ overdue_count }} overdue
+                    </span>
+                    {% endif %}
+                </h2>
+            </div>
+            <div class="dashboard-card-body">
+                {% if maintenance_due %}
+                <div class="maintenance-alerts">
+                    {% for item in maintenance_due %}
+                    <div class="maintenance-alert {% if item.overdue %}overdue{% else %}due-soon{% endif %}">
+                        <div class="maintenance-icon">
+                            {% if item.overdue %}
+                            <i class="fas fa-exclamation-triangle"></i>
+                            {% else %}
+                            <i class="fas fa-clock"></i>
+                            {% endif %}
+                        </div>
+                        <div class="maintenance-text">
+                            <div class="maintenance-vehicle">{{ item.vehicle.name }}</div>
+                            <div class="maintenance-details">
+                                {% if item.overdue %}
+                                <span style="color: var(--hire-red); font-weight: 600;">OVERDUE by {{ item.km_over|intcomma }} km</span>
+                                {% else %}
+                                Due in {{ item.km_until|intcomma }} km
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                <div style="margin-top: 1rem; text-align: center;">
+                    <a href="/verticals/car_hire/maintenance/new/" class="btn-action btn-primary">
+                        <i class="fas fa-wrench"></i> Schedule Service
+                    </a>
+                </div>
+                {% else %}
+                <div style="padding: 2rem; text-align: center; color: var(--muted);">
+                    <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">✅</div>
+                    <p style="font-weight: 600; color: var(--hire-green);">All vehicles in good condition!</p>
+                    <p style="font-size: 0.875rem;">No maintenance due</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- Chart.js CDN -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // BUG FIX: Wrap in try-catch to prevent silent failures
+    try {
+        // Parse data from Django template
+        const chartLabels = {{ chart_labels|safe }};
+        const chartBookings = {{ chart_bookings|safe }};
+        const chartRevenue = {{ chart_revenue|safe }};
+        const chartCosts = {{ chart_costs|safe }};
+        const fleetStatusData = {{ fleet_status_data|safe }};
+        const fleetStatusLabels = {{ fleet_status_labels|safe }};
+        
+        // BUG FIX: Verify Chart.js is loaded
+        if (typeof Chart === 'undefined') {
+            console.error('Chart.js failed to load');
+            return;
+        }
+        
+        // BUG FIX: Validate data arrays
+        if (!Array.isArray(chartLabels) || chartLabels.length === 0) {
+            console.warn('Chart data is empty or invalid');
+        }
+        
+        // Common chart options
+        const commonOptions = {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false }
+            }
+        };
+        
+        // Bookings & Revenue Chart (Dual Axis)
+        const bookingsCtx = document.getElementById('bookingsRevenueChart');
+        if (bookingsCtx) {
+            // BUG FIX: Check if we have valid data arrays
+            const hasBookingsData = Array.isArray(chartLabels) && chartLabels.length > 0;
+            
+            if (!hasBookingsData) {
+                // Show empty state
+                const parent = bookingsCtx.parentElement;
+                if (parent) {
+                    parent.innerHTML = '<div class="chart-empty"><i class="fas fa-chart-line"></i><p>No bookings data in this period yet</p><a href="/verticals/car_hire/trips/new/" class="btn-action btn-primary" style="margin-top: 0.75rem; display: inline-flex; padding: 0.5rem 1rem; font-size: 0.875rem;"><i class="fas fa-plus"></i> Book Trip</a></div>';
+                }
+            } else {
+        new Chart(bookingsCtx, {
+            type: 'bar',
+            data: {
+                labels: chartLabels,
+                datasets: [
+                    {
+                        type: 'line',
+                        label: 'Revenue',
+                        data: chartRevenue,
+                        borderColor: '#059669',
+                        backgroundColor: 'rgba(5, 150, 105, 0.1)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.3,
+                        yAxisID: 'y1',
+                        order: 0
+                    },
+                    {
+                        type: 'bar',
+                        label: 'Bookings',
+                        data: chartBookings,
+                        backgroundColor: 'rgba(37, 99, 235, 0.7)',
+                        borderColor: '#2563eb',
+                        borderWidth: 1,
+                        borderRadius: 4,
+                        yAxisID: 'y',
+                        order: 1
+                    }
+                ]
+            },
+            options: {
+                ...commonOptions,
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top',
+                        labels: { usePointStyle: true, padding: 15 }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                if (context.dataset.label === 'Revenue') {
+                                    return 'Revenue: MK ' + context.parsed.y.toLocaleString();
+                                }
+                                return 'Bookings: ' + context.parsed.y;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        position: 'left',
+                        title: { display: true, text: 'Bookings' },
+                        ticks: { stepSize: 1 }
+                    },
+                    y1: {
+                        beginAtZero: true,
+                        position: 'right',
+                        title: { display: true, text: 'Revenue (MK)' },
+                        grid: { drawOnChartArea: false },
+                        ticks: {
+                            callback: function(value) {
+                                return 'MK ' + (value / 1000).toFixed(0) + 'K';
+                            }
+                        }
+                    },
+                    x: {
+                        ticks: {
+                            maxRotation: 45,
+                            minRotation: 0,
+                            font: { size: 10 }
+                        }
+                    }
+                }
+            }
+        });
+            }
+        }
+    
+    // Finance Chart (Revenue vs Costs)
+    const financeCtx = document.getElementById('financeChart');
+    if (financeCtx) {
+        new Chart(financeCtx, {
+            type: 'line',
+            data: {
+                labels: chartLabels,
+                datasets: [
+                    {
+                        label: 'Revenue',
+                        data: chartRevenue,
+                        borderColor: '#16a34a',
+                        backgroundColor: 'rgba(22, 163, 74, 0.1)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.3,
+                    },
+                    {
+                        label: 'Costs',
+                        data: chartCosts,
+                        borderColor: '#dc2626',
+                        backgroundColor: 'rgba(220, 38, 38, 0.1)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.3,
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top',
+                        labels: { usePointStyle: true, padding: 15 }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return context.dataset.label + ': MK ' + context.parsed.y.toLocaleString();
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: function(value) {
+                                return 'MK ' + (value / 1000).toFixed(0) + 'K';
+                            }
+                        }
+                    },
+                    x: {
+                        ticks: {
+                            maxRotation: 45,
+                            minRotation: 0,
+                            font: { size: 10 }
+                        }
+                    }
+                }
+            }
+        });
+    }
+    
+    // Fleet Status Donut Chart
+    const fleetCtx = document.getElementById('fleetStatusChart');
+    // BUG FIX: Render chart even with zero values, but check for valid data
+    if (fleetCtx) {
+        const hasFleetData = Array.isArray(fleetStatusData) && fleetStatusData.some(v => v > 0);
+        
+        if (hasFleetData) {
+            new Chart(fleetCtx, {
+            type: 'doughnut',
+            data: {
+                labels: fleetStatusLabels,
+                datasets: [{
+                    data: fleetStatusData,
+                    backgroundColor: [
+                        '#16a34a', // Available - green
+                        '#2563eb', // On Trip - blue
+                        '#d97706', // Maintenance - amber
+                    ],
+                    borderWidth: 3,
+                    borderColor: '#ffffff',
+                    hoverOffset: 8
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: '65%',
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'bottom',
+                        labels: { usePointStyle: true, padding: 12 }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                const pct = ((context.parsed / total) * 100).toFixed(0);
+                                return context.label + ': ' + context.parsed + ' (' + pct + '%)';
+                            }
+                        }
+                    }
+                }
+            }
+        });
+        } else {
+            // BUG FIX: Show empty state message when no fleet data
+            const parent = fleetCtx.parentElement;
+            if (parent) {
+                parent.innerHTML = '<div class="chart-empty"><i class="fas fa-car"></i><p>No fleet status data available</p><a href="/verticals/car_hire/vehicles/new/" class="btn-action btn-primary" style="margin-top: 0.75rem; display: inline-flex; padding: 0.5rem 1rem; font-size: 0.875rem;"><i class="fas fa-plus"></i> Add Vehicle</a></div>';
+            }
+        }
+    }
+    
+    // ===== FILTER PANEL FUNCTIONALITY (PORTAL PATTERN - Jan 2026) =====
+    // 
+    // CRITICAL FIX: Move filter panel & backdrop to #cc-overlay-root when opening
+    // This escapes the .cc-main stacking context (z-index: 0) and ensures
+    // the filter overlay appears above KPI cards, sidebar, and all page content.
+    //
+    const filterContainer = document.querySelector('[data-car-hire-filter]');
+    if (filterContainer) {
+        const trigger = filterContainer.querySelector('[data-filter-trigger]');
+        const panel = filterContainer.querySelector('[data-filter-panel]');
+        const backdrop = filterContainer.querySelector('[data-filter-backdrop]');
+        const closeBtn = filterContainer.querySelector('[data-filter-close]');
+        const modeToggles = filterContainer.querySelectorAll('[data-mode-toggle]');
+        const conditionalForms = filterContainer.querySelectorAll('[data-form]');
+        
+        // Get or create the overlay root (defined in base.html)
+        let overlayRoot = document.getElementById('cc-overlay-root');
+        if (!overlayRoot) {
+            // Fallback: create it if not present (shouldn't happen with base.html)
+            overlayRoot = document.createElement('div');
+            overlayRoot.id = 'cc-overlay-root';
+            overlayRoot.setAttribute('aria-hidden', 'true');
+            document.body.appendChild(overlayRoot);
+        }
+        
+        // Track original parent for cleanup (optional)
+        const originalParent = panel ? panel.parentElement : null;
+        let isOpen = false;
+        
+        function positionPanel() {
+            if (!panel || !trigger) return;
+            
+            // Mobile: bottom sheet, no positioning needed (CSS handles it)
+            if (window.innerWidth <= 768) {
+                panel.style.top = '';
+                panel.style.left = '';
+                panel.style.right = '';
+                return;
+            }
+            
+            // Desktop: position near trigger button
+            const rect = trigger.getBoundingClientRect();
+            const panelWidth = 380;
+            const viewportWidth = window.innerWidth;
+            const viewportHeight = window.innerHeight;
+            
+            // Calculate left position (align to trigger, but don't overflow viewport)
+            let left = rect.left;
+            if (left + panelWidth > viewportWidth - 16) {
+                left = viewportWidth - panelWidth - 16;
+            }
+            if (left < 16) left = 16;
+            
+            // Calculate top position (below trigger)
+            let top = rect.bottom + 8;
+            
+            // If panel would overflow bottom, position above trigger
+            const panelHeight = panel.offsetHeight || 400;
+            if (top + panelHeight > viewportHeight - 16) {
+                top = Math.max(16, rect.top - panelHeight - 8);
+            }
+            
+            panel.style.top = top + 'px';
+            panel.style.left = left + 'px';
+            panel.style.right = 'auto';
+        }
+        
+        function openFilter() {
+            if (isOpen) return;
+            isOpen = true;
+            
+            // Move elements to overlay root (escapes stacking context)
+            if (backdrop && backdrop.parentElement !== overlayRoot) {
+                overlayRoot.appendChild(backdrop);
+            }
+            if (panel && panel.parentElement !== overlayRoot) {
+                overlayRoot.appendChild(panel);
+            }
+            
+            // Update ARIA
+            overlayRoot.setAttribute('aria-hidden', 'false');
+            
+            // Position panel (desktop only)
+            positionPanel();
+            
+            // Show overlay
+            requestAnimationFrame(() => {
+                if (backdrop) backdrop.classList.add('open');
+                if (panel) panel.classList.add('open');
+            });
+            
+            // Lock scroll
+            document.body.style.overflow = 'hidden';
+            
+            // Focus trap (optional accessibility)
+            if (closeBtn) closeBtn.focus();
+        }
+        
+        function closeFilter() {
+            if (!isOpen) return;
+            isOpen = false;
+            
+            // Hide overlay
+            if (panel) panel.classList.remove('open');
+            if (backdrop) backdrop.classList.remove('open');
+            
+            // Update ARIA
+            overlayRoot.setAttribute('aria-hidden', 'true');
+            
+            // Restore scroll
+            document.body.style.overflow = '';
+            
+            // Return focus to trigger
+            if (trigger) trigger.focus();
+            
+            // Optional: Move elements back to original parent after transition
+            // (Keeps DOM clean, but not strictly necessary)
+            setTimeout(() => {
+                if (!isOpen && originalParent) {
+                    if (panel && panel.parentElement === overlayRoot) {
+                        originalParent.appendChild(panel);
+                    }
+                    if (backdrop && backdrop.parentElement === overlayRoot) {
+                        originalParent.appendChild(backdrop);
+                    }
+                }
+            }, 300); // Match CSS transition duration
+        }
+        
+        function toggleForm(mode) {
+            conditionalForms.forEach(form => {
+                form.style.display = form.getAttribute('data-form') === mode ? 'block' : 'none';
+            });
+        }
+        
+        // Event listeners
+        if (trigger) trigger.addEventListener('click', openFilter);
+        if (closeBtn) closeBtn.addEventListener('click', closeFilter);
+        if (backdrop) backdrop.addEventListener('click', closeFilter);
+        
+        // Mode toggle buttons
+        modeToggles.forEach(toggle => {
+            toggle.addEventListener('click', function(e) {
+                e.preventDefault();
+                const mode = this.getAttribute('data-mode');
+                toggleForm(mode);
+                
+                filterContainer.querySelectorAll('.filter-mode-option').forEach(opt => {
+                    opt.classList.remove('active');
+                });
+                this.classList.add('active');
+            });
+        });
+        
+        // Close on Escape
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape' && isOpen) {
+                closeFilter();
+            }
+        });
+        
+        // Reposition on resize (desktop)
+        window.addEventListener('resize', function() {
+            if (isOpen) positionPanel();
+        }, { passive: true });
+        
+        // Reposition on scroll (desktop)
+        window.addEventListener('scroll', function() {
+            if (isOpen && window.innerWidth > 768) {
+                positionPanel();
+            }
+        }, { passive: true });
+    }
+    
+    // BUG FIX: Close try-catch block for chart initialization
+    } catch (error) {
+        console.error('Error initializing charts:', error);
+        // Show user-friendly message in console
+        console.log('Charts failed to render. Please check browser console for details.');
+    }
+});
+</script>
+{% endblock %}

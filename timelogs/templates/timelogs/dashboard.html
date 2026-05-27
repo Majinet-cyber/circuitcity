@@ -1,361 +1,222 @@
 {% extends "base.html" %}
 {% load humanize %}
 
-{% block title %}Time Logs · {{ selected_date|date:"F j, Y" }} · {{ request.business.name|default:"Emajinet" }}{% endblock %}
+{% block title %}Time Logs - {{ selected_date|date:"F j, Y" }}{% endblock %}
 {% block header_title %}Time Logs{% endblock %}
 
 {% block extra_css %}
 <style>
-  :root {
-    --work-color: #10b981;
-    --idle-color: #d1d5db;
-    --radius: 12px;
-  }
-  
-  .panel {
-    background: var(--cc-panel);
-    border: 1px solid var(--cc-border);
-    border-radius: var(--radius);
-    box-shadow: var(--cc-shadow);
-    padding: 1.5rem;
-    margin-bottom: 1rem;
-  }
-  
-  .battery-container {
-    width: 100%;
-    height: 60px;
-    background: var(--idle-color);
-    border-radius: var(--radius);
-    overflow: hidden;
-    position: relative;
-    display: flex;
-    margin: 1.5rem 0;
-  }
-  
-  .battery-segment {
-    height: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: white;
-    font-weight: 700;
-    font-size: 0.9rem;
-    transition: all 0.3s ease;
-  }
-  
-  .battery-segment.work {
-    background: var(--work-color);
-  }
-  
-  .battery-segment.idle {
-    background: var(--idle-color);
-    color: #6b7280;
-  }
-  
-  .stat-card {
-    background: linear-gradient(135deg, var(--cc-accent) 0%, color-mix(in oklab, var(--cc-accent) 80%, black) 100%);
-    color: white;
-    border-radius: var(--radius);
-    padding: 1.5rem;
-    text-align: center;
-  }
-  
-  .stat-value {
-    font-size: 2.5rem;
-    font-weight: 900;
-    line-height: 1;
-    margin: 0.5rem 0;
-  }
-  
-  .stat-label {
-    font-size: 0.875rem;
-    opacity: 0.9;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-  }
-  
-  .ping-table {
-    width: 100%;
-    margin-top: 1rem;
-  }
-  
-  .ping-table th {
-    background: var(--cc-border);
-    padding: 0.75rem;
-    text-align: left;
-    font-weight: 700;
-    font-size: 0.875rem;
-    text-transform: uppercase;
-  }
-  
-  .ping-table td {
-    padding: 0.75rem;
-    border-bottom: 1px solid var(--cc-border);
-  }
-  
-  .badge-inside {
-    background: var(--work-color);
-    color: white;
-    padding: 0.25rem 0.75rem;
-    border-radius: 9999px;
-    font-size: 0.75rem;
-    font-weight: 700;
-  }
-  
-  .badge-outside {
-    background: var(--idle-color);
-    color: #6b7280;
-    padding: 0.25rem 0.75rem;
-    border-radius: 9999px;
-    font-size: 0.75rem;
-    font-weight: 700;
-  }
-  
-  .date-picker-form {
-    display: flex;
-    gap: 0.5rem;
-    align-items: center;
-    flex-wrap: wrap;
-  }
-  
-  .date-picker-form input[type="date"] {
-    padding: 0.5rem 0.75rem;
-    border: 1px solid var(--cc-border);
-    border-radius: 8px;
-    font-size: 0.875rem;
-  }
-  
-  .empty-state {
-    text-align: center;
-    padding: 3rem 1rem;
-    color: var(--cc-muted);
-  }
-  
-  .empty-state i {
-    font-size: 3rem;
-    opacity: 0.5;
-    margin-bottom: 1rem;
-  }
-  
-  @media (max-width: 768px) {
-    .stat-value {
-      font-size: 2rem;
-    }
-    
-    .battery-segment {
-      font-size: 0.75rem;
-    }
-    
-    .ping-table {
-      font-size: 0.875rem;
-    }
-  }
+  .time-shell{max-width:1180px;margin:0 auto;padding:1rem;}
+  .time-hero{background:linear-gradient(135deg,#111827,#334155);color:#fff;border-radius:18px;padding:1.35rem 1.5rem;margin-bottom:1rem;display:flex;justify-content:space-between;gap:1rem;align-items:flex-end;box-shadow:0 18px 45px rgba(15,23,42,.18);}
+  .time-title{font-size:1.55rem;font-weight:900;margin:0;}
+  .time-subtitle{color:rgba(255,255,255,.72);font-size:.92rem;margin-top:.25rem;}
+  .filter-form{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;}
+  .filter-form input,.filter-form select{border:1px solid var(--cc-border,#dbe3ef);border-radius:10px;padding:.52rem .7rem;background:#fff;color:#111827;font-size:.88rem;}
+  .kpi-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:.75rem;margin-bottom:1rem;}
+  .kpi-card{background:var(--cc-panel,#fff);border:1px solid var(--cc-border,#e5e7eb);border-radius:14px;padding:1rem;box-shadow:var(--cc-shadow,0 8px 24px rgba(15,23,42,.06));position:relative;overflow:hidden;}
+  .kpi-card:before{content:"";position:absolute;inset:0 0 auto;height:4px;background:#4f46e5;}
+  .kpi-card.success:before{background:#10b981;}
+  .kpi-card.warning:before{background:#f59e0b;}
+  .kpi-card.info:before{background:#0ea5e9;}
+  .kpi-card.dark:before{background:#475569;}
+  .kpi-label{font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--cc-muted,#64748b);font-weight:800;margin-bottom:.45rem;}
+  .kpi-value{font-size:1.55rem;font-weight:900;line-height:1;color:var(--cc-text,#111827);}
+  .kpi-note{font-size:.78rem;color:var(--cc-muted,#64748b);margin-top:.35rem;}
+  .time-panel{background:var(--cc-panel,#fff);border:1px solid var(--cc-border,#e5e7eb);border-radius:16px;box-shadow:var(--cc-shadow,0 8px 24px rgba(15,23,42,.06));padding:1rem;margin-bottom:1rem;}
+  .panel-heading{display:flex;justify-content:space-between;gap:.75rem;align-items:center;margin-bottom:.85rem;}
+  .panel-title{font-size:1rem;font-weight:900;margin:0;color:var(--cc-text,#111827);}
+  .panel-note{font-size:.82rem;color:var(--cc-muted,#64748b);}
+  .attendance-wrap{overflow-x:auto;}
+  .attendance-table{width:100%;border-collapse:separate;border-spacing:0 .55rem;min-width:920px;}
+  .attendance-table th{font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--cc-muted,#64748b);font-weight:900;text-align:left;padding:0 .7rem;}
+  .attendance-table td{background:#fff;border-top:1px solid var(--cc-border,#e5e7eb);border-bottom:1px solid var(--cc-border,#e5e7eb);padding:.82rem .7rem;vertical-align:middle;font-size:.9rem;}
+  .attendance-table td:first-child{border-left:1px solid var(--cc-border,#e5e7eb);border-radius:12px 0 0 12px;}
+  .attendance-table td:last-child{border-right:1px solid var(--cc-border,#e5e7eb);border-radius:0 12px 12px 0;}
+  .staff-name{font-weight:850;color:var(--cc-text,#111827);}
+  .staff-sub{font-size:.76rem;color:var(--cc-muted,#64748b);margin-top:.1rem;}
+  .badge-soft{display:inline-flex;align-items:center;gap:.35rem;border-radius:999px;padding:.28rem .62rem;font-size:.75rem;font-weight:850;white-space:nowrap;}
+  .badge-on_time,.badge-checked_out,.badge-inside{background:#dcfce7;color:#166534;}
+  .badge-late,.badge-outside,.badge-no_checkout{background:#fee2e2;color:#991b1b;}
+  .badge-active{background:#dbeafe;color:#1d4ed8;}
+  .badge-unknown,.badge-not_checked_in{background:#f1f5f9;color:#475569;}
+  .metric-strong{font-weight:850;color:var(--cc-text,#111827);}
+  .muted{color:var(--cc-muted,#64748b);}
+  .battery-container{width:100%;height:48px;background:#e5e7eb;border-radius:12px;overflow:hidden;display:flex;margin:.75rem 0 1rem;}
+  .battery-segment{height:100%;display:flex;align-items:center;justify-content:center;font-weight:850;font-size:.82rem;}
+  .battery-segment.work{background:#10b981;color:#fff;}
+  .battery-segment.idle{background:#cbd5e1;color:#334155;}
+  .ping-table{width:100%;border-collapse:collapse;min-width:640px;}
+  .ping-table th{background:#f8fafc;color:#475569;text-transform:uppercase;font-size:.72rem;letter-spacing:.06em;padding:.7rem;text-align:left;}
+  .ping-table td{border-bottom:1px solid #e5e7eb;padding:.7rem;}
+  .empty-state{text-align:center;padding:2rem 1rem;color:var(--cc-muted,#64748b);}
+  @media (max-width:1100px){.kpi-grid{grid-template-columns:repeat(3,1fr);}.time-hero{align-items:flex-start;flex-direction:column;}}
+  @media (max-width:720px){.time-shell{padding:.75rem;}.kpi-grid{grid-template-columns:repeat(2,1fr);}.time-title{font-size:1.3rem;}.filter-form{width:100%;}.filter-form input,.filter-form select,.filter-form .btn{width:100%;}.time-panel{padding:.85rem;}}
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="container py-3" style="max-width: 1100px;">
-  
-  <!-- Header with date picker -->
-  <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-    <h1 class="h3 mb-0">Time Logs</h1>
-    
-    <form method="get" class="date-picker-form">
+<div class="time-shell">
+  <div class="time-hero">
+    <div>
+      <h1 class="time-title">Attendance Intelligence</h1>
+      <div class="time-subtitle">{{ selected_date|date:"F j, Y" }} - check-ins, late arrivals, worked time, idle time, and location signals.</div>
+    </div>
+    <form method="get" class="filter-form">
+      {% if user_is_manager and available_agents %}
+      <select name="agent" onchange="this.form.submit()">
+        <option value="all" {% if not selected_agent_id or selected_agent_id == "all" %}selected{% endif %}>All Staff</option>
+        {% for agent in available_agents %}
+        <option value="{{ agent.id }}" {% if selected_agent_id|stringformat:"s" == agent.id|stringformat:"s" %}selected{% endif %}>{{ agent.name }}</option>
+        {% endfor %}
+      </select>
+      {% endif %}
       <input type="date" name="date" value="{{ selected_date|date:'Y-m-d' }}" max="{{ today|date:'Y-m-d' }}" required>
-      <button type="submit" class="btn btn-primary btn-sm">View</button>
-      <a href="?" class="btn btn-outline-secondary btn-sm">Today</a>
+      <button type="submit" class="btn btn-light btn-sm">View</button>
+      <a href="?" class="btn btn-outline-light btn-sm">Today</a>
+      <a href="{% url 'timelogs:export_csv' %}?from_date={{ selected_date|date:'Y-m-d' }}&to_date={{ selected_date|date:'Y-m-d' }}{% if selected_agent %}&agent={{ selected_agent.id }}{% elif selected_agent_id %}&agent={{ selected_agent_id }}{% endif %}" class="btn btn-warning btn-sm">
+        <i class="bi bi-download"></i> CSV
+      </a>
     </form>
   </div>
-  
-  {% if work_log %}
-    <!-- Summary Cards -->
-    <div class="row g-3 mb-3">
-      <div class="col-12 col-sm-6 col-lg-3">
-        <div class="stat-card">
-          <div class="stat-label">On-Site Work</div>
-          <div class="stat-value">{{ work_log.total_on_site_minutes }}</div>
-          <div class="stat-label">Minutes</div>
-        </div>
-      </div>
-      
-      <div class="col-12 col-sm-6 col-lg-3">
-        <div class="stat-card" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);">
-          <div class="stat-label">Idle Time</div>
-          <div class="stat-value">{{ work_log.total_idle_minutes }}</div>
-          <div class="stat-label">Minutes</div>
-        </div>
-      </div>
-      
-      <div class="col-12 col-sm-6 col-lg-3">
-        <div class="stat-card" style="background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);">
-          <div class="stat-label">First Seen</div>
-          <div class="stat-value" style="font-size: 1.5rem;">
-            {{ work_log.first_seen_at|date:"H:i"|default:"--:--" }}
-          </div>
-          <div class="stat-label">Time</div>
-        </div>
-      </div>
-      
-      <div class="col-12 col-sm-6 col-lg-3">
-        <div class="stat-card" style="background: linear-gradient(135deg, #ec4899 0%, #db2777 100%);">
-          <div class="stat-label">Last Seen</div>
-          <div class="stat-value" style="font-size: 1.5rem;">
-            {{ work_log.last_seen_at|date:"H:i"|default:"--:--" }}
-          </div>
-          <div class="stat-label">Time</div>
-        </div>
+
+  <div class="kpi-grid" data-testid="timelog-kpi-cards">
+    <div class="kpi-card success"><div class="kpi-label">Present Today</div><div class="kpi-value">{{ kpis.present_count }}</div><div class="kpi-note">checked in</div></div>
+    <div class="kpi-card warning"><div class="kpi-label">Late</div><div class="kpi-value">{{ kpis.late_count }}</div><div class="kpi-note">after grace</div></div>
+    <div class="kpi-card info"><div class="kpi-label">Active Shifts</div><div class="kpi-value">{{ kpis.active_count }}</div><div class="kpi-note">not checked out</div></div>
+    <div class="kpi-card success"><div class="kpi-label">Completed</div><div class="kpi-value">{{ kpis.completed_count }}</div><div class="kpi-note">checked out</div></div>
+    <div class="kpi-card"><div class="kpi-label">Total Hours</div><div class="kpi-value">{{ kpis.total_worked_label }}</div><div class="kpi-note">{{ kpis.total_worked_minutes }} minutes</div></div>
+    <div class="kpi-card dark"><div class="kpi-label">Idle Time</div><div class="kpi-value">{{ kpis.total_idle_label }}</div><div class="kpi-note">{{ kpis.average_reliability_score }} reliability</div></div>
+  </div>
+
+  <div class="time-panel" data-testid="timelog-attendance-summary">
+    <div class="panel-heading">
+      <div>
+        <h2 class="panel-title">Staff Attendance Summary</h2>
+        <div class="panel-note">User, check in, check out, worked time, idle time, status, lateness, location, and notes.</div>
       </div>
     </div>
-    
-    <!-- Battery Bar Visualization -->
-    <div class="panel">
-      <h5 class="mb-3">Work vs Idle Time</h5>
-      
-      {% if battery_segments %}
-        <div class="battery-container">
-          {% for segment in battery_segments %}
-            <div class="battery-segment {{ segment.type }}" style="width: {{ segment.percent }}%;">
-              {% if segment.percent > 10 %}
-                {{ segment.label }}
-              {% endif %}
-            </div>
+    <div class="attendance-wrap">
+      <table class="attendance-table">
+        <thead>
+          <tr>
+            <th>User</th>
+            <th>Check In</th>
+            <th>Check Out</th>
+            <th>Worked</th>
+            <th>Idle</th>
+            <th>Status</th>
+            <th>Late</th>
+            <th>Location / Geo</th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in attendance_rows %}
+          <tr>
+            <td>
+              <div class="staff-name">{{ row.agent_name }}</div>
+              <div class="staff-sub">{{ row.location_label }}</div>
+            </td>
+            <td class="metric-strong">{{ row.check_in_at|date:"H:i"|default:"-" }}</td>
+            <td class="metric-strong">{{ row.check_out_at|date:"H:i"|default:"-" }}</td>
+            <td>{{ row.worked_label }}</td>
+            <td>{{ row.idle_label }}</td>
+            <td><span class="badge-soft badge-{{ row.shift_status }}">{{ row.shift_label }}</span></td>
+            <td><span class="badge-soft badge-{{ row.late_status }}">{{ row.late_label }}</span></td>
+            <td><span class="badge-soft badge-{{ row.geo_status }}">{{ row.geo_label }}</span></td>
+            <td class="muted">
+              {% if row.notes %}{{ row.notes }}{% elif row.reliability_score %}{{ row.reliability_score }} reliability{% else %}-{% endif %}
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="9"><div class="empty-state">No staff found for this business.</div></td></tr>
           {% endfor %}
-        </div>
-        
-        <div class="d-flex justify-content-around text-center mt-3">
-          <div>
-            <div style="width: 20px; height: 20px; background: var(--work-color); border-radius: 4px; display: inline-block;"></div>
-            <span class="ms-2">On-Site: {{ work_log.total_on_site_minutes }} min</span>
-          </div>
-          <div>
-            <div style="width: 20px; height: 20px; background: var(--idle-color); border-radius: 4px; display: inline-block;"></div>
-            <span class="ms-2">Idle: {{ work_log.total_idle_minutes }} min</span>
-          </div>
-        </div>
-      {% else %}
-        <div class="empty-state">
-          <i class="bi bi-hourglass-split"></i>
-          <p>No time data available yet for this day.</p>
-        </div>
-      {% endif %}
+        </tbody>
+      </table>
     </div>
-    
-    <!-- Additional Stats -->
-    <div class="panel">
-      <h5 class="mb-3">Details</h5>
-      
-      <div class="row g-3">
-        <div class="col-md-6">
-          <div class="d-flex justify-content-between border-bottom pb-2">
-            <span class="text-muted">Scheduled Start:</span>
-            <strong>{{ work_log.scheduled_start|default:"--:--" }}</strong>
-          </div>
-        </div>
-        
-        <div class="col-md-6">
-          <div class="d-flex justify-content-between border-bottom pb-2">
-            <span class="text-muted">Scheduled End:</span>
-            <strong>{{ work_log.scheduled_end|default:"--:--" }}</strong>
-          </div>
-        </div>
-        
-        <div class="col-md-6">
-          <div class="d-flex justify-content-between border-bottom pb-2">
-            <span class="text-muted">Arrived Early:</span>
-            <strong class="text-success">+{{ work_log.arrived_early_minutes }} min</strong>
-          </div>
-        </div>
-        
-        <div class="col-md-6">
-          <div class="d-flex justify-content-between border-bottom pb-2">
-            <span class="text-muted">Arrived Late:</span>
-            <strong class="text-danger">-{{ work_log.arrived_late_minutes }} min</strong>
-          </div>
-        </div>
-        
-        <div class="col-md-6">
-          <div class="d-flex justify-content-between border-bottom pb-2">
-            <span class="text-muted">Location:</span>
-            <strong>{{ work_log.location.name|default:"N/A" }}</strong>
-          </div>
-        </div>
-        
-        <div class="col-md-6">
-          <div class="d-flex justify-content-between border-bottom pb-2">
-            <span class="text-muted">Total Pings:</span>
-            <strong>{{ total_pings }}</strong>
-          </div>
-        </div>
-      </div>
+  </div>
+
+  {% if user_is_manager and not selected_agent and attendance_rows %}
+  <div class="time-panel">
+    <div class="panel-heading">
+      <h2 class="panel-title">Quick Staff Cards</h2>
+      <div class="panel-note">Tap through to inspect one person.</div>
     </div>
-    
-    <!-- Ping History Table -->
-    {% if pings %}
-      <div class="panel">
-        <div class="d-flex justify-content-between align-items-center mb-3">
-          <h5 class="mb-0">Ping History</h5>
-          <a href="{% url 'timelogs:export_csv' %}?from_date={{ selected_date|date:'Y-m-d' }}&to_date={{ selected_date|date:'Y-m-d' }}" 
-             class="btn btn-sm btn-outline-primary">
-            <i class="bi bi-download"></i> Export CSV
-          </a>
-        </div>
-        
-        <div style="overflow-x: auto;">
-          <table class="ping-table">
-            <thead>
-              <tr>
-                <th>Time</th>
-                <th>Status</th>
-                <th>Coordinates</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for ping in pings %}
-                <tr>
-                  <td>{{ ping.timestamp|date:"H:i:s" }}</td>
-                  <td>
-                    {% if ping.is_inside_geofence %}
-                      <span class="badge-inside">Inside</span>
-                    {% else %}
-                      <span class="badge-outside">Outside</span>
-                    {% endif %}
-                  </td>
-                  <td class="text-muted small">
-                    {{ ping.latitude|floatformat:6 }}, {{ ping.longitude|floatformat:6 }}
-                  </td>
-                </tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
+    <div class="row g-3">
+      {% for row in attendance_rows %}
+      <div class="col-12 col-md-6 col-xl-4">
+        <a href="?agent={{ row.agent.id }}&date={{ selected_date|date:'Y-m-d' }}" class="text-decoration-none">
+          <div class="kpi-card {% if row.late_status == 'late' %}warning{% elif row.shift_status == 'active' %}info{% else %}success{% endif %}" style="height:100%;">
+            <div class="kpi-label">{{ row.shift_label }}</div>
+            <div class="staff-name">{{ row.agent_name }}</div>
+            <div class="kpi-note">{{ row.worked_label }} worked - {{ row.idle_label }} idle - {{ row.geo_label }}</div>
+          </div>
+        </a>
       </div>
-    {% endif %}
-    
-  {% else %}
-    <!-- Empty State -->
-    <div class="panel">
-      <div class="empty-state">
-        <i class="bi bi-calendar-x"></i>
-        <h4>No Time Log for {{ selected_date|date:"F j, Y" }}</h4>
-        <p>You haven't logged any work time on this day.</p>
-        {% if selected_date == today %}
-          <p class="text-muted small">Your location pings will appear here automatically once you're on-site.</p>
-        {% endif %}
-      </div>
+      {% endfor %}
     </div>
+  </div>
   {% endif %}
-  
+
+  {% if work_log %}
+  <div class="time-panel">
+    <div class="panel-heading">
+      <h2 class="panel-title">Work vs Idle Detail</h2>
+      <div class="panel-note">{{ selected_agent.get_full_name|default:selected_agent.username }}</div>
+    </div>
+    {% if battery_segments %}
+      <div class="battery-container">
+        {% for segment in battery_segments %}
+          <div class="battery-segment {{ segment.type }}" style="width: {{ segment.percent }}%;">{% if segment.percent > 10 %}{{ segment.label }}{% endif %}</div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="empty-state">No duration segments have been captured yet.</div>
+    {% endif %}
+  </div>
+
+  {% if pings %}
+  <div class="time-panel">
+    <div class="panel-heading">
+      <h2 class="panel-title">Raw Ping History</h2>
+      <a href="{% url 'timelogs:export_csv' %}?from_date={{ selected_date|date:'Y-m-d' }}&to_date={{ selected_date|date:'Y-m-d' }}{% if selected_agent %}&agent={{ selected_agent.id }}{% endif %}" class="btn btn-sm btn-outline-primary">
+        <i class="bi bi-download"></i> Export CSV
+      </a>
+    </div>
+    <div class="attendance-wrap">
+      <table class="ping-table">
+        <thead><tr><th>Time</th><th>Geo</th><th>Coordinates</th></tr></thead>
+        <tbody>
+          {% for ping in pings %}
+          <tr>
+            <td>{{ ping.timestamp|date:"H:i:s" }}</td>
+            <td>
+              {% if ping.is_inside_geofence %}
+                <span class="badge-soft badge-inside">Inside Zone</span>
+              {% else %}
+                <span class="badge-soft badge-outside">Outside Zone</span>
+              {% endif %}
+            </td>
+            <td class="muted">{{ ping.latitude|floatformat:6 }}, {{ ping.longitude|floatformat:6 }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+  {% elif selected_agent %}
+  <div class="time-panel">
+    <div class="empty-state">No time log for {{ selected_agent.get_full_name|default:selected_agent.username }} on {{ selected_date|date:"F j, Y" }}.</div>
+  </div>
+  {% endif %}
 </div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
-  // Auto-refresh if viewing today
   {% if selected_date == today and work_log %}
-    setTimeout(() => {
-      window.location.reload();
-    }, 60000); // Refresh every 60 seconds
+    setTimeout(function(){ window.location.reload(); }, 60000);
   {% endif %}
 </script>
 {% endblock %}
-

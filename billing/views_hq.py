@@ -16,23 +16,16 @@ class HQSubscriptionsView(TemplateView):
     """
     Staff-only, global subscriptions list (ignores tenant context).
     """
+
     template_name = "billing/hq_subscriptions.html"
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         q = (self.request.GET.get("q") or "").strip()
 
-        subs = (
-            BusinessSubscription.objects
-            .select_related("business", "plan")
-            .order_by("-started_at", "-created_at")
-        )
+        subs = BusinessSubscription.objects.select_related("business", "plan").order_by("-started_at", "-created_at")
         if q:
-            subs = subs.filter(
-                Q(business__name__icontains=q) |
-                Q(plan__name__icontains=q) |
-                Q(plan__code__icontains=q)
-            )
+            subs = subs.filter(Q(business__name__icontains=q) | Q(plan__name__icontains=q) | Q(plan__code__icontains=q))
 
         ctx.update(
             q=q,
@@ -42,5 +35,3 @@ class HQSubscriptionsView(TemplateView):
             active_tab="home",  # keeps base.html sidebar styles happy
         )
         return ctx
-
-

@@ -2,11 +2,13 @@ import subprocess, sys, os, shutil
 
 PY = r".\.venv\Scripts\python.exe" if os.name == "nt" else "python"
 
+
 def run(title, *cmd):
     print(f"\n==> {title}")
     r = subprocess.run(cmd)
     if r.returncode != 0:
         sys.exit(r.returncode)
+
 
 # 1) working tree status (informational)
 run("git status", "git", "status", "--porcelain")

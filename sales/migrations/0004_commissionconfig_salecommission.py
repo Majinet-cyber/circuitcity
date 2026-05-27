@@ -8,7 +8,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("sales", "0003_backfill_sale_created_and_item_sold_at"),
         ("tenants", "0011_agentinvite_temp_password_hash_and_more"),
@@ -161,15 +160,11 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "early_blocks",
-                    models.PositiveIntegerField(
-                        default=0, help_text="Number of 30-min blocks arrived early."
-                    ),
+                    models.PositiveIntegerField(default=0, help_text="Number of 30-min blocks arrived early."),
                 ),
                 (
                     "late_blocks",
-                    models.PositiveIntegerField(
-                        default=0, help_text="Number of 30-min blocks arrived late."
-                    ),
+                    models.PositiveIntegerField(default=0, help_text="Number of 30-min blocks arrived late."),
                 ),
                 ("created_at", models.DateTimeField(auto_now_add=True)),
                 (

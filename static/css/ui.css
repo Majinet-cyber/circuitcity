@@ -12,8 +12,8 @@
   --theme-fg-muted:  var(--fg-muted,  var(--cc-muted, #9fb0cf));
 
   /* ALL primary CTAs must use the Forgot-Password blue */
-  --theme-brand:     var(--brand,     var(--cc-accent, #2563eb));  /* blue-500 */
-  --theme-brand-2:   var(--brand-2,   var(--cc-accent-2, #1d4ed8));/* blue-600 hover */
+  --theme-brand:     var(--brand,     var(--cc-accent, #ff6a1a));  /* brand orange */
+  --theme-brand-2:   var(--brand-2,   var(--cc-accent-2, #f25c05));/* brand orange hover */
 
   --theme-border:    var(--border,    var(--cc-border, rgba(148,163,184,.22)));
   --theme-card:      var(--card,      var(--cc-panel, rgba(255,255,255,.06)));

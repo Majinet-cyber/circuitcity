@@ -1,0 +1,1580 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Add Clothing Product · Wizard{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/wizard-system.css' %}?v=20260107">
+{% endblock %}
+
+{% block content %}
+<div id="wizard-container"></div>
+
+<script src="{% static 'js/wizard-engine.js' %}?v=20260107"></script>
+<script>
+(function() {
+  // Clothing categories
+  const categories = [
+    { value: 'shoes', label: 'Shoes', icon: '👟' },
+    { value: 'suits', label: 'Suits', icon: '🤵' },
+    { value: 'shirts', label: 'Shirts', icon: '👔' },
+    { value: 'tshirts', label: 'T-Shirts', icon: '👕' },
+    { value: 'jeans', label: 'Jeans', icon: '👖' },
+    { value: 'trousers', label: 'Trousers', icon: '👖' },
+    { value: 'jackets', label: 'Jackets', icon: '🧥' },
+    { value: 'dresses', label: 'Dresses', icon: '👗' },
+    { value: 'skirts', label: 'Skirts', icon: '👗' },
+    { value: 'sweaters', label: 'Sweaters', icon: '🧶' },
+    { value: 'other', label: 'Other', icon: '📦' }
+  ];
+
+  // Shoe subtypes
+  const shoeSubtypes = [
+    { value: 'dress', label: 'Dress Shoes', icon: '👞' },
+    { value: 'sports', label: 'Sports Shoes', icon: '👟', featured: true },
+    { value: 'sneakers', label: 'Sneakers', icon: '👟', featured: true },
+    { value: 'boots', label: 'Boots', icon: '🥾' },
+    { value: 'slip_on', label: 'Slip-on', icon: '🥿' },
+    { value: 'sandals', label: 'Sandals', icon: '👡' },
+    { value: 'formal', label: 'Formal', icon: '👞' },
+    { value: 'casual', label: 'Casual', icon: '👟' },
+    { value: 'other', label: 'Other', icon: '👟' }
+  ];
+
+  // Sports shoe brands
+  const sportsBrands = [
+    { value: 'Jordan', label: 'Jordan', icon: '🏀', badge: 'Premium' },
+    { value: 'Nike', label: 'Nike', icon: '✓', featured: true },
+    { value: 'Adidas', label: 'Adidas', icon: '⚽' },
+    { value: 'Puma', label: 'Puma', icon: '🐆' },
+    { value: 'Air Force', label: 'Air Force', icon: '✈️' },
+    { value: 'Air Max', label: 'Air Max', icon: '💨' },
+    { value: 'Converse', label: 'Converse', icon: '⭐' },
+    { value: 'Vans', label: 'Vans', icon: '🛹' }
+  ];
+
+  // Jordan models
+  const jordanModels = [
+    { value: 'Air 1', label: 'Jordan Air 1', icon: '👟' },
+    { value: 'Air 4', label: 'Jordan Air 4', icon: '👟' },
+    { value: 'Air 6', label: 'Jordan Air 6', icon: '👟' },
+    { value: 'Retro', label: 'Jordan Retro', icon: '👟' }
+  ];
+
+  // Suit subtypes
+  const suitSubtypes = [
+    { value: 'two_piece', label: 'Two-piece', icon: '🤵' },
+    { value: 'three_piece', label: 'Three-piece', icon: '🤵', badge: 'Classic' },
+    { value: 'casual', label: 'Casual suit', icon: '👔' },
+    { value: 'formal', label: 'Formal suit', icon: '🤵' },
+    { value: 'wedding', label: 'Wedding suit', icon: '💒', badge: 'Special' },
+    { value: 'office', label: 'Office suit', icon: '💼' },
+    { value: 'other', label: 'Other', icon: '👔' }
+  ];
+
+  // Suit fits
+  const suitFits = [
+    { value: 'slim', label: 'Slim', icon: '📏' },
+    { value: 'regular', label: 'Regular', icon: '📏', featured: true },
+    { value: 'loose', label: 'Loose', icon: '📏' }
+  ];
+
+  // Jeans types
+  const jeansTypes = [
+    { value: 'soft_denim', label: 'Soft Denim', icon: '👖' },
+    { value: 'english_denim', label: 'English Denim', icon: '👖' },
+    { value: 'skinny', label: 'Skinny', icon: '👖' },
+    { value: 'straight', label: 'Straight', icon: '👖', featured: true },
+    { value: 'bootcut', label: 'Bootcut', icon: '👖' },
+    { value: 'stretch', label: 'Stretch', icon: '👖' },
+    { value: 'other', label: 'Other', icon: '👖' }
+  ];
+
+  // Colors
+  const colors = [
+    { value: 'blue', label: 'Blue', icon: '🔵' },
+    { value: 'black', label: 'Black', icon: '⚫' },
+    { value: 'grey', label: 'Grey', icon: '⚪' },
+    { value: 'light_wash', label: 'Light wash', icon: '💙' },
+    { value: 'dark_wash', label: 'Dark wash', icon: '🔷' }
+  ];
+
+  // Sizes
+  const sizes = [
+    { value: 'S', label: 'S', icon: '📏' },
+    { value: 'M', label: 'M', icon: '📏', featured: true },
+    { value: 'L', label: 'L', icon: '📏', featured: true },
+    { value: 'XL', label: 'XL', icon: '📏' },
+    { value: 'XXL', label: 'XXL', icon: '📏' },
+    { value: 'XXXL', label: 'XXXL', icon: '📏' }
+  ];
+
+  // Numeric sizes (for trousers/jeans)
+  const numericSizes = [
+    { value: '28', label: '28', icon: '📐' },
+    { value: '30', label: '30', icon: '📐' },
+    { value: '32', label: '32', icon: '📐', featured: true },
+    { value: '34', label: '34', icon: '📐', featured: true },
+    { value: '36', label: '36', icon: '📐' },
+    { value: '38', label: '38', icon: '📐' },
+    { value: '40', label: '40', icon: '📐' },
+    { value: '42', label: '42', icon: '📐' },
+    { value: '44', label: '44', icon: '📐' }
+  ];
+
+  // Shoe sizes (MUST be numeric only, 30-50)
+  const shoeSizes = [
+    { value: '30', label: '30', icon: '👟' },
+    { value: '32', label: '32', icon: '👟' },
+    { value: '34', label: '34', icon: '👟' },
+    { value: '36', label: '36', icon: '👟' },
+    { value: '38', label: '38', icon: '👟' },
+    { value: '40', label: '40', icon: '👟', featured: true },
+    { value: '41', label: '41', icon: '👟' },
+    { value: '42', label: '42', icon: '👟', featured: true },
+    { value: '43', label: '43', icon: '👟' },
+    { value: '44', label: '44', icon: '👟' },
+    { value: '45', label: '45', icon: '👟' },
+    { value: '46', label: '46', icon: '👟' },
+    { value: '48', label: '48', icon: '👟' },
+    { value: '50', label: '50', icon: '👟' }
+  ];
+
+  // Genders
+  const genders = [
+    { value: 'men', label: 'Men', icon: '👨' },
+    { value: 'women', label: 'Women', icon: '👩' },
+    { value: 'unisex', label: 'Unisex', icon: '👥', featured: true }
+  ];
+
+  // Barcode options
+  const barcodeOptions = [
+    { value: 'yes', label: 'Yes, has barcode', icon: '📱' },
+    { value: 'no', label: 'No barcode', icon: '✋' }
+  ];
+
+  // Dynamic step generator
+  function getStepsForCategory(category) {
+    const baseSteps = [
+      // Step 1: Category (always first)
+      {
+        type: 'cards',
+        key: 'category',
+        title: 'Clothing Category',
+        subtitle: 'What type of clothing are you adding?',
+        options: categories,
+        columns: 'auto'
+      }
+    ];
+
+    // Shoes flow
+    if (category === 'shoes') {
+      return baseSteps.concat([
+        // Step 2: Shoe subtype
+        {
+          type: 'cards',
+          key: 'shoe_subtype',
+          title: 'Shoe Type',
+          subtitle: 'Select the shoe type',
+          options: shoeSubtypes,
+          columns: 'auto'
+        },
+        // Step 3: Brand (conditional for sports/sneakers)
+        {
+          type: 'cards',
+          key: 'brand',
+          title: 'Brand',
+          subtitle: 'Select the brand',
+          options: sportsBrands,
+          allowCustom: true,
+          customPlaceholder: 'Enter brand',
+          columns: 'auto'
+        },
+        // Step 4: Model (conditional for Jordan)
+        {
+          type: 'cards',
+          key: 'model',
+          title: 'Model',
+          subtitle: 'Select the Jordan model',
+          options: jordanModels,
+          allowCustom: true,
+          customPlaceholder: 'Enter model'
+        }
+      ]);
+    }
+
+    // Suits flow
+    if (category === 'suits') {
+      return baseSteps.concat([
+        // Step 2: Suit subtype
+        {
+          type: 'cards',
+          key: 'suit_subtype',
+          title: 'Suit Type',
+          subtitle: 'Select the suit type',
+          options: suitSubtypes,
+          columns: 'auto'
+        },
+        // Step 3: Fit (optional)
+        {
+          type: 'cards',
+          key: 'fit',
+          title: 'Fit',
+          subtitle: 'Select the fit style',
+          options: suitFits,
+          skipable: true,
+          columns: 'three-col'
+        }
+      ]);
+    }
+
+    // Jeans flow
+    if (category === 'jeans') {
+      return baseSteps.concat([
+        // Step 2: Jeans type
+        {
+          type: 'cards',
+          key: 'jeans_type',
+          title: 'Jeans Type',
+          subtitle: 'Select the jeans style',
+          options: jeansTypes,
+          columns: 'auto'
+        },
+        // Step 3: Color (optional)
+        {
+          type: 'cards',
+          key: 'color',
+          title: 'Color',
+          subtitle: 'Select the color',
+          options: colors,
+          skipable: true,
+          columns: 'auto'
+        }
+      ]);
+    }
+
+    // Default flow for other categories
+    return baseSteps;
+  }
+
+  // Common final steps
+  const commonFinalSteps = [
+    // Size (Step 4)
+    {
+      type: 'cards',
+      key: 'size',
+      title: 'Size',
+      subtitle: 'Select the size or enter custom (required)',
+      options: (data) => {
+        // CRITICAL: Shoes MUST use numeric sizes only (30-50)
+        if (data.category === 'shoes') {
+          return shoeSizes;
+        }
+        // Use numeric sizes for trousers/jeans
+        if (['trousers', 'jeans'].includes(data.category)) {
+          return numericSizes;
+        }
+        // Use letter sizes for other apparel
+        return sizes;
+      },
+      allowCustom: true,
+      customPlaceholder: (data) => {
+        // Different placeholder based on category
+        if (data.category === 'shoes') {
+          return 'Enter shoe size (numeric only: 30-50)';
+        }
+        if (['trousers', 'jeans'].includes(data.category)) {
+          return 'Enter waist size (e.g., "34", "36")';
+        }
+        return 'Enter custom size (e.g., "M", "XL", "XXXL")';
+      },
+      skipable: false,
+      columns: 'auto'
+    },
+    // Gender (Step 5)
+    {
+      type: 'cards',
+      key: 'gender',
+      title: 'Gender',
+      subtitle: 'Who is this for?',
+      options: genders,
+      skipable: true,
+      columns: 'three-col'
+    },
+    // REORDERED: Barcode selection comes BEFORE pricing
+    {
+      type: 'cards',
+      key: 'has_barcode',
+      title: 'Barcode',
+      subtitle: 'Does this product have a barcode?',
+      options: barcodeOptions,
+      skipable: true,
+      columns: 'two-col'
+    },
+    // REORDERED: Pricing comes AFTER barcode selection (always shown)
+    // CRITICAL: Selling price is REQUIRED, shows smart margin feedback as user types
+    {
+      type: 'multi-input',
+      key: 'pricing',
+      title: 'Pricing & Stock',
+      subtitle: 'Set prices and initial stock quantity',
+      fields: [
+        { key: 'product_name', label: 'Product Name (Optional)', type: 'text', placeholder: 'e.g., Air Jordan 1, Summer Dress', required: false },
+        { key: 'cost_price', label: 'Cost Price/Order Price (MWK)', type: 'number', min: 0, step: '0.01', required: false },
+        { key: 'selling_price', label: 'Selling Price (MWK) *REQUIRED*', type: 'number', min: 0, step: '0.01', required: true, smartPricing: true },
+        { key: 'initial_stock', label: 'Initial Stock Quantity', type: 'number', min: 1, value: 1, required: true }
+      ]
+    },
+    // Smart Barcode Collection (conditional - only if has_barcode === 'yes')
+    {
+      type: 'custom',
+      key: 'barcodes',
+      title: 'Scan Barcodes',
+      subtitle: 'Enter pricing and scan unique barcodes',
+      skip: (data) => data.has_barcode !== 'yes',
+      render: (data) => {
+        const qty = parseInt(data.quantity || data.initial_stock || 0);
+        const price = parseFloat(data.selling_price || 0);
+        const cost = parseFloat(data.cost_price || 0);
+        const scannedCount = (data.scanned_barcodes || []).length;
+        const scannedBarcodes = data.scanned_barcodes || [];
+        const isComplete = scannedCount >= qty;
+
+        // Show inline pricing form if pricing not complete
+        const pricingComplete = price > 0 && qty > 0;
+
+        if (!pricingComplete) {
+          return `
+            <div class="wizard-pricing-form" style="background: linear-gradient(135deg, #f0f9ff, #e0f2fe); padding: 24px; border-radius: 16px; border: 2px solid #0ea5e9; margin-bottom: 20px;">
+              <h3 style="margin: 0 0 16px; color: #0369a1; font-size: 1.1rem;">
+                📦 Quantity & Pricing
+              </h3>
+              <p style="margin: 0 0 20px; color: #0c4a6e; font-size: 0.9rem;">
+                First, enter the product details below. Then you'll scan barcodes.
+              </p>
+
+              <div style="display: grid; gap: 16px;">
+                <div>
+                  <label class="wizard-label" for="pricing-size">Size (Optional)</label>
+                  <input
+                    type="text"
+                    id="pricing-size"
+                    class="form-control"
+                    value="${data.size || ''}"
+                    placeholder="e.g. M, L, XL, 34, 45"
+                  >
+                  <small class="text-muted">Product size (leave blank if not applicable)</small>
+                </div>
+
+                <div>
+                  <label class="wizard-label" for="pricing-quantity">Initial Stock Quantity <span style="color: #dc2626;">*</span></label>
+                  <input
+                    type="number"
+                    id="pricing-quantity"
+                    class="form-control"
+                    min="1"
+                    step="1"
+                    value="${qty || 1}"
+                    placeholder="e.g., 5"
+                    required
+                  >
+                  <small class="text-muted">Number of items to add to stock</small>
+                </div>
+
+                <div>
+                  <label class="wizard-label" for="pricing-selling-price">Selling Price (MWK) <span style="color: #dc2626;">*REQUIRED*</span></label>
+                  <input
+                    type="number"
+                    id="pricing-selling-price"
+                    class="form-control"
+                    min="0"
+                    step="0.01"
+                    value="${price || ''}"
+                    placeholder="e.g., 15000.00"
+                    required
+                    oninput="updateInlineSmartPricing()"
+                    onblur="updateInlineSmartPricing()"
+                  >
+                  <small class="text-muted">Price per unit - REQUIRED</small>
+                  <div id="inline-smart-pricing-feedback" style="margin-top: 12px; padding: 14px 18px; border-radius: 12px; font-size: 0.95rem; font-weight: 600; display: none; transition: all 0.3s;"></div>
+                </div>
+
+                <div>
+                  <label class="wizard-label" for="pricing-cost-price">Cost/Order Price (MWK)</label>
+                  <input
+                    type="number"
+                    id="pricing-cost-price"
+                    class="form-control"
+                    min="0"
+                    step="0.01"
+                    value="${cost || ''}"
+                    placeholder="e.g., 10000.00"
+                    oninput="updateInlineSmartPricing()"
+                    onblur="updateInlineSmartPricing()"
+                  >
+                  <small class="text-muted">Optional: Your cost per unit</small>
+                </div>
+
+                <input type="hidden" id="pricing-location-id" value="{{ location_id|default:'' }}">
+
+                <div id="pricing-error" class="alert d-none" style="display: none;"></div>
+
+                <button
+                  type="button"
+                  class="btn btn-primary btn-lg w-100"
+                  onclick="savePricingAndContinue()"
+                  data-step1-url="{% url 'clothing:barcode_batch_step1' %}"
+                  style="background: linear-gradient(135deg, #0ea5e9, #0284c7); border: none; font-weight: 600;"
+                >
+                  Continue to Scan Barcodes →
+                </button>
+              </div>
+            </div>
+          `;
+        }
+
+        return `
+          <div class="wizard-barcode-collection" id="wizard-barcode-collection">
+            <!-- Progress Indicator -->
+            <div class="wizard-barcode-progress mb-3">
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="wizard-label">Progress</span>
+                <span class="badge ${isComplete ? 'bg-success' : 'bg-primary'}">
+                  Scanned ${scannedCount} / ${qty}
+                </span>
+              </div>
+              <div class="progress" style="height: 8px;">
+                <div class="progress-bar ${isComplete ? 'bg-success' : 'bg-primary'}"
+                     role="progressbar"
+                     style="width: ${Math.min(100, (scannedCount / qty) * 100)}%"
+                     aria-valuenow="${scannedCount}"
+                     aria-valuemin="0"
+                     aria-valuemax="${qty}">
+                </div>
+              </div>
+            </div>
+
+            <!-- Scanned Barcodes List -->
+            <div class="wizard-barcode-list mb-3" id="scanned-barcodes-list">
+              ${scannedBarcodes.length > 0 ? `
+                <label class="wizard-label mb-2">Scanned Barcodes:</label>
+                <div class="list-group">
+                  ${scannedBarcodes.map((code, idx) => `
+                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                      <code>${code}</code>
+                      <button type="button"
+                              class="btn btn-sm btn-outline-danger"
+                              onclick="removeBarcode(${idx})"
+                              title="Remove this barcode">
+                        <i class="bi bi-x-lg"></i>
+                      </button>
+                    </div>
+                  `).join('')}
+                </div>
+              ` : `
+                <div class="text-muted text-center py-3">
+                  <i class="bi bi-upc-scan" style="font-size: 2rem;"></i>
+                  <p class="mt-2">No barcodes scanned yet</p>
+                </div>
+              `}
+            </div>
+
+            <!-- Scanner Controls -->
+            <div class="wizard-barcode-controls">
+              <button type="button"
+                      class="wizard-btn wizard-btn-primary w-100 mb-2"
+                      id="btn-scan-barcode"
+                      onclick="openSmartBarcodeScanner()">
+                <i class="bi bi-upc-scan me-2"></i>Scan Barcode
+              </button>
+
+              <!-- Manual Entry (SCANNER-FIRST: Autofocus) -->
+              <div class="input-group mb-2">
+                <input type="text"
+                       class="form-control"
+                       id="manual-barcode-input"
+                       placeholder="📷 Scan or type barcode, press Enter..."
+                       autocomplete="off"
+                       autofocus
+                       style="font-size: 1.05rem; padding: 12px;"
+                       onkeypress="if(event.key==='Enter'){event.preventDefault();addManualBarcode();}">
+                <button class="btn btn-outline-primary"
+                        type="button"
+                        id="btn-add-manual-barcode"
+                        onclick="addManualBarcode()"
+                        style="padding: 12px 20px;">
+                  <i class="bi bi-plus-lg"></i> Add
+                </button>
+              </div>
+
+              <!-- Error Message -->
+              <div class="alert alert-danger d-none" id="barcode-error" role="alert"></div>
+
+              <!-- Continue Button (only enabled when complete) -->
+              <button type="button"
+                      class="wizard-btn wizard-btn-success w-100 mt-3"
+                      id="barcode-continue-btn"
+                      onclick="wizard.next()"
+                      ${isComplete ? '' : 'disabled'}>
+                ${isComplete ? 'Continue <i class="bi bi-arrow-right ms-1"></i>' : `Scan ${qty - scannedCount} more barcode${qty - scannedCount > 1 ? 's' : ''} to continue`}
+              </button>
+            </div>
+          </div>
+        `;
+      }
+    }
+  ];
+
+  // Barcode Scanner Function (using existing scanner component)
+  function openBarcodeScanner() {
+    // Check if UnifiedScanner is available (from unified-scanner.js)
+    if (typeof UnifiedScanner !== 'undefined') {
+      const scanner = new UnifiedScanner({
+        mode: 'barcode',
+        onSelect: (barcode) => {
+          const input = document.getElementById('input-barcode');
+          if (input) {
+            input.value = barcode;
+            input.dispatchEvent(new Event('input'));
+          }
+        },
+        onError: (error) => {
+          alert('Scanner error: ' + error);
+        }
+      });
+      scanner.open();
+    } else {
+      // Fallback: try simple camera access
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        alert('Camera access not available. Please type the barcode manually.');
+        return;
+      }
+
+      // Simple camera modal (basic fallback)
+      const modalHtml = `
+        <div id="scanner-modal" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.95);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;">
+          <video id="scanner-video" autoplay playsinline style="max-width:90%;max-height:70%;border-radius:12px;"></video>
+          <button onclick="closeScannerModal()" style="margin-top:20px;padding:12px 24px;background:#fff;border:none;border-radius:8px;font-size:16px;font-weight:600;cursor:pointer;">Cancel</button>
+          <p style="color:#fff;margin-top:12px;font-size:14px;">Note: Automatic scanning requires barcode scanner library. Please type barcode manually or install scanner.</p>
+        </div>
+      `;
+      document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+      const video = document.getElementById('scanner-video');
+      navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+        .then(stream => {
+          video.srcObject = stream;
+        })
+        .catch(err => {
+          alert('Camera access denied: ' + err.message);
+          closeScannerModal();
+        });
+    }
+  }
+
+  function closeScannerModal() {
+    const modal = document.getElementById('scanner-modal');
+    if (modal) {
+      const video = document.getElementById('scanner-video');
+      if (video && video.srcObject) {
+        video.srcObject.getTracks().forEach(track => track.stop());
+      }
+      modal.remove();
+    }
+  }
+
+  // Initialize wizard with category step only
+  let wizardSteps = [
+    {
+      type: 'cards',
+      key: 'category',
+      title: 'Clothing Category',
+      subtitle: 'What type of clothing are you adding?',
+      options: categories,
+      columns: 'auto'
+    }
+  ];
+
+  wizard = new WizardEngine('wizard-container', {
+    steps: wizardSteps,
+
+    onComplete: async (data) => {
+      console.log('Clothing wizard complete:', data);
+
+      // Show loading
+      const loading = document.createElement('div');
+      loading.className = 'wizard-loading';
+      loading.innerHTML = '<div class="wizard-loading-spinner"></div><p style="color: #fff; margin-top: 12px;">Saving product...</p>';
+      document.body.appendChild(loading);
+
+      try {
+        // Submit to server
+        const csrfToken = document.querySelector('[name=csrf-token]')?.content ||
+                          document.querySelector('[name=csrfmiddlewaretoken]')?.value;
+
+        const response = await fetch('{% url "inventory:clothing_wizard_submit" %}', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': csrfToken
+          },
+          body: JSON.stringify(data)
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+          // Success! Show success message
+          loading.remove();
+          const message = result.message || 'Product saved successfully!';
+          showSuccessBanner(message + ' Redirecting...');
+
+          // Redirect after brief delay
+          setTimeout(() => {
+            window.location.href = result.redirect || '{% url "verticals:clothing_dashboard" %}';
+          }, 1500);
+        } else {
+          loading.remove();
+          showErrorBanner(result.error || 'Failed to create product');
+        }
+      } catch (error) {
+        loading.remove();
+        console.error('Submit error:', error);
+        showErrorBanner('Failed to create product. Please try again.');
+      }
+    },
+
+    onCancel: () => {
+      if (confirm('Cancel adding clothing?')) {
+        window.location.href = '{% url "verticals:clothing_dashboard" %}';
+      }
+    }
+  });
+
+  // Success/Error banner helpers
+  function showSuccessBanner(message) {
+    const banner = document.createElement('div');
+    banner.className = 'wizard-banner wizard-banner-success';
+    banner.innerHTML = `
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span style="font-size: 24px;">✅</span>
+        <span style="font-weight: 600;">${message}</span>
+      </div>
+    `;
+    document.body.appendChild(banner);
+
+    setTimeout(() => {
+      banner.classList.add('show');
+    }, 100);
+
+    setTimeout(() => {
+      banner.classList.remove('show');
+      setTimeout(() => banner.remove(), 300);
+    }, 3000);
+  }
+
+  function showErrorBanner(message) {
+    const banner = document.createElement('div');
+    banner.className = 'wizard-banner wizard-banner-error';
+    banner.innerHTML = `
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span style="font-size: 24px;">❌</span>
+        <span style="font-weight: 600;">${message}</span>
+      </div>
+    `;
+    document.body.appendChild(banner);
+
+    setTimeout(() => {
+      banner.classList.add('show');
+    }, 100);
+  }
+
+  // Override next() to rebuild steps dynamically
+  const originalNext = wizard.next.bind(wizard);
+  wizard.next = function() {
+    // If we just selected category, rebuild the wizard steps
+    if (this.currentStep === 0 && this.data.category) {
+      const categorySteps = getStepsForCategory(this.data.category);
+      this.config.steps = [...categorySteps, ...commonFinalSteps];
+    }
+    originalNext();
+  };
+
+  // Override selectCard to enforce single selection and auto-open scanner when needed
+  const originalSelectCard = wizard.selectCard.bind(wizard);
+  wizard.selectCard = function(key, value, index) {
+    // CRITICAL FIX: Enforce single selection for all card-based steps
+    // Deselect all other cards for this key before selecting the new one
+    if (this.data[key] !== undefined && this.data[key] !== value) {
+      // Clear the previous selection to enforce single selection
+      delete this.data[key];
+    }
+
+    // Call original selectCard which sets the new value
+    originalSelectCard(key, value, index);
+
+    // Visual enforcement: remove 'selected' class from all sibling cards
+    const allCards = document.querySelectorAll(`[data-key="${key}"]`);
+    allCards.forEach(card => {
+      if (card.dataset.value !== value) {
+        card.classList.remove('wizard-card-selected');
+      }
+    });
+
+    // If user selects "No" for barcode, skip barcode input step entirely
+    if (key === 'has_barcode' && value === 'no') {
+      // Clear any barcode data
+      delete this.data.barcode;
+      delete this.data.barcodes;
+      delete this.data.scanned_barcodes;
+      // Move to next step after has_barcode (skip barcode collection)
+      setTimeout(() => {
+        this.next();
+      }, 300);
+    }
+
+    // If user selects "Yes" for barcode, auto-open scanner on next step
+    if (key === 'has_barcode' && value === 'yes') {
+      setTimeout(() => {
+        this.next(); // Move to barcode collection step
+        setTimeout(() => {
+          // Scanner should auto-open on the barcode step
+          const scanBtn = document.getElementById('btn-scan-barcode');
+          if (scanBtn) {
+            // Don't auto-open scanner, let user click when ready
+            // Just focus on the manual input as fallback
+            const manualInput = document.getElementById('manual-barcode-input');
+            if (manualInput) {
+              manualInput.focus();
+            }
+          }
+        }, 400); // Small delay to let the step render
+      }, 300);
+    }
+  };
+
+  // Add submitBarcodeInput method to wizard (legacy, for single barcode)
+  wizard.submitBarcodeInput = function() {
+    const barcodeInput = document.getElementById('input-barcode');
+    if (barcodeInput && barcodeInput.value.trim()) {
+      this.data.barcode = barcodeInput.value.trim();
+      this.next();
+    } else {
+      alert('Please enter or scan a barcode to continue.');
+    }
+  };
+
+  // =====================================================
+  // SMART BARCODE COLLECTION (Quantity-based)
+  // =====================================================
+
+  // Initialize scanned barcodes array if not exists
+  if (!wizard.data.scanned_barcodes) {
+    wizard.data.scanned_barcodes = [];
+  }
+
+  // Open smart barcode scanner
+  function openSmartBarcodeScanner() {
+    // Check if RearCameraBarcodeScanner is available
+    if (typeof RearCameraBarcodeScanner !== 'undefined') {
+      const scanner = new RearCameraBarcodeScanner({
+        onScan: (barcode) => {
+          addBarcode(barcode);
+        },
+        onError: (error) => {
+          showBarcodeError('Scanner error: ' + error);
+        }
+      });
+      scanner.open();
+    } else {
+      // Fallback: use manual input
+      const input = document.getElementById('manual-barcode-input');
+      if (input) {
+        input.focus();
+        showBarcodeError('Scanner not available. Please enter barcode manually.');
+      }
+    }
+  }
+
+  // Save pricing and initialize barcode batch session (Step 1)
+  async function savePricingAndContinue() {
+    const sellingPrice = parseFloat(document.getElementById('inline-selling-price')?.value || 0);
+    const costPrice = parseFloat(document.getElementById('inline-cost-price')?.value || 0);
+    const quantity = parseInt(document.getElementById('inline-quantity')?.value || 1);
+
+    // Validate inputs
+    if (!sellingPrice || sellingPrice <= 0) {
+      const errorDiv = document.getElementById('pricing-error');
+      if (errorDiv) {
+        errorDiv.textContent = 'Selling price must be greater than zero.';
+        errorDiv.classList.remove('d-none');
+        errorDiv.classList.add('alert-danger');
+      }
+      return;
+    }
+
+    if (!quantity || quantity < 1) {
+      const errorDiv = document.getElementById('pricing-error');
+      if (errorDiv) {
+        errorDiv.textContent = 'Quantity must be at least 1.';
+        errorDiv.classList.remove('d-none');
+        errorDiv.classList.add('alert-danger');
+      }
+      return;
+    }
+
+    // Call backend Step 1 API to initialize barcode batch session
+    try {
+      const csrfToken = document.querySelector('[name=csrf-token]')?.content ||
+                        document.querySelector('[name=csrfmiddlewaretoken]')?.value;
+
+      const step1Data = {
+        category: wizard.data.category || '',
+        subcategory: wizard.data.shoe_subtype || wizard.data.subcategory || '',
+        size: wizard.data.size || '',
+        quantity: quantity,
+        cost_price: costPrice,
+        selling_price: sellingPrice,
+        brand: wizard.data.brand || '',
+        color: wizard.data.color || '',
+        product_name: wizard.data.product_name || ''
+      };
+
+      const response = await fetch('/clothing/api/barcode-batch/step1/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': csrfToken
+        },
+        body: JSON.stringify(step1Data)
+      });
+
+      const result = await response.json();
+
+      if (result.ok) {
+        // Update wizard data
+        wizard.data.selling_price = sellingPrice;
+        wizard.data.cost_price = costPrice;
+        wizard.data.quantity = quantity;
+        wizard.data.initial_stock = quantity;
+        
+        // Clear any previous scanned barcodes
+        wizard.data.scanned_barcodes = [];
+        
+        // Re-render to show barcode scanning UI
+        wizard.render();
+      } else {
+        const errorDiv = document.getElementById('pricing-error');
+        if (errorDiv) {
+          errorDiv.textContent = result.error || 'Failed to save pricing. Please try again.';
+          errorDiv.classList.remove('d-none');
+          errorDiv.classList.add('alert-danger');
+        }
+      }
+    } catch (error) {
+      console.error('Step 1 API error:', error);
+      const errorDiv = document.getElementById('pricing-error');
+      if (errorDiv) {
+        errorDiv.textContent = 'Network error. Please check your connection and try again.';
+        errorDiv.classList.remove('d-none');
+        errorDiv.classList.add('alert-danger');
+      }
+    }
+  }
+
+  // Add barcode (from scanner or manual input)
+  async function addBarcode(barcode) {
+    if (!barcode || !barcode.trim()) {
+      showBarcodeError('Barcode cannot be empty');
+      return;
+    }
+
+    barcode = barcode.trim();
+    const qty = parseInt(wizard.data.quantity || wizard.data.initial_stock || 1);
+
+    // Validate barcode format (basic check)
+    if (barcode.length < 3) {
+      showBarcodeError('Barcode must be at least 3 characters long');
+      return;
+    }
+
+    // Call backend API to scan barcode
+    showBarcodeError('⏳ Scanning barcode...'); // Show loading message
+    try {
+      const csrfToken = document.querySelector('[name=csrf-token]')?.content ||
+                        document.querySelector('[name=csrfmiddlewaretoken]')?.value;
+
+      const response = await fetch('/clothing/api/barcode-batch/scan/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': csrfToken
+        },
+        body: JSON.stringify({ barcode: barcode })
+      });
+
+      const result = await response.json();
+
+      if (result.ok) {
+        clearBarcodeError(); // Clear loading message
+
+        // Update wizard data with new scanned barcodes from server
+        wizard.data.scanned_barcodes = result.scanned_barcodes;
+
+        // Clear manual input and refocus
+        const manualInput = document.getElementById('manual-barcode-input');
+        if (manualInput) {
+          manualInput.value = '';
+          // CRITICAL: Refocus input for next scan
+          setTimeout(() => manualInput.focus(), 100);
+        }
+
+        // Re-render the step to update UI
+        wizard.render();
+        
+        // After render, ensure focus returns to input
+        setTimeout(() => {
+          const input = document.getElementById('manual-barcode-input');
+          if (input) input.focus();
+        }, 200);
+
+        // Show success feedback
+        const successMsg = document.createElement('div');
+        successMsg.className = 'alert alert-success';
+        successMsg.style.cssText = 'position: fixed; top: 20px; right: 20px; z-index: 9999; animation: fadeIn 0.3s;';
+        successMsg.textContent = `✓ Barcode ${barcode} added (${result.scanned_count} / ${qty})`;
+        document.body.appendChild(successMsg);
+        setTimeout(() => successMsg.remove(), 2000);
+
+        // If complete, show completion message
+        if (result.complete) {
+          showBarcodeError('✅ All barcodes scanned! You can now save the product.');
+          setTimeout(() => clearBarcodeError(), 3000);
+        } else {
+          // Auto-reopen scanner for next barcode
+          setTimeout(() => {
+            openSmartBarcodeScanner();
+          }, 500);
+        }
+      } else {
+        // Show inline error from backend (non-blocking)
+        showBarcodeError('❌ ' + (result.error || 'Failed to scan barcode'));
+      }
+    } catch (error) {
+      console.error('Barcode scan error:', error);
+      showBarcodeError('❌ Failed to scan barcode. Please try again.');
+    }
+  }
+
+  // Add manual barcode
+  function addManualBarcode() {
+    const input = document.getElementById('manual-barcode-input');
+    if (input && input.value.trim()) {
+      addBarcode(input.value.trim());
+    } else {
+      showBarcodeError('Please enter a barcode');
+    }
+  }
+
+  // Update inline smart pricing feedback (for barcode step inline pricing form)
+  window.updateInlineSmartPricing = function() {
+    const feedbackDiv = document.getElementById('inline-smart-pricing-feedback');
+    if (!feedbackDiv) return;
+
+    const costInput = document.getElementById('pricing-cost-price');
+    const priceInput = document.getElementById('pricing-selling-price');
+    
+    if (!costInput || !priceInput) return;
+
+    const cost = parseFloat(costInput.value || 0);
+    const price = parseFloat(priceInput.value || 0);
+
+    // Hide if no valid data
+    if (!cost || !price || cost <= 0 || price <= 0) {
+      feedbackDiv.style.display = 'none';
+      return;
+    }
+
+    // Calculate metrics
+    const profit = price - cost;
+    const margin = ((profit / price) * 100).toFixed(1);
+    const profitPerUnit = profit.toFixed(2);
+
+    // Determine feedback type
+    let icon = '';
+    let label = '';
+
+    if (profit <= 0) {
+      icon = '⚠️';
+      label = 'Below Cost';
+      feedbackDiv.style.background = 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)';
+      feedbackDiv.style.border = '2px solid #fbbf24';
+      feedbackDiv.style.color = '#92400e';
+    } else if (margin < 20) {
+      icon = '⚡';
+      label = 'Low Margin';
+      feedbackDiv.style.background = 'linear-gradient(135deg, #fef9c3 0%, #fef08a 100%)';
+      feedbackDiv.style.border = '2px solid #eab308';
+      feedbackDiv.style.color = '#854d0e';
+    } else if (margin < 40) {
+      icon = '✅';
+      label = 'Good Margin';
+      feedbackDiv.style.background = 'linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)';
+      feedbackDiv.style.border = '2px solid #4ade80';
+      feedbackDiv.style.color = '#065f46';
+    } else {
+      icon = '🎉';
+      label = 'Excellent Margin';
+      feedbackDiv.style.background = 'linear-gradient(135deg, #bbf7d0 0%, #86efac 100%)';
+      feedbackDiv.style.border = '2px solid #22c55e';
+      feedbackDiv.style.color = '#14532d';
+    }
+
+    feedbackDiv.innerHTML = `
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span style="font-size: 1.3em;">${icon}</span>
+        <div style="flex: 1;">
+          <div><strong>${label}</strong> • Margin: <strong>${margin}%</strong></div>
+          <div style="font-size: 0.85rem; opacity: 0.9; margin-top: 4px;">
+            Profit per unit: <strong>K ${profitPerUnit}</strong> | Cost: K ${cost.toFixed(2)} → Selling: K ${price.toFixed(2)}
+          </div>
+        </div>
+      </div>
+    `;
+    feedbackDiv.style.display = 'block';
+  };
+
+
+  // Remove barcode
+  function removeBarcode(index) {
+    const scannedBarcodes = wizard.data.scanned_barcodes || [];
+    if (index >= 0 && index < scannedBarcodes.length) {
+      scannedBarcodes.splice(index, 1);
+      wizard.data.scanned_barcodes = scannedBarcodes;
+      wizard.render();
+      clearBarcodeError();
+    }
+  }
+
+  // Show barcode error
+  function showBarcodeError(message) {
+    const errorDiv = document.getElementById('barcode-error');
+    if (errorDiv) {
+      errorDiv.textContent = message;
+      errorDiv.classList.remove('d-none');
+      // Auto-hide after 5 seconds
+      setTimeout(() => {
+        clearBarcodeError();
+      }, 5000);
+    }
+  }
+
+  // Clear barcode error
+  function clearBarcodeError() {
+    const errorDiv = document.getElementById('barcode-error');
+    if (errorDiv) {
+      errorDiv.classList.add('d-none');
+      errorDiv.textContent = '';
+    }
+  }
+
+  // Override wizard.onComplete to include barcodes in submission
+  const originalOnComplete = wizard.config.onComplete;
+  wizard.config.onComplete = async function(data) {
+    // If barcodes were collected, include them in the data
+    if (data.has_barcode === 'yes' && data.scanned_barcodes) {
+      // For single barcode, use the first one
+      if (data.scanned_barcodes.length === 1) {
+        data.barcode = data.scanned_barcodes[0];
+      } else {
+        // For multiple barcodes, store as array
+        data.barcodes = data.scanned_barcodes;
+        data.barcode = data.scanned_barcodes[0]; // Also set first for backward compatibility
+      }
+    }
+
+    // Call original onComplete
+    if (originalOnComplete) {
+      return originalOnComplete(data);
+    }
+  };
+
+  // =====================================================
+  // LIVE VALIDATION (as user types)
+  // =====================================================
+  function setupLiveValidation() {
+    // Guard against double binding
+    if (window.__pricingValidationBound) return;
+    window.__pricingValidationBound = true;
+
+    setTimeout(() => {
+      const qtyInput = document.getElementById('pricing-quantity');
+      const priceInput = document.getElementById('pricing-selling-price');
+      const costInput = document.getElementById('pricing-cost-price');
+      const sizeInput = document.getElementById('pricing-size');
+      const continueBtn = document.querySelector('[onclick="savePricingAndContinue()"]');
+      const errorDiv = document.getElementById('pricing-error');
+      
+      if (!qtyInput || !priceInput) return;
+
+      // CRITICAL: Hide error div on initial load
+      if (errorDiv) {
+        errorDiv.classList.add('d-none');
+        errorDiv.style.display = 'none';
+        errorDiv.textContent = '';
+      }
+
+      // Track if fields have been touched
+      const touched = { qty: false, price: false, cost: false, size: false };
+
+      function validateField(field) {
+        const fieldId = field.id;
+        const value = (field.value || '').trim().replace(/,/g, '');
+        const num = Number(value);
+        let errorId = fieldId + '-error';
+        let errorSpan = document.getElementById(errorId);
+        
+        // Create error span if it doesn't exist
+        if (!errorSpan) {
+          errorSpan = document.createElement('small');
+          errorSpan.id = errorId;
+          errorSpan.className = 'text-danger d-block mt-1';
+          errorSpan.style.display = 'none';  // Hidden by default
+          field.parentNode.appendChild(errorSpan);
+        }
+
+        // Only show errors if field has been touched
+        const key = fieldId.includes('quantity') ? 'qty' : 
+                    fieldId.includes('selling') ? 'price' : 
+                    fieldId.includes('cost') ? 'cost' : 'size';
+        if (!touched[key]) {
+          errorSpan.textContent = '';
+          errorSpan.style.display = 'none';
+          return true;
+        }
+
+        // Validate based on field
+        if (fieldId.includes('quantity')) {
+          if (!value || isNaN(num) || num <= 0 || !Number.isInteger(num)) {
+            errorSpan.textContent = '❌ Must be a whole number greater than 0';
+            errorSpan.style.display = 'block';
+            field.classList.add('is-invalid');
+            return false;
+          }
+        } else if (fieldId.includes('selling')) {
+          if (!value || isNaN(num) || num <= 0) {
+            errorSpan.textContent = '❌ Must be greater than 0';
+            errorSpan.style.display = 'block';
+            field.classList.add('is-invalid');
+            return false;
+          }
+        } else if (fieldId.includes('cost')) {
+          if (value && (isNaN(num) || num < 0)) {
+            errorSpan.textContent = '❌ Must be 0 or greater';
+            errorSpan.style.display = 'block';
+            field.classList.add('is-invalid');
+            return false;
+          }
+        }
+        // Size has no validation (optional field)
+
+        // Clear error if valid
+        errorSpan.textContent = '';
+        errorSpan.style.display = 'none';
+        field.classList.remove('is-invalid');
+        return true;
+      }
+
+      function updateContinueButton() {
+        if (!continueBtn) return;
+        
+        const qtyValid = validateField(qtyInput);
+        const priceValid = validateField(priceInput);
+        const costValid = costInput ? validateField(costInput) : true;
+        
+        const allValid = qtyValid && priceValid && costValid;
+        continueBtn.disabled = !allValid;
+        continueBtn.style.opacity = allValid ? '1' : '0.5';
+        continueBtn.style.cursor = allValid ? 'pointer' : 'not-allowed';
+      }
+
+      // Mark as touched on blur
+      qtyInput.addEventListener('blur', () => { touched.qty = true; updateContinueButton(); });
+      priceInput.addEventListener('blur', () => { touched.price = true; updateContinueButton(); updateSmartPricingFeedback(); });
+      if (costInput) costInput.addEventListener('blur', () => { touched.cost = true; updateContinueButton(); updateSmartPricingFeedback(); });
+      if (sizeInput) sizeInput.addEventListener('blur', () => { touched.size = true; });
+
+      // Validate on input (but only show errors if touched)
+      qtyInput.addEventListener('input', updateContinueButton);
+      priceInput.addEventListener('input', () => { updateContinueButton(); updateSmartPricingFeedback(); });
+      if (costInput) costInput.addEventListener('input', () => { updateContinueButton(); updateSmartPricingFeedback(); });
+
+      // Add smart pricing feedback container if not exists
+      if (priceInput && !document.getElementById('smart-pricing-feedback')) {
+        const feedbackDiv = document.createElement('div');
+        feedbackDiv.id = 'smart-pricing-feedback';
+        feedbackDiv.style.cssText = 'margin-top: 12px; padding: 14px 18px; border-radius: 12px; font-size: 0.95rem; font-weight: 600; display: none; transition: all 0.3s;';
+        priceInput.parentNode.appendChild(feedbackDiv);
+      }
+
+      // Function to update smart pricing feedback
+      function updateSmartPricingFeedback() {
+        const feedbackDiv = document.getElementById('smart-pricing-feedback');
+        if (!feedbackDiv || !priceInput) return;
+
+        const cost = parseFloat(costInput?.value || 0);
+        const price = parseFloat(priceInput.value || 0);
+
+        // Hide if no valid data
+        if (!cost || !price || cost <= 0 || price <= 0) {
+          feedbackDiv.style.display = 'none';
+          return;
+        }
+
+        // Calculate metrics
+        const profit = price - cost;
+        const margin = ((profit / price) * 100).toFixed(1);
+        const profitPerUnit = profit.toFixed(2);
+
+        // Determine feedback type
+        let feedbackClass = '';
+        let icon = '';
+        let label = '';
+
+        if (profit <= 0) {
+          feedbackClass = 'below-cost';
+          icon = '⚠️';
+          label = 'Below Cost';
+          feedbackDiv.style.background = 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)';
+          feedbackDiv.style.border = '2px solid #fbbf24';
+          feedbackDiv.style.color = '#92400e';
+        } else if (margin < 20) {
+          feedbackClass = 'low-margin';
+          icon = '⚡';
+          label = 'Low Margin';
+          feedbackDiv.style.background = 'linear-gradient(135deg, #fef9c3 0%, #fef08a 100%)';
+          feedbackDiv.style.border = '2px solid #eab308';
+          feedbackDiv.style.color = '#854d0e';
+        } else if (margin < 40) {
+          feedbackClass = 'good-margin';
+          icon = '✅';
+          label = 'Good Margin';
+          feedbackDiv.style.background = 'linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)';
+          feedbackDiv.style.border = '2px solid #4ade80';
+          feedbackDiv.style.color = '#065f46';
+        } else {
+          feedbackClass = 'excellent-margin';
+          icon = '🎉';
+          label = 'Excellent Margin';
+          feedbackDiv.style.background = 'linear-gradient(135deg, #bbf7d0 0%, #86efac 100%)';
+          feedbackDiv.style.border = '2px solid #22c55e';
+          feedbackDiv.style.color = '#14532d';
+        }
+
+        feedbackDiv.innerHTML = `
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 1.3em;">${icon}</span>
+            <div style="flex: 1;">
+              <div><strong>${label}</strong> • Margin: <strong>${margin}%</strong></div>
+              <div style="font-size: 0.85rem; opacity: 0.9; margin-top: 4px;">
+                Profit per unit: <strong>K ${profitPerUnit}</strong> | Cost: K ${cost.toFixed(2)} → Selling: K ${price.toFixed(2)}
+              </div>
+            </div>
+          </div>
+        `;
+        feedbackDiv.style.display = 'block';
+      }
+
+      // Initial check (without showing errors - button stays enabled by default)
+      updateContinueButton();
+    }, 100);
+  }
+
+  // Save pricing and continue to scanning
+  window.savePricingAndContinue = async function() {
+    // Guard against double submission
+    if (window.__savePricingInProgress) {
+      console.log('Submission already in progress, ignoring duplicate call');
+      return;
+    }
+    window.__savePricingInProgress = true;
+
+    const sizeInput = document.getElementById('pricing-size');
+    const qtyInput = document.getElementById('pricing-quantity');
+    const priceInput = document.getElementById('pricing-selling-price');
+    const costInput = document.getElementById('pricing-cost-price');
+    const locationInput = document.getElementById('pricing-location-id');
+    const errorDiv = document.getElementById('pricing-error');
+    const continueBtn = document.querySelector('[onclick="savePricingAndContinue()"]');
+
+    // Validate inputs exist
+    if (!qtyInput || !priceInput || !errorDiv) {
+      console.error('Internal error: required input fields not found');
+      if (errorDiv) {
+        errorDiv.textContent = '❌ Internal error: price fields not found';
+        errorDiv.classList.remove('d-none');
+        errorDiv.classList.add('alert-danger');
+        errorDiv.style.display = 'block';
+      }
+      window.__savePricingInProgress = false;
+      return;
+    }
+
+    // CRITICAL: Clear any previous error messages first
+    errorDiv.classList.add('d-none');
+    errorDiv.classList.remove('alert-danger', 'alert-warning', 'alert-info');
+    errorDiv.textContent = '';
+    errorDiv.style.display = 'none';
+
+    // Get values with safe parsing
+    const sizeVal = (sizeInput?.value || "").trim();
+    const qtyRaw = (qtyInput.value || "").trim();
+    const priceRaw = (priceInput.value || "").trim().replace(/,/g, "");
+    const costRaw = (costInput?.value || "").trim().replace(/,/g, "");
+    const locationId = locationInput?.value || null;
+
+    const qty = parseInt(qtyRaw);
+    const price = Number(priceRaw);
+    const cost = Number(costRaw);
+
+    // Validate (BLOCKING errors only)
+    if (!qty || qty <= 0 || isNaN(qty) || !Number.isInteger(qty)) {
+      errorDiv.textContent = '❌ Please enter a valid quantity (must be a whole number greater than 0)';
+      errorDiv.classList.remove('d-none', 'alert-warning', 'alert-info');
+      errorDiv.classList.add('alert-danger');
+      errorDiv.style.display = 'block';
+      qtyInput.focus();
+      window.__savePricingInProgress = false;
+      return;
+    }
+
+    if (!price || price <= 0 || isNaN(price)) {
+      errorDiv.textContent = '❌ Please enter a valid selling price (must be greater than 0)';
+      errorDiv.classList.remove('d-none', 'alert-warning', 'alert-info');
+      errorDiv.classList.add('alert-danger');
+      errorDiv.style.display = 'block';
+      priceInput.focus();
+      window.__savePricingInProgress = false;
+      return;
+    }
+
+    if (isNaN(cost) || cost < 0) {
+      errorDiv.textContent = '❌ Cost price must be a valid number (0 or greater)';
+      errorDiv.classList.remove('d-none', 'alert-warning', 'alert-info');
+      errorDiv.classList.add('alert-danger');
+      errorDiv.style.display = 'block';
+      if (costInput) costInput.focus();
+      window.__savePricingInProgress = false;
+      return;
+    }
+
+    // NON-BLOCKING: Smart pricing warnings
+    let hasWarning = false;
+    if (cost > 0 && price < cost) {
+      const suggestedPrice = (cost * 1.2).toFixed(2);
+      errorDiv.textContent = `⚠️ Warning: Selling price (K${price.toFixed(0)}) is below cost (K${cost.toFixed(0)}). You're pricing at a loss. Consider K${suggestedPrice} for 20% markup. Click Continue to proceed anyway.`;
+      errorDiv.classList.remove('d-none', 'alert-danger', 'alert-info');
+      errorDiv.classList.add('alert-warning');
+      errorDiv.style.display = 'block';
+      hasWarning = true;
+      // Don't return - allow user to continue
+    } else if (!hasWarning) {
+      // Clear warnings if pricing is good
+      errorDiv.classList.add('d-none');
+      errorDiv.textContent = '';
+      errorDiv.style.display = 'none';
+    }
+
+    // Get API URL from data attribute (Django reverse)
+    const apiUrl = document.querySelector('[data-step1-url]')?.getAttribute('data-step1-url');
+    if (!apiUrl) {
+      console.error('API URL not found in template');
+      errorDiv.textContent = '❌ Configuration error: API URL not found';
+      errorDiv.classList.remove('d-none', 'alert-info', 'alert-warning');
+      errorDiv.classList.add('alert-danger');
+      errorDiv.style.display = 'block';
+      window.__savePricingInProgress = false;
+      return;
+    }
+
+    // Disable button during submission
+    if (continueBtn) {
+      continueBtn.disabled = true;
+      continueBtn.style.opacity = '0.5';
+    }
+
+    // Call backend API to validate and store batch session
+    try {
+      const csrfToken = document.querySelector('[name=csrf-token]')?.content ||
+                        document.querySelector('[name=csrfmiddlewaretoken]')?.value ||
+                        document.querySelector('input[name=csrfmiddlewaretoken]')?.value;
+
+      if (!csrfToken) {
+        console.warn('CSRF token not found');
+      }
+
+      errorDiv.textContent = '⏳ Validating...';
+      errorDiv.classList.remove('d-none', 'alert-danger', 'alert-warning');
+      errorDiv.classList.add('alert-info');
+      errorDiv.style.display = 'block';
+
+      const payload = {
+        category: wizard.data.category || '',
+        subcategory: wizard.data.shoe_subtype || wizard.data.suit_subtype || '',
+        size: sizeVal,  // Include size (optional)
+        quantity: qty,
+        cost_price: cost > 0 ? cost.toFixed(2) : '0',
+        selling_price: price.toFixed(2),
+        brand: wizard.data.brand || '',
+        color: wizard.data.color || '',
+        product_name: wizard.data.product_name || ''
+      };
+
+      // Add location_id if available
+      if (locationId) {
+        payload.location_id = locationId;
+      }
+
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': csrfToken || ''
+        },
+        body: JSON.stringify(payload)
+      });
+
+      // ALWAYS parse as JSON (API now always returns JSON)
+      let result;
+      try {
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          result = await response.json();
+        } else {
+          // Fallback for non-JSON responses
+          const text = await response.text();
+          console.error('Non-JSON response:', text);
+          throw new Error('Server returned non-JSON response (status: ' + response.status + ')');
+        }
+      } catch (parseError) {
+        console.error('JSON parse error:', parseError);
+        throw new Error('Failed to parse server response');
+      }
+
+      if (result.ok) {
+        // Save to wizard data
+        wizard.data.initial_stock = qty;
+        wizard.data.quantity = qty;
+        wizard.data.selling_price = price.toFixed(2);
+        if (cost > 0) {
+          wizard.data.cost_price = cost.toFixed(2);
+        }
+        if (sizeVal) {
+          wizard.data.size = sizeVal;
+        }
+
+        // Show warning if present (non-blocking)
+        if (result.warning) {
+          errorDiv.textContent = '⚠️ ' + result.warning + ' Continuing...';
+          errorDiv.classList.remove('d-none', 'alert-danger', 'alert-info');
+          errorDiv.classList.add('alert-warning');
+          errorDiv.style.display = 'block';
+          // Auto-clear warning after 2 seconds
+          setTimeout(() => {
+            errorDiv.classList.add('d-none');
+            errorDiv.style.display = 'none';
+          }, 2000);
+        } else {
+          // Clear error
+          errorDiv.classList.add('d-none');
+          errorDiv.textContent = '';
+          errorDiv.style.display = 'none';
+        }
+
+        // Re-render to show scanning UI
+        wizard.render();
+      } else {
+        // Handle structured errors (NEVER show location errors as price errors)
+        if (result.code === 'no_active_location' && result.action_url) {
+          errorDiv.innerHTML = '❌ ' + (result.error || 'No active location') + 
+            ' <a href="' + result.action_url + '" class="alert-link" target="_blank">Create Location</a>';
+          errorDiv.classList.remove('d-none', 'alert-info', 'alert-warning');
+          errorDiv.classList.add('alert-danger');
+          errorDiv.style.display = 'block';
+        } else if (result.field_errors) {
+          // Show field-specific errors (but map correctly to field names)
+          const errors = [];
+          for (const [field, msg] of Object.entries(result.field_errors)) {
+            if (field === 'selling_price') {
+              errors.push(`Selling price: ${msg}`);
+            } else if (field === 'quantity') {
+              errors.push(`Quantity: ${msg}`);
+            } else if (field === 'cost_price') {
+              errors.push(`Cost price: ${msg}`);
+            } else {
+              errors.push(`${field}: ${msg}`);
+            }
+          }
+          errorDiv.textContent = '❌ ' + errors.join(', ');
+          errorDiv.classList.remove('d-none', 'alert-info', 'alert-warning');
+          errorDiv.classList.add('alert-danger');
+          errorDiv.style.display = 'block';
+        } else {
+          errorDiv.textContent = '❌ ' + (result.error || 'Validation failed');
+          errorDiv.classList.remove('d-none', 'alert-info', 'alert-warning');
+          errorDiv.classList.add('alert-danger');
+          errorDiv.style.display = 'block';
+        }
+      }
+    } catch (error) {
+      console.error('Batch step 1 error:', error);
+      errorDiv.textContent = '❌ Failed to validate. Please try again. (' + error.message + ')';
+      errorDiv.classList.remove('d-none', 'alert-info', 'alert-warning');
+      errorDiv.classList.add('alert-danger');
+      errorDiv.style.display = 'block';
+    } finally {
+      // Re-enable button
+      if (continueBtn) {
+        continueBtn.disabled = false;
+        continueBtn.style.opacity = '1';
+      }
+      window.__savePricingInProgress = false;
+    }
+  };
+
+  // Setup live validation when pricing form is rendered
+  const originalRender = wizard.render.bind(wizard);
+  wizard.render = function() {
+    originalRender();
+    // Check if pricing form is visible and setup validation
+    setTimeout(() => {
+      const pricingForm = document.querySelector('.wizard-pricing-form');
+      if (pricingForm) {
+        setupLiveValidation();
+      }
+    }, 50);
+  };
+
+  // Allow Enter key in manual input
+  document.addEventListener('DOMContentLoaded', function() {
+    // Guard against double binding
+    if (window.__clothingWizardBound) return;
+    window.__clothingWizardBound = true;
+
+    // This will be called when the barcode step is rendered
+    setTimeout(() => {
+      const manualInput = document.getElementById('manual-barcode-input');
+      if (manualInput && !manualInput.__enterBound) {
+        manualInput.__enterBound = true;
+        manualInput.addEventListener('keypress', function(e) {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            addManualBarcode();
+          }
+        });
+      }
+    }, 100);
+  });
+})();
+</script>
+{% endblock %}

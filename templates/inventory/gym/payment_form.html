@@ -26,7 +26,7 @@
             <div class="glass-card p-4">
                 <form method="post">
                     {% csrf_token %}
-                    
+
                     <div class="mb-3">
                         <label for="{{ form.member.id_for_label }}" class="form-label">
                             Member <span class="text-danger">*</span>
@@ -38,22 +38,91 @@
                     </div>
 
                     <div class="mb-3">
-                        <label for="{{ form.amount.id_for_label }}" class="form-label">
-                            Amount (MWK) <span class="text-danger">*</span>
+                        <label for="{{ form.membership_amount.id_for_label }}" class="form-label">
+                            Membership Amount (MWK) <span class="text-danger">*</span>
                         </label>
-                        {{ form.amount }}
-                        {% if form.amount.errors %}
-                            <div class="text-danger small mt-1">{{ form.amount.errors }}</div>
+                        <div class="input-group">
+                            <span class="input-group-text">MWK</span>
+                            {{ form.membership_amount }}
+                        </div>
+                        <small class="form-text text-muted d-block mt-1">
+                            💡 Base membership fee (MWK 55,000 = 30 days). Days are calculated from this amount only.
+                        </small>
+                        <div id="days-preview" class="mt-2 p-2 bg-light rounded small" style="display:none;">
+                            <strong>Days granted:</strong> <span id="days-count">0</span> days
+                        </div>
+                        {% if form.membership_amount.errors %}
+                            <div class="text-danger small mt-1">{{ form.membership_amount.errors }}</div>
                         {% endif %}
                     </div>
 
                     <div class="mb-3">
+                        <label for="{{ form.trainer.id_for_label }}" class="form-label">
+                            Trainer (Optional)
+                        </label>
+                        {{ form.trainer }}
+                        {% if form.trainer.errors %}
+                            <div class="text-danger small mt-1">{{ form.trainer.errors }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="{{ form.trainer_fee.id_for_label }}" class="form-label">
+                            Trainer Fee (MWK)
+                        </label>
+                        <div class="input-group">
+                            <span class="input-group-text">MWK</span>
+                            {{ form.trainer_fee }}
+                        </div>
+                        <small class="form-text text-muted d-block mt-1">
+                            ℹ️ Additional fee for trainer service (does not add extra membership days).
+                        </small>
+                        {% if form.trainer_fee.errors %}
+                            <div class="text-danger small mt-1">{{ form.trainer_fee.errors }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">
+                            Payment Method <span class="text-danger">*</span>
+                        </label>
+                        
+                        <!-- Hidden input for form submission (maintains backend compatibility) -->
+                        <input type="hidden" name="payment_method" id="payment_method_value" value="{{ form.payment_method.initial|default:'cash' }}">
+                        
+                        <!-- Card-style payment method selection -->
+                        <div class="payment-method-cards">
+                            <div class="payment-method-card active" data-method="cash" onclick="selectGymPaymentMethod(this)">
+                                <div class="payment-icon">💵</div>
+                                <div class="payment-title">Cash</div>
+                                <small>Immediate payment</small>
+                            </div>
+                            
+                            <div class="payment-method-card" data-method="bank" onclick="selectGymPaymentMethod(this)">
+                                <div class="payment-icon">🏦</div>
+                                <div class="payment-title">Bank Transfer</div>
+                                <small>Electronic transfer</small>
+                            </div>
+                            
+                            <div class="payment-method-card" data-method="mobile_money" onclick="selectGymPaymentMethod(this)">
+                                <div class="payment-icon">📱</div>
+                                <div class="payment-title">Mobile Money</div>
+                                <small>Airtel/TNM Money</small>
+                            </div>
+                        </div>
+                        
+                        {% if form.payment_method.errors %}
+                            <div class="text-danger small mt-1">{{ form.payment_method.errors }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="mb-3"
                         <label for="{{ form.start_date.id_for_label }}" class="form-label">
                             Start Date <span class="text-danger">*</span>
                         </label>
                         {{ form.start_date }}
                         <small class="form-text text-muted">
-                            Membership will automatically extend by 30 days from this date
+                            Auto-extends from current end date if member is active.
                         </small>
                         {% if form.start_date.errors %}
                             <div class="text-danger small mt-1">{{ form.start_date.errors }}</div>
@@ -71,15 +140,119 @@
                     </div>
 
                     <div class="d-flex gap-2">
-                        <button type="submit" class="btn btn-primary">
+                        <button type="submit" class="btn btn-primary btn-lg" data-cy="gym-payment-submit">
                             <i class="bi bi-check-circle"></i> Record Payment
                         </button>
-                        <a href="{% url 'gym:members_list' %}" class="btn btn-outline-secondary">
-                            Cancel
+                        <a href="{% url 'gym:members_list' %}" class="btn btn-outline-secondary btn-lg">
+                            <i class="bi bi-x-circle"></i> Cancel
                         </a>
                     </div>
                 </form>
             </div>
+
+            <script>
+            // Real-time days calculation preview
+            document.addEventListener('DOMContentLoaded', function() {
+                const amountInput = document.querySelector('input[name="membership_amount"]');
+                const daysPreview = document.getElementById('days-preview');
+                const daysCount = document.getElementById('days-count');
+
+                if (amountInput) {
+                    amountInput.addEventListener('input', function() {
+                        const amount = parseFloat(this.value) || 0;
+                        if (amount > 0) {
+                            // Calculate days: 55000 = 30 days, so daily rate = 1833.33
+                            const days = Math.floor(amount / 1833.33);
+                            daysCount.textContent = days;
+                            daysPreview.style.display = 'block';
+                        } else {
+                            daysPreview.style.display = 'none';
+                        }
+                    });
+
+                    // Trigger on page load if value exists
+                    if (amountInput.value) {
+                        amountInput.dispatchEvent(new Event('input'));
+                    }
+                }
+            });
+            
+            // Payment method card selection
+            function selectGymPaymentMethod(card) {
+                // Remove active class from all cards
+                document.querySelectorAll('.payment-method-card').forEach(c => {
+                    c.classList.remove('active');
+                });
+                
+                // Add active class to selected card
+                card.classList.add('active');
+                
+                // Update hidden input value
+                const method = card.getAttribute('data-method');
+                document.getElementById('payment_method_value').value = method;
+            }
+            </script>
+
+            <style>
+            .payment-method-cards {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+                gap: 12px;
+                margin-top: 8px;
+            }
+            
+            .payment-method-card {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                padding: 16px 12px;
+                border: 2px solid #e2e8f0;
+                border-radius: 12px;
+                background: white;
+                cursor: pointer;
+                transition: all 0.2s ease;
+                min-height: 100px;
+                gap: 6px;
+            }
+            
+            .payment-method-card:hover {
+                border-color: #8b5cf6;
+                transform: translateY(-2px);
+                box-shadow: 0 4px 12px rgba(139, 92, 246, 0.15);
+            }
+            
+            .payment-method-card.active {
+                border-color: #8b5cf6;
+                background: linear-gradient(135deg, #f5f3ff, #ede9fe);
+                box-shadow: 0 4px 16px rgba(139, 92, 246, 0.2);
+            }
+            
+            .payment-icon {
+                font-size: 2rem;
+                transition: transform 0.2s ease;
+            }
+            
+            .payment-method-card.active .payment-icon {
+                transform: scale(1.1);
+            }
+            
+            .payment-title {
+                font-weight: 700;
+                color: #0f172a;
+                font-size: 0.95rem;
+            }
+            
+            .payment-method-card small {
+                color: #64748b;
+                font-size: 0.8rem;
+                text-align: center;
+            }
+            
+            .payment-method-card.active small {
+                color: #6d28d9;
+            }
+            </style>
 
             <!-- Recent Payments -->
             {% if recent_payments %}
@@ -98,7 +271,7 @@
                         <tbody>
                             {% for payment in recent_payments %}
                             <tr>
-                                <td>{{ payment.member.name }}</td>
+                                <td><a href="{% url 'gym:member_detail' payment.member.id %}" class="text-decoration-none text-primary">{{ payment.member.name }}</a></td>
                                 <td class="fw-semibold">MWK {{ payment.amount|floatformat:2 }}</td>
                                 <td>{{ payment.end_date|date:"d M Y" }}</td>
                                 <td class="small text-muted">{{ payment.paid_at|date:"d M Y" }}</td>
@@ -118,12 +291,32 @@
                     <i class="bi bi-info-circle"></i> Membership Information
                 </h5>
                 <p class="text-muted small mb-3">
-                    Each membership payment provides access for 30 days from the start date.
+                    Membership days are prorated based on the payment amount.
                 </p>
                 <hr>
                 <div class="mb-3">
-                    <label class="text-muted small">Standard Membership</label>
-                    <div class="fw-semibold">30 Days</div>
+                    <label class="text-muted small">Pricing</label>
+                    <div class="fw-semibold">MWK 55,000 = 30 Days</div>
+                    <div class="small text-muted">Daily rate: MWK 1,833.33</div>
+                </div>
+                <div class="mb-3">
+                    <label class="text-muted small">Membership Examples</label>
+                    <ul class="small text-muted mb-0">
+                        <li>MWK 55,000 → 30 days</li>
+                        <li>MWK 100,000 → 55 days</li>
+                        <li>MWK 110,000 → 60 days</li>
+                    </ul>
+                </div>
+                <hr>
+                <div class="mb-3">
+                    <label class="text-muted small">Trainer Fee</label>
+                    <p class="small text-muted mb-0">
+                        <strong>Optional:</strong> If member has a trainer, add the trainer fee (e.g., MWK 15,000).
+                        The trainer fee does NOT add membership days.
+                    </p>
+                    <p class="small text-muted mb-0 mt-2">
+                        <strong>Total paid</strong> = Membership amount + Trainer fee
+                    </p>
                 </div>
                 <hr>
                 <p class="text-muted small mb-0">
@@ -134,4 +327,3 @@
     </div>
 </div>
 {% endblock %}
-

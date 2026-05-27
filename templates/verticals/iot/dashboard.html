@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}IoT Monitoring Dashboard — Emajinet{% endblock %}
+
+{% block extra_css %}
+<style>
+.iot-page { max-width: 1100px; margin: 0 auto; padding: 20px 12px; }
+.device-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 20px; margin-bottom: 16px; }
+.device-card h3 { font-weight: 800; margin: 0 0 6px; color: #0f172a; }
+.status-badge { display: inline-block; padding: 4px 12px; border-radius: 99px; font-size: 0.78rem; font-weight: 700; }
+.status-online { background: #dcfce7; color: #15803d; }
+.status-offline { background: #f1f5f9; color: #64748b; }
+.status-warning { background: #fef9c3; color: #854d0e; }
+.reading-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #f1f5f9; font-size: 0.875rem; }
+.reading-row:last-child { border-bottom: none; }
+.reading-type { color: #64748b; font-weight: 600; }
+.reading-value { font-weight: 800; color: #0f172a; }
+.kpi-strip { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; margin-bottom: 24px; }
+.kpi-mini { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; }
+.kpi-mini .label { font-size: 0.75rem; text-transform: uppercase; color: #64748b; font-weight: 700; letter-spacing: 0.05em; margin-bottom: 4px; }
+.kpi-mini .value { font-size: 1.6rem; font-weight: 900; color: #0f172a; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="iot-page" data-testid="iot-dashboard">
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;">
+    <h1 style="margin:0;font-size:1.6rem;font-weight:900;color:#0f172a;">📡 IoT Monitoring</h1>
+    <span style="background:#dbeafe;color:#1d4ed8;padding:4px 12px;border-radius:99px;font-size:0.8rem;font-weight:700;">Developer-Ready Foundation</span>
+  </div>
+
+  <!-- KPI Strip -->
+  <div class="kpi-strip">
+    <div class="kpi-mini">
+      <div class="label">Total Devices</div>
+      <div class="value">{{ total_devices }}</div>
+    </div>
+    <div class="kpi-mini">
+      <div class="label">Online Now</div>
+      <div class="value" style="color:#15803d;">{{ online_count }}</div>
+    </div>
+    <div class="kpi-mini">
+      <div class="label">Offline</div>
+      <div class="value" style="color:#64748b;">{{ total_devices|add:"-"|add:online_count }}</div>
+    </div>
+  </div>
+
+  {% if not device_data %}
+  <div style="text-align:center;padding:60px 20px;background:#fff;border-radius:20px;border:2px dashed #e2e8f0;">
+    <span style="font-size:3rem;display:block;margin-bottom:16px;">📡</span>
+    <h3 style="color:#0f172a;font-weight:800;margin:0 0 8px;">No devices registered yet</h3>
+    <p style="color:#64748b;margin:0 0 20px;max-width:400px;margin-left:auto;margin-right:auto;">Register an ESP32 or other HTTP device to start sending readings.</p>
+    <a href="{% url 'staticpages:developers' %}" style="background:#2563eb;color:#fff;border-radius:10px;padding:10px 20px;font-weight:700;text-decoration:none;">View Integration Guide →</a>
+  </div>
+  {% endif %}
+
+  {% for item in device_data %}
+  {% with device=item.device %}
+  <div class="device-card" data-testid="device-card">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;">
+      <div>
+        <h3>{{ device.name }}</h3>
+        <code style="font-size:0.8rem;color:#64748b;background:#f8fafc;padding:2px 8px;border-radius:6px;">{{ device.device_id }}</code>
+      </div>
+      <div style="text-align:right;">
+        <span class="status-badge status-{{ device.status }}">{{ device.get_status_display }}</span>
+        {% if item.minutes_ago is not None %}
+        <small style="display:block;color:#94a3b8;font-size:0.75rem;margin-top:4px;">
+          {% if item.minutes_ago < 2 %}Just now
+          {% elif item.minutes_ago < 60 %}{{ item.minutes_ago }}m ago
+          {% else %}{{ item.minutes_ago|floatformat:0 }}m ago{% endif %}
+        </small>
+        {% else %}
+        <small style="display:block;color:#94a3b8;font-size:0.75rem;margin-top:4px;">Never seen</small>
+        {% endif %}
+      </div>
+    </div>
+
+    {% if item.latest_readings %}
+    <div style="border-top:1px solid #f1f5f9;padding-top:12px;">
+      <strong style="font-size:0.75rem;text-transform:uppercase;color:#64748b;letter-spacing:0.05em;">Latest Readings</strong>
+      {% for reading in item.latest_readings %}
+      <div class="reading-row">
+        <span class="reading-type">{{ reading.reading_type }}</span>
+        <span class="reading-value">{{ reading.value }} {{ reading.unit }}</span>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p style="color:#94a3b8;font-size:0.875rem;margin:8px 0 0;">No readings yet</p>
+    {% endif %}
+  </div>
+  {% endwith %}
+  {% endfor %}
+
+  <!-- Webhook Instructions -->
+  <div style="background:#0f172a;color:#e2e8f0;border-radius:16px;padding:24px;margin-top:24px;">
+    <h3 style="color:#fff;margin:0 0 12px;font-weight:800;">Webhook Endpoint</h3>
+    <p style="color:#94a3b8;font-size:0.875rem;margin:0 0 12px;">POST readings from your device to:</p>
+    <code style="background:#1e293b;padding:10px 14px;border-radius:8px;display:block;color:#86efac;font-size:0.875rem;word-break:break-all;">{{ webhook_url }}</code>
+    <p style="color:#94a3b8;font-size:0.82rem;margin:12px 0 0;">Include <code style="color:#93c5fd;">Authorization: Bearer &lt;your_api_key&gt;</code> in the request header.</p>
+    <a href="{% url 'staticpages:developers' %}" style="display:inline-block;margin-top:14px;background:#2563eb;color:#fff;border-radius:8px;padding:8px 18px;font-weight:700;text-decoration:none;font-size:0.875rem;">Full Developer Docs →</a>
+  </div>
+</div>
+{% endblock %}

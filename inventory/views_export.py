@@ -81,11 +81,11 @@ def export_inventory_csv(request: HttpRequest):
             qs = qs.filter(product_id=int(prod))
         else:
             qs = qs.filter(
-                Q(product__code__iexact=prod) |  # if 'code' exists
-                Q(product__name__icontains=prod) |  # if 'name' exists
-                Q(product__brand__icontains=prod) |
-                Q(product__model__icontains=prod) |
-                Q(product__variant__icontains=prod)
+                Q(product__code__iexact=prod)
+                | Q(product__name__icontains=prod)  # if 'code' exists
+                | Q(product__brand__icontains=prod)  # if 'name' exists
+                | Q(product__model__icontains=prod)
+                | Q(product__variant__icontains=prod)
             )
 
     # Received date range
@@ -101,25 +101,33 @@ def export_inventory_csv(request: HttpRequest):
     q = request.GET.get("q")
     if q:
         qs = qs.filter(
-            Q(imei__icontains=q) |
-            Q(product__name__icontains=q) |       # if 'name' exists
-            Q(product__brand__icontains=q) |
-            Q(product__model__icontains=q) |
-            Q(product__variant__icontains=q) |
-            Q(product__code__icontains=q) |       # if 'code' exists
-            Q(current_location__name__icontains=q) |
-            Q(assigned_agent__username__icontains=q)
+            Q(imei__icontains=q)
+            | Q(product__name__icontains=q)
+            | Q(product__brand__icontains=q)  # if 'name' exists
+            | Q(product__model__icontains=q)
+            | Q(product__variant__icontains=q)
+            | Q(product__code__icontains=q)
+            | Q(current_location__name__icontains=q)  # if 'code' exists
+            | Q(assigned_agent__username__icontains=q)
         )
 
     # Sensible ordering
     qs = qs.order_by("-received_at", "product__brand", "product__model", "product__variant")
 
     header = [
-        "id", "imei",
-        "product_name", "brand", "model", "variant",
-        "location", "status",
-        "received_at", "order_price", "selling_price",
-        "assigned_agent", "sold_at",
+        "id",
+        "imei",
+        "product_name",
+        "brand",
+        "model",
+        "variant",
+        "location",
+        "status",
+        "received_at",
+        "order_price",
+        "selling_price",
+        "assigned_agent",
+        "sold_at",
     ]
 
     def rows():
@@ -135,11 +143,9 @@ def export_inventory_csv(request: HttpRequest):
             product_name = (
                 getattr(prod, "name", "")  # type: ignore[attr-defined]
                 or " ".join(
-                    part for part in [
-                        getattr(prod, "brand", ""),
-                        getattr(prod, "model", ""),
-                        getattr(prod, "variant", "")
-                    ] if part
+                    part
+                    for part in [getattr(prod, "brand", ""), getattr(prod, "model", ""), getattr(prod, "variant", "")]
+                    if part
                 ).strip()
             )
 
@@ -175,15 +181,11 @@ def export_audits_csv(request: HttpRequest):
       - by: user id (numeric)
       - date_from, date_to: filter a.at date range (YYYY-MM-DD)
     """
-    qs = (InventoryAudit.objects
-          .select_related("item", "by_user", "item__product", "item__current_location"))
+    qs = InventoryAudit.objects.select_related("item", "by_user", "item__product", "item__current_location")
 
     # Permission scope: non-managers see their own activity or audits for items they hold
     if not _can_view_all(request.user):
-        qs = qs.filter(
-            Q(by_user=request.user) |
-            Q(item__assigned_agent=request.user)
-        )
+        qs = qs.filter(Q(by_user=request.user) | Q(item__assigned_agent=request.user))
 
     action = request.GET.get("action")
     if action:
@@ -204,12 +206,12 @@ def export_audits_csv(request: HttpRequest):
     q = request.GET.get("q")
     if q:
         qs = qs.filter(
-            Q(details__icontains=q) |
-            Q(item__imei__icontains=q) |
-            Q(item__product__name__icontains=q) |      # if 'name' exists
-            Q(item__product__brand__icontains=q) |
-            Q(item__product__model__icontains=q) |
-            Q(item__current_location__name__icontains=q)
+            Q(details__icontains=q)
+            | Q(item__imei__icontains=q)
+            | Q(item__product__name__icontains=q)
+            | Q(item__product__brand__icontains=q)  # if 'name' exists
+            | Q(item__product__model__icontains=q)
+            | Q(item__current_location__name__icontains=q)
         )
 
     qs = qs.order_by("-at", "-id")
@@ -224,15 +226,15 @@ def export_audits_csv(request: HttpRequest):
             loc = getattr(item, "current_location", None) if item else None
             at = getattr(a, "at", None)
 
-            product_name = (
-                getattr(prod, "name", "") if prod else ""
-            ) or (
+            product_name = (getattr(prod, "name", "") if prod else "") or (
                 " ".join(
-                    part for part in [
+                    part
+                    for part in [
                         getattr(prod, "brand", "") if prod else "",
                         getattr(prod, "model", "") if prod else "",
                         getattr(prod, "variant", "") if prod else "",
-                    ] if part
+                    ]
+                    if part
                 ).strip()
             )
 
@@ -250,5 +252,3 @@ def export_audits_csv(request: HttpRequest):
 
     fname = f"inventory_audits_{timezone.now():%Y%m%d_%H%M}.csv"
     return stream_csv(rows(), fname)
-
-

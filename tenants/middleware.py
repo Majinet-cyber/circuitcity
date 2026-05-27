@@ -1,7 +1,8 @@
-﻿# circuitcity/tenants/middleware.py
+# circuitcity/tenants/middleware.py
 from __future__ import annotations
 
-from typing import Optional, Iterable
+from typing import Iterable, Optional
+
 from django.utils.deprecation import MiddlewareMixin
 from django.utils.functional import cached_property
 
@@ -9,9 +10,24 @@ from django.utils.functional import cached_property
 try:
     from django.conf import settings
 except Exception:  # pragma: no cover
+
     class _S:  # minimal shim
         TENANT_SESSION_KEY = "active_business_id"
+
     settings = _S()  # type: ignore
+
+# Import shared bypass prefixes for consistent middleware behavior
+try:
+    from cc.middleware_constants import BYPASS_PREFIXES
+except Exception:  # pragma: no cover
+    # Fallback if import fails
+    BYPASS_PREFIXES = (
+        "/sw.js",
+        "/manifest.json",
+        "/favicon.ico",
+        "/static/",
+        "/media/",
+    )
 
 try:
     from tenants.models import Business, Membership, set_current_business_id  # thread-local setter
@@ -22,31 +38,34 @@ except Exception:  # pragma: no cover
     def set_current_business_id(_):  # type: ignore
         return
 
+
 try:
     # Use the SAME utils your views use to store/read active biz
     from tenants.utils import get_active_business, set_active_business
 except Exception:  # pragma: no cover
+
     def get_active_business(_request):  # type: ignore
         return None
 
     def set_active_business(_request, _biz):  # type: ignore
         return
 
+
 # Optional: scope helpers (location resolution). All guarded.
 try:
-    from tenants.scope import (
-        resolve_location_for_user,
-        serialize_scope_for_ui,
-        set_scope_in_session,
-        get_active_business as scope_get_active_business,  # same behavior as utils-based
-    )
+    from tenants.scope import get_active_business as scope_get_active_business  # same behavior as utils-based
+    from tenants.scope import resolve_location_for_user, serialize_scope_for_ui, set_scope_in_session
 except Exception:  # pragma: no cover
+
     def resolve_location_for_user(_request):  # type: ignore
         return None
+
     def serialize_scope_for_ui(_request):  # type: ignore
         return {}
+
     def set_scope_in_session(_request, *, business_id=None, location_id=None):  # type: ignore
         return
+
     scope_get_active_business = get_active_business  # type: ignore
 
 LOCAL_HOSTS = {"127.0.0.1", "localhost"}
@@ -55,7 +74,7 @@ LOCAL_HOSTS = {"127.0.0.1", "localhost"}
 CANONICAL_SESSION_KEY = getattr(settings, "TENANT_SESSION_KEY", "active_business_id")
 LEGACY_SESSION_KEYS: Iterable[str] = (CANONICAL_SESSION_KEY, "active_business_id", "biz_id")
 
-PRODUCT_MODE_SESSION_KEY = "product_mode"          # single source of truth for UI mode
+PRODUCT_MODE_SESSION_KEY = "product_mode"  # single source of truth for UI mode
 
 # ── product/vertical normalization (aliases) ────────────────────────────────────
 VERTICAL_ALIASES = {
@@ -66,13 +85,11 @@ VERTICAL_ALIASES = {
     "phones": "phones",
     "mobile": "phones",
     "mobiles": "phones",
-
     # Pharmacy
     "pharmacy": "pharmacy",
     "chemist": "pharmacy",
     "medicine": "pharmacy",
     "drugstore": "pharmacy",
-
     # Liquor
     "liquor": "liquor",
     "bar": "liquor",
@@ -80,13 +97,94 @@ VERTICAL_ALIASES = {
     "pub": "liquor",
     "bottle-store": "liquor",
     "bottle store": "liquor",
-
     # Grocery / Supermarket / Retail
     "grocery": "grocery",
     "groceries": "grocery",
     "supermarket": "grocery",
     "supermarket & groceries": "grocery",
     "retail": "grocery",
+    # Gym / Fitness
+    "gym": "gym",
+    "fitness": "gym",
+    "fitness center": "gym",
+    "health club": "gym",
+    "sports club": "gym",
+    # Clothing / Fashion
+    "clothing": "clothing",
+    "fashion": "clothing",
+    "apparel": "clothing",
+    "boutique": "clothing",
+    "garments": "clothing",
+    # Hardware & General Dealers
+    "hardware": "hardware",
+    "hardware & general dealers": "hardware",
+    "general dealers": "hardware",
+    "building supplies": "hardware",
+    "home improvement": "hardware",
+    # Cement / Building Materials
+    "cement": "cement",
+    "building materials": "cement",
+    # Farm Manager
+    "farm": "farm",
+    "agriculture": "farm",
+    "farming": "farm",
+    # Welding Workshop
+    "welding": "welding",
+    "welder": "welding",
+    "fabrication": "welding",
+    # Car Hire Service
+    "car_hire": "car_hire",
+    "car hire": "car_hire",
+    "car hire service": "car_hire",
+    "vehicle rental": "car_hire",
+    "car rental": "car_hire",
+    "fleet": "car_hire",
+    # Car Dealer
+    "car_dealer": "car_dealer",
+    "car dealer": "car_dealer",
+    "dealership": "car_dealer",
+    "car dealership": "car_dealer",
+    "vehicle dealer": "car_dealer",
+    "vehicle dealership": "car_dealer",
+    "auto dealer": "car_dealer",
+    "used cars": "car_dealer",
+    "second hand cars": "car_dealer",
+    # Renewable Energy
+    "energy": "energy",
+    "renewable energy": "energy",
+    "solar": "energy",
+    "solar energy": "energy",
+    "solar power": "energy",
+    "solar systems": "energy",
+    "battery systems": "energy",
+    "inverter": "energy",
+    "green energy": "energy",
+    "clean energy": "energy",
+    # Mobile Money Agent
+    "mobile_money": "mobile_money",
+    "mobile money": "mobile_money",
+    "mobile money agent": "mobile_money",
+    "momo agent": "mobile_money",
+    "mobile money reconciliation": "mobile_money",
+    # Mixed Retail (multi-department shop)
+    "mixed_retail": "mixed_retail",
+    "mixed retail": "mixed_retail",
+    "multi retail": "mixed_retail",
+    "general shop": "mixed_retail",
+    "multi-department": "mixed_retail",
+    # Consultancy & Services
+    "consultancy": "consultancy",
+    "consulting": "consultancy",
+    "freelance": "consultancy",
+    "agency": "consultancy",
+    "services": "consultancy",
+    "advisory": "consultancy",
+    # Butchery
+    "butchery": "butchery",
+    "butcher": "butchery",
+    "meat shop": "butchery",
+    "butchery shop": "butchery",
+    "abattoir": "butchery",
 }
 
 
@@ -225,16 +323,19 @@ def _pick_owned_business_for_user(user) -> Optional[object]:
 
 def _pick_active_membership_business_for_user(user) -> Optional[object]:
     """
-    Choose the most recent ACTIVE membership's business where the Business itself is ACTIVE.
+    Choose the SINGLE ACTIVE membership's business if user has exactly one.
+    Returns None if user has 0 or 2+ active memberships (preserves multi-business selection flow).
+    
+    CRITICAL FIX: Only auto-select when user has exactly ONE membership.
+    Multi-business users should NOT have auto-selected business - they must choose.
     """
     if Membership is None or user is None:
         return None
     try:
-        mem_qs = (
-            Membership.objects.filter(user=user)
-            .select_related("business")
-            .order_by("-created_at", "-id")
-        )
+        mem_qs = Membership.objects.filter(user=user).select_related("business").order_by("-created_at", "-id")
+        
+        # Filter to only ACTIVE memberships with ACTIVE businesses
+        active_memberships = []
         for mem in mem_qs:
             biz = getattr(mem, "business", None)
             if not biz:
@@ -242,10 +343,15 @@ def _pick_active_membership_business_for_user(user) -> Optional[object]:
             if _has_field(Business, "status") and str(getattr(biz, "status", "")).upper() != "ACTIVE":
                 continue
             if _is_active_membership(mem):
-                return biz
+                active_memberships.append((mem, biz))
+        
+        # CRITICAL: Only auto-select if exactly ONE membership
+        if len(active_memberships) != 1:
+            return None
+        
+        return active_memberships[0][1]  # Return the business
     except Exception:
         return None
-    return None
 
 
 def _derive_product_mode_from_business(biz) -> str:
@@ -255,7 +361,17 @@ def _derive_product_mode_from_business(biz) -> str:
     if not biz:
         return "generic"
 
-    for attr in ("vertical", "category", "industry", "type", "kind", "sector", "business_kind", "business_type"):
+    for attr in (
+        "template_key",
+        "vertical",
+        "category",
+        "industry",
+        "type",
+        "kind",
+        "sector",
+        "business_kind",
+        "business_type",
+    ):
         val = getattr(biz, attr, None)
         if isinstance(val, str) and val.strip():
             return normalize_vertical(val)
@@ -309,7 +425,7 @@ def _attach_location_scope(request) -> None:
     """
     Optional helper: if tenants.scope is available, compute the effective location,
     store it on the request for templates, and persist in session.
-    No-ops if the helpers aren’t importable.
+    No-ops if the helpers aren't importable.
     """
     try:
         # Resolve against the same active business we just activated
@@ -329,6 +445,33 @@ def _attach_location_scope(request) -> None:
         # Never block request flow if scope helpers fail
         request.location_id = None
         request.scope = {}
+
+
+def _attach_role_to_request(request) -> None:
+    """
+    AUTHORITATIVE role attachment: compute role using centralized logic and store on request.
+    This is the single source of truth for role determination used by views, templates, etc.
+
+    Attaches:
+        - request.cc_business: Business object
+        - request.cc_role: Role string ("MANAGER", "AGENT", "OWNER", "AUDITOR", "BAR_MANAGER", "NONE")
+        - request.cc_is_manager: Boolean (True for managers, owners, staff, superusers)
+        - request.cc_is_agent: Boolean (True ONLY if agent and NOT manager)
+        - request.cc_is_owner: Boolean (True if business owner)
+
+    CRITICAL: This implements manager precedence - managers are NEVER agents.
+    """
+    try:
+        from tenants.utils_roles import attach_role_to_request
+
+        attach_role_to_request(request)
+    except Exception:
+        # Fallback: set safe defaults if utils_roles isn't available
+        request.cc_business = getattr(request, "business", None)
+        request.cc_role = "NONE"
+        request.cc_is_manager = False
+        request.cc_is_agent = False
+        request.cc_is_owner = False
 
 
 # ── Middleware ─────────────────────────────────────────────────────────────────
@@ -356,6 +499,23 @@ class TenantResolutionMiddleware(MiddlewareMixin):
     def _has_business_model(self) -> bool:
         return Business is not None
 
+    def __call__(self, request):
+        # CRITICAL: Bypass critical paths at the very top to prevent redirect loops
+        path = request.path_info or request.path or "/"
+
+        # Bypass shared allowlist paths (service worker, static, etc.)
+        for prefix in BYPASS_PREFIXES:
+            if path.startswith(prefix):
+                return self.get_response(request)
+
+        # CRITICAL: Bypass HQ paths to prevent redirect loops
+        if path.startswith("/hq/"):
+            return self.get_response(request)
+        # CRITICAL: Bypass public gym QR code endpoints (no tenant resolution required)
+        if path.startswith("/gym/qr/"):
+            return self.get_response(request)
+        return super().__call__(request)
+
     def process_request(self, request):
         # Start clean every request
         request.business = None
@@ -363,25 +523,73 @@ class TenantResolutionMiddleware(MiddlewareMixin):
         request.product_mode = "generic"
         request.location_id = None
         request.scope = {}
+        # Role flags (will be set after business resolution)
+        request.cc_business = None
+        request.cc_role = "NONE"
+        request.cc_is_manager = False
+        request.cc_is_agent = False
+        request.cc_is_owner = False
         try:
             set_current_business_id(None)  # reset thread-local at request start
         except Exception:
             pass
+
+        # CRITICAL: Bypass critical paths entirely to prevent redirect loops
+        path = getattr(request, "path", "")
+
+        # Bypass shared allowlist paths (service worker, static, etc.)
+        for prefix in BYPASS_PREFIXES:
+            if path.startswith(prefix):
+                _set_product_mode_on_request(request, None)
+                return
+
+        # CRITICAL: Bypass HQ paths to prevent redirect loops
+        if path.startswith("/hq/"):
+            _set_product_mode_on_request(request, None)
+            return
+        # CRITICAL: Bypass public gym QR code endpoints (no tenant resolution required)
+        if path.startswith("/gym/qr/"):
+            _set_product_mode_on_request(request, None)
+            return
+
+        # CRITICAL: Bypass staff/superusers to prevent redirect loops
+        user = getattr(request, "user", None)
+        if getattr(user, "is_authenticated", False):
+            if getattr(user, "is_staff", False) or getattr(user, "is_superuser", False):
+                _set_product_mode_on_request(request, None)
+                return
 
         if not self._has_business_model:
             # Still allow mode override even if Business model isn't present
             _set_product_mode_on_request(request, None)
             return
 
-        user = getattr(request, "user", None)
+        # (0) CRITICAL: Auto-select single-business users FIRST
+        #     This prevents 302 redirects to /tenants/ for users with exactly one membership
+        #     Must happen BEFORE any other resolution to ensure session is populated
+        if getattr(user, "is_authenticated", False):
+            try:
+                from tenants.services.active_business import ensure_active_business
+                biz = ensure_active_business(request, user, auto_select_single=True)
+                if biz:
+                    # SSOT auto-selected a business - activate it and return
+                    _activate(request, biz)
+                    _set_product_mode_on_request(request, biz)
+                    _attach_location_scope(request)  # safe, optional
+                    _attach_role_to_request(request)  # AUTHORITATIVE role determination
+                    return
+            except Exception:
+                pass  # Continue with normal resolution if SSOT fails
 
         # (1) Canonical: use the same util as your views/templates
+        #     (This will now benefit from the session set by SSOT above)
         try:
             b = get_active_business(request)
             if b:
                 _activate(request, b)
                 _set_product_mode_on_request(request, b)
                 _attach_location_scope(request)  # safe, optional
+                _attach_role_to_request(request)  # AUTHORITATIVE role determination
                 return
         except Exception:
             # continue with fallbacks
@@ -395,6 +603,7 @@ class TenantResolutionMiddleware(MiddlewareMixin):
                 _activate(request, b)
                 _set_product_mode_on_request(request, b)
                 _attach_location_scope(request)
+                _attach_role_to_request(request)  # AUTHORITATIVE role determination
                 return
             except Exception:
                 pass  # ignore bad ids quietly
@@ -413,10 +622,13 @@ class TenantResolutionMiddleware(MiddlewareMixin):
         if bid:
             try:
                 b = _filter_active_business(Business.objects).get(pk=bid)
-                if getattr(user, "is_superuser", False) or _user_has_active_membership(user, b):
+                # CRITICAL FIX: Also accept business creators as valid (owner == manager access)
+                is_creator = getattr(b, "created_by_id", None) == getattr(user, "pk", None)
+                if getattr(user, "is_superuser", False) or _user_has_active_membership(user, b) or is_creator:
                     _activate(request, b)
                     _set_product_mode_on_request(request, b)
                     _attach_location_scope(request)
+                    _attach_role_to_request(request)  # AUTHORITATIVE role determination
                     return
             except Exception:
                 pass  # invalid id / inactive business
@@ -432,10 +644,15 @@ class TenantResolutionMiddleware(MiddlewareMixin):
                 b = _filter_active_business(Business.objects).filter(subdomain__iexact=sub).first()
                 if b:
                     # Allow anonymous or superusers; require membership for authed users
-                    if (not getattr(user, "is_authenticated", False)) or getattr(user, "is_superuser", False) or _user_has_active_membership(user, b):
+                    if (
+                        (not getattr(user, "is_authenticated", False))
+                        or getattr(user, "is_superuser", False)
+                        or _user_has_active_membership(user, b)
+                    ):
                         _activate(request, b)
                         _set_product_mode_on_request(request, b)
                         _attach_location_scope(request)
+                        _attach_role_to_request(request)  # AUTHORITATIVE role determination
                         return
         except Exception:
             # get_host() may raise in tests or odd proxies
@@ -448,6 +665,7 @@ class TenantResolutionMiddleware(MiddlewareMixin):
                 _activate(request, b)
                 _set_product_mode_on_request(request, b)
                 _attach_location_scope(request)
+                _attach_role_to_request(request)  # AUTHORITATIVE role determination
                 return
 
         # (6) Owned/created business (fresh signups / dev localhost)
@@ -457,11 +675,13 @@ class TenantResolutionMiddleware(MiddlewareMixin):
                 _activate(request, b)
                 _set_product_mode_on_request(request, b)
                 _attach_location_scope(request)
+                _attach_role_to_request(request)  # AUTHORITATIVE role determination
                 return
 
         # Unresolved business → still compute/allow mode override so UI is not blocked
         _set_product_mode_on_request(request, None)
         _attach_location_scope(request)
+        _attach_role_to_request(request)  # AUTHORITATIVE role determination (will set NONE if no business)
 
     def process_response(self, request, response):
         # Clear thread-local after the response is built (belt & suspenders)
@@ -469,6 +689,19 @@ class TenantResolutionMiddleware(MiddlewareMixin):
             set_current_business_id(None)
         except Exception:
             pass
+
+        # Add X-Active-Workspace header — only for authenticated users with an active workspace.
+        # This allows API consumers and JS to read the current workspace without parsing HTML.
+        # Format: "<id>:<name>" (e.g. "7:Acme Shop")
+        try:
+            user = getattr(request, "user", None)
+            if user and getattr(user, "is_authenticated", False):
+                biz = getattr(request, "business", None)
+                if biz is not None:
+                    response["X-Active-Workspace"] = f"{biz.id}:{biz.name}"
+        except Exception:
+            pass
+
         return response
 
 
@@ -480,4 +713,5 @@ class ActiveBusinessMiddleware(TenantResolutionMiddleware):
     Backwards-compatible alias for setups that list `ActiveBusinessMiddleware`
     in MIDDLEWARE. Inherits full behavior from TenantResolutionMiddleware.
     """
+
     pass

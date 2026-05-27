@@ -19,6 +19,7 @@
 
 {# Django admin (always safe) #}
 {% url 'admin:index' as url_admin %}
+{% url 'wallet:cash_statement' as url_cash_bank %}
 
 <!-- =========================
      STYLES (one visual system for all roles)
@@ -32,26 +33,58 @@
   }
   .cc-brand{display:flex;align-items:center;gap:.6rem;font-weight:800;color:#fff;font-size:1.05rem;text-decoration:none}
   .cc-brand .logo{
-    display:grid;place-items:center;width:28px;height:28px;border-radius:8px;
-    background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);
-    box-shadow:inset 0 1px 0 rgba(255,255,255,.15)
+    display:grid;place-items:center;width:30px;height:30px;border-radius:9px;
+    background:linear-gradient(135deg,#ff7a2e,#f25c05);border:1px solid rgba(255,255,255,.10);
+    box-shadow:0 4px 12px rgba(255,106,26,.40),inset 0 1px 0 rgba(255,255,255,.20)
   }
-  .cc-section{font-size:.72rem;letter-spacing:.08em;color:#8ea0b5;margin:10px 10px 6px;text-transform:uppercase}
+  .cc-section{font-size:.72rem;letter-spacing:.08em;color:#94a3b8;margin:10px 10px 6px;text-transform:uppercase;font-weight:700}
   .cc-nav{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:8px}
   .cc-nav a.navlink{
     display:flex;align-items:center;gap:.65rem;padding:10px 12px;border-radius:12px;color:#cbd5e1;text-decoration:none;
     background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,.05);
     transition:transform .18s ease,background .18s ease,border-color .18s ease
   }
-  .cc-nav a.navlink:hover{background:rgba(34,211,238,.08);border-color:rgba(34,211,238,.28);transform:translateX(2px)}
+  .cc-nav a.navlink:hover{background:rgba(16,185,129,.08);border-color:rgba(16,185,129,.28);transform:translateX(2px)}
   .cc-nav li.active a.navlink{
-    background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.16);
-    box-shadow:0 10px 24px rgba(0,0,0,.25),inset 0 0 0 1px rgba(255,255,255,.06)
+    background:rgba(16,185,129,.12);border-color:rgba(16,185,129,.24);
+    box-shadow:0 10px 24px rgba(16,185,129,.15),inset 0 0 0 1px rgba(16,185,129,.08)
   }
   .cc-nav a.navlink .bi{
-    background:linear-gradient(120deg,#22d3ee,#10b981 60%,#22d3ee 100%);
-    -webkit-background-clip:text;-webkit-text-fill-color:transparent;
-    filter:drop-shadow(0 2px 6px rgba(34,211,238,.15));font-size:1.05rem
+    background:linear-gradient(120deg,#10b981,#059669 60%,#047857 100%);
+    background-clip:text;
+    -webkit-background-clip:text;
+    -webkit-text-fill-color:transparent;
+    filter:drop-shadow(0 2px 6px rgba(16,185,129,.22));font-size:1.05rem
+  }
+  /* Farm vertical - GREEN theme for icons */
+  .cc-sidebar[data-vertical="farm"] .cc-nav a.navlink .bi{
+    background:linear-gradient(120deg,#16a34a,#22c55e 60%,#10b981 100%);
+    background-clip:text;
+    -webkit-background-clip:text;
+    -webkit-text-fill-color:transparent;
+    filter:drop-shadow(0 2px 6px rgba(22,163,74,.2))
+  }
+  .cc-sidebar[data-vertical="farm"] .cc-nav a.navlink:hover{
+    background:rgba(34,197,94,.08);border-color:rgba(34,197,94,.28)
+  }
+  .cc-sidebar[data-vertical="farm"] .cc-nav li.active a.navlink{
+    background:rgba(34,197,94,.12);border-color:rgba(34,197,94,.24);
+    box-shadow:0 10px 24px rgba(22,163,74,.15),inset 0 0 0 1px rgba(34,197,94,.08)
+  }
+  /* Car Hire vertical - GREEN theme for icons (fleet/vehicles) */
+  .cc-sidebar[data-vertical="car_hire"] .cc-nav a.navlink .bi{
+    background:linear-gradient(120deg,#059669,#10b981 60%,#34d399 100%);
+    background-clip:text;
+    -webkit-background-clip:text;
+    -webkit-text-fill-color:transparent;
+    filter:drop-shadow(0 2px 6px rgba(5,150,105,.2))
+  }
+  .cc-sidebar[data-vertical="car_hire"] .cc-nav a.navlink:hover{
+    background:rgba(16,185,129,.08);border-color:rgba(16,185,129,.28)
+  }
+  .cc-sidebar[data-vertical="car_hire"] .cc-nav li.active a.navlink{
+    background:rgba(16,185,129,.12);border-color:rgba(16,185,129,.24);
+    box-shadow:0 10px 24px rgba(5,150,105,.15),inset 0 0 0 1px rgba(16,185,129,.08)
   }
   .cc-bottom{margin-top:auto}
   .cc-toggle{border:0;background:transparent;color:#8ea0b5;padding:0 .35rem}
@@ -62,7 +95,7 @@
 <!-- =========================
      SIDEBAR
      ========================= -->
-<aside class="cc-sidebar">
+<aside class="cc-sidebar" {% if BUSINESS_VERTICAL %}data-vertical="{{ BUSINESS_VERTICAL }}"{% endif %}>
   <a class="cc-brand" href="{{ url_main_dash|default:'/dashboard/' }}">
     <span class="logo"><img src="{% static 'img/logo-32.png' %}" width="20" height="20" alt=""></span>
     <span>{% firstof request.business.name APP_NAME 'Emajinet' %}</span>
@@ -91,6 +124,10 @@
       <li class="{% if request.path|slice:'0:15' == '/hq/stock-trends' %}active{% endif %}">
         <a class="navlink" href="{{ url_hq_stock_trends|default:'/hq/stock-trends/' }}"><i class="bi bi-graph-up-arrow"></i><span>Stock Trends</span></a>
       </li>
+      {% url 'hq:hq_analytics' as url_hq_analytics %}
+      <li class="{% if request.path|slice:'0:13' == '/hq/analytics' %}active{% endif %}">
+        <a class="navlink" href="{{ url_hq_analytics|default:'/hq/analytics/' }}"><i class="bi bi-bar-chart-line"></i><span>Analytics</span></a>
+      </li>
 
       {# Django Admin shortcut (opens in new tab) #}
       <li class="{% if request.path|slice:'0:7' == '/admin/' %}active{% endif %}">
@@ -102,14 +139,103 @@
   </div>
   {% endif %}
 
+  <!-- energy-sidebar-simulations:v1 -->
   <!-- ---------- Tenant Business Navigation (Vertical-Aware) ---------- -->
+  {% if request.business %}
+  <div>
+    <div class="cc-section">Money</div>
+    <ul class="cc-nav">
+      <li class="{% if request.path|slice:'0:17' == '/wallet/cash-bank' %}active{% endif %}">
+        <a class="navlink" href="{{ url_cash_bank|default:'/wallet/cash-bank/' }}" data-cy="nav-cash-bank">
+          <i class="bi bi-bank"></i><span>Cash &amp; Bank</span>
+        </a>
+      </li>
+    </ul>
+  </div>
+  {% endif %}
+
   {% if request.business and sidebar_items %}
     {% with vertical=BUSINESS_VERTICAL|default:'phones' %}
     
     {# Group items by section #}
     {% regroup sidebar_items by section as sections %}
-    
+
     {% for section in sections %}
+      {# Special handling for MORE section - make it collapsible #}
+      {% if section.grouper == "MORE" %}
+      <div>
+        <div class="cc-section cc-section-collapsible" data-bs-toggle="collapse" data-bs-target="#sidebarMore" aria-expanded="false" aria-controls="sidebarMore" style="cursor: pointer; display: flex; justify-content: space-between; align-items: center;">
+          <span>More</span>
+          <i class="bi bi-chevron-down" style="font-size: 0.9rem; transition: transform 0.3s;"></i>
+        </div>
+        <div class="collapse" id="sidebarMore">
+          <ul class="cc-nav">
+            {% for item in section.list %}
+              {# Check if item requires manager role #}
+              {% if item.require_manager|default:False %}
+                {% if request.user.is_superuser or request.user.is_staff or IS_MANAGER %}
+                  {# Resolve URL (try named URL first, then use as-is if it starts with /, else construct from active_prefix) #}
+                  {% url item.url as item_url %}
+                  {% if not item_url and item.url|slice:':1' == '/' %}
+                    {% with item_url=item.url %}
+                      <li class="{% if item.active_pattern in request.path or item.active_prefix in request.path %}active{% endif %}">
+                        <a class="navlink" href="{{ item_url }}" {% if item.key %}data-cy="nav-{{ item.key }}"{% endif %}>
+                          <i class="bi {{ item.icon }}"></i>
+                          <span>{% if vertical == 'gym' and item.label == 'Agents' %}Trainers{% else %}{{ item.label }}{% endif %}</span>
+                        </a>
+                      </li>
+                    {% endwith %}
+                  {% elif item_url %}
+                    <li class="{% if item.active_pattern in request.path or item.active_prefix in request.path %}active{% endif %}">
+                      <a class="navlink" href="{{ item_url }}" {% if item.key %}data-cy="nav-{{ item.key }}"{% endif %} {% if item.testid %}data-testid="{{ item.testid }}"{% endif %}>
+                        <i class="bi {{ item.icon }}"></i>
+                        <span>{% if vertical == 'gym' and item.label == 'Agents' %}Trainers{% else %}{{ item.label }}{% endif %}</span>
+                      </a>
+                    </li>
+                  {% elif item.active_prefix %}
+                    {# Fallback: use active_prefix as URL if named URL resolution fails #}
+                    <li class="{% if item.active_pattern in request.path or item.active_prefix in request.path %}active{% endif %}">
+                      <a class="navlink" href="{{ item.active_prefix }}/" {% if item.key %}data-cy="nav-{{ item.key }}"{% endif %} {% if item.testid %}data-testid="{{ item.testid }}"{% endif %}>
+                        <i class="bi {{ item.icon }}"></i>
+                        <span>{% if vertical == 'gym' and item.label == 'Agents' %}Trainers{% else %}{{ item.label }}{% endif %}</span>
+                      </a>
+                    </li>
+                  {% endif %}
+                {% endif %}
+              {% else %}
+                {# No manager requirement - show to all #}
+                {% url item.url as item_url %}
+                {% if not item_url and item.url|slice:':1' == '/' %}
+                  {% with item_url=item.url %}
+                    <li class="{% if item.active_pattern in request.path or item.active_prefix in request.path %}active{% endif %}">
+                      <a class="navlink" href="{{ item_url }}" {% if item.key %}data-cy="nav-{{ item.key }}"{% endif %} {% if item.testid %}data-testid="{{ item.testid }}"{% endif %}>
+                        <i class="bi {{ item.icon }}"></i>
+                        <span>{% if vertical == 'gym' and item.label == 'Agents' %}Trainers{% else %}{{ item.label }}{% endif %}</span>
+                      </a>
+                    </li>
+                  {% endwith %}
+                {% elif item_url %}
+                  <li class="{% if item.active_pattern in request.path or item.active_prefix in request.path %}active{% endif %}">
+                    <a class="navlink" href="{{ item_url }}" {% if item.key %}data-cy="nav-{{ item.key }}"{% endif %} {% if item.testid %}data-testid="{{ item.testid }}"{% endif %}>
+                      <i class="bi {{ item.icon }}"></i>
+                      <span>{% if vertical == 'gym' and item.label == 'Agents' %}Trainers{% else %}{{ item.label }}{% endif %}</span>
+                    </a>
+                  </li>
+                {% elif item.active_prefix %}
+                  {# Fallback: use active_prefix as URL if named URL resolution fails #}
+                  <li class="{% if item.active_pattern in request.path or item.active_prefix in request.path %}active{% endif %}">
+                    <a class="navlink" href="{{ item.active_prefix }}/" {% if item.key %}data-cy="nav-{{ item.key }}"{% endif %} {% if item.testid %}data-testid="{{ item.testid }}"{% endif %}>
+                      <i class="bi {{ item.icon }}"></i>
+                      <span>{% if vertical == 'gym' and item.label == 'Agents' %}Trainers{% else %}{{ item.label }}{% endif %}</span>
+                    </a>
+                  </li>
+                {% endif %}
+              {% endif %}
+            {% endfor %}
+          </ul>
+        </div>
+      </div>
+      {% else %}
       <div>
         <div class="cc-section">{{ section.grouper }}</div>
         <ul class="cc-nav">
@@ -117,54 +243,113 @@
             {# Check if item requires manager role #}
             {% if item.require_manager|default:False %}
               {% if request.user.is_superuser or request.user.is_staff or IS_MANAGER %}
-                {# Resolve URL (try named URL first, then use as-is if it starts with /) #}
-                {% url item.url as item_url %}
-                {% if not item_url and item.url|slice:':1' == '/' %}
-                  {% with item_url=item.url %}
-                    <li class="{% if item.active_pattern in request.path %}active{% endif %}">
-                      <a class="navlink" href="{{ item_url }}">
+                {# Resolve URL: if it starts with /, use as-is (direct path); otherwise try named URL #}
+                {% if item.url|slice:':1' == '/' %}
+                  {# Direct path - use as-is #}
+                  <li class="{% if item.active_pattern in request.path or item.active_prefix in request.path %}active{% endif %}">
+                    <a class="navlink" href="{{ item.url }}" {% if item.key %}data-cy="nav-{{ item.key }}"{% endif %} {% if item.testid %}data-testid="{{ item.testid }}"{% endif %}>
+                      <i class="bi {{ item.icon }}"></i>
+                      <span>{% if vertical == 'gym' and item.label == 'Agents' %}Trainers{% else %}{{ item.label }}{% endif %}</span>
+                    </a>
+                  </li>
+                {% else %}
+                  {# Try named URL resolution #}
+                  {% url item.url as item_url %}
+                  {% if item_url %}
+                    <li class="{% if item.active_pattern in request.path or item.active_prefix in request.path %}active{% endif %}">
+                      <a class="navlink" href="{{ item_url }}" {% if item.key %}data-cy="nav-{{ item.key }}"{% endif %} {% if item.testid %}data-testid="{{ item.testid }}"{% endif %}>
                         <i class="bi {{ item.icon }}"></i>
                         <span>{% if vertical == 'gym' and item.label == 'Agents' %}Trainers{% else %}{{ item.label }}{% endif %}</span>
                       </a>
                     </li>
-                  {% endwith %}
-                {% elif item_url %}
-                  <li class="{% if item.active_pattern in request.path %}active{% endif %}">
-                    <a class="navlink" href="{{ item_url }}">
+                  {% elif item.active_prefix %}
+                    {# Fallback: use active_prefix as URL #}
+                    <li class="{% if item.active_pattern in request.path or item.active_prefix in request.path %}active{% endif %}">
+                      <a class="navlink" href="{{ item.active_prefix }}/" {% if item.key %}data-cy="nav-{{ item.key }}"{% endif %} {% if item.testid %}data-testid="{{ item.testid }}"{% endif %}>
+                        <i class="bi {{ item.icon }}"></i>
+                        <span>{% if vertical == 'gym' and item.label == 'Agents' %}Trainers{% else %}{{ item.label }}{% endif %}</span>
+                      </a>
+                    </li>
+                  {% endif %}
+                {% endif %}
+              {% endif %}
+            {% else %}
+              {# No manager requirement - show to all #}
+              {# Resolve URL: if it starts with /, use as-is (direct path); otherwise try named URL #}
+              {% if item.url|slice:':1' == '/' %}
+                {# Direct path - use as-is #}
+                <li class="{% if item.active_pattern in request.path or item.active_prefix in request.path %}active{% endif %}">
+                  <a class="navlink" href="{{ item.url }}" {% if item.key %}data-cy="nav-{{ item.key }}"{% endif %} {% if item.testid %}data-testid="{{ item.testid }}"{% endif %}>
+                    <i class="bi {{ item.icon }}"></i>
+                    <span>{% if vertical == 'gym' and item.label == 'Agents' %}Trainers{% else %}{{ item.label }}{% endif %}</span>
+                  </a>
+                </li>
+              {% else %}
+                {# Try named URL resolution #}
+                {% url item.url as item_url %}
+                {% if item_url %}
+                  <li class="{% if item.active_pattern in request.path or item.active_prefix in request.path %}active{% endif %}">
+                    <a class="navlink" href="{{ item_url }}" {% if item.key %}data-cy="nav-{{ item.key }}"{% endif %} {% if item.testid %}data-testid="{{ item.testid }}"{% endif %}>
+                      <i class="bi {{ item.icon }}"></i>
+                      <span>{% if vertical == 'gym' and item.label == 'Agents' %}Trainers{% else %}{{ item.label }}{% endif %}</span>
+                    </a>
+                  </li>
+                {% elif item.active_prefix %}
+                  {# Fallback: use active_prefix as URL #}
+                  <li class="{% if item.active_pattern in request.path or item.active_prefix in request.path %}active{% endif %}">
+                    <a class="navlink" href="{{ item.active_prefix }}/" {% if item.key %}data-cy="nav-{{ item.key }}"{% endif %} {% if item.testid %}data-testid="{{ item.testid }}"{% endif %}>
                       <i class="bi {{ item.icon }}"></i>
                       <span>{% if vertical == 'gym' and item.label == 'Agents' %}Trainers{% else %}{{ item.label }}{% endif %}</span>
                     </a>
                   </li>
                 {% endif %}
               {% endif %}
-            {% else %}
-              {# No manager requirement - show to all #}
-              {% url item.url as item_url %}
-              {% if not item_url and item.url|slice:':1' == '/' %}
-                {% with item_url=item.url %}
-                  <li class="{% if item.active_pattern in request.path %}active{% endif %}">
-                    <a class="navlink" href="{{ item_url }}">
-                      <i class="bi {{ item.icon }}"></i>
-                      <span>{% if vertical == 'gym' and item.label == 'Agents' %}Trainers{% else %}{{ item.label }}{% endif %}</span>
-                    </a>
-                  </li>
-                {% endwith %}
-              {% elif item_url %}
-                <li class="{% if item.active_pattern in request.path %}active{% endif %}">
-                  <a class="navlink" href="{{ item_url }}">
-                    <i class="bi {{ item.icon }}"></i>
-                    <span>{% if vertical == 'gym' and item.label == 'Agents' %}Trainers{% else %}{{ item.label }}{% endif %}</span>
-                  </a>
-                </li>
-              {% endif %}
             {% endif %}
           {% endfor %}
         </ul>
       </div>
+      {% endif %}
     {% endfor %}
     
     {% endwith %}
   {% endif %}
 
-  <!-- NOTE: Settings / Feedback / Logout live in the top-right avatar menu (base.html) -->
+  <!-- ========== BOTTOM SECTION (Logout) ========== -->
+  <div class="cc-bottom">
+    <div class="cc-section">Account</div>
+    <ul class="cc-nav">
+      <li>
+        <form method="post" action="{% url 'accounts:logout' %}" style="margin:0;">
+          {% csrf_token %}
+          <button type="submit" class="navlink" style="width:100%;border:none;cursor:pointer;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,.16);" data-testid="sidebar-logout-btn">
+            <i class="bi bi-box-arrow-right" style="background:linear-gradient(120deg,#ef4444,#dc2626);background-clip:text;-webkit-background-clip:text;-webkit-text-fill-color:transparent;"></i>
+            <span>Logout</span>
+          </button>
+        </form>
+      </li>
+    </ul>
+  </div>
+
+  <!-- NOTE: Settings / Feedback also available in top-right avatar menu (base.html) -->
 </aside>
+
+<script>
+// Add rotation animation to chevron icon when More section is toggled
+document.addEventListener('DOMContentLoaded', function() {
+  const moreToggle = document.querySelector('[data-bs-target="#sidebarMore"]');
+  if (moreToggle) {
+    const chevron = moreToggle.querySelector('.bi-chevron-down');
+    const collapseEl = document.getElementById('sidebarMore');
+    
+    if (collapseEl) {
+      collapseEl.addEventListener('show.bs.collapse', function () {
+        if (chevron) chevron.style.transform = 'rotate(180deg)';
+      });
+      
+      collapseEl.addEventListener('hide.bs.collapse', function () {
+        if (chevron) chevron.style.transform = 'rotate(0deg)';
+      });
+    }
+  }
+});
+</script>

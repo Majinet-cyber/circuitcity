@@ -1,0 +1,328 @@
+{% comment %}
+=======================================================================
+PAYMENT MIX BAR - Standardized Component (Phones/Clothing Style)
+=======================================================================
+
+Usage:
+  {% include "partials/payment_mix_bar_standard.html" with payment_mix=dashboard_kpis.payment_mix range_label=dashboard_kpis.range_label %}
+
+Required context:
+  - payment_mix: List of dicts with keys:
+      - method: str (display name, e.g., "Cash", "Bank", "Mobile Money")
+      - method_code: str (internal code, e.g., "CASH", "BANK", "MOBILE_MONEY")
+      - amount: float (total amount for this method)
+      - count: int (number of transactions)
+      - percentage: float (0-100)
+  
+Optional context:
+  - range_label: str (e.g., "Today", "Last 7 Days", "This Month")
+  - total_revenue: float (for displaying total, defaults to sum of payment_mix amounts)
+
+Features:
+  - One horizontal bar with colored segments showing percentages
+  - Individual payment method cards with amounts
+  - Mobile-first responsive design
+  - Matches phones/clothing dashboard style
+{% endcomment %}
+
+{% if payment_mix %}
+<section class="payment-mix-section">
+  <h2 class="section-title">
+    <i class="bi bi-wallet2"></i> Payment Mix
+    {% if range_label %}
+      <span class="range-label">({{ range_label }})</span>
+    {% endif %}
+  </h2>
+  
+  <!-- Payment Method Cards -->
+  <div class="payment-mix-cards">
+    {% for pm in payment_mix %}
+      <div class="payment-mix-card" data-method="{{ pm.method_code|default:pm.method|lower|slugify }}">
+        <h3>
+          <i class="bi {% if pm.method == 'Cash' %}bi-cash-stack{% elif pm.method == 'Bank' %}bi-bank{% else %}bi-phone{% endif %}"></i>
+          {{ pm.method }}
+        </h3>
+        <p class="amount">MK {{ pm.amount|floatformat:0 }}</p>
+        <small>
+          <span class="percentage-badge">{{ pm.percentage }}% of revenue</span>
+        </small>
+      </div>
+    {% endfor %}
+  </div>
+  
+  <!-- Visual Bar Chart -->
+  <div class="payment-mix-bar-container">
+    {% for pm in payment_mix %}
+      {% if pm.percentage > 0 %}
+        <div class="payment-mix-bar-segment" 
+             data-method="{{ pm.method_code|default:pm.method|lower|slugify }}"
+             style="flex: 0 0 {{ pm.percentage }}%">
+          {{ pm.percentage }}%
+        </div>
+      {% endif %}
+    {% endfor %}
+  </div>
+  
+  <!-- Legend -->
+  <div class="payment-mix-legend">
+    {% for pm in payment_mix %}
+      <span class="legend-item" data-method="{{ pm.method_code|default:pm.method|lower|slugify }}">
+        <span class="legend-color"></span>
+        {{ pm.method }}
+      </span>
+    {% endfor %}
+  </div>
+</section>
+
+<style>
+/* Payment Mix Section */
+.payment-mix-section {
+  background: white;
+  border-radius: 20px;
+  padding: 24px;
+  box-shadow: 0 4px 20px rgba(15, 23, 42, 0.08);
+  border: 1px solid rgba(226, 232, 240, 0.5);
+  transition: all 0.3s;
+}
+
+.payment-mix-section:hover {
+  box-shadow: 0 8px 30px rgba(15, 23, 42, 0.1);
+}
+
+.payment-mix-section .section-title {
+  margin: 0 0 18px;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #0f172a;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.payment-mix-section .range-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #64748b;
+  margin-left: 8px;
+}
+
+/* Payment Method Cards */
+.payment-mix-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.payment-mix-card {
+  background: white;
+  border-radius: 16px;
+  padding: 20px;
+  border: 2px solid #e2e8f0;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Method-specific colors for cards */
+.payment-mix-card[data-method="cash"] {
+  border-left: 4px solid #10b981;
+}
+
+.payment-mix-card[data-method="bank"] {
+  border-left: 4px solid #3b82f6;
+}
+
+.payment-mix-card[data-method="mobile_money"] {
+  border-left: 4px solid #f59e0b;
+}
+
+.payment-mix-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+}
+
+.payment-mix-card h3 {
+  margin: 0 0 12px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #1e293b;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.payment-mix-card .amount {
+  margin: 0;
+  font-size: 1.8rem;
+  font-weight: 800;
+  color: #0f172a;
+  line-height: 1.1;
+}
+
+.payment-mix-card[data-method="cash"] .amount {
+  color: #10b981;
+}
+
+.payment-mix-card[data-method="bank"] .amount {
+  color: #3b82f6;
+}
+
+.payment-mix-card[data-method="mobile_money"] .amount {
+  color: #f59e0b;
+}
+
+.payment-mix-card .percentage-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.payment-mix-card[data-method="cash"] .percentage-badge {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.payment-mix-card[data-method="bank"] .percentage-badge {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.payment-mix-card[data-method="mobile_money"] .percentage-badge {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+/* Visual Bar Chart */
+.payment-mix-bar-container {
+  display: flex;
+  height: 40px;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  margin-bottom: 12px;
+}
+
+.payment-mix-bar-segment {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 700;
+  font-size: 0.9rem;
+  transition: all 0.3s ease;
+}
+
+.payment-mix-bar-segment:hover {
+  filter: brightness(1.1);
+}
+
+.payment-mix-bar-segment[data-method="cash"] {
+  background: linear-gradient(135deg, #10b981, #059669);
+}
+
+.payment-mix-bar-segment[data-method="bank"] {
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+}
+
+.payment-mix-bar-segment[data-method="mobile_money"] {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+}
+
+/* Legend */
+.payment-mix-legend {
+  display: flex;
+  justify-content: space-around;
+  flex-wrap: wrap;
+  gap: 16px;
+  font-size: 0.9rem;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #64748b;
+  font-weight: 600;
+}
+
+.legend-color {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+}
+
+.legend-item[data-method="cash"] .legend-color {
+  background: #10b981;
+}
+
+.legend-item[data-method="bank"] .legend-color {
+  background: #3b82f6;
+}
+
+.legend-item[data-method="mobile_money"] .legend-color {
+  background: #f59e0b;
+}
+
+/* Mobile Optimizations */
+@media (max-width: 768px) {
+  .payment-mix-cards {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  
+  .payment-mix-card {
+    padding: 16px;
+  }
+  
+  .payment-mix-card .amount {
+    font-size: 1.5rem;
+  }
+  
+  .payment-mix-bar-container {
+    height: 36px;
+  }
+  
+  .payment-mix-bar-segment {
+    font-size: 0.85rem;
+  }
+  
+  .payment-mix-legend {
+    justify-content: center;
+    gap: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .payment-mix-section {
+    padding: 16px;
+  }
+  
+  .payment-mix-bar-segment {
+    font-size: 0.75rem;
+  }
+  
+  /* Hide percentage text on very small segments on mobile */
+  .payment-mix-bar-segment[style*="flex: 0 0 5%"],
+  .payment-mix-bar-segment[style*="flex: 0 0 10%"] {
+    font-size: 0;
+  }
+}
+</style>
+{% else %}
+<section class="payment-mix-section">
+  <h2 class="section-title">
+    <i class="bi bi-wallet2"></i> Payment Mix
+    {% if range_label %}
+      <span class="range-label">({{ range_label }})</span>
+    {% endif %}
+  </h2>
+  <p style="color: #64748b; text-align: center; padding: 40px 0">
+    No payment data for {{ range_label|default:"this period"|lower }}
+  </p>
+</section>
+{% endif %}
+

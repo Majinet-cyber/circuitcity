@@ -1,0 +1,360 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Mixed Retail Dashboard · {{ business.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+.mr-wrap { max-width: 1200px; margin: 0 auto; padding: 20px 14px; }
+
+/* KPI Grid */
+.kpi-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px; margin-bottom: 24px; }
+.kpi-card {
+  background: #fff; border: 1px solid #e2e8f0; border-radius: 14px;
+  padding: 16px 18px; position: relative; overflow: hidden;
+  box-shadow: 0 1px 4px rgba(15,23,42,.06);
+  transition: transform .15s ease, box-shadow .15s ease;
+}
+.kpi-card:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(15,23,42,.10); }
+.kpi-icon {
+  width: 36px; height: 36px; border-radius: 10px;
+  display: grid; place-items: center; margin-bottom: 10px;
+  background: linear-gradient(135deg, #dcfce7, #bbf7d0);
+}
+.kpi-icon .bi { font-size: 1rem; background: linear-gradient(120deg,#10b981,#059669); background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.kpi-label { font-size: .7rem; text-transform: uppercase; letter-spacing: .07em; color: #64748b; font-weight: 700; margin-bottom: 6px; }
+.kpi-value { font-size: 1.5rem; font-weight: 900; color: #0f172a; line-height: 1.1; }
+.kpi-sub { font-size: .72rem; color: #94a3b8; margin-top: 3px; }
+.kpi-card.accent-green { border-left: 3px solid #22c55e; }
+.kpi-card.accent-blue  { border-left: 3px solid #3b82f6; }
+.kpi-card.accent-amber { border-left: 3px solid #f59e0b; }
+.kpi-card.accent-red   { border-left: 3px solid #ef4444; }
+.kpi-card.accent-purple{ border-left: 3px solid #a855f7; }
+.kpi-card.accent-teal  { border-left: 3px solid #14b8a6; }
+
+/* Section headers */
+.section-head { font-size: .8rem; text-transform: uppercase; letter-spacing: .07em; font-weight: 800; color: #475569; margin: 24px 0 12px; }
+
+/* Insights */
+.insight-list { display: flex; flex-direction: column; gap: 8px; }
+.insight-item {
+  background: #fffbeb; border: 1px solid #fde68a; border-radius: 10px;
+  padding: 10px 14px; font-size: .85rem; color: #92400e;
+  display: flex; align-items: flex-start; gap: 8px;
+}
+.insight-item .bi { color: #f59e0b; flex-shrink: 0; margin-top: 2px; }
+
+/* Badges */
+.badges-row { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 24px; }
+.badge-pill {
+  display: flex; align-items: center; gap: 7px;
+  padding: 8px 14px; border-radius: 99px; font-size: .78rem; font-weight: 700;
+  border: 1px solid;
+}
+.badge-pill.bg-success { background: #dcfce7; border-color: #86efac; color: #166534; }
+.badge-pill.bg-warning { background: #fefce8; border-color: #fde047; color: #854d0e; }
+.badge-pill.bg-info    { background: #e0f2fe; border-color: #7dd3fc; color: #075985; }
+.badge-pill.bg-primary { background: #eff6ff; border-color: #93c5fd; color: #1e40af; }
+
+/* Quick Action Grid */
+.qa-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px,1fr)); gap: 12px; margin-bottom: 24px; }
+.qa-card {
+  background: #fff; border: 1px solid #e2e8f0; border-radius: 14px;
+  padding: 16px 12px; display: flex; flex-direction: column; align-items: center;
+  gap: 8px; text-decoration: none; color: #374151; font-size: .82rem; font-weight: 700;
+  box-shadow: 0 1px 3px rgba(15,23,42,.05); transition: all .15s ease;
+}
+.qa-card:hover { background: #f0fdf4; border-color: #86efac; color: #15803d; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(16,185,129,.15); }
+.qa-card .qa-icon {
+  width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center;
+  background: linear-gradient(135deg, #dcfce7, #bbf7d0);
+}
+.qa-card .qa-icon .bi { font-size: 1.2rem; background: linear-gradient(120deg,#10b981,#059669); background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+
+/* Table */
+.mr-table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+.mr-table th { text-align: left; padding: 8px 12px; font-size: .72rem; text-transform: uppercase; letter-spacing: .05em; color: #64748b; border-bottom: 2px solid #e2e8f0; }
+.mr-table td { padding: 10px 12px; border-bottom: 1px solid #f1f5f9; }
+.mr-table tr:last-child td { border-bottom: none; }
+.mr-table tr:hover td { background: #f8fafc; }
+
+/* Dept nav chips */
+.dept-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
+.dept-chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 6px 12px; border-radius: 99px; font-size: .78rem; font-weight: 600;
+  background: #f1f5f9; border: 1px solid #e2e8f0; color: #475569;
+  text-decoration: none; transition: background .12s;
+}
+.dept-chip:hover { background: #e0f2fe; border-color: #7dd3fc; color: #0284c7; }
+
+/* Empty state */
+.empty-state { text-align: center; padding: 40px 20px; color: #94a3b8; }
+.empty-state h3 { font-size: .95rem; font-weight: 700; color: #64748b; margin-bottom: 6px; }
+
+@media (max-width: 600px) {
+  .kpi-grid { grid-template-columns: 1fr 1fr; }
+  .qa-grid { grid-template-columns: repeat(3, 1fr); }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="mr-wrap">
+
+  <!-- Header -->
+  <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:20px; flex-wrap:wrap; gap:12px;">
+    <div>
+      <h1 style="font-size:1.4rem;font-weight:900;margin:0 0 4px;color:#0f172a;">{{ business.name }}</h1>
+      <p style="color:#64748b;font-size:.85rem;margin:0;">Mixed Retail &middot; {{ today|date:"l, d M Y" }}</p>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <a href="{% url 'mixed_retail:sell' %}" style="display:inline-flex;align-items:center;gap:6px;padding:9px 18px;background:#10b981;color:#fff;border-radius:10px;font-size:.85rem;font-weight:700;text-decoration:none;">
+        <i class="bi bi-cart-plus"></i> Quick Sell
+      </a>
+      <a href="{% url 'mixed_retail:product_add' %}" style="display:inline-flex;align-items:center;gap:6px;padding:9px 18px;background:#fff;color:#374151;border:1px solid #d1d5db;border-radius:10px;font-size:.85rem;font-weight:700;text-decoration:none;">
+        <i class="bi bi-plus-lg"></i> Add Product
+      </a>
+      <a href="{% url 'mixed_retail:stock_in' %}" style="display:inline-flex;align-items:center;gap:6px;padding:9px 18px;background:#fff;color:#374151;border:1px solid #d1d5db;border-radius:10px;font-size:.85rem;font-weight:700;text-decoration:none;">
+        <i class="bi bi-boxes"></i> Stock In
+      </a>
+    </div>
+  </div>
+
+  <!-- KPI Grid -->
+  <div class="kpi-grid">
+    <div class="kpi-card accent-green">
+      <div class="kpi-icon"><i class="bi bi-cash"></i></div>
+      <div class="kpi-label">Today's Sales</div>
+      <div class="kpi-value">MWK {{ today_sales|floatformat:0|intcomma }}</div>
+      <div class="kpi-sub">{{ today_count }} transaction{{ today_count|pluralize }}</div>
+    </div>
+    <div class="kpi-card accent-blue">
+      <div class="kpi-icon"><i class="bi bi-graph-up-arrow"></i></div>
+      <div class="kpi-label">Gross Profit</div>
+      <div class="kpi-value">MWK {{ today_profit|floatformat:0|intcomma }}</div>
+      <div class="kpi-sub">Today's profit</div>
+    </div>
+    <div class="kpi-card accent-purple">
+      <div class="kpi-icon"><i class="bi bi-archive"></i></div>
+      <div class="kpi-label">Stock Value</div>
+      <div class="kpi-value">MWK {{ stock_value|floatformat:0|intcomma }}</div>
+      <div class="kpi-sub">{{ total_products }} product{{ total_products|pluralize }}</div>
+    </div>
+    <div class="kpi-card {% if low_stock_count > 0 %}accent-amber{% else %}accent-green{% endif %}">
+      <div class="kpi-icon"><i class="bi bi-exclamation-triangle"></i></div>
+      <div class="kpi-label">Low Stock</div>
+      <div class="kpi-value">{{ low_stock_count }}</div>
+      <div class="kpi-sub">Item{{ low_stock_count|pluralize }} below reorder level</div>
+    </div>
+    <div class="kpi-card {% if out_of_stock_count > 0 %}accent-red{% else %}accent-green{% endif %}">
+      <div class="kpi-icon"><i class="bi bi-x-circle"></i></div>
+      <div class="kpi-label">Out of Stock</div>
+      <div class="kpi-value">{{ out_of_stock_count }}</div>
+      <div class="kpi-sub">Items to restock now</div>
+    </div>
+    <div class="kpi-card accent-blue">
+      <div class="kpi-icon"><i class="bi bi-calendar-month"></i></div>
+      <div class="kpi-label">Month Revenue</div>
+      <div class="kpi-value">MWK {{ month_sales|floatformat:0|intcomma }}</div>
+      <div class="kpi-sub">MWK {{ month_profit|floatformat:0|intcomma }} profit</div>
+    </div>
+  </div>
+
+  <!-- Gamification Badges -->
+  {% if badges %}
+  <div class="badges-row">
+    {% for badge in badges %}
+    <span class="badge-pill bg-{{ badge.color }}">
+      <i class="bi {{ badge.icon }}"></i>
+      <span>{{ badge.name }}</span>
+      <span style="font-weight:400;opacity:.8;"> — {{ badge.description }}</span>
+    </span>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <!-- Smart Insights -->
+  {% if insights %}
+  <div class="section-head">Smart Insights</div>
+  <div class="insight-list" style="margin-bottom:24px;">
+    {% for msg in insights %}
+    <div class="insight-item"><i class="bi bi-lightbulb"></i><span>{{ msg }}</span></div>
+    {% endfor %}
+  </div>
+  {% elif not total_products %}
+  <div class="section-head">Get Started</div>
+  <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:12px;padding:16px 20px;margin-bottom:24px;">
+    <div style="font-size:.88rem;color:#166534;font-weight:600;margin-bottom:8px;">Your Mixed Retail workspace is ready.</div>
+    <div style="font-size:.83rem;color:#166534;line-height:1.6;">
+      1. Add your products with cost and selling prices.<br>
+      2. Use Quick Sell to record sales immediately.<br>
+      3. Track your stock, expenses, and profit in real time.
+    </div>
+  </div>
+  {% elif today_count == 0 %}
+  <div class="section-head">Smart Insights</div>
+  <div class="insight-list" style="margin-bottom:24px;">
+    <div class="insight-item"><i class="bi bi-lightbulb"></i><span>No sales yet today. Use Quick Sell or Stock In to get started.</span></div>
+  </div>
+  {% endif %}
+
+  <!-- Quick Actions -->
+  <div class="section-head">Quick Actions</div>
+  <div class="qa-grid">
+    <a href="{% url 'mixed_retail:sell' %}" class="qa-card">
+      <div class="qa-icon"><i class="bi bi-cart-plus"></i></div>
+      <span>Quick Sell</span>
+    </a>
+    <a href="{% url 'mixed_retail:stock_in' %}" class="qa-card">
+      <div class="qa-icon"><i class="bi bi-upc-scan"></i></div>
+      <span>Scan IN</span>
+    </a>
+    <a href="{% url 'mixed_retail:product_add' %}" class="qa-card">
+      <div class="qa-icon"><i class="bi bi-plus-square"></i></div>
+      <span>Add Product</span>
+    </a>
+    <a href="{% url 'mixed_retail:products' %}" class="qa-card">
+      <div class="qa-icon"><i class="bi bi-box-seam"></i></div>
+      <span>Products</span>
+    </a>
+    <a href="{% url 'mixed_retail:expenses' %}" class="qa-card">
+      <div class="qa-icon"><i class="bi bi-cash-stack"></i></div>
+      <span>Add Expense</span>
+    </a>
+    <a href="{% url 'mixed_retail:sales' %}" class="qa-card">
+      <div class="qa-icon"><i class="bi bi-receipt"></i></div>
+      <span>Sales History</span>
+    </a>
+    <a href="{% url 'mixed_retail:reports' %}" class="qa-card">
+      <div class="qa-icon"><i class="bi bi-bar-chart-line"></i></div>
+      <span>Reports</span>
+    </a>
+    <a href="{% url 'mixed_retail:departments' %}" class="qa-card">
+      <div class="qa-icon"><i class="bi bi-grid-3x3-gap"></i></div>
+      <span>Departments</span>
+    </a>
+  </div>
+
+  <!-- Department Navigation -->
+  {% if departments %}
+  <div class="section-head">Departments</div>
+  <div class="dept-chips">
+    {% for dept in departments %}
+    <a href="{% url 'mixed_retail:products' %}?dept={{ dept.id }}" class="dept-chip">
+      <i class="bi {{ dept.icon|default:'bi-bag' }}"></i>
+      {{ dept.name }}
+    </a>
+    {% endfor %}
+    <a href="{% url 'mixed_retail:departments' %}" class="dept-chip" style="border-style:dashed;">
+      <i class="bi bi-gear"></i> Manage
+    </a>
+  </div>
+  {% endif %}
+
+  {% if total_products %}
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;flex-wrap:wrap;">
+    <!-- Top Products Today -->
+    <div style="background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:18px;box-shadow:0 1px 4px rgba(15,23,42,.05);">
+      <div class="section-head" style="margin-top:0;">Top Products Today</div>
+      {% if top_products %}
+      <table class="mr-table">
+        <thead>
+          <tr>
+            <th>Product</th>
+            <th style="text-align:right;">Revenue</th>
+            <th style="text-align:right;">Qty</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in top_products %}
+          <tr>
+            <td>
+              <div style="font-weight:600;color:#0f172a;">{{ p.product__name }}</div>
+              <div style="font-size:.72rem;color:#94a3b8;">{{ p.product__department__name|default:'—' }}</div>
+            </td>
+            <td style="text-align:right;font-weight:700;">MWK {{ p.total_revenue|floatformat:0|intcomma }}</td>
+            <td style="text-align:right;color:#64748b;">{{ p.total_qty|floatformat:0 }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <div class="empty-state">
+        <i class="bi bi-bar-chart" style="font-size:2rem;display:block;margin-bottom:8px;"></i>
+        <h3>No sales today yet</h3>
+        <p style="font-size:.83rem;">Use Quick Sell to record your first sale.</p>
+        <a href="{% url 'mixed_retail:sell' %}" style="display:inline-block;margin-top:8px;padding:8px 16px;background:#10b981;color:#fff;border-radius:8px;font-size:.82rem;font-weight:700;text-decoration:none;">Quick Sell</a>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Department Performance (Month) -->
+    <div style="background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:18px;box-shadow:0 1px 4px rgba(15,23,42,.05);">
+      <div class="section-head" style="margin-top:0;">Department Performance This Month</div>
+      {% if dept_perf %}
+      <table class="mr-table">
+        <thead>
+          <tr>
+            <th>Department</th>
+            <th style="text-align:right;">Revenue</th>
+            <th style="text-align:right;">Profit</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for dept in dept_perf %}
+          <tr>
+            <td style="font-weight:600;">{{ dept.product__department__name|default:'Unclassified' }}</td>
+            <td style="text-align:right;font-weight:700;">MWK {{ dept.revenue|floatformat:0|intcomma }}</td>
+            <td style="text-align:right;color:{% if dept.profit > 0 %}#16a34a{% else %}#ef4444{% endif %};">MWK {{ dept.profit|floatformat:0|intcomma }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <div class="empty-state">
+        <i class="bi bi-grid" style="font-size:2rem;display:block;margin-bottom:8px;"></i>
+        <h3>No department data this month</h3>
+        <p style="font-size:.83rem;">Record sales to see department performance.</p>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Payment Mix -->
+  {% if payment_mix %}
+  <div class="section-head">Payment Mix (Today)</div>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:24px;">
+    {% for pm in payment_mix %}
+    <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:12px 16px;min-width:120px;">
+      <div style="font-size:.7rem;color:#64748b;text-transform:uppercase;letter-spacing:.05em;font-weight:700;">{{ pm.payment_method|title|cut:'_' }}</div>
+      <div style="font-size:1.1rem;font-weight:900;color:#0f172a;">MWK {{ pm.total|floatformat:0|intcomma }}</div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {% else %}
+  <!-- Empty state: no products yet -->
+  <div style="margin-top:24px;background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:40px;text-align:center;box-shadow:0 1px 4px rgba(15,23,42,.05);">
+    <div style="width:64px;height:64px;background:linear-gradient(135deg,#dcfce7,#bbf7d0);border-radius:18px;display:grid;place-items:center;margin:0 auto 16px;">
+      <i class="bi bi-box-seam" style="font-size:1.8rem;background:linear-gradient(120deg,#10b981,#059669);background-clip:text;-webkit-background-clip:text;-webkit-text-fill-color:transparent;"></i>
+    </div>
+    <h3 style="font-size:1.1rem;font-weight:800;color:#0f172a;margin-bottom:8px;">No products yet</h3>
+    <p style="color:#64748b;font-size:.9rem;max-width:480px;margin:0 auto 20px;">
+      Mixed Retail lets you sell anything — phones, electronics, clothing, groceries, hardware, cosmetics, furniture and more.
+      Add your first product to start tracking sales, stock, and profit.
+    </p>
+    <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
+      <a href="{% url 'mixed_retail:product_add' %}" style="display:inline-flex;align-items:center;gap:8px;padding:10px 22px;background:#10b981;color:#fff;border-radius:10px;font-size:.9rem;font-weight:700;text-decoration:none;">
+        <i class="bi bi-plus-lg"></i> Add First Product
+      </a>
+      <a href="{% url 'mixed_retail:departments' %}" style="display:inline-flex;align-items:center;gap:8px;padding:10px 22px;background:#fff;color:#374151;border:1px solid #d1d5db;border-radius:10px;font-size:.9rem;font-weight:700;text-decoration:none;">
+        <i class="bi bi-grid-3x3-gap"></i> Setup Departments
+      </a>
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}

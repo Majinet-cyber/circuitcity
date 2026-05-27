@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+
+{% block title %}Add Livestock Event - Farm Manager{% endblock %}
+
+{% block content %}
+<div class="container py-4" style="max-width: 600px;">
+    <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="/verticals/farm/dashboard/">Dashboard</a></li>
+            <li class="breadcrumb-item"><a href="/verticals/farm/livestock/">Livestock</a></li>
+            <li class="breadcrumb-item active">Add Event</li>
+        </ol>
+    </nav>
+
+    <!-- ==================== RECOMMENDED ACTIONS (Smart Entry) ==================== -->
+    {% if recommended_actions %}
+    <div class="card border-0 shadow-sm mb-4" data-testid="recommended-actions-panel" style="border-left: 4px solid #2563eb !important;">
+        <div class="card-header bg-transparent">
+            <h6 class="mb-0" style="display: flex; align-items: center; gap: 0.5rem;">
+                <i class="bi bi-lightbulb-fill" style="color: #f59f00;"></i>
+                Recommended Actions
+                <span style="background: #fef3c7; color: #d97706; font-size: 0.6rem; padding: 0.15rem 0.4rem; border-radius: 999px; font-weight: 700; text-transform: uppercase;">Smart</span>
+            </h6>
+        </div>
+        <div class="card-body">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.5rem;">
+                {% for action in recommended_actions %}
+                <div class="recommendation-card" data-testid="recommendation-card" style="
+                    background: linear-gradient(135deg, rgba(37, 99, 235, 0.05), rgba(59, 130, 246, 0.02));
+                    border: 1px solid rgba(37, 99, 235, 0.2);
+                    border-radius: 8px;
+                    padding: 0.5rem;
+                    cursor: pointer;
+                " onclick="document.getElementById('event_type').value='{{ action.entry_prefill.type }}'; document.getElementById('notes').value='{{ action.entry_prefill.notes|escapejs }}';">
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <span style="font-size: 1rem;">
+                            {% if action.category == 'feed' %}🌾{% elif action.category == 'veterinary' %}💉{% else %}📋{% endif %}
+                        </span>
+                        <div style="flex: 1;">
+                            <div style="font-weight: 600; font-size: 0.75rem; color: #1e293b;">{{ action.title }}</div>
+                            <div style="font-size: 0.65rem; color: #64748b;">{{ action.reason|truncatechars:40 }}</div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="card border-0 shadow-sm">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0"><i class="bi bi-calendar-event"></i> Add Livestock Event</h5>
+        </div>
+        <div class="card-body">
+            <form method="post" data-testid="farm-livestock-event-form">
+                {% csrf_token %}
+
+                <div class="mb-3">
+                    <label for="batch_id" class="form-label">Batch *</label>
+                    <select class="form-select" id="batch_id" name="batch_id" required>
+                        <option value="">Select a batch...</option>
+                        {% for batch in batches %}
+                        <option value="{{ batch.id }}" {% if preselect_batch_id and batch.id|stringformat:"s" == preselect_batch_id %}selected{% endif %}>{{ batch.name }} ({{ batch.get_animal_type_display }} - {{ batch.count_current }} current)</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label for="event_type" class="form-label">Event Type *</label>
+                    <select class="form-select" id="event_type" name="event_type" required>
+                        {% for value, label in event_types %}
+                        <option value="{{ value }}">{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label for="date" class="form-label">Date</label>
+                    <input type="date" class="form-control" id="date" name="date">
+                </div>
+
+                <div class="mb-3">
+                    <label for="count" class="form-label">Number of Animals *</label>
+                    <input type="number" class="form-control form-control-lg" id="count" name="count" 
+                           min="1" required autofocus>
+                </div>
+
+                <div class="mb-3" id="price-field">
+                    <label for="unit_price" class="form-label">Price per Animal (MWK)</label>
+                    <input type="number" class="form-control" id="unit_price" name="unit_price" 
+                           step="0.01" min="0" placeholder="For purchases/sales">
+                </div>
+
+                <div class="mb-3">
+                    <label for="notes" class="form-label">Notes</label>
+                    <textarea class="form-control" id="notes" name="notes" rows="2"></textarea>
+                </div>
+
+                <div class="d-grid gap-2">
+                    <button type="submit" class="btn btn-primary btn-lg" data-testid="farm-livestock-event-submit">
+                        <i class="bi bi-check-circle"></i> Record Event
+                    </button>
+                    <a href="/verticals/farm/livestock/" class="btn btn-outline-secondary">Cancel</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+// Show/hide price field based on event type
+document.getElementById('event_type').addEventListener('change', function() {
+    var priceField = document.getElementById('price-field');
+    if (['purchase', 'sale'].includes(this.value)) {
+        priceField.style.display = 'block';
+    } else {
+        priceField.style.display = 'none';
+    }
+});
+</script>
+{% endblock %}
+

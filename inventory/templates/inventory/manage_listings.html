@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Manage Marketplace Listings{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+  <div class="row">
+    <div class="col-12">
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>Marketplace Listings</h1>
+        <div>
+          <a href="{% url 'inventory:view_enquiries' %}" class="btn btn-secondary me-2">
+            View Enquiries
+            {% if unread_enquiries_count > 0 %}
+              <span class="badge bg-danger">{{ unread_enquiries_count }}</span>
+            {% endif %}
+          </a>
+          <a href="{% url 'inventory:create_listing' %}" class="btn btn-primary">+ Create Listing</a>
+        </div>
+      </div>
+
+      {% if listings %}
+        <div class="table-responsive">
+          <table class="table table-hover">
+            <thead>
+              <tr>
+                <th>Title</th>
+                <th>Price</th>
+                <th>Status</th>
+                <th>Created</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for listing in listings %}
+                <tr>
+                  <td>
+                    <strong>{{ listing.title }}</strong>
+                    {% if listing.description %}
+                      <br><small class="text-muted">{{ listing.description|truncatewords:15 }}</small>
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if listing.price %}
+                      MWK {{ listing.price|floatformat:0 }}
+                    {% else %}
+                      <span class="text-muted">-</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if listing.is_active %}
+                      <span class="badge bg-success">Active</span>
+                    {% else %}
+                      <span class="badge bg-secondary">Inactive</span>
+                    {% endif %}
+                  </td>
+                  <td>{{ listing.created_at|date:"M d, Y" }}</td>
+                  <td>
+                    <a href="{% url 'inventory:edit_listing' listing.id %}" class="btn btn-sm btn-outline-primary">Edit</a>
+                    <form method="post" action="{% url 'inventory:delete_listing' listing.id %}" style="display: inline;" onsubmit="return confirm('Delete this listing?');">
+                      {% csrf_token %}
+                      <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                    </form>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="alert alert-info">
+          <p class="mb-0">No listings yet. <a href="{% url 'inventory:create_listing' %}">Create your first listing</a> to appear on the marketplace!</p>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}
+

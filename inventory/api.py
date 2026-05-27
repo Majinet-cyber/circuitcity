@@ -11,7 +11,13 @@ from django.contrib.auth.decorators import login_required
 from django.db import connection, transaction
 from django.db import models as djmodels
 from django.db.models import (
-    Count, Sum, F, Value, DecimalField, ExpressionWrapper, Q,
+    Count,
+    Sum,
+    F,
+    Value,
+    DecimalField,
+    ExpressionWrapper,
+    Q,
 )
 from django.db.models.functions import TruncDate, Coalesce, Cast, Trim, Concat, NullIf
 from django.http import JsonResponse, HttpRequest
@@ -24,10 +30,13 @@ from django.views.decorators.http import require_POST
 try:
     from tenants.utils import require_business, get_active_business  # type: ignore
 except Exception:  # pragma: no cover
+
     def require_business(fn):  # type: ignore
         return fn
+
     def get_active_business(request):  # type: ignore
         return getattr(request, "business", None)
+
 
 from .models import InventoryItem, Product, OrderPrice
 from sales.models import Sale
@@ -44,12 +53,8 @@ try:
 except Exception:  # pragma: no cover
     # Very-safe fallback if constants.py isn't present
     def IN_STOCK_Q():
-        return ~(
-            Q(status__iexact="SOLD")
-            | Q(sold_at__isnull=False)
-            | Q(is_sold=True)
-            | Q(in_stock=False)
-        )
+        return ~(Q(status__iexact="SOLD") | Q(sold_at__isnull=False) | Q(is_sold=True) | Q(in_stock=False))
+
 
 # Canonical updater
 try:
@@ -74,6 +79,7 @@ _TASK_MODULES = (
     "sales.tasks",
     "cc.celery",  # fallback provides 'ping'
 )
+
 
 def _resolve_task_callable(task_name: str) -> Optional[Callable[..., Any]]:
     """
@@ -110,16 +116,19 @@ def _resolve_task_callable(task_name: str) -> Optional[Callable[..., Any]]:
 
 # ---------- helpers ----------
 
+
 def _ok(data: dict, status: int = 200) -> JsonResponse:
     payload = {"ok": True}
     payload.update(data)
     return JsonResponse(payload, status=status)
+
 
 def _err(msg: str, status: int = 400, **extra) -> JsonResponse:
     payload = {"ok": False, "error": msg}
     if extra:
         payload.update(extra)
     return JsonResponse(payload, status=status)
+
 
 def _can_view_all(user) -> bool:
     if not getattr(user, "is_authenticated", False):
@@ -129,6 +138,7 @@ def _can_view_all(user) -> bool:
     # Manager / Admin groups
     return user.groups.filter(name__in=["Admin", "Manager", "Auditor", "Auditors"]).exists()
 
+
 def _scope_mode(request: HttpRequest) -> str:
     """
     Default to per-agent scope (self) unless the caller explicitly asks for ?scope=all.
@@ -136,10 +146,13 @@ def _scope_mode(request: HttpRequest) -> str:
     val = (request.GET.get("scope") or "").strip().lower()
     return "all" if val in {"all", "global"} else "self"
 
+
 def _has_field(model, name: str) -> bool:
     return any(getattr(f, "name", None) == name for f in model._meta.get_fields())
 
+
 # -- Dynamic field discovery for Sales/Inventory --
+
 
 def _sale_date_field() -> str:
     for c in ("sold_at", "created_at", "created", "timestamp", "date"):
@@ -147,11 +160,13 @@ def _sale_date_field() -> str:
             return c
     return "created_at"
 
+
 def _sale_amount_field() -> str | None:
     for c in ("price", "amount", "total_amount", "sale_price", "total", "grand_total"):
         if _has_field(Sale, c):
             return c
     return None
+
 
 def _sale_cost_field() -> str | None:
     for c in ("cost", "total_cost", "cost_amount"):
@@ -159,14 +174,17 @@ def _sale_cost_field() -> str | None:
             return c
     return None
 
+
 def _item_imei_field() -> str:
     for c in ("imei", "serial", "barcode", "code"):
         if _has_field(InventoryItem, c):
             return c
     return "imei"
 
+
 def _item_status_field() -> str:
     return "status" if _has_field(InventoryItem, "status") else "state"
+
 
 def _best_item_date_field() -> str:
     for c in ("sold_at", "sold_on", "checked_out_at", "dispatched_at", "updated_at", "created_at", "created"):
@@ -174,21 +192,36 @@ def _best_item_date_field() -> str:
             return c
     return "created_at"
 
+
 def _best_item_price_field() -> str | None:
     for c in ("selling_price", "price", "sale_price", "amount", "total_amount", "sell_price", "order_price"):
         if _has_field(InventoryItem, c):
             return c
     return None
 
+
 # --------- Ownership logic ----------
 
 _OWNER_FIELD_CANDIDATES = [
     # very common
-    "assigned_agent", "assigned_to", "assignee", "owner",
-    "user", "agent", "created_by", "added_by", "received_by",
-    "handled_by", "custodian", "stocked_by", "checked_in_by",
-    "sold_by", "creator", "createdby",
+    "assigned_agent",
+    "assigned_to",
+    "assignee",
+    "owner",
+    "user",
+    "agent",
+    "created_by",
+    "added_by",
+    "received_by",
+    "handled_by",
+    "custodian",
+    "stocked_by",
+    "checked_in_by",
+    "sold_by",
+    "creator",
+    "createdby",
 ]
+
 
 def _agent_owner_q(model, user) -> Q:
     """
@@ -206,6 +239,7 @@ def _agent_owner_q(model, user) -> Q:
         q |= Q(**{f"{name}__username": getattr(user, "username", None)})
     return q
 
+
 def _apply_self_scope_or_none(qs, model, user):
     """
     If caller is agent-level, restrict to self-ownership.
@@ -217,6 +251,7 @@ def _apply_self_scope_or_none(qs, model, user):
         return qs.filter(q)
     # No ownership columns we recognize -> show nothing for agents
     return qs.none()
+
 
 # ---------- SAFE base queryset for InventoryItem ----------
 def _safe_items_qs():
@@ -241,6 +276,7 @@ def _safe_items_qs():
         pass
     return qs
 
+
 def _scoped_sales_qs(request: HttpRequest):
     qs = Sale.objects.all()
     try:
@@ -253,6 +289,7 @@ def _scoped_sales_qs(request: HttpRequest):
         if _can_view_all(request.user):
             return qs
     return _apply_self_scope_or_none(qs, Sale, request.user)
+
 
 def _scoped_stock_qs(request: HttpRequest):
     # Use safe base to avoid selecting/ordering missing columns
@@ -267,6 +304,7 @@ def _scoped_stock_qs(request: HttpRequest):
             return qs
     return _apply_self_scope_or_none(qs, InventoryItem, request.user)
 
+
 # ---------- tenant/business helpers (for default location) ----------
 def _get_active_business(request):
     """
@@ -276,6 +314,7 @@ def _get_active_business(request):
         return get_active_business(request)
     except Exception:
         return getattr(request, "business", None)
+
 
 def _locations_for_active_business(request) -> list[dict[str, Any]]:
     """
@@ -298,6 +337,7 @@ def _locations_for_active_business(request) -> list[dict[str, Any]]:
     except Exception:
         return []
 
+
 def _agent_home_location_id(request) -> Optional[int]:
     try:
         prof = getattr(request.user, "agent_profile", None)
@@ -306,6 +346,7 @@ def _agent_home_location_id(request) -> Optional[int]:
     except Exception:
         pass
     return None
+
 
 def _pick_default_location(request) -> tuple[Optional[int], Optional[str]]:
     """
@@ -341,10 +382,12 @@ def _pick_default_location(request) -> tuple[Optional[int], Optional[str]]:
 
 # ---------- local normalization + lookup used by api_mark_sold ----------
 
+
 def _normalize_code(raw: str | None) -> str:
     if not raw:
         return ""
     return "".join(ch for ch in str(raw).strip() if ch.isdigit())
+
 
 def _find_instock_for_business(request: HttpRequest, raw: str) -> Optional[InventoryItem]:
     """
@@ -394,11 +437,13 @@ def _find_instock_for_business(request: HttpRequest, raw: str) -> Optional[Inven
 
 # ---------- utilities ----------
 
+
 def date_range_filter(qs, field_name: str, start, end_excl):
     field = qs.model._meta.get_field(field_name)
     if isinstance(field, djmodels.DateTimeField):
         return qs.filter(**{f"{field_name}__date__gte": start, f"{field_name}__date__lt": end_excl})
     return qs.filter(**{f"{field_name}__gte": start, f"{field_name}__lt": end_excl})
+
 
 def _amount_sum_expression(afield: str | None):
     """
@@ -417,11 +462,13 @@ def _amount_sum_expression(afield: str | None):
         dec = DecimalField(max_digits=14, decimal_places=2)
         return Coalesce(Sum(Cast(F(afield), dec)), Value(0, output_field=dec))
 
+
 def _json_body(request: HttpRequest) -> dict:
     try:
         return json.loads(request.body.decode("utf-8") or "{}")
     except Exception:
         return {}
+
 
 def _norm_digits(s: str | None) -> str:
     return "".join(ch for ch in (s or "") if ch.isdigit())
@@ -435,9 +482,17 @@ except Exception:  # pragma: no cover
     CurrencySetting = None  # type: ignore
 
 _CURRENCY_SIGNS = {
-    "MWK": "MK","USD": "$","EUR": "€","GBP": "£","ZAR": "R",
-    "ZMW": "K","TZS": "TSh","KES": "KSh","NGN": "₦",
+    "MWK": "MK",
+    "USD": "$",
+    "EUR": "€",
+    "GBP": "£",
+    "ZAR": "R",
+    "ZMW": "K",
+    "TZS": "TSh",
+    "KES": "KSh",
+    "NGN": "₦",
 }
+
 
 def _normalize_ccy(code: str | None) -> str:
     if not code:
@@ -445,8 +500,11 @@ def _normalize_ccy(code: str | None) -> str:
     code = code.strip().upper()
     return "MWK" if code in ("MKW", "MWK") else code
 
+
 def _get_currency_setting():
-    base = "MWK"; display = "MWK"; rates = {}
+    base = "MWK"
+    display = "MWK"
+    rates = {}
     if CurrencySetting:
         try:
             obj = CurrencySetting.get()
@@ -456,6 +514,7 @@ def _get_currency_setting():
         except Exception:
             pass
     return base, display, rates
+
 
 def _convert_amount(amount: Decimal | float | int, base: str, display: str, rates: dict) -> float:
     if base == display:
@@ -468,6 +527,7 @@ def _convert_amount(amount: Decimal | float | int, base: str, display: str, rate
         pass
     return float(amount or 0)
 
+
 def _currency_payload():
     base, display, rates = _get_currency_setting()
     sign = _CURRENCY_SIGNS.get(display, display)
@@ -478,6 +538,7 @@ def _currency_payload():
 
 
 # ---------- Product helpers used by place-order ----------
+
 
 @never_cache
 @login_required
@@ -533,11 +594,11 @@ def api_stock_models(request: HttpRequest):
     if q:
         # very forgiving search across brand/model/variant/name/code
         filt = (
-            Q(brand__icontains=q) |
-            Q(model__icontains=q) |
-            Q(variant__icontains=q) |
-            Q(name__icontains=q) |
-            Q(code__icontains=q)
+            Q(brand__icontains=q)
+            | Q(model__icontains=q)
+            | Q(variant__icontains=q)
+            | Q(name__icontains=q)
+            | Q(code__icontains=q)
         )
         qs = Product.objects.filter(filt).order_by("brand", "model")[:50]
 
@@ -548,6 +609,7 @@ def api_stock_models(request: HttpRequest):
         items.append({"id": p.id, "label": label})
 
     return _ok({"items": items})
+
 
 def _parse_date_loose(s: str | None) -> Optional[date]:
     if not s:
@@ -563,6 +625,7 @@ def _parse_date_loose(s: str | None) -> Optional[date]:
     except Exception:
         return None
 
+
 def _extract_range(request: HttpRequest, *, default_period: str = "month") -> Tuple[date, date, dict]:
     """
     Determine [start, end_inclusive] from GET:
@@ -574,15 +637,13 @@ def _extract_range(request: HttpRequest, *, default_period: str = "month") -> Tu
     today = timezone.localdate()
 
     # 1) single day (support both ?on= and ?date=)
-    on = _parse_date_loose(
-        (request.GET.get("on") or request.GET.get("date") or request.GET.get("day"))
-    )
+    on = _parse_date_loose((request.GET.get("on") or request.GET.get("date") or request.GET.get("day")))
     if on:
         return on, on, {"start": on.isoformat(), "end": on.isoformat()}
 
     # 2) many alias pairs for convenience
     aliases_start = ["start", "from", "df", "date_from", "start_date"]
-    aliases_end   = ["end", "to", "dt", "date_to", "end_date"]
+    aliases_end = ["end", "to", "dt", "date_to", "end_date"]
     start = None
     end_incl = None
     for key in aliases_start:
@@ -621,15 +682,32 @@ def _extract_range(request: HttpRequest, *, default_period: str = "month") -> Tu
 # ---------- SOLD-like logic & day filler ----------
 
 _SOLD_LIKE = (
-    "SOLD","Sold","sold",
-    "DISPATCHED","Dispatched","dispatched",
-    "CHECKED_OUT","CHECKED-OUT","Checked_out","checked_out","checked-out",
-    "OUT","Out","out",
-    "DELIVERED","Delivered","delivered",
-    "ISSUED","Issued","issued",
-    "PAID","Paid","paid",
+    "SOLD",
+    "Sold",
+    "sold",
+    "DISPATCHED",
+    "Dispatched",
+    "dispatched",
+    "CHECKED_OUT",
+    "CHECKED-OUT",
+    "Checked_out",
+    "checked_out",
+    "checked-out",
+    "OUT",
+    "Out",
+    "out",
+    "DELIVERED",
+    "Delivered",
+    "delivered",
+    "ISSUED",
+    "Issued",
+    "issued",
+    "PAID",
+    "Paid",
+    "paid",
 )
-_IN_STOCK_LIKE = ("IN_STOCK","IN STOCK","AVAILABLE","Available","available","NEW","New","new")
+_IN_STOCK_LIKE = ("IN_STOCK", "IN STOCK", "AVAILABLE", "Available", "available", "NEW", "New", "new")
+
 
 def _fill_days(
     start: date,
@@ -664,6 +742,7 @@ def _fill_days(
 
 # ---------- Fallback from InventoryItem when Sales empty ----------
 
+
 def _fallback_items_daily(
     request: HttpRequest,
     start,
@@ -674,19 +753,21 @@ def _fallback_items_daily(
     label_fmt: str | Callable[[date], str] = "iso",
 ):
     status_field = _item_status_field()
-    date_field   = _best_item_date_field()
-    price_field  = _best_item_price_field()
+    date_field = _best_item_date_field()
+    price_field = _best_item_price_field()
 
     qs = _scoped_stock_qs(request)
 
     if _has_field(InventoryItem, status_field):
-        cond = Q(**{f"{status_field}__in": _SOLD_LIKE}) \
-             | Q(**{f"{status_field}__istartswith": "sold"}) \
-             | Q(**{f"{status_field}__istartswith": "dispatch"}) \
-             | Q(**{f"{status_field}__istartswith": "check"}) \
-             | Q(**{f"{status_field}__iexact": "out"}) \
-             | Q(**{f"{status_field}__istartswith": "deliver"}) \
-             | Q(**{f"{status_field}__istartswith": "issue"})
+        cond = (
+            Q(**{f"{status_field}__in": _SOLD_LIKE})
+            | Q(**{f"{status_field}__istartswith": "sold"})
+            | Q(**{f"{status_field}__istartswith": "dispatch"})
+            | Q(**{f"{status_field}__istartswith": "check"})
+            | Q(**{f"{status_field}__iexact": "out"})
+            | Q(**{f"{status_field}__istartswith": "deliver"})
+            | Q(**{f"{status_field}__istartswith": "issue"})
+        )
         cond |= ~Q(**{f"{status_field}__in": _IN_STOCK_LIKE})
         qs = qs.filter(cond)
 
@@ -706,10 +787,7 @@ def _fallback_items_daily(
     else:
         val_expr = Count("id")
 
-    agg = (
-        qs.annotate(d=TruncDate(date_field))
-          .values("d").annotate(val=val_expr).order_by("d")
-    )
+    agg = qs.annotate(d=TruncDate(date_field)).values("d").annotate(val=val_expr).order_by("d")
 
     base, display, rates = _get_currency_setting()
     data_map: dict[date, float] = {}
@@ -736,20 +814,24 @@ def inventory_list(request: HttpRequest):
     if use_all and _can_view_all(request.user):
         qs = _safe_items_qs().select_related("product")
 
-    data = [{
-        "id": i.id,
-        "imei": i.imei,
-        "product": str(i.product),
-        "status": getattr(i, _item_status_field(), None),
-        "location": getattr(getattr(i, "current_location", None), "name", None),
-        "received_at": i.received_at.isoformat() if getattr(i, "received_at", None) else None,
-        "selling_price": float(i.selling_price) if getattr(i, "selling_price", None) is not None else None,
-    } for i in qs.order_by("-id")[:500]]
+    data = [
+        {
+            "id": i.id,
+            "imei": i.imei,
+            "product": str(i.product),
+            "status": getattr(i, _item_status_field(), None),
+            "location": getattr(getattr(i, "current_location", None), "name", None),
+            "received_at": i.received_at.isoformat() if getattr(i, "received_at", None) else None,
+            "selling_price": float(i.selling_price) if getattr(i, "selling_price", None) is not None else None,
+        }
+        for i in qs.order_by("-id")[:500]
+    ]
 
     return _ok({"data": data})
 
 
 # ---------- API: AI predictions (last 14d) ----------
+
 
 @never_cache
 @login_required
@@ -794,11 +876,14 @@ def predictions_summary(request: HttpRequest):
     base, display, rates = _get_currency_setting()
     daily_rev_avg_display = _convert_amount(daily_rev_avg, base, display, rates)
 
-    overall = [{
-        "date": (today + timedelta(days=i)).isoformat(),
-        "predicted_units": round(daily_units_avg, 2),
-        "predicted_revenue": round(daily_rev_avg_display, 2),
-    } for i in range(1, 8)]
+    overall = [
+        {
+            "date": (today + timedelta(days=i)).isoformat(),
+            "predicted_units": round(daily_units_avg, 2),
+            "predicted_revenue": round(daily_rev_avg_display, 2),
+        }
+        for i in range(1, 8)
+    ]
 
     # 14-day per-model run-rate (Python)
     model_count: dict[int, int] = {}
@@ -829,24 +914,28 @@ def predictions_summary(request: HttpRequest):
         need_next_7 = daily_model_avg * 7.0
 
         if on_hand <= 2:
-            risky.append({
-                "product": name,
-                "on_hand": on_hand,
-                "stockout_date": today.isoformat(),
-                "suggested_restock": max(1, 5 - on_hand),
-                "urgent": True,
-                "reason": "critical_low_stock",
-            })
+            risky.append(
+                {
+                    "product": name,
+                    "on_hand": on_hand,
+                    "stockout_date": today.isoformat(),
+                    "suggested_restock": max(1, 5 - on_hand),
+                    "urgent": True,
+                    "reason": "critical_low_stock",
+                }
+            )
         elif daily_model_avg > 0 and on_hand < need_next_7:
             days_cover = (on_hand / daily_model_avg) if daily_model_avg else 0
-            risky.append({
-                "product": name,
-                "on_hand": on_hand,
-                "stockout_date": (today + timedelta(days=max(0, int(days_cover)))).isoformat(),
-                "suggested_restock": int(round(max(0.0, need_next_7 - on_hand))),
-                "urgent": on_hand <= (daily_model_avg * 2.0),
-                "reason": "runrate_shortfall",
-            })
+            risky.append(
+                {
+                    "product": name,
+                    "on_hand": on_hand,
+                    "stockout_date": (today + timedelta(days=max(0, int(days_cover)))).isoformat(),
+                    "suggested_restock": int(round(max(0.0, need_next_7 - on_hand))),
+                    "urgent": on_hand <= (daily_model_avg * 2.0),
+                    "reason": "runrate_shortfall",
+                }
+            )
 
     return _ok({"overall": overall, "risky": risky, "currency": _currency_payload()})
 
@@ -883,7 +972,7 @@ def api_value_trend(request: HttpRequest):
             pass
 
     # Always prefer Python aggregation on SQLite (safe) — and keep it simple.
-    is_sqlite = (connection.vendor == "sqlite")
+    is_sqlite = connection.vendor == "sqlite"
 
     if not is_sqlite:
         # Non-SQLite: try DB aggregation first, fall back to Python if anything goes wrong.
@@ -907,7 +996,7 @@ def api_value_trend(request: HttpRequest):
                     output_field=dec,
                 )
 
-            agg = (qs.annotate(d=TruncDate(dfield)).values("d").annotate(val=expr).order_by("d"))
+            agg = qs.annotate(d=TruncDate(dfield)).values("d").annotate(val=expr).order_by("d")
 
             base, display, rates = _get_currency_setting()
             data_map: dict[date, float] = {}
@@ -982,6 +1071,7 @@ def api_value_trend(request: HttpRequest):
 
 # ---------- API: Sales trend (line chart) ----------
 
+
 @never_cache
 @login_required
 def api_sales_trend(request: HttpRequest):
@@ -1015,8 +1105,7 @@ def api_sales_trend(request: HttpRequest):
         else:
             val_expr = Count("id")
 
-        agg = (qs.annotate(d=TruncDate(dfield))
-                 .values("d").annotate(val=val_expr).order_by("d"))
+        agg = qs.annotate(d=TruncDate(dfield)).values("d").annotate(val=val_expr).order_by("d")
 
         base, display, rates = _get_currency_setting()
         data_map: dict[date, float] = {}
@@ -1038,7 +1127,9 @@ def api_sales_trend(request: HttpRequest):
 
         if metric == "amount" and sum(values) == 0:
             flabels, fvalues = _fallback_items_daily(
-                request, start_incl, end_excl,
+                request,
+                start_incl,
+                end_excl,
                 "amount",
                 model_id,
                 label_fmt=labels_fmt,
@@ -1046,12 +1137,14 @@ def api_sales_trend(request: HttpRequest):
             if flabels:
                 labels, values = flabels, fvalues
 
-        return _ok({
-            "labels": labels,
-            "values": values,
-            "range": range_meta,
-            "currency": _currency_payload() if metric == "amount" else None
-        })
+        return _ok(
+            {
+                "labels": labels,
+                "values": values,
+                "range": range_meta,
+                "currency": _currency_payload() if metric == "amount" else None,
+            }
+        )
 
     except Exception as e:
         log.warning("api_sales_trend primary aggregation failed: %s", e)
@@ -1083,7 +1176,9 @@ def api_sales_trend(request: HttpRequest):
 
     if metric == "amount" and sum(values) == 0:
         flabels, fvalues = _fallback_items_daily(
-            request, start_incl, end_excl,
+            request,
+            start_incl,
+            end_excl,
             "amount",
             model_id,
             label_fmt=labels_fmt,
@@ -1091,15 +1186,18 @@ def api_sales_trend(request: HttpRequest):
         if flabels:
             labels, values = flabels, fvalues
 
-    return _ok({
-        "labels": labels,
-        "values": values,
-        "range": range_meta,
-        "currency": _currency_payload() if metric == "amount" else None
-    })
+    return _ok(
+        {
+            "labels": labels,
+            "values": values,
+            "range": range_meta,
+            "currency": _currency_payload() if metric == "amount" else None,
+        }
+    )
 
 
 # ---------- API: Top models (bar chart) ----------
+
 
 @never_cache
 @login_required
@@ -1136,12 +1234,7 @@ def api_top_models(request: HttpRequest):
             model,
             Value("Unknown", output_field=djmodels.CharField()),
         )
-        return (
-            qs.annotate(label=label)
-              .values("label")
-              .annotate(c=Count("id"))
-              .order_by("-c", "label")[:12]
-        )
+        return qs.annotate(label=label).values("label").annotate(c=Count("id")).order_by("-c", "label")[:12]
 
     def _items_group(qs):
         brand = Coalesce(
@@ -1159,12 +1252,7 @@ def api_top_models(request: HttpRequest):
             model,
             Value("Unknown", output_field=djmodels.CharField()),
         )
-        return (
-            qs.annotate(label=label)
-              .values("label")
-              .annotate(c=Count("id"))
-              .order_by("-c", "label")[:12]
-        )
+        return qs.annotate(label=label).values("label").annotate(c=Count("id")).order_by("-c", "label")[:12]
 
     labels: list[str] = []
     values: list[int] = []
@@ -1180,17 +1268,19 @@ def api_top_models(request: HttpRequest):
     # 2) Fallback to InventoryItem rows that look sold in the window
     if sum(values) == 0:
         status_field = _item_status_field()
-        date_field   = _best_item_date_field()
+        date_field = _best_item_date_field()
         iqs = _scoped_stock_qs(request)
         if _has_field(InventoryItem, status_field):
-            cond = Q(**{f"{status_field}__in": _SOLD_LIKE}) \
-                 | Q(**{f"{status_field}__istartswith": "sold"}) \
-                 | Q(**{f"{status_field}__istartswith": "dispatch"}) \
-                 | Q(**{f"{status_field}__istartswith": "check"}) \
-                 | Q(**{f"{status_field}__iexact": "out"}) \
-                 | Q(**{f"{status_field}__istartswith": "deliver"}) \
-                 | Q(**{f"{status_field}__istartswith": "issue"}) \
-                 | ~Q(**{f"{status_field}__in": _IN_STOCK_LIKE})
+            cond = (
+                Q(**{f"{status_field}__in": _SOLD_LIKE})
+                | Q(**{f"{status_field}__istartswith": "sold"})
+                | Q(**{f"{status_field}__istartswith": "dispatch"})
+                | Q(**{f"{status_field}__istartswith": "check"})
+                | Q(**{f"{status_field}__iexact": "out"})
+                | Q(**{f"{status_field}__istartswith": "deliver"})
+                | Q(**{f"{status_field}__istartswith": "issue"})
+                | ~Q(**{f"{status_field}__in": _IN_STOCK_LIKE})
+            )
             iqs = iqs.filter(cond)
         if _has_field(InventoryItem, date_field):
             iqs = date_range_filter(iqs, date_field, start_incl, end_excl)
@@ -1217,6 +1307,7 @@ def api_top_models(request: HttpRequest):
 
 # ---------- API: Alerts (window-aware) ----------
 
+
 @never_cache
 @login_required
 def alerts_feed(request: HttpRequest):
@@ -1240,7 +1331,7 @@ def alerts_feed(request: HttpRequest):
 
     dfield = _sale_date_field()
     sales_qs = date_range_filter(_scoped_sales_qs(request), dfield, start_incl, end_incl + timedelta(days=1))
-    stock_qs  = _scoped_stock_qs(request)
+    stock_qs = _scoped_stock_qs(request)
 
     model_id = request.GET.get("model")
     if model_id:
@@ -1260,7 +1351,8 @@ def alerts_feed(request: HttpRequest):
 
     alerts = []
     for r in stock:
-        brand = r["product__brand"]; model = r["product__model"]
+        brand = r["product__brand"]
+        model = r["product__model"]
         name = f"{brand} {model}"
         on_hand = int(r["on_hand"] or 0)
         daily = runrate_map.get(r["product_id"], 0.0)
@@ -1269,8 +1361,13 @@ def alerts_feed(request: HttpRequest):
         if on_hand <= 2:
             alerts.append({"type": "Low stock", "severity": "high", "message": f"{name} has only {on_hand} on hand."})
         elif daily > 0 and on_hand < need7:
-            alerts.append({"type": "Near stockout", "severity": "warn",
-                           "message": f"{name} may stock out within 7 days. On-hand {on_hand}, needed ~{int(round(need7))}."})
+            alerts.append(
+                {
+                    "type": "Near stockout",
+                    "severity": "warn",
+                    "message": f"{name} may stock out within 7 days. On-hand {on_hand}, needed ~{int(round(need7))}.",
+                }
+            )
 
     sev_order = {"high": 0, "warn": 1, "info": 2}
     alerts.sort(key=lambda a: sev_order.get(a.get("severity", "info"), 9))
@@ -1278,6 +1375,7 @@ def alerts_feed(request: HttpRequest):
 
 
 # ---------- Scanner & Time APIs ----------
+
 
 @never_cache
 @login_required
@@ -1306,6 +1404,7 @@ def api_mark_sold(request: HttpRequest):
     loc_id = body.get("location_id") or body.get("location")
     if not loc_id:
         loc_id, _ = _pick_default_location(request)
+
     def _set_item_location_by_id(_item, _loc_id):
         if not _loc_id:
             return
@@ -1335,6 +1434,7 @@ def api_mark_sold(request: HttpRequest):
                         setattr(_item, "location", loc_obj)
             except Exception:
                 pass
+
     _set_item_location_by_id(item, loc_id)
 
     # Parse price & sold date
@@ -1360,12 +1460,16 @@ def api_mark_sold(request: HttpRequest):
     else:
         # ultra-safe fallback if utils_status isn't available
         status_field = _item_status_field()
-        try: setattr(item, status_field, "SOLD")
-        except Exception: pass
+        try:
+            setattr(item, status_field, "SOLD")
+        except Exception:
+            pass
         sfield = _best_item_date_field()
         if _has_field(InventoryItem, sfield):
-            try: setattr(item, sfield, sold_dt)
-            except Exception: pass
+            try:
+                setattr(item, sfield, sold_dt)
+            except Exception:
+                pass
         if _has_field(InventoryItem, "is_sold"):
             item.is_sold = True
         if _has_field(InventoryItem, "in_stock"):
@@ -1377,17 +1481,22 @@ def api_mark_sold(request: HttpRequest):
     dfield = _sale_date_field()
     sale = Sale(item=item)
     if _has_field(Sale, "agent"):
-        try: setattr(sale, "agent", request.user)
-        except Exception: pass
+        try:
+            setattr(sale, "agent", request.user)
+        except Exception:
+            pass
     if afield and price_val is not None:
-        try: setattr(sale, afield, price_val)
-        except Exception: pass
-    try: setattr(sale, dfield, sold_dt)
-    except Exception: pass
+        try:
+            setattr(sale, afield, price_val)
+        except Exception:
+            pass
+    try:
+        setattr(sale, dfield, sold_dt)
+    except Exception:
+        pass
     sale.save()
 
     return _ok({"ok": True, "id": item.id, "sale_id": sale.id})
-
 
 
 @never_cache
@@ -1404,7 +1513,8 @@ def api_time_checkin(request: HttpRequest):
         try:
             mod = __import__(dotted, fromlist=["TimeLog"])
             TimeLog = getattr(mod, "TimeLog", None)
-            if TimeLog: break
+            if TimeLog:
+                break
         except Exception:
             continue
 
@@ -1424,8 +1534,10 @@ def api_time_checkin(request: HttpRequest):
     }
     for k, v in mapping.items():
         if _has_field(TimeLog, k) or hasattr(TimeLog, k):
-            try: setattr(obj, k, v)
-            except Exception: pass
+            try:
+                setattr(obj, k, v)
+            except Exception:
+                pass
     try:
         obj.save()
         return _ok({"stored": True, "id": getattr(obj, "id", None)})
@@ -1435,6 +1547,7 @@ def api_time_checkin(request: HttpRequest):
 
 
 # ---------- NEW: Async Task Submit & Status ----------
+
 
 @never_cache
 @login_required
@@ -1513,6 +1626,7 @@ def api_task_status(request: HttpRequest):
 
 # ---------- NEW: Quick audit-chain verify (API) ----------
 
+
 @never_cache
 @login_required
 def api_audit_verify(request: HttpRequest):
@@ -1532,9 +1646,11 @@ def api_audit_verify(request: HttpRequest):
     limit = max(100, min(limit, 200000))
 
     # Verify newest→oldest slice by reversing after fetch to walk forward
-    rows = list(AuditLog.objects.order_by("-id").values(
-        "id", "prev_hash", "hash", "actor_id", "entity", "entity_id", "action", "payload"
-    )[:limit])
+    rows = list(
+        AuditLog.objects.order_by("-id").values(
+            "id", "prev_hash", "hash", "actor_id", "entity", "entity_id", "action", "payload"
+        )[:limit]
+    )
     rows.reverse()
 
     import hashlib as _hashlib
@@ -1570,6 +1686,7 @@ def api_audit_verify(request: HttpRequest):
 
 # ---------- NEW: Restock heatmap (safe stub) ----------
 
+
 @never_cache
 @login_required
 @require_business
@@ -1580,13 +1697,15 @@ def restock_heatmap(request: HttpRequest):
     Replace later with real geo/grid data if you add coordinates to locations.
     Response shape stays stable: { ok: true, points: [...] }.
     """
-    return _ok({
-        "points": [],         # e.g. [{ "label": "Area 25", "value": 0.0 }]
-        "generated_at": timezone.now().isoformat(),
-    })
+    return _ok(
+        {
+            "points": [],  # e.g. [{ "label": "Area 25", "value": 0.0 }]
+            "generated_at": timezone.now().isoformat(),
+        }
+    )
 
 
 # ---------- Back-compat aliases ----------
 
-api_predictions = predictions_summary       # /inventory/api/predictions (no slash) compat
-api_alerts = alerts_feed                    # keep older route names working
+api_predictions = predictions_summary  # /inventory/api/predictions (no slash) compat
+api_alerts = alerts_feed  # keep older route names working

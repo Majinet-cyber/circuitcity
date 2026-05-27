@@ -1,0 +1,271 @@
+{% extends "base.html" %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}Edit Sale · Sale #{{ sale.pk }}{% endblock %}
+{% block header_title %}✏️ Correct Sale Details{% endblock %}
+
+{% block extra_css %}
+<style>
+  .page{max-width:800px;margin:0 auto;padding:clamp(12px,4vw,24px)}
+  
+  .card{
+    background:#fff;
+    border:1px solid #e2e8f0;
+    border-radius:16px;
+    padding:24px;
+    box-shadow:0 4px 12px rgba(0,0,0,.05);
+    margin-bottom:24px;
+  }
+  
+  .alert{
+    padding:16px 20px;
+    border-radius:12px;
+    margin-bottom:24px;
+    display:flex;
+    align-items:center;
+    gap:12px;
+  }
+  .alert-info{background:#dbeafe;border:1px solid #60a5fa;color:#1e40af}
+  .alert-warning{background:#fef3c7;border:1px solid #fbbf24;color:#92400e}
+  .alert-danger{background:#fee2e2;border:1px solid #f87171;color:#991b1b}
+  .alert i{font-size:24px}
+  
+  .detail-row{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:12px 0;
+    border-bottom:1px solid #f1f5f9;
+  }
+  .detail-row:last-child{border-bottom:none}
+  .detail-label{color:#64748b;font-size:14px}
+  .detail-value{font-weight:600;font-size:15px}
+  
+  .form-group{margin-bottom:20px}
+  .form-label{
+    display:block;
+    font-weight:600;
+    font-size:14px;
+    color:#0f172a;
+    margin-bottom:8px;
+  }
+  .form-label .required{color:#ef4444}
+  .form-input,.form-select,.form-textarea{
+    width:100%;
+    padding:12px 16px;
+    border:2px solid #e2e8f0;
+    border-radius:10px;
+    font-size:15px;
+    transition:all .2s;
+    min-height:44px;
+  }
+  .form-input:focus,.form-select:focus,.form-textarea:focus{
+    outline:none;
+    border-color:#3b82f6;
+    box-shadow:0 0 0 3px rgba(59,130,246,.1);
+  }
+  
+  .btn{
+    appearance:none;
+    border:none;
+    padding:14px 28px;
+    border-radius:12px;
+    font-weight:700;
+    font-size:15px;
+    cursor:pointer;
+    transition:all .2s;
+    display:inline-flex;
+    align-items:center;
+    gap:10px;
+    min-height:52px;
+    justify-content:center;
+  }
+  .btn-primary{background:#3b82f6;color:#fff;width:100%}
+  .btn-primary:hover{background:#2563eb;transform:translateY(-2px);box-shadow:0 4px 12px rgba(59,130,246,.3)}
+  .btn-secondary{background:#f1f5f9;color:#475569}
+  .btn-secondary:hover{background:#e2e8f0}
+  
+  .actions{
+    display:flex;
+    gap:12px;
+    margin-top:24px;
+  }
+  
+  .cost-warning{
+    padding:12px 16px;
+    background:#fef3c7;
+    border:1px solid #fbbf24;
+    border-radius:8px;
+    color:#92400e;
+    font-size:14px;
+    margin-top:8px;
+  }
+  
+  @media (max-width:640px){
+    .card{padding:16px}
+    .actions{flex-direction:column-reverse}
+    .btn{width:100%}
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page">
+  <div class="alert alert-info">
+    <i class="bi bi-info-circle-fill"></i>
+    <div>
+      <strong>Correcting Sale Details</strong>
+      <p style="margin:4px 0 0">This will update the sale price and IMEI without undoing the sale or affecting stock quantities.</p>
+    </div>
+  </div>
+  
+  <!-- Sale Details -->
+  <div class="card">
+    <h2 style="margin:0 0 20px;font-size:20px;">📋 Current Sale Details</h2>
+    
+    <div class="detail-row">
+      <span class="detail-label">Sale ID</span>
+      <span class="detail-value">#{{ sale.pk }}</span>
+    </div>
+    
+    <div class="detail-row">
+      <span class="detail-label">Item</span>
+      <span class="detail-value">
+        {{ sale.item.product.name|default:"Unknown" }}
+        {% if sale.item.product.variant_label %}
+        <br><small style="color:#64748b;font-weight:normal">{{ sale.item.product.variant_label }}</small>
+        {% endif %}
+      </span>
+    </div>
+    
+    <div class="detail-row">
+      <span class="detail-label">Current Price</span>
+      <span class="detail-value" style="color:#10b981">K{{ sale.price|floatformat:0|intcomma }}</span>
+    </div>
+    
+    {% if current_imei %}
+    <div class="detail-row">
+      <span class="detail-label">Current IMEI</span>
+      <span class="detail-value"><code>{{ current_imei }}</code></span>
+    </div>
+    {% endif %}
+    
+    {% if order_price %}
+    <div class="detail-row">
+      <span class="detail-label">Cost Price</span>
+      <span class="detail-value" style="color:#64748b">K{{ order_price|floatformat:0|intcomma }}</span>
+    </div>
+    {% endif %}
+  </div>
+  
+  <!-- Edit Form -->
+  {% if can_edit %}
+  <form method="post" class="card">
+    {% csrf_token %}
+    
+    <div style="margin-bottom:16px">
+      <a href="{% url 'sales:rollback_confirm' sale.id %}" style="color:#3b82f6;text-decoration:none;font-size:14px">
+        ← Back to action choice
+      </a>
+    </div>
+    
+    <h2 style="margin:0 0 20px;font-size:20px;">✏️ Update Sale Details</h2>
+    
+    <!-- Selling Price -->
+    <div class="form-group">
+      <label class="form-label">Selling Price (MWK) <span class="required">*</span></label>
+      <input 
+        type="number" 
+        name="selling_price" 
+        id="selling-price" 
+        class="form-input"
+        placeholder="0.00"
+        step="0.01"
+        min="0"
+        value="{{ sale.price }}"
+        required
+      >
+      {% if order_price %}
+      <div class="cost-warning" id="cost-warning" style="display:none">
+        ⚠️ Selling price is below cost price (K{{ order_price|floatformat:0|intcomma }}). This is allowed but may indicate an error.
+      </div>
+      {% endif %}
+    </div>
+    
+    <!-- IMEI -->
+    <div class="form-group">
+      <label class="form-label">IMEI (Optional)</label>
+      <input 
+        type="text" 
+        name="imei" 
+        id="imei" 
+        class="form-input"
+        placeholder="Enter 15-digit IMEI"
+        value="{{ current_imei }}"
+        maxlength="15"
+        pattern="[0-9]{15}"
+      >
+      <small style="color:#64748b;font-size:13px;display:block;margin-top:6px">
+        IMEI must be exactly 15 digits. Leave blank to keep current IMEI.
+      </small>
+    </div>
+    
+    <!-- Actions -->
+    <div class="actions">
+      <a href="{% url 'sales:rollback_confirm' sale.id %}" class="btn btn-secondary" style="flex:1">
+        <i class="bi bi-x-circle"></i> Cancel
+      </a>
+      <button type="submit" class="btn btn-primary" style="flex:2">
+        <i class="bi bi-check-circle"></i> Save Changes
+      </button>
+    </div>
+  </form>
+  {% else %}
+  <div class="alert alert-danger">
+    <i class="bi bi-x-circle-fill"></i>
+    <div>
+      <strong>Cannot Edit This Sale</strong>
+      <p style="margin:4px 0 0">{{ error_msg }}</p>
+    </div>
+  </div>
+  <div class="actions">
+    <a href="{% url 'sales:rollback_confirm' sale.id %}" class="btn btn-secondary" style="width:100%">
+      <i class="bi bi-arrow-left"></i> Back
+    </a>
+  </div>
+  {% endif %}
+</div>
+
+<script>
+// Show/hide cost warning
+const sellingPriceInput = document.getElementById('selling-price');
+const costWarning = document.getElementById('cost-warning');
+const orderPrice = {{ order_price|default:0 }};
+
+if (sellingPriceInput && costWarning && orderPrice > 0) {
+  sellingPriceInput.addEventListener('input', function() {
+    const price = parseFloat(this.value) || 0;
+    if (price > 0 && price < orderPrice) {
+      costWarning.style.display = 'block';
+    } else {
+      costWarning.style.display = 'none';
+    }
+  });
+}
+
+// IMEI formatting (only digits, max 15)
+const imeiInput = document.getElementById('imei');
+if (imeiInput) {
+  imeiInput.addEventListener('input', function() {
+    // Remove non-digits
+    this.value = this.value.replace(/\D/g, '');
+    // Limit to 15 digits
+    if (this.value.length > 15) {
+      this.value = this.value.substring(0, 15);
+    }
+  });
+}
+</script>
+{% endblock %}
+

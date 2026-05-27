@@ -3,6 +3,7 @@ from django.contrib.postgres.search import TrigramSimilarity
 from inventory.models import SKU
 from accounts.models import Agent
 
+
 def api_global_search(request):
     q = (request.GET.get("q") or "").strip()
     if not q:
@@ -11,14 +12,12 @@ def api_global_search(request):
         SKU.objects.annotate(sim=TrigramSimilarity("name", q))
         .filter(sim__gt=0.2)
         .order_by("-sim")
-        .values("id","name","code")[:8]
+        .values("id", "name", "code")[:8]
     )
     agents = list(
         Agent.objects.annotate(sim=TrigramSimilarity("full_name", q))
         .filter(sim__gt=0.2)
         .order_by("-sim")
-        .values("id","full_name")[:6]
+        .values("id", "full_name")[:6]
     )
     return JsonResponse({"skus": skus, "agents": agents})
-
-

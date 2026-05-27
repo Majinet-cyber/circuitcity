@@ -1,0 +1,198 @@
+name: CI
+
+on:
+  push:
+    branches: ["main", "mobile-layout-v1"]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python-tests:
+    runs-on: ubuntu-24.04
+
+    # If you use Postgres in production, testing with Postgres avoids surprises.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: cc_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    env:
+      # Adjust to your project (examples: "cc.settings", "circuitcity.settings")
+      DJANGO_SETTINGS_MODULE: cc.settings
+      DJANGO_SECRET_KEY: ${{ secrets.DJANGO_SECRET_KEY_CI }}
+
+      # Explicitly mark as CI environment (even though GitHub sets it, we want to be explicit)
+      CI: "true"
+
+      # If your app reads DATABASE_URL, use this:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/cc_test
+
+      # Optional extra safety: explicitly disable SSL mode
+      PGSSLMODE: disable
+
+      # Helpful CI flags (adjust to match how your settings are written)
+      DEBUG: "0"
+      ENABLE_EMAIL_OTP: "0"
+      ALLOWED_HOSTS: "localhost,127.0.0.1"
+      PAYCHANGU_MODE: "test"  # Explicit: never hit live payments in CI
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+          python -m pip install -r requirements-dev.txt
+
+      - name: Django checks + migrate
+        run: |
+          python manage.py check
+          python manage.py migrate --noinput
+
+      # CRITICAL RELIABILITY GATE
+      # These tests MUST pass - they cover the "embarrassing" failures
+      # Enforces: strict markers, strict config, warnings as errors
+      - name: Run CRITICAL tests (reliability gate)
+        run: |
+          echo "========================================"
+          echo "  CRITICAL RELIABILITY GATE"
+          echo "========================================"
+          echo "These tests must ALL pass to continue."
+          echo "Tier A (core): phones, liquor, grocery, pharmacy, clothing, gym, hardware, cement"
+          echo "Tier B (new): farm, welding (dashboard only)"
+          python -m pytest -m critical --maxfail=1 -q --strict-markers --strict-config -W error -ra
+        env:
+          PYTHONWARNINGS: "error"
+        continue-on-error: false
+
+      # OTP tests (run with OTP enabled to verify 2FA works)
+      - name: Run OTP critical tests
+        run: |
+          echo "Running OTP verification tests..."
+          python -m pytest -m "critical and otp" -q --strict-markers --strict-config -W error
+        env:
+          ENABLE_EMAIL_OTP: "1"
+          PYTHONWARNINGS: "error"
+        continue-on-error: false
+
+      # Full test suite runs after critical tests pass
+      - name: Run full test suite
+        run: |
+          python -m pytest -q --ignore=tests/critical/
+
+
+  cypress:
+    runs-on: ubuntu-24.04
+    needs: python-tests
+
+    env:
+      DJANGO_SETTINGS_MODULE: cc.settings
+      DJANGO_SECRET_KEY: ${{ secrets.DJANGO_SECRET_KEY_CI }}
+
+      # Explicitly mark as CI environment
+      CI: "true"
+
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/cc_e2e
+
+      # Optional extra safety: explicitly disable SSL mode
+      PGSSLMODE: disable
+
+      # Cypress env (available via Cypress.env(...))
+      CYPRESS_ADMIN_EMAIL: ${{ secrets.CYPRESS_ADMIN_EMAIL }}
+      CYPRESS_ADMIN_PASSWORD: ${{ secrets.CYPRESS_ADMIN_PASSWORD }}
+
+      # Base URL for e2e
+      CYPRESS_BASE_URL: http://localhost:8000
+
+      ENABLE_EMAIL_OTP: "0"
+      DEBUG: "0"
+      ALLOWED_HOSTS: "localhost,127.0.0.1"
+      PAYCHANGU_MODE: "test"  # Explicit: never hit live payments in CI
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: cc_e2e
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install Python deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Migrate DB
+        run: |
+          python manage.py migrate --noinput
+
+      # OPTIONAL (highly recommended):
+      # Create a seed command so Cypress can log in reliably.
+      # Example: python manage.py seed_ci --admin-email ... --admin-password ...
+      - name: Seed CI data (optional)
+        run: |
+          echo "Skipping seed step (add python manage.py seed_ci when ready)"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install Node deps
+        run: npm ci
+
+      - name: Cypress run
+        uses: cypress-io/github-action@v6
+        with:
+          # Start Django, wait for it, then run Cypress
+          start: python manage.py runserver 0.0.0.0:8000
+          wait-on: http://localhost:8000
+          wait-on-timeout: 120
+          # If you want to be extra explicit about baseUrl:
+          # command: npx cypress run --config baseUrl=http://localhost:8000
+
+      - name: Upload Cypress screenshots/videos on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cypress-artifacts
+          path: |
+            cypress/screenshots
+            cypress/videos

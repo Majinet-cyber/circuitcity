@@ -1,0 +1,400 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Butchery Command Centre · {{ business.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+.bt-wrap { max-width: 1140px; margin: 0 auto; padding: 20px 14px; }
+
+/* Period filter */
+.period-bar {
+  background: #fff; border: 1px solid #e2e8f0; border-radius: 12px;
+  padding: 10px 14px; display: flex; align-items: center; gap: 8px;
+  flex-wrap: wrap; margin-bottom: 20px;
+  box-shadow: 0 1px 3px rgba(15,23,42,.05);
+}
+.period-bar .pb-label { font-size: .78rem; font-weight: 700; color: #475569; flex-shrink: 0; }
+.period-btn {
+  padding: 6px 14px; border-radius: 8px; font-size: .78rem; font-weight: 700;
+  text-decoration: none; border: 1px solid #e2e8f0; color: #475569; background: #f8fafc;
+  transition: all .12s ease;
+}
+.period-btn:hover { background: #f0fdf4; border-color: #86efac; color: #15803d; }
+.period-btn.active { background: #10b981; border-color: #10b981; color: #fff; }
+.period-active-label {
+  margin-left: auto; font-size: .75rem; color: #64748b; font-weight: 600;
+  background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px;
+  padding: 4px 12px;
+}
+
+/* Hero card */
+.hero-card {
+  background: linear-gradient(135deg, #0f172a 0%, #134e4a 100%);
+  border-radius: 18px; padding: 24px 28px; margin-bottom: 24px;
+  color: #fff; position: relative; overflow: hidden;
+}
+.hero-card::after {
+  content: ''; position: absolute; right: -40px; top: -40px;
+  width: 200px; height: 200px; border-radius: 50%;
+  background: rgba(16,185,129,.1);
+}
+.hero-title { font-size: 1.35rem; font-weight: 900; margin: 0 0 4px; }
+.hero-sub { font-size: .85rem; color: rgba(255,255,255,.7); margin: 0 0 16px; }
+.hero-stats { display: flex; gap: 24px; flex-wrap: wrap; }
+.hero-stat-item { }
+.hero-stat-val { font-size: 1.4rem; font-weight: 900; color: #6ee7b7; }
+.hero-stat-lbl { font-size: .72rem; color: rgba(255,255,255,.6); text-transform: uppercase; letter-spacing: .05em; }
+
+/* KPI Grid */
+.kpi-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(175px, 1fr)); gap: 12px; margin-bottom: 24px; }
+.kpi-card {
+  background: #fff; border: 1px solid #e2e8f0; border-radius: 14px;
+  padding: 16px 18px; position: relative; overflow: hidden;
+  box-shadow: 0 1px 4px rgba(15,23,42,.06);
+  transition: transform .15s ease, box-shadow .15s ease;
+}
+.kpi-card:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(15,23,42,.10); }
+.kpi-icon {
+  width: 36px; height: 36px; border-radius: 10px;
+  display: grid; place-items: center; margin-bottom: 10px;
+  background: linear-gradient(135deg, #dcfce7, #bbf7d0);
+}
+.kpi-icon .bi { font-size: 1rem; background: linear-gradient(120deg,#10b981,#059669); background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.kpi-icon.amber { background: linear-gradient(135deg,#fef3c7,#fde68a); }
+.kpi-icon.amber .bi { background: linear-gradient(120deg,#f59e0b,#d97706); background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.kpi-icon.red { background: linear-gradient(135deg,#fee2e2,#fecaca); }
+.kpi-icon.red .bi { background: linear-gradient(120deg,#ef4444,#dc2626); background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.kpi-icon.blue { background: linear-gradient(135deg,#dbeafe,#bfdbfe); }
+.kpi-icon.blue .bi { background: linear-gradient(120deg,#3b82f6,#2563eb); background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.kpi-label { font-size: .69rem; text-transform: uppercase; letter-spacing: .07em; color: #64748b; font-weight: 700; margin-bottom: 6px; }
+.kpi-value { font-size: 1.4rem; font-weight: 900; color: #0f172a; line-height: 1.1; }
+.kpi-sub { font-size: .71rem; color: #94a3b8; margin-top: 3px; }
+.kpi-card.accent-green { border-left: 3px solid #22c55e; }
+.kpi-card.accent-blue  { border-left: 3px solid #3b82f6; }
+.kpi-card.accent-amber { border-left: 3px solid #f59e0b; }
+.kpi-card.accent-red   { border-left: 3px solid #ef4444; }
+.kpi-card.accent-teal  { border-left: 3px solid #14b8a6; }
+.kpi-card.accent-violet{ border-left: 3px solid #8b5cf6; }
+
+/* Section header */
+.section-head { font-size: .78rem; text-transform: uppercase; letter-spacing: .07em; font-weight: 800; color: #475569; margin: 24px 0 12px; display: flex; align-items: center; gap: 8px; }
+.section-head::before { content: ''; display: block; width: 3px; height: 14px; background: #10b981; border-radius: 2px; }
+
+/* Quick Actions */
+.qa-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px,1fr)); gap: 10px; margin-bottom: 24px; }
+.qa-card {
+  background: #fff; border: 1px solid #e2e8f0; border-radius: 12px;
+  padding: 14px 10px; display: flex; flex-direction: column; align-items: center;
+  gap: 7px; text-decoration: none; color: #374151; font-size: .8rem; font-weight: 700;
+  box-shadow: 0 1px 3px rgba(15,23,42,.05); transition: all .15s ease; text-align: center;
+}
+.qa-card:hover { background: #f0fdf4; border-color: #86efac; color: #15803d; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(16,185,129,.15); }
+.qa-card.primary { background: #10b981; border-color: #10b981; color: #fff; }
+.qa-card.primary:hover { background: #059669; border-color: #059669; color: #fff; }
+.qa-card.orange { background: #f97316; border-color: #f97316; color: #fff; }
+.qa-card.orange:hover { background: #ea580c; border-color: #ea580c; color: #fff; }
+.qa-icon {
+  width: 40px; height: 40px; border-radius: 10px;
+  display: grid; place-items: center;
+  background: linear-gradient(135deg, #dcfce7, #bbf7d0);
+}
+.qa-card.primary .qa-icon,
+.qa-card.orange .qa-icon { background: rgba(255,255,255,.2); }
+.qa-icon .bi { font-size: 1.1rem; background: linear-gradient(120deg,#10b981,#059669); background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.qa-card.primary .qa-icon .bi,
+.qa-card.orange .qa-icon .bi { background: none; -webkit-text-fill-color: #fff; color: #fff; }
+
+/* Insights */
+.insight-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 24px; }
+.insight-item {
+  background: #fffbeb; border: 1px solid #fde68a; border-radius: 10px;
+  padding: 10px 14px; font-size: .84rem; color: #78350f;
+  display: flex; align-items: flex-start; gap: 8px;
+}
+.insight-dot { width: 6px; height: 6px; border-radius: 50%; background: #f59e0b; flex-shrink: 0; margin-top: 6px; }
+
+/* Panel */
+.bt-panel { background:#fff; border:1px solid #e2e8f0; border-radius:14px; padding:18px; box-shadow:0 1px 4px rgba(15,23,42,.05); }
+.bt-panel-title { font-size:.82rem; font-weight:800; color:#0f172a; margin:0 0 12px; }
+
+/* Table */
+.bt-table { width: 100%; border-collapse: collapse; font-size: .83rem; }
+.bt-table th { text-align: left; padding: 8px 10px; font-size: .7rem; text-transform: uppercase; letter-spacing: .05em; color: #64748b; border-bottom: 2px solid #e2e8f0; font-weight: 700; }
+.bt-table td { padding: 9px 10px; border-bottom: 1px solid #f1f5f9; }
+.bt-table tr:last-child td { border-bottom: none; }
+.bt-table tr:hover td { background: #f8fafc; }
+
+/* Empty state */
+.empty-state { text-align: center; padding: 32px 20px; color: #94a3b8; }
+.empty-state h3 { font-size: .9rem; font-weight: 700; color: #64748b; margin-bottom: 6px; }
+.empty-state p { font-size: .82rem; }
+
+/* Ledger status */
+.ledger-badge { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 99px; font-size: .72rem; font-weight: 700; }
+.ledger-badge.locked { background: #dcfce7; color: #166534; }
+.ledger-badge.draft { background: #fef3c7; color: #92400e; }
+
+@media (max-width: 640px) {
+  .kpi-grid { grid-template-columns: 1fr 1fr; }
+  .qa-grid { grid-template-columns: repeat(3, 1fr); }
+  .hero-stats { gap: 16px; }
+  .hero-title { font-size: 1.15rem; }
+  .two-col { grid-template-columns: 1fr !important; }
+  .period-active-label { display: none; }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="bt-wrap">
+
+  <!-- Period Filter -->
+  <div class="period-bar">
+    <span class="pb-label">Period:</span>
+    <a href="?period=month" class="period-btn {% if period_key == 'month' %}active{% endif %}">Month</a>
+    <a href="?period=w1" class="period-btn {% if period_key == 'w1' %}active{% endif %}">Week 1</a>
+    <a href="?period=w2" class="period-btn {% if period_key == 'w2' %}active{% endif %}">Week 2</a>
+    <a href="?period=w3" class="period-btn {% if period_key == 'w3' %}active{% endif %}">Week 3</a>
+    <a href="?period=w4" class="period-btn {% if period_key == 'w4' %}active{% endif %}">Week 4</a>
+    <a href="?period=w5" class="period-btn {% if period_key == 'w5' %}active{% endif %}">Week 5</a>
+    <span class="period-active-label">{{ period_label }}</span>
+  </div>
+
+  <!-- Hero Card -->
+  <div class="hero-card" style="margin-bottom:24px;">
+    <div class="hero-title">Butchery Command Centre</div>
+    <div class="hero-sub">Track meat intake, daily sales, kg sold, stock value, and profit in one place &mdash; {{ business.name }}</div>
+    <div class="hero-stats">
+      <div class="hero-stat-item">
+        <div class="hero-stat-val">MWK {{ period_revenue|floatformat:0|intcomma }}</div>
+        <div class="hero-stat-lbl">{{ period_label|truncatechars:30 }} Revenue</div>
+      </div>
+      <div class="hero-stat-item">
+        <div class="hero-stat-val">{{ period_kg|floatformat:1 }} kg</div>
+        <div class="hero-stat-lbl">Kg Sold</div>
+      </div>
+      <div class="hero-stat-item">
+        <div class="hero-stat-val">MWK {{ period_profit|floatformat:0|intcomma }}</div>
+        <div class="hero-stat-lbl">Gross Profit</div>
+      </div>
+      <div class="hero-stat-item">
+        <div class="hero-stat-val">{{ days_tracked }}</div>
+        <div class="hero-stat-lbl">Days Tracked</div>
+      </div>
+    </div>
+    {% if ledger_today %}
+    <div style="margin-top:14px;">
+      {% if ledger_today.is_locked %}
+      <span class="ledger-badge locked"><i class="bi bi-lock-fill"></i> Today Locked</span>
+      {% else %}
+      <span class="ledger-badge draft"><i class="bi bi-pencil"></i> Today: Draft</span>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- KPI Cards -->
+  <div class="kpi-grid">
+    <div class="kpi-card accent-green">
+      <div class="kpi-icon"><i class="bi bi-cash"></i></div>
+      <div class="kpi-label">Today's Revenue</div>
+      <div class="kpi-value">MWK {{ today_revenue|floatformat:0|intcomma }}</div>
+      <div class="kpi-sub">{{ today_count }} transaction{{ today_count|pluralize }}</div>
+    </div>
+    <div class="kpi-card accent-teal">
+      <div class="kpi-icon"><i class="bi bi-graph-up-arrow"></i></div>
+      <div class="kpi-label">Today's Profit</div>
+      <div class="kpi-value">MWK {{ today_profit|floatformat:0|intcomma }}</div>
+      <div class="kpi-sub">Gross profit today</div>
+    </div>
+    <div class="kpi-card accent-blue">
+      <div class="kpi-icon blue"><i class="bi bi-rulers"></i></div>
+      <div class="kpi-label">KG Sold Today</div>
+      <div class="kpi-value">{{ kg_today|floatformat:2 }} kg</div>
+      <div class="kpi-sub">By weight</div>
+    </div>
+    <div class="kpi-card accent-green">
+      <div class="kpi-icon"><i class="bi bi-calendar-month"></i></div>
+      <div class="kpi-label">Month Revenue</div>
+      <div class="kpi-value">MWK {{ month_revenue|floatformat:0|intcomma }}</div>
+      <div class="kpi-sub">MWK {{ month_profit|floatformat:0|intcomma }} profit</div>
+    </div>
+    <div class="kpi-card accent-teal">
+      <div class="kpi-icon"><i class="bi bi-archive"></i></div>
+      <div class="kpi-label">Stock Value</div>
+      <div class="kpi-value">MWK {{ stock_value|floatformat:0|intcomma }}</div>
+      <div class="kpi-sub">{{ total_products }} active cut{{ total_products|pluralize }}</div>
+    </div>
+    <div class="kpi-card {% if low_stock_count > 0 %}accent-amber{% else %}accent-green{% endif %}">
+      <div class="kpi-icon {% if low_stock_count > 0 %}amber{% endif %}"><i class="bi bi-exclamation-triangle"></i></div>
+      <div class="kpi-label">Low Stock</div>
+      <div class="kpi-value">{{ low_stock_count }}</div>
+      <div class="kpi-sub">Below reorder level</div>
+    </div>
+    <div class="kpi-card {% if out_of_stock_count > 0 %}accent-red{% else %}accent-green{% endif %}">
+      <div class="kpi-icon {% if out_of_stock_count > 0 %}red{% endif %}"><i class="bi bi-x-circle"></i></div>
+      <div class="kpi-label">Out of Stock</div>
+      <div class="kpi-value">{{ out_of_stock_count }}</div>
+      <div class="kpi-sub">Need restocking</div>
+    </div>
+    <div class="kpi-card accent-violet">
+      <div class="kpi-icon blue"><i class="bi bi-calendar3"></i></div>
+      <div class="kpi-label">Days Tracked</div>
+      <div class="kpi-value">{{ days_tracked }}</div>
+      <div class="kpi-sub">This month</div>
+    </div>
+    <div class="kpi-card accent-teal">
+      <div class="kpi-icon"><i class="bi bi-truck"></i></div>
+      <div class="kpi-label">Intake Batches</div>
+      <div class="kpi-value">{{ current_intakes }}</div>
+      <div class="kpi-sub">This month</div>
+    </div>
+  </div>
+
+  <!-- Smart Insights -->
+  {% if insights %}
+  <div class="section-head">Smart Insights</div>
+  <div class="insight-list">
+    {% for msg in insights %}
+    <div class="insight-item"><span class="insight-dot"></span><span>{{ msg }}</span></div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <!-- Quick Actions -->
+  <div class="section-head">Quick Actions</div>
+  <div class="qa-grid">
+    <a href="{% url 'butchery:daily_sales' %}" class="qa-card primary">
+      <div class="qa-icon"><i class="bi bi-journal-plus"></i></div>
+      <span>Record Daily Sales</span>
+    </a>
+    <a href="{% url 'butchery:sell' %}" class="qa-card">
+      <div class="qa-icon"><i class="bi bi-cart-plus"></i></div>
+      <span>Quick Sell</span>
+    </a>
+    <a href="{% url 'butchery:intake' %}" class="qa-card">
+      <div class="qa-icon"><i class="bi bi-truck"></i></div>
+      <span>Record Intake</span>
+    </a>
+    <a href="{% url 'butchery:processing' %}" class="qa-card">
+      <div class="qa-icon"><i class="bi bi-scissors"></i></div>
+      <span>Process Cuts</span>
+    </a>
+    <a href="{% url 'butchery:product_add' %}" class="qa-card">
+      <div class="qa-icon"><i class="bi bi-plus-square"></i></div>
+      <span>Add Cut</span>
+    </a>
+    <a href="{% url 'butchery:products' %}" class="qa-card">
+      <div class="qa-icon"><i class="bi bi-box-seam"></i></div>
+      <span>Stock View</span>
+    </a>
+    <a href="{% url 'butchery:reports' %}" class="qa-card">
+      <div class="qa-icon"><i class="bi bi-bar-chart-line"></i></div>
+      <span>Reports</span>
+    </a>
+    <a href="{% url 'butchery:reports_export_csv' %}?period={{ period_key }}" class="qa-card">
+      <div class="qa-icon"><i class="bi bi-file-earmark-spreadsheet"></i></div>
+      <span>Export CSV</span>
+    </a>
+    <a href="{% url 'butchery:reports_export_pdf' %}?period={{ period_key }}" class="qa-card orange">
+      <div class="qa-icon"><i class="bi bi-file-earmark-pdf"></i></div>
+      <span>Export PDF</span>
+    </a>
+  </div>
+
+  <!-- Two-column panels -->
+  <div class="two-col" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px;">
+
+    <!-- Top Cuts -->
+    <div class="bt-panel">
+      <div class="bt-panel-title">Top Cuts &mdash; {{ period_label|truncatechars:30 }}</div>
+      {% if top_cuts %}
+      <table class="bt-table">
+        <thead>
+          <tr>
+            <th>Cut / Product</th>
+            <th style="text-align:right;">Revenue</th>
+            <th style="text-align:right;">Qty</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for c in top_cuts %}
+          <tr>
+            <td>
+              <div style="font-weight:700;color:#0f172a;">{{ c.product__name }}</div>
+              <div style="font-size:.7rem;color:#94a3b8;">{{ c.product__category|title }}</div>
+            </td>
+            <td style="text-align:right;font-weight:700;color:#059669;">MWK {{ c.revenue|floatformat:0|intcomma }}</td>
+            <td style="text-align:right;color:#64748b;font-size:.82rem;">{{ c.qty|floatformat:2 }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <div class="empty-state">
+        <i class="bi bi-bar-chart" style="font-size:1.8rem;display:block;margin-bottom:8px;"></i>
+        <h3>No sales for this period</h3>
+        <p>Use Record Daily Sales or Quick Sell to record sales.</p>
+        <a href="{% url 'butchery:daily_sales' %}" style="display:inline-block;margin-top:8px;padding:8px 16px;background:#10b981;color:#fff;border-radius:8px;font-size:.8rem;font-weight:700;text-decoration:none;">Record Daily Sales</a>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Recent Intakes -->
+    <div class="bt-panel">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <div class="bt-panel-title" style="margin:0;">Recent Intakes</div>
+        <a href="{% url 'butchery:intake' %}" style="font-size:.76rem;color:#10b981;text-decoration:none;font-weight:700;">View All</a>
+      </div>
+      {% if recent_intakes %}
+      <table class="bt-table">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Type</th>
+            <th style="text-align:right;">Weight</th>
+            <th style="text-align:right;">Cost/kg</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for i in recent_intakes %}
+          <tr>
+            <td style="font-weight:600;color:#0f172a;">{{ i.intake_date|date:"d M" }}</td>
+            <td style="color:#64748b;">{{ i.get_meat_type_display }}</td>
+            <td style="text-align:right;font-weight:700;">{{ i.intake_weight_kg|floatformat:1 }} kg</td>
+            <td style="text-align:right;color:#475569;">MWK {{ i.cost_per_kg|floatformat:0|intcomma }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <div class="empty-state">
+        <i class="bi bi-truck" style="font-size:1.8rem;display:block;margin-bottom:8px;"></i>
+        <h3>No intake recorded yet</h3>
+        <p>Record carcass or bulk meat intake to track stock and cost per kg.</p>
+        <a href="{% url 'butchery:intake' %}" style="display:inline-block;margin-top:8px;padding:8px 16px;background:#10b981;color:#fff;border-radius:8px;font-size:.8rem;font-weight:700;text-decoration:none;">Record Intake</a>
+      </div>
+      {% endif %}
+    </div>
+
+  </div>
+
+  <!-- Setup CTA if no products -->
+  {% if not total_products %}
+  <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:40px;text-align:center;box-shadow:0 1px 4px rgba(15,23,42,.05);margin-bottom:24px;">
+    <div style="width:60px;height:60px;background:linear-gradient(135deg,#dcfce7,#bbf7d0);border-radius:16px;display:grid;place-items:center;margin:0 auto 16px;">
+      <i class="bi bi-box-seam" style="font-size:1.6rem;background:linear-gradient(120deg,#10b981,#059669);background-clip:text;-webkit-background-clip:text;-webkit-text-fill-color:transparent;"></i>
+    </div>
+    <h3 style="font-size:1.1rem;font-weight:800;color:#0f172a;margin-bottom:8px;">No cuts or products yet</h3>
+    <p style="color:#64748b;font-size:.88rem;max-width:420px;margin:0 auto 20px;">
+      Add your butchery cuts — Pork Braai, Chicken Fresh, Beef Steak, Sausage, Drinks — to start recording sales and tracking stock.
+    </p>
+    <a href="{% url 'butchery:product_add' %}" style="display:inline-flex;align-items:center;gap:8px;padding:10px 24px;background:#10b981;color:#fff;border-radius:10px;font-size:.9rem;font-weight:700;text-decoration:none;">
+      <i class="bi bi-plus-lg"></i> Add First Cut
+    </a>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}

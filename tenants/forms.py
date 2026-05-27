@@ -1,65 +1,168 @@
-﻿# tenants/forms.py
+# tenants/forms.py
 from __future__ import annotations
 
 from django import forms
 from django.utils.text import slugify
 from django.core.exceptions import ValidationError
+from django.contrib.auth.password_validation import validate_password
+from django.contrib.auth import get_user_model
 
 from .models import Business
+from .validators import (
+    validate_email_soft,
+    validate_msisdn,
+    validate_business_name,
+    validate_business_name_not_numeric,
+)
+
+User = get_user_model()
 
 try:
     from .models import Location  # optional; used to populate location choices
 except Exception:  # pragma: no cover
     Location = None  # type: ignore
 
+try:
+    from inventory.business_kinds import BusinessKind
+except Exception:  # pragma: no cover
+    BusinessKind = None  # type: ignore
+
+
+def _get_business_kind_choices():
+    """Return business kind choices including the empty placeholder."""
+    try:
+        from inventory.business_kinds import BusinessKind as BK
+        return [("", "Select your business type...")] + list(BK.choices)
+    except Exception:
+        return [("", "Select your business type...")]
+
+
+CURRENCY_CHOICES = [
+    ("MWK", "MWK - Malawian Kwacha"),
+    ("ZMW", "ZMW - Zambian Kwacha"),
+    ("USD", "USD - US Dollar"),
+    ("KES", "KES - Kenyan Shilling"),
+    ("TZS", "TZS - Tanzanian Shilling"),
+    ("ZAR", "ZAR - South African Rand"),
+    ("NGN", "NGN - Nigerian Naira"),
+    ("GHS", "GHS - Ghanaian Cedi"),
+    ("UGX", "UGX - Ugandan Shilling"),
+    ("ETB", "ETB - Ethiopian Birr"),
+    ("GBP", "GBP - British Pound"),
+    ("EUR", "EUR - Euro"),
+]
+
 
 class CreateBusinessForm(forms.ModelForm):
     """
-    Minimal manager-onboarding form.
-    - Only asks for 'name'
+    Manager-onboarding form for creating a new workspace.
+    - Asks for name, business_kind, and currency
     - Derives a unique slug automatically (appends -2, -3, ... if needed)
+    - Multi-workspace: users may create as many businesses as they like
     """
+    business_kind = forms.ChoiceField(
+        label="Business type",
+        choices=_get_business_kind_choices,
+        required=True,
+        widget=forms.Select(attrs={"class": "form-select"}),
+        help_text="Choose the vertical that best describes your business.",
+    )
+    currency = forms.ChoiceField(
+        label="Currency",
+        choices=CURRENCY_CHOICES,
+        initial="MWK",
+        required=False,
+        widget=forms.Select(attrs={"class": "form-select"}),
+    )
+
     class Meta:
         model = Business
-        fields = ["name"]  # add "subdomain" here if you want to collect it at create time
+        fields = ["name"]
+
+    def __init__(self, *args, user=None, **kwargs):
+        """
+        Pass `user` to enable per-user validation if needed.
+        Example: form = CreateBusinessForm(request.POST, user=request.user)
+        """
+        super().__init__(*args, **kwargs)
+        self.user = user
+        self.fields["name"].widget.attrs.update({"class": "form-control", "placeholder": "e.g., Sunrise Liquor Store"})
 
     def _unique_slug(self, base: str) -> str:
         """
         Ensure the slug is unique without racing: best-effort check here;
-        database unique constraints should still enforce final uniqueness.
+        database unique constraints still enforce final uniqueness.
         """
         base = (base or "").strip("-")
         if not base:
             base = "shop"
         slug = base
-        # Try a few numeric suffixes (cheap, avoids heavy queries)
         for i in range(1, 999):
             try:
                 exists = Business.objects.filter(slug=slug).exists()
             except Exception:
-                # If model lacks slug or DB unavailable at this moment, just return
                 exists = False
             if not exists:
                 return slug
             slug = f"{base}-{i+1}"
-        return slug  # fallback (DB should still reject duplicates)
+        return slug
+
+    def clean_name(self):
+        """
+        Validate business/store name:
+        - Not numeric-only
+        - Must be unique (case-insensitive) across the platform
+        - Must pass basic business name validation
+        """
+        name = (self.cleaned_data.get("name") or "").strip()
+
+        if not name:
+            raise ValidationError("Please provide a business/store name.")
+
+        try:
+            validate_business_name_not_numeric(name)
+        except ValidationError as e:
+            raise ValidationError(e.messages)
+
+        if Business.objects.filter(name__iexact=name).exists():
+            raise ValidationError(
+                "That store name is already in use. Please pick another name or "
+                "contact support if you believe this is an error."
+            )
+
+        try:
+            validate_business_name(name)
+        except ValidationError as e:
+            raise ValidationError(e.messages)
+
+        return name
+
+    def clean_business_kind(self):
+        kind = (self.cleaned_data.get("business_kind") or "").strip()
+        if not kind:
+            raise ValidationError("Please select your business type.")
+        try:
+            from inventory.business_kinds import BusinessKind as BK
+            valid = [c[0] for c in BK.choices]
+            if kind not in valid:
+                raise ValidationError(f"Invalid business type: {kind}.")
+        except ImportError:
+            pass
+        return kind
 
     def clean(self):
+        """Derive a unique slug from the business name."""
         cleaned = super().clean()
         name = (cleaned.get("name") or "").strip()
-        if not name:
-            raise forms.ValidationError("Please provide a business/store name.")
 
-        # Provide a unique slug for views to use (only if model has slug)
         try:
             field_names = {f.name for f in Business._meta.fields}
         except Exception:
             field_names = set()
 
-        if "slug" in field_names:
+        if "slug" in field_names and name:
             base = slugify(name) or "shop"
-            cleaned_slug = self._unique_slug(base)
-            cleaned["slug"] = cleaned_slug
+            cleaned["slug"] = self._unique_slug(base)
         return cleaned
 
 
@@ -103,20 +206,33 @@ class InviteAgentForm(forms.Form):
     Used by managers to invite agents.
 
     Behavior:
-      - 'invited_name' is optional
-      - 'email' and 'phone' are BOTH optional
+      - 'invited_name' is optional but validated (letters, spaces, basic punctuation only)
+      - 'email' and 'phone' are BOTH optional but validated when provided
       - optional 'message' field is included for convenience
       - optional 'ttl_days' (default 7; 1..30 allowed)
       - optional 'location_id' (choices populated when form initialized with business=...)
+      - optional 'role' (default AGENT; can be BAR_MANAGER for liquor stores)
     """
     invited_name = forms.CharField(
         max_length=120,
         required=False,
         label="Invited name (optional)",
+        help_text="Use letters and spaces only."
     )
-    email = forms.EmailField(required=False)
-    phone = forms.CharField(required=False, help_text="Optional. WhatsApp/phone number")
-    message = forms.CharField(required=False, max_length=240)
+    email = forms.EmailField(
+        required=False,
+        help_text="Optional. Email address for the agent."
+    )
+    phone = forms.CharField(
+        required=False,
+        max_length=32,
+        help_text="Optional. WhatsApp/phone number."
+    )
+    message = forms.CharField(
+        required=False,
+        max_length=240,
+        widget=forms.Textarea(attrs={"rows": 3})
+    )
 
     ttl_days = forms.IntegerField(
         required=False,
@@ -124,6 +240,17 @@ class InviteAgentForm(forms.Form):
         max_value=30,
         initial=7,
         help_text="Optional. Expiry in days for the invite link (1–30). Default is 7."
+    )
+    
+    role = forms.ChoiceField(
+        required=False,
+        choices=[
+            ("AGENT", "Sales Agent"),
+            ("BAR_MANAGER", "Bar Manager"),
+        ],
+        initial="AGENT",
+        label="Role",
+        help_text="Role for the invitee. Bar Manager is for liquor stores only."
     )
 
     location_id = forms.ChoiceField(
@@ -150,28 +277,81 @@ class InviteAgentForm(forms.Form):
             pass
         self.fields["location_id"].choices = choices
 
+    def clean_invited_name(self):
+        """
+        Validate that the invited name contains only letters, spaces, and basic punctuation.
+        Prevent numeric-only names or names with invalid characters.
+        """
+        name = (self.cleaned_data.get("invited_name") or "").strip()
+        if not name:
+            return name
+        
+        # Check if name is only digits (not allowed)
+        if name.replace(" ", "").isdigit():
+            raise ValidationError("Name cannot be only numbers. Please enter a valid name.")
+        
+        # Allow letters (any language), spaces, hyphens, apostrophes, and dots
+        import re
+        if not re.match(r"^[\w\s'\-\.]+$", name, re.UNICODE):
+            raise ValidationError(
+                "Name can only contain letters, spaces, hyphens, apostrophes, and dots."
+            )
+        
+        # Ensure at least one letter is present
+        if not re.search(r"[a-zA-Z\u00C0-\u017F]", name):
+            raise ValidationError("Name must contain at least one letter.")
+        
+        return name
+
+    def clean_email(self):
+        """
+        Validate email if provided using the soft email validator.
+        """
+        email = (self.cleaned_data.get("email") or "").strip()
+        if not email:
+            return email
+        
+        try:
+            validate_email_soft(email)
+        except ValidationError as e:
+            raise ValidationError(e.messages)
+        
+        return email.lower()
+
+    def clean_phone(self):
+        """
+        Validate phone number if provided using the MSISDN validator.
+        """
+        phone = (self.cleaned_data.get("phone") or "").strip()
+        if not phone:
+            return phone
+        
+        try:
+            validate_msisdn(phone)
+        except ValidationError as e:
+            raise ValidationError(e.messages)
+        
+        return phone
+
     def clean(self):
         cleaned = super().clean()
 
-        # Normalize whitespace on free-text fields
-        for key in ("invited_name", "email", "phone", "message"):
-            if key in cleaned and isinstance(cleaned.get(key), str):
-                cleaned[key] = cleaned[key].strip()
-
-        # Phone: light sanity check (allow empty)
-        phone = cleaned.get("phone")
-        if phone:
-            raw_digits = "".join(ch for ch in phone if ch.isdigit())
-            if len(raw_digits) < 7:
-                raise forms.ValidationError("Please enter a valid phone or leave it blank.")
+        # Normalize whitespace on message field
+        if "message" in cleaned and isinstance(cleaned.get("message"), str):
+            cleaned["message"] = cleaned["message"].strip()
 
         # ttl_days: default to 7 if empty/invalid (bounds already enforced by field)
         ttl = cleaned.get("ttl_days")
         if not ttl:
             cleaned["ttl_days"] = 7
 
-        # NOTE: We intentionally do NOT require email or phone.
-        # The manager can copy/share the generated link directly.
+        # At least one of email or phone should be provided (optional but recommended)
+        email = cleaned.get("email")
+        phone = cleaned.get("phone")
+        if not email and not phone:
+            # This is just a warning, not an error - manager can still share link manually
+            pass
+
         return cleaned
 
 
@@ -183,6 +363,7 @@ class AgentInviteAcceptForm(forms.Form):
     - Email is prefilled from the invite and locked (disabled) so the token
       cannot be used to create a different account.
     - User selects a password and confirms it.
+    - Enforces Django's password validators (including StrongPasswordValidator).
 
     Usage in view:
         form = AgentInviteAcceptForm(initial_email=invite.email, data=request.POST or None)
@@ -190,13 +371,13 @@ class AgentInviteAcceptForm(forms.Form):
     email = forms.EmailField(disabled=True, required=False, label="Email")
     password1 = forms.CharField(
         widget=forms.PasswordInput,
-        min_length=8,
+        min_length=12,
         label="Password",
-        help_text="At least 8 characters."
+        help_text="At least 12 characters with uppercase, lowercase, digit, and symbol."
     )
     password2 = forms.CharField(
         widget=forms.PasswordInput,
-        min_length=8,
+        min_length=12,
         label="Confirm password"
     )
 
@@ -209,18 +390,36 @@ class AgentInviteAcceptForm(forms.Form):
         self._initial_email = initial_email or ""
 
     def clean_password1(self):
+        """
+        Validate password using Django's password validators.
+        This ensures the StrongPasswordValidator and other validators are applied.
+        """
         pw = self.cleaned_data.get("password1") or ""
-        # Basic strength nudges (kept simple to avoid surprises)
-        if len(pw) < 8:
-            raise ValidationError("Password must be at least 8 characters.")
+        
+        # Create a temporary user object for validation context
+        # (some validators check password similarity to user attributes)
+        temp_user = User(
+            email=self._initial_email or "",
+            username=self._initial_email.split("@")[0] if self._initial_email else "user"
+        )
+        
+        try:
+            # Use Django's password validation framework
+            validate_password(pw, user=temp_user)
+        except ValidationError as e:
+            # Re-raise with all error messages
+            raise ValidationError(e.messages)
+        
         return pw
 
     def clean(self):
         cleaned = super().clean()
         p1 = cleaned.get("password1")
         p2 = cleaned.get("password2")
+        
+        # Check password match (only if both were provided and p1 passed validation)
         if p1 and p2 and p1 != p2:
-            raise ValidationError("Passwords do not match.")
+            self.add_error("password2", "Passwords do not match.")
 
         # Ensure email survives (disabled fields are not posted)
         # Safely extract email from initial value or fallback to saved initial_email

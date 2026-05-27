@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Credit Statement — {{ credit.customer_name }}</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #f8fafc;
+    color: #0f172a;
+    min-height: 100vh;
+  }
+
+  /* ===== Print action bar (hidden when printing) ===== */
+  .action-bar {
+    background: #fff;
+    border-bottom: 1px solid #e2e8f0;
+    padding: 12px 24px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .action-bar h2 { font-size: 1rem; font-weight: 700; color: #0f172a; flex: 1; }
+  .btn {
+    padding: 8px 18px; border-radius: 8px; font-weight: 700; font-size: .88rem;
+    cursor: pointer; text-decoration: none; border: none; display: inline-flex; align-items: center; gap: 6px;
+  }
+  .btn-primary { background: #7c3aed; color: #fff; }
+  .btn-whatsapp { background: #25d366; color: #fff; }
+  .btn-back { background: #f1f5f9; color: #475569; }
+
+  /* ===== Statement card ===== */
+  .statement {
+    max-width: 640px;
+    margin: 32px auto;
+    background: #fff;
+    border-radius: 16px;
+    box-shadow: 0 4px 24px rgba(15,23,42,.1);
+    overflow: hidden;
+  }
+
+  .stmt-header {
+    background: linear-gradient(135deg, #7c3aed, #a855f7);
+    color: #fff;
+    padding: 32px;
+  }
+  .stmt-header .biz-name { font-size: 1.3rem; font-weight: 900; letter-spacing: -.01em; }
+  .stmt-header .doc-title { font-size: .85rem; opacity: .8; margin-top: 4px; text-transform: uppercase; letter-spacing: .08em; }
+  .stmt-header .ref { font-size: .75rem; opacity: .65; margin-top: 12px; }
+
+  .stmt-body { padding: 28px 32px; }
+
+  .row-2col {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 24px;
+  }
+  .info-block label { font-size: .7rem; text-transform: uppercase; letter-spacing: .08em; color: #64748b; font-weight: 700; }
+  .info-block .val { font-size: 1rem; font-weight: 700; color: #0f172a; margin-top: 4px; }
+  .info-block .sub { font-size: .8rem; color: #64748b; margin-top: 2px; }
+
+  .divider { height: 1px; background: #f1f5f9; margin: 20px 0; }
+
+  .amount-section {
+    background: #faf5ff;
+    border: 1px solid #e9d5ff;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 24px;
+  }
+  .amount-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; }
+  .amount-row.total { font-size: 1.1rem; font-weight: 900; border-top: 2px solid #e9d5ff; margin-top: 8px; padding-top: 12px; }
+  .amount-row .label { color: #64748b; font-size: .88rem; }
+  .amount-row .val { font-weight: 700; color: #0f172a; }
+  .amount-row.total .val { color: {% if credit.status == "settled" %}#059669{% else %}#dc2626{% endif %}; font-size: 1.15rem; }
+
+  .status-chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 14px; border-radius: 99px; font-size: .8rem; font-weight: 800;
+    text-transform: uppercase; letter-spacing: .06em; margin-bottom: 20px;
+  }
+  .status-open    { background: #fee2e2; color: #991b1b; }
+  .status-partial { background: #fef3c7; color: #92400e; }
+  .status-settled { background: #dcfce7; color: #15803d; }
+
+  .payments-title { font-size: .8rem; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; color: #64748b; margin-bottom: 12px; }
+  .payment-row {
+    display: flex; justify-content: space-between; align-items: center;
+    background: #f8fafc; border-radius: 8px; padding: 10px 14px; margin-bottom: 6px;
+  }
+  .payment-row .p-date { font-size: .78rem; color: #94a3b8; }
+  .payment-row .p-amount { font-weight: 800; color: #059669; }
+  .payment-row .p-ref { font-size: .75rem; color: #64748b; }
+
+  .no-payments { text-align: center; padding: 16px; color: #94a3b8; font-size: .88rem; }
+
+  .stmt-footer {
+    background: #f8fafc; border-top: 1px solid #f1f5f9;
+    padding: 20px 32px; text-align: center;
+    font-size: .78rem; color: #94a3b8; line-height: 1.6;
+  }
+
+  /* ===== Print styles ===== */
+  @media print {
+    .action-bar { display: none !important; }
+    body { background: #fff; }
+    .statement { box-shadow: none; margin: 0; border-radius: 0; }
+    @page { margin: 1cm; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Action bar (screen only) -->
+<div class="action-bar">
+  <h2>Credit Statement</h2>
+  <a href="{% url 'liquor:credit_detail' credit.id %}" class="btn btn-back">← Back</a>
+  <button onclick="window.print()" class="btn btn-primary">🖨 Print / Save PDF</button>
+  <a id="whatsapp-btn" href="#" class="btn btn-whatsapp" target="_blank">
+    📱 WhatsApp
+  </a>
+</div>
+
+<!-- Statement document -->
+<div class="statement">
+
+  <!-- Header -->
+  <div class="stmt-header">
+    <div class="biz-name">{{ business.name }}</div>
+    <div class="doc-title">Credit Statement</div>
+    <div class="ref">
+      Ref #{{ credit.id }} &nbsp;·&nbsp;
+      Issued: {{ credit.created_at|date:"d M Y" }} &nbsp;·&nbsp;
+      {% if credit.notes %}{{ credit.notes|truncatechars:40 }}{% else %}No notes{% endif %}
+    </div>
+  </div>
+
+  <div class="stmt-body">
+
+    <!-- Customer + product details -->
+    <div class="row-2col">
+      <div class="info-block">
+        <label>Customer</label>
+        <div class="val">{{ credit.customer_name }}</div>
+        {% if credit.customer_phone %}<div class="sub">📞 {{ credit.customer_phone }}</div>{% endif %}
+      </div>
+      <div class="info-block">
+        <label>Date</label>
+        <div class="val">{{ credit.created_at|date:"d M Y" }}</div>
+        <div class="sub">{{ credit.created_at|date:"H:i" }}</div>
+      </div>
+    </div>
+
+    {% if credit.related_sale %}
+    <div class="info-block" style="margin-bottom:16px">
+      <label>Product sold</label>
+      <div class="val">
+        {{ credit.related_sale.product.name|default:"—" }}
+        &nbsp;·&nbsp;
+        {{ credit.related_sale.quantity }} {{ credit.related_sale.get_unit_display }}
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="divider"></div>
+
+    <!-- Status chip -->
+    <span class="status-chip status-{{ credit.status }}">
+      {% if credit.status == "settled" %}✓ Settled
+      {% elif credit.status == "partial" %}◑ Partially Paid
+      {% else %}● Open{% endif %}
+    </span>
+
+    <!-- Amounts -->
+    <div class="amount-section">
+      <div class="amount-row">
+        <span class="label">Total Credit Amount</span>
+        <span class="val">MK {{ credit.amount|floatformat:0 }}</span>
+      </div>
+      <div class="amount-row">
+        <span class="label">Amount Paid</span>
+        <span class="val" style="color:#059669">MK {{ credit.amount_paid|floatformat:0 }}</span>
+      </div>
+      <div class="amount-row total">
+        <span class="label">Balance Remaining</span>
+        <span class="val">MK {{ credit.balance|floatformat:0 }}</span>
+      </div>
+    </div>
+
+    <!-- Payment history -->
+    <div class="payments-title">Payment History</div>
+    {% if payments %}
+      {% for p in payments %}
+      <div class="payment-row">
+        <div>
+          <div style="font-weight:700;font-size:.9rem">MK {{ p.amount|floatformat:0 }}</div>
+          <div class="p-ref">
+            {% if p.transaction_id %}Ref: {{ p.transaction_id }}{% else %}No reference{% endif %}
+          </div>
+        </div>
+        <div style="text-align:right">
+          <div class="p-amount">+MK {{ p.amount|floatformat:0 }}</div>
+          <div class="p-date">{{ p.created_at|date:"d M Y" }}</div>
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="no-payments">No payments recorded yet.</div>
+    {% endif %}
+
+    {% if credit.notes %}
+    <div class="divider"></div>
+    <div class="info-block">
+      <label>Notes</label>
+      <div class="val" style="font-size:.9rem;font-weight:500;margin-top:6px">{{ credit.notes }}</div>
+    </div>
+    {% endif %}
+
+  </div>
+
+  <div class="stmt-footer">
+    {{ business.name }} &nbsp;·&nbsp; Generated {{ "now"|date:"d M Y" }}<br>
+    This is an official credit statement. Please retain for your records.
+  </div>
+
+</div>
+
+<script>
+// Build WhatsApp message
+(function() {
+  var bal = {{ credit.balance|floatformat:0 }};
+  var total = {{ credit.amount|floatformat:0 }};
+  var paid = {{ credit.amount_paid|floatformat:0 }};
+  var name = "{{ credit.customer_name|escapejs }}";
+  var biz  = "{{ business.name|escapejs }}";
+  var status = "{{ credit.status }}";
+  var msg = "";
+  if (status === "settled") {
+    msg = "✅ Dear " + name + ", your credit of MK " + total + " with " + biz + " has been fully cleared. Thank you! 🙏";
+  } else {
+    msg = "📋 Hi " + name + ", this is your credit statement from " + biz + ".\n\n"
+        + "Total: MK " + total + "\n"
+        + "Paid: MK " + paid + "\n"
+        + "Balance: MK " + bal + "\n\n"
+        + "Please settle your balance at your earliest convenience. Thank you!";
+  }
+  var phone = "{{ credit.customer_phone|default:'' }}".replace(/\D/g,'');
+  var url = "https://wa.me/" + (phone || "") + "?text=" + encodeURIComponent(msg);
+  document.getElementById('whatsapp-btn').href = url;
+})();
+</script>
+</body>
+</html>

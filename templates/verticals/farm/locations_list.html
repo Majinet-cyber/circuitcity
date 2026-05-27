@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block title %}Locations - {{ business.name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-3">
+    <div class="d-flex justify-content-between align-items-start mb-4">
+        <div>
+            <h1 class="h3 mb-1"><span class="me-2">📍</span>{{ hero_title }}</h1>
+            <p class="text-muted mb-0">{{ hero_blurb }}</p>
+        </div>
+        <a href="{% url 'verticals:farm_locations_create' %}" class="btn btn-primary">
+            <i class="bi bi-plus-circle me-1"></i> Add Location
+        </a>
+    </div>
+    
+    {% if locations %}
+    <div class="card">
+        <ul class="list-group list-group-flush">
+            {% for location in locations %}
+            <li class="list-group-item d-flex justify-content-between align-items-center">
+                <div>
+                    <h6 class="mb-0">{{ location.name }}</h6>
+                    {% if location.address %}
+                    <small class="text-muted">{{ location.address }}</small>
+                    {% endif %}
+                </div>
+                <a href="{% url 'verticals:farm_locations_edit' location.id %}" class="btn btn-sm btn-outline-secondary">
+                    <i class="bi bi-pencil"></i> Edit
+                </a>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% else %}
+    <div class="text-center py-5">
+        <div class="fs-1 mb-3">📍</div>
+        <h5>No locations yet</h5>
+        <p class="text-muted">Add your first farm location (field, plot, area)</p>
+        <a href="{% url 'verticals:farm_locations_create' %}" class="btn btn-primary">
+            <i class="bi bi-plus-circle me-1"></i> Add Location
+        </a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

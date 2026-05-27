@@ -20,6 +20,7 @@ WHATSAPP_PHONE_NUMBER_ID = os.environ.get("WHATSAPP_PHONE_NUMBER_ID")
 
 class WhatsAppError(Exception):
     """Raised when the WhatsApp Cloud API call fails."""
+
     pass
 
 
@@ -53,4 +54,3 @@ def send_whatsapp_text(to_number: str, body: str) -> dict:
         logger.error("WhatsApp API error %s: %s", resp.status_code, resp.text)
         raise WhatsAppError(f"WhatsApp API error {resp.status_code}: {resp.text}")
     return resp.json()
-

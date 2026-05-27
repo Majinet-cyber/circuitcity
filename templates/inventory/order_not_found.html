@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+
+{% block title %}Purchase Order Not Found - Emajinet{% endblock %}
+{% block header_title %}Purchase Order{% endblock %}
+
+{% block content %}
+<div style="max-width:720px;margin:2rem auto;padding:0 1rem;">
+  <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:28px;box-shadow:0 10px 30px rgba(15,23,42,.08);">
+    <div style="font-size:2rem;color:#059669;margin-bottom:12px;"><i class="bi bi-clipboard-x"></i></div>
+    <h2 style="margin:0 0 8px;color:#0f172a;">Purchase order not found</h2>
+    <p style="color:#64748b;margin:0 0 18px;">{{ message|default:"This purchase order is not available for the current business." }}</p>
+    {% if po_id %}<p style="color:#94a3b8;font-size:.9rem;">Requested order: #{{ po_id }}</p>{% endif %}
+    <a href="{% url 'inventory:orders_list' %}" class="btn btn-primary"><i class="bi bi-list-ul"></i> View Orders</a>
+  </div>
+</div>
+{% endblock %}

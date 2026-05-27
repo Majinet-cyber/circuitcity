@@ -1,0 +1,53 @@
+{% comment %}
+More Features Dropdown for Vertical Dashboards
+Conditionally renders a dropdown with Wallet, Time Logs, Reports, and Simulator links.
+Only shows the dropdown if at least one URL is available.
+
+Required context variables (from base_context):
+- url_wallet: string (may be empty)
+- url_time_logs: string (may be empty)
+- url_reports: string (may be empty)
+- url_simulator: string (may be empty)
+
+Usage:
+  {% include "partials/vertical_more_dropdown.html" %}
+{% endcomment %}
+
+{% if url_wallet or url_time_logs or url_reports or url_simulator %}
+<div class="dropdown" style="display:inline-block">
+  <button class="btn dropdown-toggle ghost" type="button" id="verticalMoreDropdown" data-bs-toggle="dropdown" aria-expanded="false" style="border-radius:999px;padding:10px 16px;font-weight:700;border:1px solid rgba(255,255,255,.8);color:inherit;background:transparent;transition:all 0.2s">
+    <i class="bi bi-three-dots"></i> More
+  </button>
+  <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="verticalMoreDropdown" style="border-radius:12px;box-shadow:0 10px 30px rgba(15,23,42,.15);border:1px solid rgba(226,232,240,0.8);min-width:200px">
+    {% if url_wallet %}
+    <li>
+      <a class="dropdown-item" href="{{ url_wallet }}" style="padding:10px 16px;font-weight:600;transition:all 0.2s;display:flex;align-items:center;gap:8px">
+        <i class="bi bi-wallet2" style="font-size:1.1rem"></i> Wallet
+      </a>
+    </li>
+    {% endif %}
+    {% if url_time_logs %}
+    <li>
+      <a class="dropdown-item" href="{{ url_time_logs }}" style="padding:10px 16px;font-weight:600;transition:all 0.2s;display:flex;align-items:center;gap:8px">
+        <i class="bi bi-clock-history" style="font-size:1.1rem"></i> Time Logs
+      </a>
+    </li>
+    {% endif %}
+    {% if url_reports %}
+    <li>
+      <a class="dropdown-item" href="{{ url_reports }}" style="padding:10px 16px;font-weight:600;transition:all 0.2s;display:flex;align-items:center;gap:8px">
+        <i class="bi bi-file-earmark-bar-graph" style="font-size:1.1rem"></i> Reports
+      </a>
+    </li>
+    {% endif %}
+    {% if url_simulator %}
+    <li>
+      <a class="dropdown-item" href="{{ url_simulator }}" style="padding:10px 16px;font-weight:600;transition:all 0.2s;display:flex;align-items:center;gap:8px">
+        <i class="bi bi-calculator" style="font-size:1.1rem"></i> Simulator
+      </a>
+    </li>
+    {% endif %}
+  </ul>
+</div>
+{% endif %}
+

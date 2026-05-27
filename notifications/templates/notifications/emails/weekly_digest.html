@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Weekly Sales Summary</title>
+</head>
+<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+    <div style="background-color: #673AB7; color: white; padding: 20px; text-align: center; border-radius: 5px 5px 0 0;">
+        <h1 style="margin: 0;">📊 Weekly Sales Summary</h1>
+        <p style="margin: 10px 0 0 0; font-size: 14px;">{{ week_start }} - {{ week_end }}</p>
+    </div>
+    
+    <div style="background-color: #f9f9f9; padding: 30px; border: 1px solid #ddd; border-top: none; border-radius: 0 0 5px 5px;">
+        <h2 style="color: #673AB7;">{{ business_name }}</h2>
+        
+        <!-- Summary Cards -->
+        <div style="display: flex; flex-wrap: wrap; gap: 15px; margin: 20px 0;">
+            <div style="flex: 1; min-width: 150px; background-color: white; padding: 15px; border-radius: 5px; border: 1px solid #ddd;">
+                <p style="margin: 0; color: #666; font-size: 14px;">Total Revenue</p>
+                <p style="margin: 5px 0 0 0; font-size: 24px; font-weight: bold; color: #4CAF50;">MK {{ total_revenue|floatformat:0|intcomma }}</p>
+            </div>
+            <div style="flex: 1; min-width: 150px; background-color: white; padding: 15px; border-radius: 5px; border: 1px solid #ddd;">
+                <p style="margin: 0; color: #666; font-size: 14px;">Total Profit</p>
+                <p style="margin: 5px 0 0 0; font-size: 24px; font-weight: bold; color: #2196F3;">MK {{ total_profit|floatformat:0|intcomma }}</p>
+            </div>
+            <div style="flex: 1; min-width: 150px; background-color: white; padding: 15px; border-radius: 5px; border: 1px solid #ddd;">
+                <p style="margin: 0; color: #666; font-size: 14px;">Total Sales</p>
+                <p style="margin: 5px 0 0 0; font-size: 24px; font-weight: bold; color: #FF9800;">{{ total_sales_count }}</p>
+            </div>
+        </div>
+        
+        <!-- Top Products by Revenue -->
+        {% if top_products_by_revenue %}
+        <div style="background-color: white; padding: 20px; border-radius: 5px; margin: 20px 0;">
+            <h3 style="margin-top: 0; color: #333;">Top Products by Revenue</h3>
+            <table style="width: 100%; border-collapse: collapse;">
+                {% for product in top_products_by_revenue|slice:":10" %}
+                <tr>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #eee;">{{ product.name }}</td>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #eee; text-align: right;">
+                        <strong>MK {{ product.revenue|floatformat:0|intcomma }}</strong>
+                        <span style="color: #666; font-size: 12px;">({{ product.quantity }} units)</span>
+                    </td>
+                </tr>
+                {% endfor %}
+            </table>
+        </div>
+        {% endif %}
+        
+        <!-- Top Products by Quantity -->
+        {% if top_products_by_quantity %}
+        <div style="background-color: white; padding: 20px; border-radius: 5px; margin: 20px 0;">
+            <h3 style="margin-top: 0; color: #333;">Top Products by Quantity</h3>
+            <table style="width: 100%; border-collapse: collapse;">
+                {% for product in top_products_by_quantity|slice:":10" %}
+                <tr>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #eee;">{{ product.name }}</td>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #eee; text-align: right;">
+                        <strong>{{ product.quantity }}</strong> units
+                        <span style="color: #666; font-size: 12px;">(MK {{ product.revenue|floatformat:0|intcomma }})</span>
+                    </td>
+                </tr>
+                {% endfor %}
+            </table>
+        </div>
+        {% endif %}
+        
+        <!-- Top Agents -->
+        {% if top_agents %}
+        <div style="background-color: white; padding: 20px; border-radius: 5px; margin: 20px 0;">
+            <h3 style="margin-top: 0; color: #333;">Top Agents</h3>
+            <table style="width: 100%; border-collapse: collapse;">
+                {% for agent in top_agents|slice:":5" %}
+                <tr>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #eee;">{{ agent.name }}</td>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #eee; text-align: right;">
+                        <strong>MK {{ agent.revenue|floatformat:0|intcomma }}</strong>
+                        <span style="color: #666; font-size: 12px;">({{ agent.sales_count }} sales)</span>
+                    </td>
+                </tr>
+                {% endfor %}
+            </table>
+        </div>
+        {% endif %}
+        
+        <!-- Highest Selling Day -->
+        {% if highest_day %}
+        <div style="background-color: #E8F5E9; padding: 15px; border-radius: 5px; margin: 20px 0;">
+            <p style="margin: 0;">
+                <strong>Highest Selling Day:</strong> {{ highest_day }}
+                {% if highest_day_revenue %}
+                <span style="color: #4CAF50;">(MK {{ highest_day_revenue|floatformat:0|intcomma }})</span>
+                {% endif %}
+            </p>
+        </div>
+        {% endif %}
+        
+        <!-- Tips -->
+        {% if tips %}
+        <div style="background-color: #FFF3E0; padding: 20px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #FF9800;">
+            <h3 style="margin-top: 0; color: #333;">💡 Tips for Next Week</h3>
+            <ul style="margin: 0; padding-left: 20px;">
+                {% for tip in tips|slice:":3" %}
+                <li style="margin-bottom: 10px;">{{ tip }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+    </div>
+    
+    <div style="text-align: center; margin-top: 20px; color: #666; font-size: 12px;">
+        <p>This is an automated weekly summary. Please do not reply directly to this message.</p>
+    </div>
+</body>
+</html>
+

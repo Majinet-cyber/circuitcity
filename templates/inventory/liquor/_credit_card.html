@@ -1,0 +1,96 @@
+{% comment %}
+  Partial: single credit customer card
+  Expects: credit, risk_level, risk_label, risk_color (from parent with-block)
+{% endcomment %}
+{% load static %}
+{% with initials=credit.customer_name|slice:":2"|upper %}
+<div class="cc-card risk-{{ risk_level }}"
+     data-name="{{ credit.customer_name|lower }}"
+     data-phone="{{ credit.customer_phone|lower }}">
+
+  <!-- Card Header -->
+  <div class="cc-header">
+    <div class="cc-avatar" style="background:{{ risk_color }}">{{ initials }}</div>
+    <div>
+      <div class="cc-name">{{ credit.customer_name }}</div>
+      {% if credit.customer_phone %}
+        <div class="cc-phone"><i class="bi bi-telephone"></i> {{ credit.customer_phone }}</div>
+      {% endif %}
+    </div>
+    <span class="risk-badge {{ risk_level }}">{{ risk_label }}</span>
+  </div>
+
+  <!-- Card Body -->
+  <div class="cc-body">
+    <div class="cc-debt">MK {{ credit.balance|floatformat:0 }}</div>
+    <div style="font-size:.75rem;color:#94a3b8;margin-top:3px">
+      {% if credit.status == "settled" %}Fully settled{% elif credit.status == "partial" %}Partial — MK {{ credit.amount_paid|floatformat:0 }} paid{% else %}Full balance outstanding{% endif %}
+    </div>
+
+    <div class="cc-meta" style="margin-top:12px">
+      <span class="cc-meta-pill">
+        <i class="bi bi-calendar3" style="font-size:.7rem"></i>
+        {{ credit.created_at|date:"d M Y" }}
+      </span>
+      {% if credit.status == "open" or credit.status == "partial" %}
+        <span class="cc-meta-pill overdue">
+          <i class="bi bi-clock" style="font-size:.7rem"></i>
+          {{ credit.created_at|timesince }} old
+        </span>
+      {% endif %}
+      {% if credit.status == "partial" %}
+        <span class="cc-meta-pill partial">Partial</span>
+      {% endif %}
+      {% if credit.related_sale %}
+        <span class="cc-meta-pill">
+          <i class="bi bi-box" style="font-size:.7rem"></i>
+          {{ credit.related_sale.product.name|truncatechars:18 }}
+        </span>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Smart Warnings -->
+  {% if credit.status != "settled" and credit.status != "cancelled" %}
+  <div class="cc-warnings">
+    {% if credit.balance > 100000 %}
+      <div class="cc-warning-row danger">⚠ This customer owes over MK 100,000 — review before extending more credit.</div>
+    {% endif %}
+    {% if credit.status == "open" %}
+      <div class="cc-warning-row">💳 Full balance outstanding — follow up for payment.</div>
+    {% endif %}
+    {% if credit.status == "partial" %}
+      <div class="cc-warning-row">📤 Partial payment received — MK {{ credit.balance|floatformat:0 }} still owed.</div>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% if credit.status == "settled" %}
+  <div class="cc-warnings">
+    <div style="font-size:.8rem;color:#059669;background:#f0fdf4;border-left:3px solid #10b981;border-radius:6px;padding:7px 10px;font-weight:600">
+      ✅ Debt cleared — customer in good standing
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Card Actions -->
+  <div class="cc-footer">
+    <a href="{% url 'liquor:credit_detail' credit_id=credit.id %}" class="cc-btn cc-btn-outline">
+      <i class="bi bi-eye"></i> View
+    </a>
+    {% if credit.status != "settled" and credit.status != "cancelled" %}
+      <a href="{% url 'liquor:submit_payment' credit_id=credit.id %}" class="cc-btn cc-btn-outline">
+        <i class="bi bi-cash-coin"></i> Pay
+      </a>
+      <button onclick="openModal('clearModal{{ credit.id }}')" class="cc-btn cc-btn-success">
+        <i class="bi bi-check-circle-fill"></i> Clear
+      </button>
+    {% else %}
+      <span class="cc-btn" style="background:#f0fdf4;color:#059669;pointer-events:none">
+        <i class="bi bi-check-circle-fill"></i> Settled
+      </span>
+    {% endif %}
+  </div>
+
+</div>
+{% endwith %}

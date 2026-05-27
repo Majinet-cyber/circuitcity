@@ -1,0 +1,305 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Sales History · Pharmacy · Emajinet{% endblock %}
+
+{% block content %}
+<style>
+  .sales-history-page{display:flex;flex-direction:column;gap:18px;padding:18px;max-width:1400px;margin:0 auto}
+  .page-header{background:linear-gradient(120deg,#10b981,#34d399);padding:24px;border-radius:20px;color:#fff;display:flex;flex-wrap:wrap;gap:18px;align-items:center;justify-content:space-between}
+  .page-header h1{margin:0;font-size:clamp(24px,3vw,32px)}
+  .page-header p{margin:4px 0 0;opacity:.9}
+  .header-actions{display:flex;gap:12px;flex-wrap:wrap}
+  .btn-custom{border-radius:30px;padding:10px 20px;font-weight:700;text-decoration:none;border:none;cursor:pointer;font-size:0.95rem;transition:all 0.2s}
+  .btn-primary-custom{background:#fff;color:#10b981}
+  .btn-primary-custom:hover{background:#f0fdf4;color:#059669}
+  .btn-outline-custom{border:2px solid rgba(255,255,255,.9);color:#fff;background:transparent}
+  .btn-outline-custom:hover{background:rgba(255,255,255,.15)}
+  
+  .filter-panel{background:#fff;border-radius:18px;padding:20px;box-shadow:0 10px 30px rgba(15,23,42,.08)}
+  .filter-form{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
+  .form-group-inline{display:flex;flex-direction:column;gap:6px;min-width:160px}
+  .form-group-inline label{font-size:0.85rem;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.05em}
+  .form-group-inline input,.form-group-inline select{padding:8px 12px;border:2px solid #e2e8f0;border-radius:12px;font-size:0.95rem;font-family:inherit}
+  .form-group-inline input:focus,.form-group-inline select:focus{outline:none;border-color:#10b981;background:#f0fdf4}
+  .filter-actions{display:flex;gap:8px;margin-top:auto}
+  .filter-actions button{padding:10px 20px;border-radius:12px;border:none;font-weight:600;cursor:pointer;font-size:0.9rem;transition:all 0.2s}
+  .btn-apply{background:#10b981;color:#fff}
+  .btn-apply:hover{background:#059669}
+  .btn-clear{background:#e2e8f0;color:#64748b}
+  .btn-clear:hover{background:#cbd5e1;color:#475569}
+  
+  .summary-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:18px}
+  .summary-card{background:#fff;border-radius:16px;padding:18px;box-shadow:0 10px 30px rgba(15,23,42,.08)}
+  .summary-card h3{margin:0 0 8px;font-size:0.85rem;text-transform:uppercase;color:#64748b;letter-spacing:0.08em}
+  .summary-card p{margin:0;font-size:1.6rem;font-weight:800;color:#0f172a}
+  
+  .sales-table-container{background:#fff;border-radius:18px;padding:20px;box-shadow:0 10px 30px rgba(15,23,42,.08)}
+  .sales-table{width:100%;border-collapse:collapse;font-size:0.9rem;min-width:800px}
+  .sales-table thead{background:#f8fafc;border-bottom:2px solid #e2e8f0}
+  .sales-table th{padding:12px;text-align:left;font-weight:700;color:#475569;text-transform:uppercase;font-size:0.75rem;letter-spacing:0.08em;white-space:nowrap}
+  .sales-table td{padding:14px 12px;border-bottom:1px solid #f1f5f9;vertical-align:middle}
+  .sales-table tbody tr{transition:background 0.15s}
+  .sales-table tbody tr:hover{background:#f8fafc}
+  .sales-table tbody tr.highlighted{background:#fef3c7;animation:highlight-pulse 1.5s ease-out}
+  @keyframes highlight-pulse{0%,100%{background:#fef3c7}50%{background:#fde68a}}
+  
+  .timestamp-cell{display:flex;flex-direction:column;gap:2px}
+  .timestamp-date{font-weight:600;color:#0f172a}
+  .timestamp-time{font-size:0.85rem;color:#64748b}
+  .product-cell{display:flex;flex-direction:column;gap:3px}
+  .product-name{font-weight:600;color:#0f172a}
+  .product-meta{font-size:0.85rem;color:#64748b}
+  .badge-payment{display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:999px;font-size:0.75rem;font-weight:700;text-transform:uppercase}
+  .badge-cash{background:#dcfce7;color:#15803d}
+  .badge-bank{background:#dbeafe;color:#1e40af}
+  .badge-mobile{background:#fce7f3;color:#be185d}
+  .price-highlight{font-weight:700;color:#0f172a;font-size:1rem}
+  
+  .pagination-container{display:flex;justify-content:space-between;align-items:center;margin-top:20px;flex-wrap:wrap;gap:12px}
+  .pagination-info{color:#64748b;font-size:0.9rem}
+  .pagination-links{display:flex;gap:6px;flex-wrap:wrap}
+  .pagination-links a,.pagination-links span{padding:8px 14px;border-radius:8px;text-decoration:none;font-weight:600;font-size:0.9rem;transition:all 0.2s}
+  .pagination-links a{background:#f8fafc;color:#475569}
+  .pagination-links a:hover{background:#e2e8f0;color:#0f172a}
+  .pagination-links .current{background:#10b981;color:#fff}
+  
+  .empty-state{text-align:center;padding:60px 20px;color:#64748b}
+  .empty-state i{font-size:4rem;margin-bottom:16px;opacity:0.4}
+  .empty-state h3{margin:16px 0 8px;font-size:1.4rem;color:#0f172a}
+  .empty-state p{margin:0;font-size:1rem}
+</style>
+
+<div class="sales-history-page">
+  <header class="page-header">
+    <div>
+      <h1>💊 Sales History</h1>
+      <p>{{ business.name }}</p>
+    </div>
+    <div class="header-actions">
+      <a href="{% url 'verticals:pharmacy_dashboard' %}" class="btn-custom btn-outline-custom">← Dashboard</a>
+      <a href="{% url 'verticals:pharmacy_sales_export_csv' %}?{% if start_date %}start={{ start_date }}&{% endif %}{% if end_date %}end={{ end_date }}&{% endif %}{% if search_query %}q={{ search_query }}{% endif %}" 
+         class="btn-custom btn-primary-custom">
+        📥 Download CSV
+      </a>
+    </div>
+  </header>
+
+  {% comment %}Filter Panel{% endcomment %}
+  <section class="filter-panel">
+    <form method="get" class="filter-form">
+      <div class="form-group-inline">
+        <label for="start">Start Date</label>
+        <input type="date" id="start" name="start" value="{{ start_date }}">
+      </div>
+      
+      <div class="form-group-inline">
+        <label for="end">End Date</label>
+        <input type="date" id="end" name="end" value="{{ end_date }}">
+      </div>
+      
+      <div class="form-group-inline" style="flex:1;min-width:250px">
+        <label for="q">Search</label>
+        <input 
+          type="text" 
+          id="q" 
+          name="q" 
+          value="{{ search_query }}" 
+          placeholder="Product, batch, customer, cashier..."
+        >
+      </div>
+      
+      <div class="filter-actions">
+        <button type="submit" class="btn-apply">Apply Filters</button>
+        <a href="{% url 'verticals:pharmacy_sales_history' %}" class="btn-clear" style="display:flex;align-items:center;text-decoration:none">Clear</a>
+      </div>
+    </form>
+  </section>
+
+  {% comment %}Summary Cards{% endcomment %}
+  {% if summary %}
+  <section class="summary-cards">
+    <article class="summary-card" style="border-left:4px solid #10b981">
+      <h3>Total Revenue</h3>
+      <p>K {{ summary.total_revenue|floatformat:0|default:"0" }}</p>
+    </article>
+    <article class="summary-card" style="border-left:4px solid #f59e0b">
+      <h3>Total Cost</h3>
+      <p>K {{ summary.total_cost|floatformat:0|default:"0" }}</p>
+    </article>
+    <article class="summary-card" style="border-left:4px solid #3b82f6">
+      <h3>Total Sales</h3>
+      <p>{{ summary.total_sales|default:"0" }}</p>
+    </article>
+    <article class="summary-card" style="border-left:4px solid #8b5cf6">
+      <h3>Items Sold</h3>
+      <p>{{ summary.total_items|default:"0" }}</p>
+    </article>
+  </section>
+  {% endif %}
+
+  {% comment %}Sales Table{% endcomment %}
+  <section class="sales-table-container">
+    {% if sales %}
+      <div class="cc-table-scroll">
+        <table class="sales-table">
+        <thead>
+          <tr>
+            <th>Timestamp</th>
+            <th>Item</th>
+            <th>Batch</th>
+            <th>Qty</th>
+            <th>Unit Price</th>
+            <th>Total</th>
+            <th>Payment</th>
+            <th>Customer</th>
+            <th>Cashier</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for sale in sales %}
+          <tr {% if sale.id == highlighted_sale_id %}class="highlighted" id="sale-{{ sale.id }}"{% endif %}>
+            <td>
+              <div class="timestamp-cell">
+                <span class="timestamp-date">{{ sale.sold_at|date:"M j, Y" }}</span>
+                <span class="timestamp-time">{{ sale.sold_at|date:"g:i A" }}</span>
+              </div>
+            </td>
+            <td>
+              <div class="product-cell">
+                <span class="product-name">{{ sale.batch.merch_product.name }}</span>
+                {% if sale.prescription_number %}
+                <span class="product-meta">Rx: {{ sale.prescription_number }}</span>
+                {% endif %}
+              </div>
+            </td>
+            <td><code style="font-size:0.85rem;color:#64748b">{{ sale.batch.batch_number|truncatechars:12 }}</code></td>
+            <td><strong>{{ sale.quantity }}</strong></td>
+            <td>K {{ sale.unit_price|floatformat:2 }}</td>
+            <td><span class="price-highlight">K {{ sale.total_amount|floatformat:2 }}</span></td>
+            <td>
+              {% if sale.payment_method == 'CASH' %}
+              <span class="badge-payment badge-cash">💵 Cash</span>
+              {% elif sale.payment_method == 'BANK' %}
+              <span class="badge-payment badge-bank">🏦 Bank</span>
+              {% elif sale.payment_method == 'MOBILE_MONEY' %}
+              <span class="badge-payment badge-mobile">📱 Mobile</span>
+              {% elif sale.payment_method == 'CREDIT' %}
+              <span class="badge-payment" style="background:#fef3c7;color:#92400e">📋 Credit</span>
+              {% else %}
+              <span class="badge-payment" style="background:#f1f5f9;color:#64748b">{{ sale.get_payment_method_display }}</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if sale.customer_name %}
+                <div class="product-cell">
+                  <span class="product-name">{{ sale.customer_name }}</span>
+                  {% if sale.customer_phone %}
+                  <span class="product-meta">{{ sale.customer_phone }}</span>
+                  {% endif %}
+                </div>
+              {% else %}
+                <span style="color:#94a3b8">—</span>
+              {% endif %}
+            </td>
+            <td>{{ sale.sold_by.username|default:"System" }}</td>
+            <td>
+              {% if IS_MANAGER %}
+              <div style="display:flex;gap:6px">
+                <a href="{% url 'pharmacy:sale_edit' sale.id %}" class="btn btn-sm btn-outline-primary" title="Edit sale" style="padding:6px 12px;border-radius:8px;text-decoration:none;font-size:0.85rem;border:2px solid #3b82f6;color:#3b82f6;background:transparent;transition:all 0.2s">
+                  <i class="bi bi-pencil-square"></i> Edit
+                </a>
+                <button class="btn btn-sm btn-outline-danger" onclick="rollbackSale({{ sale.id }})" title="Rollback sale and restore batch inventory" style="padding:6px 12px;border-radius:8px;font-size:0.85rem;border:2px solid #ef4444;color:#ef4444;background:transparent;transition:all 0.2s">
+                  <i class="bi bi-arrow-counterclockwise"></i>
+                </button>
+              </div>
+              {% else %}
+              <span class="text-muted small">—</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      </div>
+
+      {% comment %}Pagination{% endcomment %}
+      {% if sales.has_other_pages %}
+      <div class="pagination-container">
+        <div class="pagination-info">
+          Showing {{ sales.start_index }}–{{ sales.end_index }} of {{ sales.paginator.count }} sales
+        </div>
+        <div class="pagination-links">
+          {% if sales.has_previous %}
+            <a href="?page=1{% if start_date %}&start={{ start_date|urlencode }}{% endif %}{% if end_date %}&end={{ end_date|urlencode }}{% endif %}{% if search_query %}&q={{ search_query|urlencode }}{% endif %}">First</a>
+            <a href="?page={{ sales.previous_page_number }}{% if start_date %}&start={{ start_date|urlencode }}{% endif %}{% if end_date %}&end={{ end_date|urlencode }}{% endif %}{% if search_query %}&q={{ search_query|urlencode }}{% endif %}">← Prev</a>
+          {% endif %}
+          
+          <span class="current">Page {{ sales.number }} of {{ sales.paginator.num_pages }}</span>
+          
+          {% if sales.has_next %}
+            <a href="?page={{ sales.next_page_number }}{% if start_date %}&start={{ start_date|urlencode }}{% endif %}{% if end_date %}&end={{ end_date|urlencode }}{% endif %}{% if search_query %}&q={{ search_query|urlencode }}{% endif %}">Next →</a>
+            <a href="?page={{ sales.paginator.num_pages }}{% if start_date %}&start={{ start_date|urlencode }}{% endif %}{% if end_date %}&end={{ end_date|urlencode }}{% endif %}{% if search_query %}&q={{ search_query|urlencode }}{% endif %}">Last</a>
+          {% endif %}
+        </div>
+      </div>
+      {% endif %}
+
+    {% else %}
+      <div class="empty-state">
+        <i class="bi bi-inbox"></i>
+        <h3>No Sales Found</h3>
+        {% if start_date or end_date or search_query %}
+        <p>Try adjusting your filters or <a href="{% url 'verticals:pharmacy_sales_history' %}">clear all filters</a>.</p>
+        {% else %}
+        <p>Sales will appear here once you record them.</p>
+        {% endif %}
+      </div>
+    {% endif %}
+  </section>
+</div>
+
+{% comment %}Auto-scroll to highlighted sale{% endcomment %}
+{% if highlighted_sale_id %}
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    const highlightedRow = document.getElementById('sale-{{ highlighted_sale_id }}');
+    if (highlightedRow) {
+      highlightedRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  });
+</script>
+{% endif %}
+
+{% comment %}Rollback sale functionality{% endcomment %}
+<script>
+function rollbackSale(saleId) {
+  if (!confirm('⚠️ Rollback this sale?\n\nThis will:\n• Cancel the sale\n• Restore batch inventory\n• Cannot be undone\n\nAre you sure?')) {
+    return;
+  }
+  
+  fetch(`/verticals/pharmacy/sales/${saleId}/rollback/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRFToken': '{{ csrf_token }}'
+    }
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.ok) {
+      alert('✅ ' + data.message);
+      location.reload();
+    } else {
+      alert('❌ Error: ' + (data.error || 'Failed to rollback sale'));
+    }
+  })
+  .catch(error => {
+    alert('❌ Network error: ' + error.message);
+  });
+}
+</script>
+
+{% endblock %}
+

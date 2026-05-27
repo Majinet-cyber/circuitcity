@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Profit Simulator — {{ batch.name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-3" style="max-width:720px;">
+
+  <!-- Back + Header -->
+  <div style="margin-bottom:1.25rem;">
+    <a href="{% url 'verticals:farm_livestock_list' %}" style="color:#64748b;font-size:.85rem;text-decoration:none;">
+      ← Back to Livestock
+    </a>
+    <h1 style="font-size:1.5rem;font-weight:800;margin:.5rem 0 0;">Profit Simulator</h1>
+    <p style="color:#64748b;font-size:.875rem;margin:0;">{{ batch.name }} · {{ batch.get_animal_type_display }}</p>
+  </div>
+
+  <!-- Simulation Inputs -->
+  <div style="background:#fff;border:1px solid #e2e8f0;border-radius:20px;padding:1.5rem;margin-bottom:1.25rem;box-shadow:0 2px 8px rgba(0,0,0,0.05);">
+    <div style="font-size:.8rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:1rem;">Adjust Assumptions</div>
+    <form method="get" style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+      <div>
+        <label style="font-size:.78rem;font-weight:600;color:#0f172a;display:block;margin-bottom:4px;">Sale Price per Head (MWK)</label>
+        <input type="number" name="sale_price" value="{{ sim_price|floatformat:0 }}" step="100" min="0"
+          style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:10px;font-size:.9rem;outline:none;" required>
+      </div>
+      <div>
+        <label style="font-size:.78rem;font-weight:600;color:#0f172a;display:block;margin-bottom:4px;">Animals to Sell</label>
+        <input type="number" name="count" value="{{ sim_count }}" step="1" min="0"
+          style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:10px;font-size:.9rem;outline:none;" required>
+      </div>
+      <div style="grid-column:span 2;text-align:right;">
+        <button type="submit" style="background:#2563eb;color:#fff;border:none;border-radius:10px;padding:10px 24px;font-weight:700;font-size:.875rem;cursor:pointer;">
+          Run Simulation
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Scenario Cards -->
+  {% if simulation %}
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.75rem;margin-bottom:1.25rem;">
+    <!-- Best Case -->
+    <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:16px;padding:1.25rem;text-align:center;">
+      <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;color:#16a34a;margin-bottom:.5rem;">Best Case</div>
+      <div style="font-size:1.25rem;font-weight:900;color:#14532d;">MWK {{ simulation.best_case_profit|floatformat:0|intcomma }}</div>
+      <div style="font-size:.7rem;color:#64748b;margin-top:4px;">Revenue: MWK {{ simulation.best_case_revenue|floatformat:0|intcomma }}</div>
+    </div>
+    <!-- Expected Case -->
+    <div style="background:#eff6ff;border:2px solid #93c5fd;border-radius:16px;padding:1.25rem;text-align:center;">
+      <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;color:#2563eb;margin-bottom:.5rem;">Expected</div>
+      <div style="font-size:1.25rem;font-weight:900;color:{% if simulation.expected_case_profit >= 0 %}#1d4ed8{% else %}#dc2626{% endif %};">
+        MWK {{ simulation.expected_case_profit|floatformat:0|intcomma }}
+      </div>
+      <div style="font-size:.7rem;color:#64748b;margin-top:4px;">Revenue: MWK {{ simulation.expected_case_revenue|floatformat:0|intcomma }}</div>
+    </div>
+    <!-- Worst Case -->
+    <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:16px;padding:1.25rem;text-align:center;">
+      <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;color:#dc2626;margin-bottom:.5rem;">Worst Case</div>
+      <div style="font-size:1.25rem;font-weight:900;color:#991b1b;">MWK {{ simulation.worst_case_profit|floatformat:0|intcomma }}</div>
+      <div style="font-size:.7rem;color:#64748b;margin-top:4px;">Revenue: MWK {{ simulation.worst_case_revenue|floatformat:0|intcomma }}</div>
+    </div>
+  </div>
+
+  <!-- Summary + Key Metrics -->
+  <div style="background:#fff;border:1px solid #e2e8f0;border-radius:20px;padding:1.5rem;box-shadow:0 2px 8px rgba(0,0,0,0.05);margin-bottom:1.25rem;">
+    <div style="font-size:.8rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:.875rem;">Key Metrics</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;">
+      <div style="background:#f8fafc;border-radius:12px;padding:.875rem;">
+        <div style="font-size:.72rem;color:#64748b;">Total Cost (so far)</div>
+        <div style="font-size:1.1rem;font-weight:800;color:#0f172a;">MWK {{ simulation.total_cost|floatformat:0|intcomma }}</div>
+      </div>
+      {% if simulation.break_even_price %}
+      <div style="background:#f8fafc;border-radius:12px;padding:.875rem;">
+        <div style="font-size:.72rem;color:#64748b;">Break-even per Animal</div>
+        <div style="font-size:1.1rem;font-weight:800;color:#0f172a;">MWK {{ simulation.break_even_price|floatformat:0|intcomma }}</div>
+      </div>
+      {% endif %}
+      {% if simulation.roi_pct %}
+      <div style="background:{% if simulation.roi_pct >= 0 %}#f0fdf4{% else %}#fef2f2{% endif %};border-radius:12px;padding:.875rem;">
+        <div style="font-size:.72rem;color:#64748b;">ROI (%)</div>
+        <div style="font-size:1.1rem;font-weight:800;color:{% if simulation.roi_pct >= 0 %}#15803d{% else %}#dc2626{% endif %};">
+          {{ simulation.roi_pct|floatformat:1 }}%
+        </div>
+      </div>
+      {% endif %}
+      <div style="background:#f8fafc;border-radius:12px;padding:.875rem;">
+        <div style="font-size:.72rem;color:#64748b;">Animals in Batch</div>
+        <div style="font-size:1.1rem;font-weight:800;color:#0f172a;">{{ batch.count_current }}</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Summary Text -->
+  <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:16px;padding:1rem 1.25rem;">
+    <i class="bi bi-calculator" style="color:#2563eb;margin-right:6px;"></i>
+    <span style="font-size:.875rem;color:#1d4ed8;">{{ simulation.summary }}</span>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}

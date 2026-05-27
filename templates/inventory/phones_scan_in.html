@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% load static %}
+{% load brand_icons %}
 
 {% block title %}Scan In Phones · Inventory{% endblock %}
 {% block header_title %}📱 Scan In Phones{% endblock %}
@@ -22,9 +23,12 @@
     --cc-accent:#1f6feb;
     --cc-accent-600:#1a5fd4;
     --cc-shadow:0 6px 18px rgba(2,6,23,.08);
-    --brand-itel:#f59e0b;
     --brand-tecno:#3b82f6;
-    --brand-samsung:#1e3a8a;
+    --brand-itel:#ef4444;
+    --brand-samsung:#f97316;
+    --brand-pixel:#10b981;
+    --brand-redmi:#8b5cf6;
+    --brand-iphone:#111827;
   }
   body{background:var(--cc-bg);color:var(--cc-text)}
 
@@ -147,6 +151,7 @@
     align-items:center;
     box-shadow:0 2px 8px rgba(2,6,23,.04);
     margin-bottom:16px;
+    min-width:0;
   }
   .field > label{
     position:absolute;
@@ -261,22 +266,164 @@
     padding:20px;
   }
 
+  /* ===== Counter Badge ===== */
+  .imei-counter{
+    font-size:11px;
+    color:var(--cc-muted);
+    margin-top:8px;
+    font-weight:600;
+  }
+  .imei-counter.valid{
+    color:#10b981;
+  }
+  .imei-counter.invalid{
+    color:#ef4444;
+  }
+
+  /* ===== IMEI Scan Button (Below Input) ===== */
+  .btn-scan-below{
+    appearance:none;
+    background:var(--cc-accent);
+    color:#fff;
+    border:none;
+    border-radius:10px;
+    padding:12px 18px;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+    cursor:pointer;
+    transition:all 0.2s ease;
+    font-size:15px;
+    font-weight:600;
+    min-height:44px;
+    touch-action:manipulation;
+  }
+  .btn-scan-below:hover{
+    background:var(--cc-accent-600);
+    transform:translateY(-2px);
+    box-shadow:0 4px 12px rgba(31,111,235,.25);
+  }
+  .btn-scan-below:active{
+    transform:translateY(0);
+  }
+
+  /* ===== Model Cards ===== */
+  .model-card{
+    background:var(--cc-panel);
+    border:2px solid var(--cc-border);
+    border-radius:12px;
+    padding:16px;
+    cursor:pointer;
+    transition:all 0.2s ease;
+    text-align:left;
+    min-height:120px;
+    display:flex;
+    flex-direction:column;
+    justify-content:space-between;
+  }
+  .model-card:hover{
+    transform:translateY(-3px);
+    box-shadow:0 8px 20px rgba(2,6,23,0.12);
+    border-color:var(--cc-accent);
+  }
+  .model-card.selected{
+    border-color:var(--cc-accent);
+    background:linear-gradient(135deg,rgba(31,111,235,0.08),rgba(31,111,235,0.03));
+    box-shadow:0 0 0 3px rgba(31,111,235,.15);
+  }
+  .model-card-name{
+    font-size:16px;
+    font-weight:700;
+    color:var(--cc-text);
+    margin:0 0 6px;
+  }
+  .model-card-variant{
+    font-size:13px;
+    color:var(--cc-muted);
+    margin:0;
+  }
+  .model-card-price{
+    font-size:12px;
+    color:#10b981;
+    font-weight:600;
+    margin:8px 0 0;
+  }
+  #model-cards-container:empty::before{
+    content:'Loading models...';
+    display:block;
+    text-align:center;
+    padding:32px;
+    color:var(--cc-muted);
+    font-style:italic;
+  }
+
   /* ===== Mobile Responsive ===== */
-  @media (max-width:640px){
+  @media (max-width:430px){
+    .page{
+      padding:12px;
+    }
     .brand-cards{
       grid-template-columns:1fr;
+      gap:12px;
+    }
+    .brand-card{
+      padding:16px;
+    }
+    .brand-card h3{
+      font-size:18px;
     }
     .stats-row{
       flex-direction:column;
       gap:8px;
       text-align:center;
     }
+    .form-with-sidebar{
+      grid-template-columns:1fr;
+    }
+    .field > input, .field > select{
+      font-size:16px; /* Prevents zoom on iOS */
+    }
+    #model-cards-container{
+      grid-template-columns:1fr;
+      gap:10px;
+    }
+  }
+  @media (max-width:640px){
+    .brand-cards{
+      grid-template-columns:repeat(auto-fit,minmax(160px,1fr));
+    }
+    #model-cards-container{
+      grid-template-columns:repeat(auto-fill,minmax(160px,1fr));
+    }
   }
 </style>
+
+<link rel="stylesheet" href="{% static 'css/imei-scanner-modal.css' %}?v={{ BUILD_ID|default:STATIC_VERSION|default:'1' }}">
 {% endblock %}
 
 {% block content %}
 <div class="page">
+  {% if show_category_selector %}
+  <!-- Category selector (unified scan-in: Phones / Laptops / Desktops) -->
+  <div class="cat-chooser" style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:24px">
+    <a href="{{ scan_in_url }}?category=phones" class="cat-card" style="background:var(--cc-panel);border:2.5px solid var(--cc-accent);border-radius:18px;padding:20px;text-align:center;text-decoration:none;color:inherit;background:linear-gradient(135deg,rgba(31,111,235,0.07),rgba(31,111,235,0.02))">
+      <div style="font-size:2.5rem;margin-bottom:8px">📱</div>
+      <div style="font-weight:800;font-size:1rem">Phones</div>
+      <div style="font-size:.78rem;color:var(--cc-muted);margin-top:2px">IMEI-based stock</div>
+    </a>
+    <a href="{{ scan_in_url }}?category=laptops" class="cat-card" style="background:var(--cc-panel);border:2.5px solid var(--cc-border);border-radius:18px;padding:20px;text-align:center;text-decoration:none;color:inherit">
+      <div style="font-size:2.5rem;margin-bottom:8px">💻</div>
+      <div style="font-weight:800;font-size:1rem">Laptops</div>
+      <div style="font-size:.78rem;color:var(--cc-muted);margin-top:2px">Serial number stock</div>
+    </a>
+    <a href="{{ scan_in_url }}?category=desktops" class="cat-card" style="background:var(--cc-panel);border:2.5px solid var(--cc-border);border-radius:18px;padding:20px;text-align:center;text-decoration:none;color:inherit">
+      <div style="font-size:2.5rem;margin-bottom:8px">🖥️</div>
+      <div style="font-weight:800;font-size:1rem">Desktops</div>
+      <div style="font-size:.78rem;color:var(--cc-muted);margin-top:2px">Serial number stock</div>
+    </a>
+  </div>
+  {% endif %}
   <!-- Gamification Bar -->
   <div class="gamification-bar">
     <div class="stats-row">
@@ -295,17 +442,45 @@
     </div>
   </div>
 
+  <!-- Empty State (when no catalog products) -->
+  {% if not has_catalog %}
+  <div class="form-section" style="text-align:center;padding:48px 24px;">
+    <h2 style="margin:0 0 12px;color:var(--cc-muted);">📦 No phone models yet</h2>
+    <p style="color:var(--cc-muted);margin:0 0 24px;">
+      You haven't added any phone models to your catalog yet.
+      {% if request.user.is_staff or request.user.is_superuser %}
+        <br>Managers can seed the catalog from Admin or use the phone catalog seeder.
+      {% else %}
+        <br>Contact your manager to add phone models.
+      {% endif %}
+    </p>
+    {% if request.user.is_staff or request.user.is_superuser %}
+    <a href="/admin/inventory/phoneproductcatalog/add/" class="btn btn-primary" style="display:inline-block;">
+      ➕ Add Phone Model
+    </a>
+    {% endif %}
+  </div>
+  {% endif %}
+
   <!-- Brand Selection Cards -->
+  {% if has_catalog %}
   <div class="brand-cards">
     {% for brand in brands %}
     <div class="brand-card" data-brand="{{ brand.key }}" onclick="selectBrand('{{ brand.key }}', '{{ brand.name }}')">
-      <img src="{% static brand.logo %}" alt="{{ brand.name }}" onerror="this.style.display='none'">
+      <div class="brand-img-wrap">
+        {% if brand.logo %}
+        <img src="{% brand_icon_path brand.logo %}" alt="{{ brand.name }}" onerror="this.style.display='none'; this.parentElement.style.display='none';">
+        {% else %}
+        <div style="width:100%;height:100%;background:linear-gradient(135deg,#e2e8f0,#cbd5e1);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:24px;color:#64748b;">{{ brand.name|slice:":2" }}</div>
+        {% endif %}
+      </div>
       <h3>{{ brand.name }}</h3>
       <p class="tagline">{{ brand.tagline }}</p>
       <p class="tap-hint">👆 Tap to select</p>
     </div>
     {% endfor %}
   </div>
+  {% endif %}
 
   <!-- Scan Form with IMEI Picker Sidebar -->
   <div id="scan-form-wrapper" style="display:none;">
@@ -319,19 +494,46 @@
           <span id="selected-brand-name"></span> Models
         </h3>
 
-        <div class="field">
-          <label>Model & Variant</label>
-          <select name="catalog_product_id" id="model-select" required>
-            <option value="">Loading models...</option>
-          </select>
+        <div id="model-cards-container" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-bottom:20px;">
+          <!-- Model cards will be dynamically inserted here -->
         </div>
+        
+        <input type="hidden" name="catalog_product_id" id="catalog-product-id-input" required>
 
-        <div class="field">
+        <div class="field" style="min-width:0;">
           <label>IMEI (15 digits)</label>
-          <input type="text" name="imei" id="imei-input" maxlength="15" pattern="\d{15}" placeholder="Enter 15-digit IMEI" required>
+          <input type="text" name="imei" id="imei-input" maxlength="15" pattern="\d{15}" placeholder="Enter 15-digit IMEI" inputmode="numeric" required>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-top:-8px;margin-bottom:16px;gap:12px;flex-wrap:wrap;">
+          <button type="button" class="btn-scan-below" data-imei-scan-trigger="imei-input" title="Scan IMEI with camera">
+            <i class="bi bi-upc-scan"></i> Scan IMEI
+          </button>
+          <div class="imei-counter" id="imei-counter" style="font-size:11px;color:#64748b;font-weight:600;margin:0;">0 / 15 digits</div>
         </div>
 
-        <button type="submit" class="btn btn-primary" style="width:100%;">
+        <!-- Barcode Workflow -->
+        <div class="field" style="margin-top:20px;">
+          <label style="display:block;margin-bottom:8px;font-weight:600;">Has Barcode?</label>
+          <div style="display:flex;gap:16px;margin-bottom:8px;">
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+              <input type="radio" name="has_barcode" value="no" checked style="cursor:pointer;">
+              <span>No</span>
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+              <input type="radio" name="has_barcode" value="yes" style="cursor:pointer;">
+              <span>Yes</span>
+            </label>
+          </div>
+          <small style="color:var(--cc-muted);font-size:0.85rem;">If your phone has a printed barcode, choose Yes and scan/type it. If not, choose No.</small>
+        </div>
+
+        <div class="field" id="barcode-field" style="display:none;">
+          <label>Barcode <span style="color:#dc2626;">*</span></label>
+          <input type="text" name="barcode" id="barcode-input" placeholder="Scan or type barcode" maxlength="100">
+          <small style="color:var(--cc-muted);font-size:0.85rem;">Required when Has Barcode = Yes</small>
+        </div>
+
+        <button type="submit" class="btn btn-primary" id="submit-button" data-cy="scan-phone-btn" style="width:100%;" disabled>
           ✅ Scan In Phone
         </button>
       </form>
@@ -376,56 +578,134 @@
     document.getElementById('scan-form-wrapper').scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
+  // Barcode workflow: show/hide barcode field based on radio selection
+  function toggleBarcodeField() {
+    const hasBarcodeYes = document.querySelector('input[name="has_barcode"][value="yes"]');
+    const barcodeField = document.getElementById('barcode-field');
+    const barcodeInput = document.getElementById('barcode-input');
+    
+    if (hasBarcodeYes && hasBarcodeYes.checked) {
+      barcodeField.style.display = 'block';
+      barcodeInput.required = true;
+    } else {
+      barcodeField.style.display = 'none';
+      barcodeInput.required = false;
+      barcodeInput.value = '';
+    }
+  }
+
+  // Initialize barcode workflow on page load and bfcache restore
+  document.addEventListener('DOMContentLoaded', function() {
+    const barcodeRadios = document.querySelectorAll('input[name="has_barcode"]');
+    barcodeRadios.forEach(radio => {
+      radio.addEventListener('change', toggleBarcodeField);
+    });
+    toggleBarcodeField();
+  });
+
+  window.addEventListener('pageshow', function(event) {
+    if (event.persisted) {
+      toggleBarcodeField();
+    }
+  });
+
   async function fetchModels(brandKey) {
-    const select = document.getElementById('model-select');
-    select.innerHTML = '<option value="">Loading...</option>';
+    const container = document.getElementById('model-cards-container');
+    container.innerHTML = ''; // Shows "Loading models..." via CSS
     
     try {
       const response = await fetch(`/inventory/api/phone-models/?brand=${encodeURIComponent(brandKey.toUpperCase())}`);
       const data = await response.json();
       
       if (data.models && data.models.length > 0) {
-        select.innerHTML = '<option value="">-- Select a model --</option>';
         data.models.forEach(model => {
-          const option = document.createElement('option');
-          option.value = model.id;
-          option.textContent = model.display_name;
+          const card = document.createElement('div');
+          card.className = 'model-card';
+          card.setAttribute('data-model-id', model.id);
+          card.setAttribute('data-cy', 'model-card');
           
-          // Store cost price as data attribute for potential auto-fill
-          if (model.default_cost_price) {
-            option.dataset.cost = model.default_cost_price;
+          // Parse display name to show model and variant separately
+          const displayParts = model.display_name.split('(');
+          const modelName = displayParts[0].trim();
+          const variantInfo = displayParts[1] ? displayParts[1].replace(')', '').trim() : '';
+          
+          let cardHTML = `
+            <div class="model-card-name">${modelName}</div>
+          `;
+          
+          if (variantInfo) {
+            cardHTML += `<div class="model-card-variant">${variantInfo}</div>`;
           }
           
-          select.appendChild(option);
+          if (model.default_cost_price) {
+            cardHTML += `<div class="model-card-price">Cost: MWK ${parseFloat(model.default_cost_price).toFixed(2)}</div>`;
+          }
+          
+          card.innerHTML = cardHTML;
+          
+          // Add click handler
+          card.addEventListener('click', function() {
+            selectModel(model.id, this);
+          });
+          
+          container.appendChild(card);
         });
       } else {
-        select.innerHTML = '<option value="">No models found for this brand</option>';
+        container.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:32px;color:var(--cc-muted);">No models found for this brand</div>';
       }
     } catch (error) {
       console.error('Failed to fetch models:', error);
-      select.innerHTML = '<option value="">Error loading models</option>';
+      container.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:32px;color:#ef4444;">Error loading models</div>';
     }
   }
+  
+  function selectModel(modelId, cardElement) {
+    // Remove selected class from all model cards
+    document.querySelectorAll('.model-card').forEach(card => {
+      card.classList.remove('selected');
+    });
+    
+    // Add selected class to clicked card
+    cardElement.classList.add('selected');
+    
+    // Update hidden input
+    document.getElementById('catalog-product-id-input').value = modelId;
+    
+    // Fetch available IMEIs for this model
+    fetchAvailableImeis(modelId);
+    
+    // Scroll to IMEI input
+    document.getElementById('imei-input').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
 
-  // IMEI input: auto-format as digits only
+  // IMEI input: auto-format as digits only + live counter
   const imeiInput = document.getElementById('imei-input');
+  const imeiCounter = document.getElementById('imei-counter');
+  const submitButton = document.querySelector('#scan-form button[type="submit"]');
+  
   imeiInput.addEventListener('input', function(e) {
     let value = e.target.value.replace(/\D/g, '');  // digits only
     if (value.length > 15) {
-      value = value.slice(-15);  // last 15 digits
+      value = value.slice(0, 15);  // block beyond 15 digits
     }
     e.target.value = value;
-  });
-
-  // Model select: fetch available IMEIs when model changes
-  const modelSelect = document.getElementById('model-select');
-  modelSelect.addEventListener('change', function() {
-    const productId = this.value;
-    if (!productId) {
-      document.getElementById('imei-list-container').innerHTML = '<div class="imei-empty">Select a model to see available IMEIs</div>';
-      return;
+    
+    // Update counter
+    const len = value.length;
+    imeiCounter.textContent = `${len} / 15 digits`;
+    
+    // Visual feedback
+    imeiCounter.classList.remove('valid', 'invalid');
+    if (len === 15) {
+      imeiCounter.classList.add('valid');
+      imeiCounter.textContent = '✅ 15 / 15 digits';
+      submitButton.disabled = false;
+    } else if (len > 0) {
+      imeiCounter.classList.add('invalid');
+      submitButton.disabled = true;
+    } else {
+      submitButton.disabled = true;
     }
-    fetchAvailableImeis(productId);
   });
 
   async function fetchAvailableImeis(productId) {
@@ -468,5 +748,8 @@
     });
   }
 </script>
+
+<link rel="stylesheet" href="{% static 'css/imei-scanner-modal.css' %}?v={{ BUILD_ID|default:STATIC_VERSION|default:'1' }}">
+<script src="{% static 'js/phones-imei-scanner.js' %}?v={{ BUILD_ID|default:STATIC_VERSION|default:'1' %}"></script>
 {% endblock %}
 

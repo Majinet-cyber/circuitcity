@@ -40,5 +40,3 @@ class OnboardingConfig(AppConfig):
                 log.debug("Loaded %s", signals_mod)
         except Exception as exc:
             log.warning("Failed to load %s: %s", signals_mod, exc)
-
-

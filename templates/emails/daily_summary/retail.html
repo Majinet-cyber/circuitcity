@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Daily Summary — {{ business.name }}</title>
+  <style>
+    /* Reset */
+    body, table, td, a { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
+    table, td { mso-table-lspace: 0pt; mso-table-rspace: 0pt; }
+    img { -ms-interpolation-mode: bicubic; border: 0; display: block; }
+
+    body {
+      margin: 0; padding: 0;
+      background-color: #f0f4f8;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      color: #1a202c;
+    }
+
+    .wrapper { width: 100%; background-color: #f0f4f8; padding: 32px 0; }
+    .container { max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.08); }
+
+    /* Header */
+    .header { background: linear-gradient(135deg, #1a56db 0%, #1e429f 100%); padding: 32px 40px; text-align: center; }
+    .header h1 { margin: 0; color: #ffffff; font-size: 22px; font-weight: 700; letter-spacing: -0.3px; }
+    .header .subtitle { margin: 6px 0 0; color: rgba(255,255,255,0.8); font-size: 14px; }
+    .header .date-badge { display: inline-block; margin-top: 12px; background: rgba(255,255,255,0.2); color: #fff; font-size: 13px; padding: 4px 14px; border-radius: 20px; }
+
+    /* Body */
+    .body { padding: 32px 40px; }
+
+    /* KPI Grid */
+    .kpi-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 24px 0; }
+    @media (max-width: 480px) { .kpi-grid { grid-template-columns: 1fr; } }
+    .kpi-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 20px; }
+    .kpi-card.accent { background: #eff6ff; border-color: #bfdbfe; }
+    .kpi-card.warning { background: #fffbeb; border-color: #fde68a; }
+    .kpi-value { font-size: 26px; font-weight: 700; color: #1a56db; line-height: 1.1; }
+    .kpi-card.warning .kpi-value { color: #b45309; }
+    .kpi-label { font-size: 12px; color: #64748b; margin-top: 4px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.4px; }
+
+    /* Highlights */
+    .highlights { margin: 24px 0; }
+    .highlight-row { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #e2e8f0; font-size: 14px; }
+    .highlight-row:last-child { border-bottom: none; }
+    .highlight-label { color: #64748b; }
+    .highlight-value { font-weight: 600; color: #1a202c; text-align: right; max-width: 60%; }
+
+    /* Alert banner */
+    .alert-banner { background: #fffbeb; border-left: 4px solid #f59e0b; padding: 14px 18px; border-radius: 0 8px 8px 0; margin: 24px 0; font-size: 14px; }
+    .alert-banner strong { color: #b45309; }
+
+    /* Footer */
+    .footer { background: #f8fafc; border-top: 1px solid #e2e8f0; padding: 24px 40px; text-align: center; }
+    .footer p { margin: 0; font-size: 12px; color: #94a3b8; line-height: 1.6; }
+    .footer a { color: #64748b; text-decoration: none; }
+  </style>
+</head>
+<body>
+<div class="wrapper">
+  <div class="container">
+
+    <!-- Header -->
+    <div class="header">
+      <h1>{{ business.name }}</h1>
+      <p class="subtitle">Daily Business Summary</p>
+      <span class="date-badge">{{ report_date|date:"l, N j, Y" }}</span>
+    </div>
+
+    <!-- Body -->
+    <div class="body">
+
+      <div class="kpi-grid">
+        <div class="kpi-card accent">
+          <div class="kpi-value">{{ total_sales }}</div>
+          <div class="kpi-label">Total Sales Today</div>
+        </div>
+        <div class="kpi-card accent">
+          <div class="kpi-value">{{ currency }} {{ total_revenue|floatformat:0 }}</div>
+          <div class="kpi-label">Total Revenue</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-value">{{ currency }} {{ total_profit|floatformat:0 }}</div>
+          <div class="kpi-label">Total Profit</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-value">{{ currency }} {{ total_cogs|floatformat:0 }}</div>
+          <div class="kpi-label">Total COGS</div>
+        </div>
+      </div>
+
+      <!-- Highlights -->
+      <div class="highlights">
+        {% if top_product %}
+        <div class="highlight-row">
+          <span class="highlight-label">Top Product</span>
+          <span class="highlight-value">{{ top_product }}</span>
+        </div>
+        {% endif %}
+        {% if top_category %}
+        <div class="highlight-row">
+          <span class="highlight-label">Top Category</span>
+          <span class="highlight-value">{{ top_category }}</span>
+        </div>
+        {% endif %}
+        {% if biggest_sale_amount %}
+        <div class="highlight-row">
+          <span class="highlight-label">Biggest Sale</span>
+          <span class="highlight-value">{{ currency }} {{ biggest_sale_amount|floatformat:0 }}{% if biggest_sale_ref %} · {{ biggest_sale_ref }}{% endif %}</span>
+        </div>
+        {% endif %}
+      </div>
+
+      {% if low_stock_alerts > 0 %}
+      <div class="alert-banner">
+        ⚠️ <strong>{{ low_stock_alerts }} item{{ low_stock_alerts|pluralize }} out of stock.</strong>
+        Please restock soon to avoid missed sales.
+      </div>
+      {% endif %}
+
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <p>
+        This summary was automatically generated for <strong>{{ business.name }}</strong>.<br>
+        To stop receiving these emails, ask your manager to disable Daily Summary in Settings.
+      </p>
+    </div>
+
+  </div>
+</div>
+</body>
+</html>

@@ -15,15 +15,7 @@ from django.utils import timezone
 
 User = settings.AUTH_USER_MODEL
 
-
-def q2(x: Optional[Decimal]) -> Decimal:
-    """Quantize to 2 dp (HALF_UP)."""
-    from decimal import ROUND_HALF_UP
-    if x is None:
-        return Decimal("0.00")
-    if not isinstance(x, Decimal):
-        x = Decimal(str(x))
-    return x.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+from .money import q2
 
 
 # ----------------------------------------------------------------------

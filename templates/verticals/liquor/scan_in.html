@@ -1,0 +1,1246 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Stock In - Liquor{% endblock %}
+
+{% block extra_css %}
+<style>
+.scan-in-container {
+    max-width: 1100px;
+    margin: 2rem auto;
+    padding: 1rem;
+}
+
+/* ===== Category Cards (Beer, Cider, etc.) ===== */
+.category-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1rem;
+    margin: 2rem 0;
+}
+
+.category-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 1rem;
+    padding: 2rem 1.5rem;
+    color: white;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 16px rgba(102,126,234,0.3);
+}
+
+.category-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 24px rgba(102,126,234,0.5);
+}
+
+.category-card.selected {
+    box-shadow: 0 0 0 4px #4ade80;
+    transform: scale(1.05);
+}
+
+.category-card h3 {
+    margin: 0.5rem 0 0 0;
+    font-size: 1.3rem;
+}
+
+.category-card .icon {
+    font-size: 2rem;
+}
+
+/* ===== Product Selection ===== */
+.product-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 1rem;
+    margin: 1.5rem 0;
+}
+
+.product-item {
+    background: white;
+    border: 2px solid #e2e8f0;
+    border-radius: 0.75rem;
+    padding: 1rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.product-item:hover {
+    border-color: #667eea;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.product-item.selected {
+    border-color: #4ade80;
+    background: linear-gradient(135deg, rgba(74,222,128,0.1), rgba(102,126,234,0.1));
+    box-shadow: 0 0 0 3px rgba(74,222,128,0.2);
+}
+
+.product-name {
+    font-weight: 700;
+    color: #1a1a2e;
+    margin-bottom: 0.5rem;
+}
+
+.product-stock {
+    font-size: 0.875rem;
+    color: #64748b;
+}
+
+/* ===== Unit Selection (Bottle / Crate) ===== */
+.unit-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin: 1.5rem 0;
+}
+
+.unit-btn {
+    padding: 1.5rem;
+    background: white;
+    border: 3px solid #e2e8f0;
+    border-radius: 0.75rem;
+    font-weight: 700;
+    font-size: 1.1rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: center;
+}
+
+.unit-btn:hover {
+    border-color: #667eea;
+    transform: translateY(-2px);
+}
+
+.unit-btn.selected {
+    border-color: #4ade80;
+    background: linear-gradient(135deg, rgba(74,222,128,0.15), rgba(102,126,234,0.15));
+    box-shadow: 0 0 0 3px rgba(74,222,128,0.2);
+}
+
+.unit-icon {
+    font-size: 2rem;
+    display: block;
+    margin-bottom: 0.5rem;
+}
+
+/* ===== Quantity Panels ===== */
+.qty-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+    gap: 0.75rem;
+    margin: 1.5rem 0;
+}
+
+.qty-panel {
+    padding: 1.25rem 0.75rem;
+    background: white;
+    border: 2px solid #e2e8f0;
+    border-radius: 0.5rem;
+    font-weight: 700;
+    font-size: 1.25rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: center;
+}
+
+.qty-panel:hover {
+    border-color: #667eea;
+    transform: scale(1.05);
+}
+
+.qty-panel.selected {
+    border-color: #4ade80;
+    background: linear-gradient(135deg, rgba(74,222,128,0.2), rgba(102,126,234,0.2));
+    color: #1a1a2e;
+}
+
+/* ===== Price Input ===== */
+.price-panel {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 0.75rem;
+    border: 2px solid #e2e8f0;
+    margin: 1.5rem 0;
+}
+
+.price-panel label {
+    display: block;
+    font-weight: 600;
+    color: #334155;
+    margin-bottom: 0.75rem;
+}
+
+.price-panel input {
+    width: 100%;
+    padding: 1rem;
+    border: 2px solid #e2e8f0;
+    border-radius: 0.5rem;
+    font-size: 1.25rem;
+    font-weight: 600;
+}
+
+.price-panel input:focus {
+    outline: none;
+    border-color: #667eea;
+}
+
+/* ===== Submit Button ===== */
+.submit-btn {
+    width: 100%;
+    padding: 1.5rem;
+    background: #4ade80;
+    color: #1a1a2e;
+    border: none;
+    border-radius: 0.75rem;
+    font-size: 1.25rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+    box-shadow: 0 4px 16px rgba(74,222,128,0.4);
+}
+
+.submit-btn:hover:not(:disabled) {
+    background: #22c55e;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(74,222,128,0.6);
+}
+
+.submit-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.section-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #1a1a2e;
+    margin: 2rem 0 1rem 0;
+}
+
+.step-indicator {
+    display: inline-block;
+    background: #667eea;
+    color: white;
+    padding: 0.25rem 0.75rem;
+    border-radius: 999px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    margin-right: 0.5rem;
+}
+
+.hidden {
+    display: none !important;
+}
+
+/* Smart Pricing Feedback Styles */
+.pricing-feedback-container {
+    margin-top: 12px;
+    padding: 14px 18px;
+    border-radius: 12px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    line-height: 1.4;
+    transition: all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+    opacity: 0;
+    transform: translateY(-8px);
+    display: none;
+}
+
+.pricing-feedback-container.show {
+    opacity: 1;
+    transform: translateY(0);
+    display: block;
+}
+
+/* Below Cost - Warning (Yellow) */
+.pricing-feedback-container.below-cost {
+    background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+    border: 2px solid #fbbf24;
+    color: #92400e;
+}
+
+/* Above Cost - Success (Green) */
+.pricing-feedback-container.above-cost {
+    background: linear-gradient(135deg, #d1fae5 0%, #86efac 100%);
+    border: 2px solid #4ade80;
+    color: #065f46;
+}
+
+.pricing-feedback-icon {
+    display: inline-block;
+    margin-right: 8px;
+    font-size: 1.2em;
+}
+
+.pricing-feedback-message {
+    display: inline;
+}
+
+/* Selling price primary style */
+.selling-price-primary {
+    width: 100%;
+    padding: 1rem;
+    border: 2px solid #e2e8f0;
+    border-radius: 0.5rem;
+    font-size: 1.25rem;
+    font-weight: 600;
+}
+
+.selling-price-primary:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+}
+
+@media (max-width: 768px) {
+    .category-grid {
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    }
+    
+    .product-list {
+        grid-template-columns: 1fr;
+    }
+    
+    .qty-grid {
+        grid-template-columns: repeat(auto-fit, minmax(70px, 1fr));
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="scan-in-container">
+
+    <!-- Progress Header -->
+    <div id="progress-header" style="background:#fff;border-radius:16px;border:1px solid #e2e8f0;padding:16px 20px;margin-bottom:24px;box-shadow:0 2px 12px rgba(15,23,42,.06)">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+        <div>
+          <h1 style="margin:0;font-size:1.3rem;font-weight:800;color:#0f172a">📦 Stock In — Liquor</h1>
+          <p style="margin:4px 0 0;font-size:.85rem;color:#64748b" id="progress-hint">Select a category to begin</p>
+        </div>
+        <div id="selection-chips" style="display:flex;gap:6px;flex-wrap:wrap"></div>
+      </div>
+      <!-- Step progress bar -->
+      <div style="display:flex;gap:4px;align-items:center">
+        {% for i in "1234567" %}
+        <div class="step-pip" id="pip-{{ forloop.counter }}" style="flex:1;height:5px;border-radius:99px;background:#e2e8f0;transition:background 0.3s"></div>
+        {% endfor %}
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-top:6px">
+        <span style="font-size:.7rem;color:#94a3b8">Category</span>
+        <span style="font-size:.7rem;color:#94a3b8">Product</span>
+        <span style="font-size:.7rem;color:#94a3b8">Unit</span>
+        <span style="font-size:.7rem;color:#94a3b8">Qty</span>
+        <span style="font-size:.7rem;color:#94a3b8">Cost</span>
+        <span style="font-size:.7rem;color:#94a3b8">Shots</span>
+        <span style="font-size:.7rem;color:#94a3b8">Done</span>
+      </div>
+    </div>
+
+    <!-- Smart Success Banner (shows between step transitions) -->
+    <div id="smart-banner" style="display:none;margin-bottom:20px;padding:14px 18px;border-radius:12px;font-weight:600;font-size:.95rem;animation:fadeSlideDown 0.4s ease-out">
+      <span id="smart-banner-text"></span>
+    </div>
+    <style>
+      @keyframes fadeSlideDown{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:translateY(0)}}
+      /* Category colors */
+      .cat-beer .category-card{background:linear-gradient(135deg,#fef3c7,#fde68a)!important;color:#92400e!important;box-shadow:0 4px 16px rgba(217,119,6,.2)!important}
+      .cat-cider .category-card{background:linear-gradient(135deg,#d1fae5,#86efac)!important;color:#065f46!important;box-shadow:0 4px 16px rgba(5,150,105,.2)!important}
+      .cat-wine .category-card{background:linear-gradient(135deg,#fce7f3,#fbcfe8)!important;color:#831843!important;box-shadow:0 4px 16px rgba(190,24,93,.2)!important}
+      .cat-spirits .category-card,.cat-gin .category-card{background:linear-gradient(135deg,#ede9fe,#ddd6fe)!important;color:#4c1d95!important;box-shadow:0 4px 16px rgba(124,58,237,.2)!important}
+      .cat-whiskey .category-card{background:linear-gradient(135deg,#fef3c7,#fed7aa)!important;color:#78350f!important;box-shadow:0 4px 16px rgba(180,83,9,.2)!important}
+      .cat-vodka .category-card{background:linear-gradient(135deg,#f0f9ff,#e0f2fe)!important;color:#0c4a6e!important;box-shadow:0 4px 16px rgba(2,132,199,.2)!important}
+      .cat-brandy .category-card{background:linear-gradient(135deg,#fef3c7,#fde68a)!important;color:#7c2d12!important;box-shadow:0 4px 16px rgba(194,65,12,.2)!important}
+      .cat-cocktail .category-card{background:linear-gradient(135deg,#fae8ff,#f5d0fe)!important;color:#701a75!important;box-shadow:0 4px 16px rgba(162,28,175,.2)!important}
+    </style>
+
+    <!-- Step 1: Category Selection -->
+    <div id="step-1">
+        <h2 class="section-title">
+            <span class="step-indicator">Step 1</span>
+            Select Category
+        </h2>
+        <div class="category-grid" id="category-grid-wrap">
+            {% for category in categories %}
+            <div class="cat-{{ category }}">
+            <div class="category-card" data-category="{{ category }}" onclick="selectCategory('{{ category }}')">
+                <div class="icon">
+                    {% if category == 'beer' %}🍺
+                    {% elif category == 'cider' %}🍻
+                    {% elif category == 'wine' %}🍷
+                    {% elif category == 'spirits' or category == 'gin' %}🥃
+                    {% elif category == 'whiskey' %}🥃
+                    {% elif category == 'vodka' %}🧊
+                    {% elif category == 'brandy' %}🥂
+                    {% elif category == 'cocktail' %}🍹
+                    {% else %}🍶
+                    {% endif %}
+                </div>
+                <h3>{{ category|title }}</h3>
+                <div style="font-size:.7rem;opacity:.7;margin-top:4px">
+                    {% if category == 'spirits' or category == 'whiskey' or category == 'gin' or category == 'vodka' or category == 'brandy' %}Sold by shot
+                    {% elif category == 'wine' %}Sold by glass
+                    {% else %}Sold by bottle{% endif %}
+                </div>
+            </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    
+    <!-- Step 2: Product Selection -->
+    <div id="step-2" class="hidden">
+        <h2 class="section-title">
+            <span class="step-indicator">Step 2</span>
+            Select Product
+        </h2>
+        <div class="product-list" id="product-list">
+            <!-- Products will be populated here -->
+        </div>
+    </div>
+    
+    <!-- Step 3: Unit Selection (Bottle, Crate, Pack, or Glass+Bottle) -->
+    <div id="step-3" class="hidden">
+        <h2 class="section-title">
+            <span class="step-indicator">Step 3</span>
+            Select Unit Type
+        </h2>
+        <div class="unit-grid">
+            <button class="unit-btn" data-unit="bottle" onclick="selectUnit('bottle')">
+                <span class="unit-icon">🍾</span>
+                Bottles
+            </button>
+            <button class="unit-btn" data-unit="crate" onclick="selectUnit('crate')" id="crate-btn">
+                <span class="unit-icon">📦</span>
+                Crates
+            </button>
+            <button class="unit-btn" data-unit="pack" onclick="selectUnit('pack')" id="pack-btn" style="display:none;">
+                <span class="unit-icon">🧃</span>
+                Packs (6-pack)
+            </button>
+            <button class="unit-btn" data-unit="glass_bottle" onclick="selectUnit('glass_bottle')" id="glass-bottle-btn" style="display:none;">
+                <span class="unit-icon">🍷</span>
+                Glass + Bottle
+            </button>
+        </div>
+        <div id="unit-hint" style="margin-top:0.75rem;font-size:0.85rem;color:#64748b;display:none;"></div>
+    </div>
+    
+    <!-- Step 4: Quantity Selection -->
+    <div id="step-4" class="hidden">
+        <h2 class="section-title">
+            <span class="step-indicator">Step 4</span>
+            How Many?
+        </h2>
+        <div class="qty-grid">
+            <button class="qty-panel" data-qty="1" onclick="selectQuantity(1)">1</button>
+            <button class="qty-panel" data-qty="2" onclick="selectQuantity(2)">2</button>
+            <button class="qty-panel" data-qty="3" onclick="selectQuantity(3)">3</button>
+            <button class="qty-panel" data-qty="4" onclick="selectQuantity(4)">4</button>
+            <button class="qty-panel" data-qty="5" onclick="selectQuantity(5)">5</button>
+            <button class="qty-panel" data-qty="10" onclick="selectQuantity(10)">10</button>
+            <button class="qty-panel" data-qty="15" onclick="selectQuantity(15)">15</button>
+            <button class="qty-panel" data-qty="20" onclick="selectQuantity(20)">20</button>
+            <button class="qty-panel" data-qty="30" onclick="selectQuantity(30)">30</button>
+            <button class="qty-panel" data-qty="50" onclick="selectQuantity(50)">50</button>
+            <button class="qty-panel" data-qty="100" onclick="selectQuantity(100)">100</button>
+            <button class="qty-panel" data-qty="custom" onclick="customQuantity()">Custom</button>
+        </div>
+        <input type="number" id="custom-qty-input" class="hidden" style="width:100%;padding:1rem;font-size:1.25rem;border:2px solid #e2e8f0;border-radius:0.5rem;margin-top:1rem;" placeholder="Enter custom quantity">
+    </div>
+    
+    <!-- Step 5: Cost Price (Hidden after entry) -->
+    <div id="step-5" class="hidden">
+        <h2 class="section-title">
+            <span class="step-indicator">Step 5</span>
+            Cost Price per <span id="unit-label">Unit</span>
+        </h2>
+        <div class="price-panel" id="cost-price-panel">
+            <label for="cost-price">Cost Price (MWK)</label>
+            <input type="number" id="cost-price" step="0.01" min="0" placeholder="0.00">
+            <!-- Helper text showing computed per-bottle cost for crates/packs -->
+            <div id="cost-helper-text" style="margin-top:12px;padding:12px;background:#f0f9ff;border:2px solid #38bdf8;border-radius:8px;color:#075985;font-size:0.95rem;font-weight:600;display:none;">
+                <i class="bi bi-calculator"></i> <span id="cost-helper-content"></span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Step 5b: Spirits Shot Configuration (only for spirits/whiskey) -->
+    <div id="step-5b-shots" class="hidden">
+        <h2 class="section-title">
+            <span class="step-indicator">Step 5b</span>
+            Shots Configuration
+        </h2>
+        <div class="price-panel" style="background:#fffbeb;border-color:#f59e0b;">
+            <div style="margin-bottom:1rem;padding:10px;background:#fef3c7;border-radius:8px;font-size:0.9rem;color:#92400e;">
+                <strong>Spirits sold by shot:</strong> Enter shots per bottle and your selling price per shot. The system calculates cost per shot, profit margin, and total shots automatically.
+            </div>
+            <label for="shots-per-bottle">Shots per Bottle</label>
+            <input type="number" id="shots-per-bottle" step="1" min="1" placeholder="30" value="30" style="margin-bottom:1rem;">
+            <label for="price-per-shot">Selling Price per Shot (MWK)</label>
+            <input type="number" id="price-per-shot" step="0.01" min="0" placeholder="0.00">
+            <div id="shots-calc-preview" style="margin-top:12px;padding:12px;background:#f0fdf4;border:2px solid #4ade80;border-radius:8px;display:none;font-size:0.9rem;color:#065f46;line-height:1.7;">
+            </div>
+        </div>
+    </div>
+    
+    <!-- Step 6: Selling Price (Primary) with Smart Feedback -->
+    <div id="step-6" class="hidden">
+        <h2 class="section-title">
+            <span class="step-indicator">Step 6</span>
+            Selling Price per <span id="selling-unit-label">Unit</span>
+        </h2>
+        <div class="price-panel">
+            <label for="selling-price">Selling Price (MWK)</label>
+            <input type="number" id="selling-price" class="selling-price-primary" step="0.01" min="0" placeholder="0.00">
+        </div>
+        
+        <!-- Smart Pricing Feedback -->
+        <div id="pricing-feedback" class="pricing-feedback-container">
+            <span class="pricing-feedback-icon"></span>
+            <span class="pricing-feedback-message"></span>
+        </div>
+    </div>
+    
+    <!-- Step 7: Submit -->
+    <div id="step-7" class="hidden">
+        <button class="submit-btn" onclick="submitStockIn()">✅ Add to Stock</button>
+        <button class="submit-btn" style="background:#64748b;margin-top:1rem;" onclick="resetForm()">↺ Start Over</button>
+    </div>
+</div>
+
+<!-- Shot Max Warning Modal -->
+<div id="shot-warning-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:20px;padding:32px;max-width:400px;width:90%;box-shadow:0 24px 60px rgba(0,0,0,.3);text-align:center">
+    <div style="font-size:3rem;margin-bottom:12px">🤔</div>
+    <h3 style="margin:0 0 8px;font-size:1.2rem;color:#0f172a">Are you sure about that?</h3>
+    <p id="shot-warning-text" style="color:#64748b;margin:0 0 20px;line-height:1.5"></p>
+    <div style="display:flex;gap:12px;justify-content:center">
+      <button onclick="shotWarningReview()" style="padding:12px 24px;border-radius:99px;border:2px solid #e2e8f0;background:#fff;font-weight:700;cursor:pointer;color:#64748b">
+        Review
+      </button>
+      <button onclick="shotWarningProceed()" style="padding:12px 24px;border-radius:99px;border:none;background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;font-weight:700;cursor:pointer">
+        Proceed Anyway
+      </button>
+    </div>
+  </div>
+</div>
+
+<script src="{% static 'js/pricing-helpers.js' %}"></script>
+<script>
+var liquorWizardUrl = "{% url 'inventory:liquor_wizard' %}";
+// Liquor Smart Pricing JS — with step progress, smart messages, shot max warning
+
+let selectedCategory = null;
+let selectedProduct = null;
+let selectedProductData = null;  // Store full product data
+let selectedUnit = null;
+let selectedQuantity = null;
+let costPrice = null;
+let costPricePerBottle = null;  // Computed cost per bottle (for crates)
+let sellingPrice = null;
+let costPriceEntered = false;
+
+const productsData = {{ products_by_category|safe }};
+
+// ===== STEP PROGRESS HELPERS =====
+function setStep(stepNum) {
+  for (var i = 1; i <= 7; i++) {
+    var pip = document.getElementById('pip-' + i);
+    if (!pip) continue;
+    if (i < stepNum) pip.style.background = '#7c3aed';
+    else if (i === stepNum) pip.style.background = '#a855f7';
+    else pip.style.background = '#e2e8f0';
+  }
+}
+
+function showBanner(msg, type) {
+  // type: 'success' | 'info' | 'warning'
+  var banner = document.getElementById('smart-banner');
+  var text = document.getElementById('smart-banner-text');
+  if (!banner || !text) return;
+  var styles = {
+    success: 'background:linear-gradient(135deg,#d1fae5,#a7f3d0);color:#065f46;border:2px solid #6ee7b7',
+    info: 'background:linear-gradient(135deg,#ede9fe,#ddd6fe);color:#4c1d95;border:2px solid #c4b5fd',
+    warning: 'background:linear-gradient(135deg,#fef3c7,#fde68a);color:#92400e;border:2px solid #fbbf24',
+  };
+  banner.style.cssText = 'margin-bottom:20px;padding:14px 18px;border-radius:12px;font-weight:600;font-size:.95rem;animation:fadeSlideDown 0.4s ease-out;' + (styles[type] || styles.info);
+  text.textContent = msg;
+  banner.style.display = 'block';
+  clearTimeout(banner._hideTimer);
+  banner._hideTimer = setTimeout(function() { banner.style.display = 'none'; }, 5000);
+}
+
+function addChip(label, color) {
+  var chips = document.getElementById('selection-chips');
+  if (!chips) return;
+  var chip = document.createElement('span');
+  chip.style.cssText = 'display:inline-block;padding:3px 10px;border-radius:99px;font-size:.7rem;font-weight:700;background:' + color + ';color:#fff';
+  chip.textContent = label;
+  chips.appendChild(chip);
+}
+
+function clearChips() {
+  var chips = document.getElementById('selection-chips');
+  if (chips) chips.innerHTML = '';
+}
+
+function setHint(msg) {
+  var hint = document.getElementById('progress-hint');
+  if (hint) hint.textContent = msg;
+}
+
+// ===== SHOT MAX WARNING =====
+var _shotWarningPendingCallback = null;
+
+function checkShotMaxWarning(shotsValue, callback) {
+  var shots = parseInt(shotsValue) || 0;
+  var TYPICAL_MAX = 30;
+  if (shots <= TYPICAL_MAX) { callback(); return; }
+  
+  var modal = document.getElementById('shot-warning-modal');
+  var text = document.getElementById('shot-warning-text');
+  if (!modal || !text) { callback(); return; }
+  
+  _shotWarningPendingCallback = callback;
+  text.textContent = 'Most bottles yield around 30 shots. You entered ' + shots + ' shots per bottle — that\'s ' + (shots - TYPICAL_MAX) + ' more than typical. Is that correct for this product?';
+  modal.style.display = 'flex';
+}
+
+function shotWarningReview() {
+  var modal = document.getElementById('shot-warning-modal');
+  if (modal) modal.style.display = 'none';
+  _shotWarningPendingCallback = null;
+  // Focus back on shots input
+  var inp = document.getElementById('shots-per-bottle');
+  if (inp) { inp.focus(); inp.select(); }
+}
+
+function shotWarningProceed() {
+  var modal = document.getElementById('shot-warning-modal');
+  if (modal) modal.style.display = 'none';
+  if (_shotWarningPendingCallback) {
+    _shotWarningPendingCallback();
+    _shotWarningPendingCallback = null;
+  }
+}
+
+function selectCategory(category) {
+    selectedCategory = category;
+    setStep(2);
+    clearChips();
+    
+    // Category-specific smart messages
+    const catMessages = {
+        'beer': { msg: '🍺 Beer selected — stocked and sold by bottle.', type: 'success' },
+        'cider': { msg: '🍻 Cider selected — stock by bottle or pack.', type: 'success' },
+        'wine': { msg: '🍷 Wine selected — stocked in bottles, sold by glass. Configure glasses per bottle next.', type: 'info' },
+        'spirits': { msg: '🥃 Spirits selected — stocked in bottles, sold by shot. You\'ll configure shots per bottle.', type: 'info' },
+        'whiskey': { msg: '🥃 Whiskey selected — premium spirit. You\'ll configure shots per bottle next.', type: 'info' },
+        'gin': { msg: '🍸 Gin selected — stocked in bottles, sold by shot.', type: 'info' },
+        'vodka': { msg: '🧊 Vodka selected — stocked in bottles, sold by shot.', type: 'info' },
+        'brandy': { msg: '🥂 Brandy selected — premium spirit, sold by shot.', type: 'info' },
+        'cocktail': { msg: '🍹 Cocktail selected — sold by the glass.', type: 'success' },
+    };
+    const bm = catMessages[category] || { msg: '✅ ' + category.charAt(0).toUpperCase() + category.slice(1) + ' selected.', type: 'success' };
+    showBanner(bm.msg, bm.type);
+    setHint('Step 2 — Select product');
+    
+    const catColors = {
+        beer:'#d97706', cider:'#059669', wine:'#be185d', spirits:'#7c3aed',
+        whiskey:'#b45309', gin:'#0369a1', vodka:'#0284c7', brandy:'#c2410c', cocktail:'#a21caf',
+    };
+    addChip(category.charAt(0).toUpperCase() + category.slice(1), catColors[category] || '#475569');
+    
+    // Update UI
+    document.querySelectorAll('.category-card').forEach(card => card.classList.remove('selected'));
+    const sel = document.querySelector(`.category-card[data-category="${category}"]`);
+    if (sel) sel.classList.add('selected');
+    
+    // Populate products
+    const products = productsData[category] || [];
+    const productList = document.getElementById('product-list');
+    productList.innerHTML = '';
+    
+    if (products.length === 0) {
+        productList.innerHTML = '<div style="padding:24px;text-align:center;color:#94a3b8;border:2px dashed #e2e8f0;border-radius:12px">No products in this category yet. <a href="' + liquorWizardUrl + '" style="color:#7c3aed;font-weight:600">Create one →</a></div>';
+    } else {
+        products.forEach(product => {
+            const item = document.createElement('div');
+            item.className = 'product-item';
+            item.dataset.productId = product.id;
+            item.onclick = () => selectProduct(product.id, product.name);
+            const stock = product.quantity_in_stock || 0;
+            const stockColor = stock === 0 ? '#dc2626' : stock <= 5 ? '#f59e0b' : '#059669';
+            item.innerHTML = `
+                <div class="product-name">${product.name}</div>
+                <div class="product-stock" style="color:${stockColor}">Stock: ${stock} ${stock === 0 ? '⚠ Out' : stock <= 5 ? '⚠ Low' : '✓'}</div>
+            `;
+            productList.appendChild(item);
+        });
+    }
+    
+    // Show step 2
+    document.getElementById('step-2').classList.remove('hidden');
+    document.getElementById('step-2').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function selectProduct(productId, productName) {
+    // Find full product data
+    const products = productsData[selectedCategory] || [];
+    selectedProductData = products.find(p => p.id === productId);
+    selectedProduct = { id: productId, name: productName };
+    setStep(3);
+    setHint('Step 3 — Select unit type');
+    
+    const isSpirits = selectedCategory === 'spirits' || selectedCategory === 'whiskey' || selectedCategory === 'gin' || selectedCategory === 'vodka' || selectedCategory === 'brandy';
+    const isWine = selectedCategory === 'wine';
+    if (isSpirits) {
+        showBanner(`✨ Great choice — ${productName} selected. Spirits are stocked by bottle. You'll configure shots next.`, 'info');
+    } else if (isWine) {
+        showBanner(`🍷 ${productName} selected. Wine is stocked in bottles and sold by the glass.`, 'info');
+    } else {
+        showBanner(`✅ ${productName} selected! How many are you stocking?`, 'success');
+    }
+    
+    // Update UI
+    document.querySelectorAll('.product-item').forEach(item => item.classList.remove('selected'));
+    document.querySelector(`.product-item[data-product-id="${productId}"]`).classList.add('selected');
+    
+    const crateBtn = document.getElementById('crate-btn');
+    const packBtn = document.getElementById('pack-btn');
+    const unitHint = document.getElementById('unit-hint');
+
+    // Reset visibility
+    if (crateBtn) crateBtn.style.display = 'block';
+    if (packBtn) packBtn.style.display = 'none';
+    if (unitHint) unitHint.style.display = 'none';
+
+    if (selectedCategory === 'spirits' || selectedCategory === 'whiskey') {
+        // Spirits: bottles only, no crates/packs; shots configured later
+        if (crateBtn) crateBtn.style.display = 'none';
+        if (unitHint) {
+            unitHint.textContent = '🥃 Spirits are stocked in bottles. Shot pricing will be configured next.';
+            unitHint.style.display = 'block';
+        }
+    } else if (selectedCategory === 'cider') {
+        // Cider: bottles OR packs
+        const packSize = (selectedProductData && selectedProductData.pack_size) ? selectedProductData.pack_size : 6;
+        if (packBtn) {
+            packBtn.style.display = 'block';
+            packBtn.innerHTML = `<span class="unit-icon">🧃</span> Packs (${packSize}-pack)`;
+        }
+        if (crateBtn) crateBtn.style.display = 'none';  // ciders use packs, not crates
+        if (unitHint) {
+            unitHint.textContent = `🍻 Ciders: stock by bottle or by ${packSize}-pack. Pack price is auto-split per bottle.`;
+            unitHint.style.display = 'block';
+        }
+    }
+    
+    // Show step 3
+    document.getElementById('step-3').classList.remove('hidden');
+    document.getElementById('step-3').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function selectUnit(unit) {
+    selectedUnit = unit;
+    setStep(4);
+    setHint('Step 4 — How many are you stocking?');
+    
+    const unitLabel = unit === 'crate' ? 'crate' : unit === 'pack' ? 'pack' : 'bottle';
+    showBanner(`📦 Stocking by ${unitLabel}. How many ${unitLabel}s are you adding?`, 'success');
+    
+    // Update UI
+    document.querySelectorAll('.unit-btn').forEach(btn => btn.classList.remove('selected'));
+    document.querySelector(`.unit-btn[data-unit="${unit}"]`).classList.add('selected');
+    
+    // Update labels
+    if (unit === 'crate') {
+        document.getElementById('unit-label').textContent = 'Crate';
+    } else if (unit === 'pack') {
+        const packSize = (selectedProductData && selectedProductData.pack_size) ? selectedProductData.pack_size : 6;
+        document.getElementById('unit-label').textContent = `Pack (${packSize}-pack)`;
+    } else if (unit === 'glass_bottle') {
+        document.getElementById('unit-label').textContent = 'Bottle';  // Qty still in bottles
+    } else {
+        document.getElementById('unit-label').textContent = 'Bottle';
+    }
+    document.getElementById('selling-unit-label').textContent = 'Bottle';
+    
+    // Show step 4
+    document.getElementById('step-4').classList.remove('hidden');
+    document.getElementById('step-4').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function selectQuantity(qty) {
+    if (qty === 'custom') {
+        return;  // Handle custom separately
+    }
+    
+    selectedQuantity = qty;
+    
+    // Update UI
+    document.querySelectorAll('.qty-panel').forEach(panel => panel.classList.remove('selected'));
+    document.querySelector(`.qty-panel[data-qty="${qty}"]`).classList.add('selected');
+    document.getElementById('custom-qty-input').classList.add('hidden');
+    
+    // Show step 5 (cost price)
+    document.getElementById('step-5').classList.remove('hidden');
+    document.getElementById('step-5').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    
+    // Setup cost price handler (only once)
+    setupCostPriceHandler();
+}
+
+function customQuantity() {
+    // Update UI
+    document.querySelectorAll('.qty-panel').forEach(panel => panel.classList.remove('selected'));
+    document.querySelector(`.qty-panel[data-qty="custom"]`).classList.add('selected');
+    
+    const customInput = document.getElementById('custom-qty-input');
+    customInput.classList.remove('hidden');
+    customInput.focus();
+    
+    customInput.onchange = function() {
+        selectedQuantity = parseInt(this.value) || 1;
+        // Show step 5 (cost price)
+        document.getElementById('step-5').classList.remove('hidden');
+        document.getElementById('step-5').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        // Setup cost price handler
+        setupCostPriceHandler();
+    };
+}
+
+function setupCostPriceHandler() {
+    const costPriceInput = document.getElementById('cost-price');
+    if (!costPriceInput || costPriceEntered) return;
+    
+    const costHelperText = document.getElementById('cost-helper-text');
+    const costHelperContent = document.getElementById('cost-helper-content');
+    
+    // Show helper text as user types (for crates/packs)
+    costPriceInput.addEventListener('input', function() {
+        const value = parseFloat(this.value);
+        if (selectedUnit === 'crate' && value && value > 0 && selectedProductData) {
+            const bottlesPerCrate = selectedProductData.bottles_per_crate || 20;
+            const costPerBottle = (value / bottlesPerCrate).toFixed(2);
+            costHelperContent.textContent = `≈ MWK ${costPerBottle} per bottle (${bottlesPerCrate} bottles per crate)`;
+            costHelperText.style.display = 'block';
+            costPricePerBottle = parseFloat(costPerBottle);
+        } else if (selectedUnit === 'pack' && value && value > 0 && selectedProductData) {
+            const packSize = selectedProductData.pack_size || 6;
+            const costPerBottle = (value / packSize).toFixed(2);
+            costHelperContent.textContent = `≈ MWK ${costPerBottle} per bottle (${packSize} bottles per pack)`;
+            costHelperText.style.display = 'block';
+            costPricePerBottle = parseFloat(costPerBottle);
+        } else {
+            costHelperText.style.display = 'none';
+            costPricePerBottle = value;
+        }
+    });
+    
+    // When cost price is entered, proceed to next step
+    costPriceInput.addEventListener('blur', function() {
+        const value = parseFloat(this.value);
+        if (value && value > 0) {
+            costPrice = value;
+            
+            // Calculate cost per bottle for comparison
+            if (selectedUnit === 'crate' && selectedProductData) {
+                const bottlesPerCrate = selectedProductData.bottles_per_crate || 20;
+                costPricePerBottle = value / bottlesPerCrate;
+            } else if (selectedUnit === 'pack' && selectedProductData) {
+                const packSize = selectedProductData.pack_size || 6;
+                costPricePerBottle = value / packSize;
+            } else {
+                costPricePerBottle = value;
+            }
+            
+            costPriceEntered = true;
+            
+            setTimeout(() => {
+                document.getElementById('cost-price-panel').style.display = 'none';
+
+                const isSpirits = ['spirits','whiskey','gin','vodka','brandy'].includes(selectedCategory);
+                const isWine = selectedCategory === 'wine';
+                const isWineGlass = isWine && selectedUnit === 'glass_bottle';
+
+                if (isSpirits) {
+                    setStep(6);
+                    setHint('Step 6 — Configure shots per bottle');
+                    showBanner(`✨ Spirits stocked by bottle. Let's configure your shots next to maximize profit tracking.`, 'info');
+                    document.getElementById('step-5b-shots').classList.remove('hidden');
+                    document.getElementById('step-5b-shots').scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    setupShotsPreview();
+                    document.getElementById('step-7').classList.remove('hidden');
+                } else if (isWineGlass) {
+                    // Wine + Glass+Bottle: show selling price per bottle, glass config, and submit
+                    setStep(6);
+                    setHint('Step 6 — Set selling price per bottle, then configure glass pricing');
+                    const suggestedBottlePrice = costPricePerBottle > 0 ? Math.round(costPricePerBottle * 1.3).toLocaleString() : '—';
+                    showBanner(`🍷 Wine stocked! Set bottle price, then configure glass pricing below. Suggested bottle price (30% margin): MK ${suggestedBottlePrice}`, 'info');
+                    document.getElementById('step-6').classList.remove('hidden');
+                    document.getElementById('step-6').scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    document.getElementById('step-5b-wine').classList.remove('hidden');
+                    document.getElementById('step-7').classList.remove('hidden');
+                    setupSmartPricingFeedback();
+                    setupWineGlassPreview();
+                } else if (isWine) {
+                    // Wine bottle-only: just selling price and submit
+                    setStep(6);
+                    setHint('Step 6 — Set selling price per bottle');
+                    if (costPricePerBottle > 0) {
+                        const suggested = Math.round(costPricePerBottle * 1.3);
+                        showBanner(`🍷 Wine (bottle only). Suggested selling price (30% margin): MK ${suggested.toLocaleString()}`, 'info');
+                    }
+                    document.getElementById('step-6').classList.remove('hidden');
+                    document.getElementById('step-6').scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    document.getElementById('step-7').classList.remove('hidden');
+                    setupSmartPricingFeedback();
+                } else {
+                    setStep(6);
+                    setHint('Step 6 — Set selling price per bottle');
+                    if (costPricePerBottle > 0) {
+                        const suggested = Math.round(costPricePerBottle * 1.35);
+                        showBanner(`💡 Cost: MK ${Math.round(costPricePerBottle).toLocaleString()} per bottle. Suggested selling price (35% margin): MK ${suggested.toLocaleString()}`, 'info');
+                    }
+                    document.getElementById('step-6').classList.remove('hidden');
+                    document.getElementById('step-6').scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    document.getElementById('step-7').classList.remove('hidden');
+                    setupSmartPricingFeedback();
+                }
+            }, 500);
+        }
+    }, { once: true });
+}
+
+function setupShotsPreview() {
+    const shotsInput = document.getElementById('shots-per-bottle');
+    const priceInput = document.getElementById('price-per-shot');
+    const preview = document.getElementById('shots-calc-preview');
+
+    function updatePreview() {
+        const shots = parseInt(shotsInput.value) || 0;
+        const pricePerShot = parseFloat(priceInput.value) || 0;
+        const qty = selectedQuantity || 1;
+        const cpb = costPricePerBottle || 0;
+        if (shots <= 0 || pricePerShot <= 0) {
+            preview.style.display = 'none';
+            return;
+        }
+        const costPerShot = shots > 0 ? (cpb / shots) : 0;
+        const profitPerShot = pricePerShot - costPerShot;
+        const revenuePerBottle = shots * pricePerShot;
+        const totalShots = qty * shots;
+        preview.innerHTML = `
+            <strong>Live calculation:</strong><br>
+            Cost per shot: MWK ${costPerShot.toFixed(2)}<br>
+            Selling price/shot: MWK ${pricePerShot.toFixed(2)}<br>
+            Gross profit/shot: MWK ${profitPerShot.toFixed(2)} (${cpb > 0 ? ((profitPerShot/pricePerShot)*100).toFixed(1) : '--'}% margin)<br>
+            Revenue per bottle: MWK ${revenuePerBottle.toFixed(2)} vs cost MWK ${cpb.toFixed(2)}<br>
+            Total shots added: ${totalShots} shots from ${qty} bottle${qty !== 1 ? 's' : ''}
+        `;
+        preview.style.display = 'block';
+    }
+
+    shotsInput.addEventListener('input', updatePreview);
+    priceInput.addEventListener('input', updatePreview);
+    updatePreview();
+}
+
+function setupSmartPricingFeedback() {
+    const sellingPriceInput = document.getElementById('selling-price');
+    const feedbackContainer = document.getElementById('pricing-feedback');
+    
+    if (!sellingPriceInput || !feedbackContainer) return;
+    
+    function updateFeedback() {
+        const selling = parseFloat(sellingPriceInput.value);
+        
+        // CRITICAL FIX: Compare bottle-to-bottle prices (not crate vs bottle)
+        const costToCompare = costPricePerBottle || costPrice;
+        
+        if (!costToCompare || !selling || selling <= 0) {
+            feedbackContainer.classList.remove('show', 'above-cost', 'below-cost');
+            return;
+        }
+        
+        // Use PricingHelpers for consistent calculation (bottle vs bottle)
+        const calc = PricingHelpers.calculate(costToCompare, selling);
+        const feedback = PricingHelpers.getFeedback(calc);
+        
+        const icon = feedbackContainer.querySelector('.pricing-feedback-icon');
+        const message = feedbackContainer.querySelector('.pricing-feedback-message');
+        
+        // Update UI
+        feedbackContainer.classList.remove('above-cost', 'below-cost');
+        feedbackContainer.classList.add(feedback.type, 'show');
+        icon.textContent = feedback.icon;
+        message.textContent = feedback.message;
+    }
+    
+    sellingPriceInput.addEventListener('input', updateFeedback);
+    sellingPriceInput.addEventListener('change', updateFeedback);
+}
+
+async function submitStockIn() {
+    // Validate all selections
+    if (!selectedProduct || !selectedUnit || !selectedQuantity) {
+        alert('Please complete all steps');
+        return;
+    }
+
+    const isSpirits = selectedCategory === 'spirits' || selectedCategory === 'whiskey';
+    
+    // Get final prices
+    costPrice = costPrice || parseFloat(document.getElementById('cost-price').value) || 0;
+    sellingPrice = parseFloat(document.getElementById('selling-price').value) || 0;
+
+    // Validate spirits shots (with soft warning for >30)
+    if (isSpirits) {
+        const shotsPerBottle = parseInt(document.getElementById('shots-per-bottle').value) || 0;
+        const pricePerShot = parseFloat(document.getElementById('price-per-shot').value) || 0;
+        if (shotsPerBottle <= 0) {
+            alert('❌ Shots per bottle must be greater than 0 for spirits sold by shot.');
+            return;
+        }
+        if (pricePerShot < 0) {
+            alert('❌ Selling price per shot cannot be negative.');
+            return;
+        }
+        // Shot max soft warning (TASK 5)
+        if (shotsPerBottle > 30) {
+            checkShotMaxWarning(shotsPerBottle, function() {
+                // User proceeded — continue with submit
+                _doActualSubmit(isSpirits);
+            });
+            return; // Wait for user to confirm
+        }
+    }
+    
+    // For non-spirits or shots <= 30, submit directly
+    _doActualSubmit(isSpirits);
+}
+
+async function _doActualSubmit(isSpirits) {
+    // Prepare form data
+    const formData = new FormData();
+    formData.append('product_id', selectedProduct.id);
+    formData.append('unit_type', selectedUnit);
+    formData.append('quantity', selectedQuantity);
+    formData.append('cost_per_unit', costPrice.toFixed(2));
+    if (sellingPrice > 0) {
+        formData.append('selling_price', sellingPrice.toFixed(2));
+    }
+
+    // Category-specific fields
+    if (isSpirits) {
+        const shotsPerBottle = parseInt(document.getElementById('shots-per-bottle').value) || 30;
+        const pricePerShot = parseFloat(document.getElementById('price-per-shot').value) || 0;
+        formData.append('shots_per_bottle', shotsPerBottle);
+        if (pricePerShot > 0) {
+            formData.append('price_per_shot', pricePerShot.toFixed(2));
+        }
+    }
+    if (selectedUnit === 'pack') {
+        const packSize = (selectedProductData && selectedProductData.pack_size) ? selectedProductData.pack_size : 6;
+        formData.append('pack_size', packSize);
+    }
+    
+    // Get CSRF token
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || '{{ csrf_token }}';
+    
+    try {
+        const response = await fetch(window.location.href, {
+            method: 'POST',
+            headers: { 'X-CSRFToken': csrfToken },
+            body: formData
+        });
+        
+        if (response.ok) {
+            setStep(7);
+            const bottlesAdded = selectedUnit === 'crate' ? selectedQuantity * 20 : selectedQuantity;
+            let successText = `🟢 Stock added 🎉\n${bottlesAdded} bottle${bottlesAdded !== 1 ? 's' : ''} of ${selectedProduct.name}`;
+            if (selectedCategory === 'wine' && selectedUnit === 'glass_bottle') {
+                const gpb = parseInt(document.getElementById('glasses-per-bottle').value) || 6;
+                const totalGlasses = bottlesAdded * gpb;
+                successText += `\n${totalGlasses} glasses (${gpb} per bottle)`;
+            }
+            successText += `\nRedirecting...`;
+            showSuccessMessage(successText);
+            if (window.CCSounds) window.CCSounds.playStockAddedSound();
+            setTimeout(() => {
+                window.location.href = window.location.pathname + '?added=1';
+            }, 1500);
+        } else {
+            alert('❌ Failed to add stock. Please try again.');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('❌ Network error. Please try again.');
+    }
+}
+
+function showSuccessMessage(message) {
+    // Create success overlay
+    const overlay = document.createElement('div');
+    overlay.style.cssText = `
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: linear-gradient(135deg, #d1fae5 0%, #86efac 100%);
+        border: 3px solid #4ade80;
+        border-radius: 20px;
+        padding: 32px 48px;
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: #065f46;
+        text-align: center;
+        z-index: 10000;
+        box-shadow: 0 20px 60px rgba(74, 222, 128, 0.4);
+        white-space: pre-line;
+        line-height: 1.6;
+    `;
+    overlay.textContent = message;
+    document.body.appendChild(overlay);
+    
+    // Remove after delay
+    setTimeout(() => overlay.remove(), 3000);
+}
+
+function resetForm() {
+    // Reset all selections
+    selectedCategory = null;
+    selectedProduct = null;
+    selectedProductData = null;
+    selectedUnit = null;
+    selectedQuantity = null;
+    costPrice = null;
+    costPricePerBottle = null;
+    sellingPrice = null;
+    costPriceEntered = false;
+    
+    // Reset UI
+    document.querySelectorAll('.selected').forEach(el => el.classList.remove('selected'));
+    document.getElementById('step-2').classList.add('hidden');
+    document.getElementById('step-3').classList.add('hidden');
+    document.getElementById('step-4').classList.add('hidden');
+    document.getElementById('step-5').classList.add('hidden');
+    document.getElementById('step-5b-shots').classList.add('hidden');
+    document.getElementById('step-6').classList.add('hidden');
+    document.getElementById('step-7').classList.add('hidden');
+    document.getElementById('cost-price').value = '';
+    document.getElementById('selling-price').value = '';
+    document.getElementById('custom-qty-input').value = '';
+    document.getElementById('custom-qty-input').classList.add('hidden');
+    document.getElementById('cost-price-panel').style.display = 'block';
+    document.getElementById('cost-helper-text').style.display = 'none';
+    const shotsPreview = document.getElementById('shots-calc-preview');
+    if (shotsPreview) shotsPreview.style.display = 'none';
+    const shotsInput = document.getElementById('shots-per-bottle');
+    if (shotsInput) shotsInput.value = '30';
+    const pricePerShot = document.getElementById('price-per-shot');
+    if (pricePerShot) pricePerShot.value = '';
+    const unitHint = document.getElementById('unit-hint');
+    if (unitHint) unitHint.style.display = 'none';
+
+    // Restore unit buttons
+    const crateBtn = document.getElementById('crate-btn');
+    const packBtn = document.getElementById('pack-btn');
+    if (crateBtn) crateBtn.style.display = 'block';
+    if (packBtn) packBtn.style.display = 'none';
+    // Reset wine glass unit button and fields
+    const glassBottleBtn = document.getElementById('glass-bottle-btn');
+    if (glassBottleBtn) glassBottleBtn.style.display = 'none';
+    const glassesInput = document.getElementById('glasses-per-bottle');
+    if (glassesInput) { glassesInput.value = '6'; delete glassesInput._winePreviewSetup; }
+    const pricePerGlassInput = document.getElementById('price-per-glass');
+    if (pricePerGlassInput) pricePerGlassInput.value = '';
+    const wineCalcPreview = document.getElementById('wine-glass-calc-preview');
+    if (wineCalcPreview) wineCalcPreview.style.display = 'none';
+
+    // Hide feedback
+    const feedbackContainer = document.getElementById('pricing-feedback');
+    if (feedbackContainer) {
+        feedbackContainer.classList.remove('show', 'above-cost', 'below-cost');
+    }
+    
+    // Scroll to top
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+</script>
+
+<form method="post" style="display:none;" id="hidden-form">
+    {% csrf_token %}
+</form>
+
+<!-- UX SAFETY FIX: Collapsible "Create new product" section (no fixed positioning, clear separation) -->
+<div style="max-width:1100px;margin:2rem auto;padding:1rem">
+  <details style="background:#f8fafc;border:2px solid #e2e8f0;border-radius:12px;padding:16px;margin-top:24px">
+    <summary style="cursor:pointer;font-weight:600;color:#64748b;font-size:0.95rem;user-select:none">
+      Need to create a new product? (Catalog)
+    </summary>
+    <div style="margin-top:16px;padding-top:16px;border-top:1px solid #e2e8f0">
+      <p style="margin:0 0 12px;color:#64748b;font-size:0.9rem">
+        If the product you want to stock doesn't exist yet, create it in the product catalog first.
+      </p>
+      <a href="{% url 'inventory:liquor_wizard' %}" style="display:inline-flex;align-items:center;gap:8px;padding:10px 20px;background:#6366f1;color:white;border-radius:8px;font-weight:600;text-decoration:none;font-size:0.95rem;transition:background 0.2s">
+        <i class="bi bi-plus-circle"></i>
+        <span>Create new product (Catalog)</span>
+      </a>
+    </div>
+  </details>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function() {
+  {% for message in messages %}
+    {% if 'stocked' in message.message|lower or 'added' in message.message|lower or 'bottle' in message.message|lower %}
+    document.addEventListener('DOMContentLoaded', function() {
+      setTimeout(function() {
+        if (window.CCSounds) window.CCSounds.playStockAddedSound();
+      }, 200);
+    });
+    {% endif %}
+  {% endfor %}
+})();
+</script>
+{% endblock %}
+ursor:pointer;font-weight:600;color:#64748b;font-size:0.95rem;user-select:none">
+      Need to create a new product? (Catalog)
+    </summary>
+    <div style="margin-top:16px;padding-top:16px;border-top:1px solid #e2e8f0">
+      <p style="margin:0 0 12px;color:#64748b;font-size:0.9rem">
+        If the product you want to stock doesn't exist yet, create it in the product catalog first.
+      </p>
+      <a href="{% url 'inventory:liquor_wizard' %}" style="display:inline-flex;align-items:center;gap:8px;padding:10px 20px;background:#6366f1;color:white;border-radius:8px;font-weight:600;text-decoration:none;font-size:0.95rem;transition:background 0.2s">
+        <i class="bi bi-plus-circle"></i>
+        <span>Create new product (Catalog)</span>
+      </a>
+    </div>
+  </details>
+</div>
+
+
+
+<script>
+(function() {
+  {% for message in messages %}
+    {% if 'stocked' in message.message|lower or 'added' in message.message|lower or 'bottle' in message.message|lower %}
+    document.addEventListener('DOMContentLoaded', function() {
+      setTimeout(function() {
+        if (window.CCSounds) window.CCSounds.playStockAddedSound();
+      }, 200);
+    });
+    {% endif %}
+  {% endfor %}
+})();
+</script>
+

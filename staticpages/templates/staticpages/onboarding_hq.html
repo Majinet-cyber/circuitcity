@@ -4,7 +4,7 @@
 {% block title %}HQ Staff Onboarding - Emajinet{% endblock %}
 
 {% block content %}
-<div class="container-fluid px-3 px-md-4 py-4">
+<div class="px-3 px-md-4 py-4">
   <!-- Header -->
   <div class="row mb-4">
     <div class="col-12">
@@ -20,14 +20,12 @@
             </p>
           </div>
           <div>
-            <!-- PDF download temporarily disabled -->
-            <button type="button" 
-                    class="btn btn-outline-secondary" 
-                    disabled
-                    title="PDF version coming soon">
+            <!-- PDF download -->
+            <a href="{% url 'staticpages:hq_onboarding_pdf' %}" 
+               class="btn btn-danger">
               <i class="bi bi-download me-2"></i>
-              Download PDF (Coming Soon)
-            </button>
+              Download PDF
+            </a>
           </div>
         </div>
       </div>

@@ -10,12 +10,14 @@ from django.contrib.auth import get_user_model
 from django.db.models import F, DecimalField, ExpressionWrapper, Sum, Q
 from django.utils import timezone
 
+
 # ---- Resolve models lazily to avoid import-time errors during migrations ----
 def _m(name):
     try:
         return apps.get_model("inventory", name)
     except Exception:
         return None
+
 
 Location = _m("Location")
 AgentProfile = _m("AgentProfile")
@@ -36,6 +38,7 @@ DocItem = _m("DocItem") or _m("DocumentItem") or _m("BusinessDocItem") or _m("Or
 # =====================================================================
 #                            CORE MODELS
 # =====================================================================
+
 
 # ---------- Locations (with GPS) ----------
 class LocationAdmin(admin.ModelAdmin):
@@ -71,11 +74,261 @@ class AgentProfileAdmin(admin.ModelAdmin):
 
 # ---------- Products ----------
 class ProductAdmin(admin.ModelAdmin):
-    list_display = ("brand", "model", "variant")
+    list_display = ("brand", "model", "variant", "cost_price", "sale_price", "stock_summary", "last_sale_date")
     list_filter = ("brand",)
-    search_fields = ("model", "variant", "brand")
+    search_fields = ("model", "variant", "brand", "code", "name")
     ordering = ("brand", "model", "variant")
     list_per_page = 50
+
+    # Editable fields for HQ pricing control
+    fieldsets = (
+        ("Product Info", {"fields": ("code", "name", "brand", "model", "variant", "low_stock_threshold")}),
+        (
+            "Pricing (HQ Editable)",
+            {
+                "fields": ("cost_price", "sale_price"),
+                "description": "Edit prices here to update all future sales. Changes reflect immediately in dashboards.",
+            },
+        ),
+    )
+
+    readonly_fields = ("stock_summary", "last_sale_date")
+
+    actions = ("action_force_delete_products",)
+
+    @admin.display(description="Stock Summary")
+    def stock_summary(self, obj):
+        """Show current on-hand quantity and stock value."""
+        from inventory.services.services_recalc import recalc_product_stock
+
+        try:
+            stats = recalc_product_stock(obj.id)
+            qty = stats["on_hand_quantity"]
+            value = stats["stock_value"]
+            return f"{qty} items · MWK {value:,.0f}"
+        except Exception:
+            return "—"
+
+    @admin.display(description="Last Sale")
+    def last_sale_date(self, obj):
+        """Show last sale date if any."""
+        try:
+            from sales.models import Sale
+
+            last_sale = Sale.objects.filter(item__product=obj).order_by("-created_at").first()
+            if last_sale:
+                return last_sale.created_at.strftime("%Y-%m-%d")
+        except Exception:
+            pass
+        return "—"
+
+    def save_model(self, request, obj, form, change):
+        """After saving, trigger recalculation for affected business/locations."""
+        super().save_model(request, obj, form, change)
+
+        # Recalculate stock for this product
+        try:
+            from inventory.services.services_recalc import recalc_product_stock
+
+            recalc_product_stock(obj.id)
+
+            # If business is set, recalculate business KPIs
+            if hasattr(obj, "business") and obj.business:
+                from inventory.services.services_recalc import recalc_inventory_kpis
+
+                recalc_inventory_kpis(obj.business.id)
+        except Exception as e:
+            import logging
+
+            logger = logging.getLogger(__name__)
+            logger.exception(f"Error recalculating after Product save: {e}")
+
+    @admin.action(description="Force delete selected products (HQ only, removes unsold stock)")
+    def action_force_delete_products(self, request, queryset):
+        """
+        HQ-only action to force delete products and their unsold stock.
+        Preserves completed sales records.
+        """
+        if not request.user.is_superuser:
+            messages.error(request, "Only superusers can force delete products.")
+            return
+
+        deleted_count = 0
+        stock_deleted = 0
+
+        for product in queryset:
+            # Delete unsold stock items
+            from inventory.models import InventoryItem
+
+            unsold_items = InventoryItem.objects.filter(
+                product=product,
+                status="IN_STOCK",
+                sold_at__isnull=True,
+            )
+            stock_count = unsold_items.count()
+
+            # Check for completed sales
+            try:
+                from sales.models import Sale
+
+                sales_count = Sale.objects.filter(item__product=product).count()
+                if sales_count > 0:
+                    messages.warning(
+                        request,
+                        f"Product '{product}' has {sales_count} completed sale(s). "
+                        f"Sales records are preserved. Only unsold stock ({stock_count} items) will be deleted.",
+                    )
+            except Exception:
+                pass
+
+            # Delete unsold stock
+            unsold_items.delete()
+            stock_deleted += stock_count
+
+            # Delete the product
+            product.delete()
+            deleted_count += 1
+
+        messages.success(
+            request,
+            f"Force deleted {deleted_count} product(s) and {stock_deleted} unsold stock item(s). "
+            f"Completed sales records were preserved.",
+        )
+
+
+# ---------- MerchProduct (Liquor, Clothing, Groceries, etc.) ----------
+MerchProduct = _m("MerchProduct")
+if MerchProduct:
+
+    class MerchProductAdmin(admin.ModelAdmin):
+        list_display = ("name", "kind", "business", "stock_summary", "pricing_summary", "is_active")
+        list_filter = ("kind", "is_active", "is_archived", "business")
+        search_fields = ("name", "sku", "barcode", "category")
+        ordering = ("name",)
+        list_per_page = 50
+
+        # Editable fields organized by vertical
+        fieldsets = (
+            ("Product Info", {"fields": ("business", "name", "kind", "sku", "barcode", "category", "is_active")}),
+            (
+                "Liquor Pricing (HQ Editable)",
+                {
+                    "fields": (
+                        "price_per_bottle",
+                        "cost_per_bottle",
+                        "price_per_shot",
+                        "cost_per_shot",
+                        "price_per_glass",
+                        "cost_per_glass",
+                        "bottles_per_crate",
+                        "shots_per_bottle",
+                        "glasses_per_bottle",
+                        "has_shots",
+                        "has_glasses",
+                        "supports_crates",
+                    ),
+                    "classes": ("collapse",),
+                    "description": "Liquor-specific pricing fields. Edit here to update all future sales.",
+                },
+            ),
+            (
+                "General Merchandise Pricing (HQ Editable)",
+                {
+                    "fields": ("cost_price", "selling_price", "quantity_in_stock"),
+                    "description": "For clothing, groceries, etc. Edit prices here to update all future sales.",
+                },
+            ),
+            ("Clothing/Grocery Fields", {"fields": ("size", "color", "spec_label"), "classes": ("collapse",)}),
+            (
+                "Stock Targets (Liquor)",
+                {"fields": ("target_bottles", "auto_adjust_enabled", "auto_adjust_pct"), "classes": ("collapse",)},
+            ),
+            ("Archive", {"fields": ("is_archived", "archived_at", "archived_by"), "classes": ("collapse",)}),
+        )
+
+        readonly_fields = ("stock_summary", "pricing_summary", "archived_at", "archived_by")
+
+        actions = ("action_force_delete_merch_products",)
+
+        @admin.display(description="Stock Summary")
+        def stock_summary(self, obj):
+            """Show current stock quantity and value."""
+            from inventory.services.services_recalc import recalc_merch_product_stock
+
+            try:
+                stats = recalc_merch_product_stock(obj.id)
+                qty = stats["on_hand_quantity"]
+                value = stats["stock_value"]
+                if qty > 0:
+                    return f"{qty} units · MWK {value:,.0f}"
+                return "0 units"
+            except Exception:
+                return "—"
+
+        @admin.display(description="Pricing")
+        def pricing_summary(self, obj):
+            """Show pricing summary based on product kind."""
+            parts = []
+            if obj.cost_price:
+                parts.append(f"Cost: MWK {obj.cost_price:,.0f}")
+            if obj.selling_price:
+                parts.append(f"Sell: MWK {obj.selling_price:,.0f}")
+            if obj.price_per_bottle:
+                parts.append(f"Bottle: MWK {obj.price_per_bottle:,.0f}")
+            if obj.price_per_shot:
+                parts.append(f"Shot: MWK {obj.price_per_shot:,.0f}")
+            return " | ".join(parts) if parts else "No pricing"
+
+        def save_model(self, request, obj, form, change):
+            """After saving, trigger recalculation."""
+            super().save_model(request, obj, form, change)
+
+            try:
+                from inventory.services.services_recalc import recalc_merch_product_stock
+
+                recalc_merch_product_stock(obj.id)
+
+                if obj.business_id:
+                    from inventory.services.services_recalc import recalc_inventory_kpis
+
+                    recalc_inventory_kpis(obj.business_id)
+            except Exception as e:
+                import logging
+
+                logger = logging.getLogger(__name__)
+                logger.exception(f"Error recalculating after MerchProduct save: {e}")
+
+        @admin.action(description="Force delete selected products (HQ only)")
+        def action_force_delete_merch_products(self, request, queryset):
+            """HQ-only action to force delete MerchProducts."""
+            if not request.user.is_superuser:
+                messages.error(request, "Only superusers can force delete products.")
+                return
+
+            deleted_count = 0
+
+            for product in queryset:
+                # Check for related sales
+                try:
+                    from sales.models import Sale
+
+                    sales_count = Sale.objects.filter(product=product).count()
+                    if sales_count > 0:
+                        messages.warning(
+                            request,
+                            f"Product '{product}' has {sales_count} completed sale(s). "
+                            f"Sales records are preserved.",
+                        )
+                except Exception:
+                    pass
+
+                # Delete the product
+                product.delete()
+                deleted_count += 1
+
+            messages.success(
+                request, f"Force deleted {deleted_count} product(s). " f"Completed sales records were preserved."
+            )
 
 
 # ---------- Inventory + inline audits ----------
@@ -125,6 +378,7 @@ class AssignToAgentActionForm(forms.Form):
     Extra widget shown above the actions dropdown to choose the target agent
     for the bulk transfer.
     """
+
     agent = forms.ModelChoiceField(
         queryset=get_user_model().objects.filter(is_staff=False),
         required=True,
@@ -147,6 +401,7 @@ class InventoryItemAdmin(admin.ModelAdmin):
         "order_price",
         "selling_price",
         "profit_display",
+        "stock_summary",
     )
     list_filter = ("status", "current_location", "product__model", "product__brand")
     search_fields = ("imei", "product__model", "product__variant", "assigned_agent__username")
@@ -158,15 +413,45 @@ class InventoryItemAdmin(admin.ModelAdmin):
     list_per_page = 50
     show_full_result_count = False
 
+    # Editable fields for HQ pricing control
+    fieldsets = (
+        ("Item Info", {"fields": ("imei", "product", "status", "current_location", "assigned_agent", "received_at")}),
+        (
+            "Pricing (HQ Editable)",
+            {
+                "fields": ("order_price", "selling_price"),
+                "description": "Edit prices here. Changes reflect immediately in dashboards and future sales.",
+            },
+        ),
+        (
+            "Metadata",
+            {
+                "fields": ("business", "is_active", "archived_at", "archived_by", "sold_at", "sold_by"),
+                "classes": ("collapse",),
+            },
+        ),
+    )
+
+    readonly_fields = ("stock_summary", "sold_at", "sold_by", "archived_at", "archived_by")
+
     # ----- Bulk actions -----
-    actions = ("action_assign_to_agent", "action_unassign")
+    actions = ("action_assign_to_agent", "action_unassign", "action_force_delete_stock")
     action_form = AssignToAgentActionForm
+
+    @admin.display(description="Stock Info")
+    def stock_summary(self, obj):
+        """Show quick stock info."""
+        if obj.status == "SOLD":
+            return f"Sold on {obj.sold_at.strftime('%Y-%m-%d') if obj.sold_at else '—'}"
+        return "In Stock"
 
     def get_queryset(self, request):
         qs = super().get_queryset(request).select_related("product", "current_location", "assigned_agent")
         # annotate profit server-side to avoid per-row Python property work
         return qs.annotate(
-            _profit=ExpressionWrapper(F("selling_price") - F("order_price"), output_field=DecimalField(max_digits=12, decimal_places=2))
+            _profit=ExpressionWrapper(
+                F("selling_price") - F("order_price"), output_field=DecimalField(max_digits=12, decimal_places=2)
+            )
         )
 
     @admin.display(ordering="_profit", description="Profit")
@@ -241,6 +526,134 @@ class InventoryItemAdmin(admin.ModelAdmin):
 
         messages.success(request, f"Unassigned {updated} item(s).")
 
+    @admin.action(description="Force delete selected stock items (HQ only, preserves sales)")
+    def action_force_delete_stock(self, request, queryset):
+        """
+        HQ-only action to force delete stock items.
+        Preserves completed sales records (won't delete if sold).
+        """
+        if not request.user.is_superuser:
+            messages.error(request, "Only superusers can force delete stock items.")
+            return
+
+        deleted_count = 0
+        skipped_sold = 0
+
+        for item in queryset:
+            # Check if item has been sold
+            if item.status == "SOLD" or item.sold_at:
+                skipped_sold += 1
+                continue
+
+            # Check for related barcodes/serials/IMEIs
+            try:
+                # Delete related barcodes if they exist
+                if hasattr(item, "barcodes"):
+                    item.barcodes.all().delete()
+                elif hasattr(item, "barcode_registry"):
+                    try:
+                        item.barcode_registry.delete()
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+
+            # Store business/location for recalculation
+            business_id = item.business_id if item.business else None
+            location_id = item.current_location_id if item.current_location else None
+            product_id = item.product_id
+
+            # Delete the item
+            item.delete()
+            deleted_count += 1
+
+            # Recalculate affected totals
+            try:
+                from inventory.services.services_recalc import recalc_product_stock, recalc_inventory_kpis
+
+                recalc_product_stock(product_id)
+                if business_id:
+                    recalc_inventory_kpis(business_id, location_id)
+            except Exception as e:
+                import logging
+
+                logger = logging.getLogger(__name__)
+                logger.exception(f"Error recalculating after stock delete: {e}")
+
+        if skipped_sold > 0:
+            messages.warning(
+                request,
+                f"Skipped {skipped_sold} sold item(s) (sales records preserved). "
+                f"Force deleted {deleted_count} unsold item(s).",
+            )
+        else:
+            messages.success(
+                request,
+                f"Force deleted {deleted_count} stock item(s). " f"Stock totals and dashboards have been recalculated.",
+            )
+
+    def save_model(self, request, obj, form, change):
+        """After saving, trigger recalculation for affected business/locations."""
+        super().save_model(request, obj, form, change)
+
+        # Recalculate stock for this product
+        try:
+            from inventory.services.services_recalc import recalc_product_stock, recalc_inventory_kpis
+
+            if obj.product_id:
+                recalc_product_stock(obj.product_id)
+
+            # If business is set, recalculate business KPIs
+            if obj.business_id:
+                location_id = obj.current_location_id if obj.current_location else None
+                recalc_inventory_kpis(obj.business_id, location_id)
+        except Exception as e:
+            import logging
+
+            logger = logging.getLogger(__name__)
+            logger.exception(f"Error recalculating after InventoryItem save: {e}")
+
+    def delete_model(self, request, obj):
+        """Before deleting, check for sales and handle cleanup."""
+        # Check for completed sales
+        if obj.status == "SOLD" or obj.sold_at:
+            messages.warning(request, f"Cannot delete sold item '{obj}'. Sales records must be preserved for audit.")
+            return
+
+        # Store IDs for recalculation
+        business_id = obj.business_id if obj.business else None
+        location_id = obj.current_location_id if obj.current_location else None
+        product_id = obj.product_id
+
+        # Delete related barcodes/serials
+        try:
+            if hasattr(obj, "barcodes"):
+                obj.barcodes.all().delete()
+            elif hasattr(obj, "barcode_registry"):
+                try:
+                    obj.barcode_registry.delete()
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+        # Delete the item
+        super().delete_model(request, obj)
+
+        # Recalculate affected totals
+        try:
+            from inventory.services.services_recalc import recalc_product_stock, recalc_inventory_kpis
+
+            if product_id:
+                recalc_product_stock(product_id)
+            if business_id:
+                recalc_inventory_kpis(business_id, location_id)
+        except Exception as e:
+            import logging
+
+            logger = logging.getLogger(__name__)
+            logger.exception(f"Error recalculating after InventoryItem delete: {e}")
+
 
 # ---------- Audit log ----------
 class InventoryAuditAdmin(admin.ModelAdmin):
@@ -262,24 +675,28 @@ class InventoryAuditAdmin(admin.ModelAdmin):
 
 # ---------- Time logs (GPS check-ins) ----------
 class TimeLogAdmin(admin.ModelAdmin):
-    list_display = ("user", "checkin_type", "logged_at", "location", "within_geofence", "distance_m", "accuracy_m")
-    list_filter = ("checkin_type", "within_geofence", "location", "logged_at")
-    search_fields = ("user__username", "note")
-    date_hierarchy = "logged_at"
-    ordering = ("-logged_at",)
-    list_select_related = ("user", "location")
+    """
+    Admin for TimeLog model (attendance events).
+    Fields: business, user, location, kind, ts, lat, lon
+    """
+    list_display = ("user", "kind", "ts", "location", "business")
+    list_filter = ("kind", "location", "ts")
+    search_fields = ("user__username", "user__email")
+    date_hierarchy = "ts"
+    ordering = ("-ts",)
+    list_select_related = ("user", "location", "business")
     autocomplete_fields = ("user", "location")
     fieldsets = (
-        ("When & who", {"fields": ("user", "checkin_type", "logged_at", "note")}),
+        ("When & Who", {"fields": ("user", "business", "kind", "ts")}),
         (
             "Where",
             {
-                "fields": ("location", "latitude", "longitude", "accuracy_m", "distance_m", "within_geofence"),
-                "description": "distance_m/within_geofence are usually filled by the API.",
+                "fields": ("location", "lat", "lon"),
+                "description": "Optional geo coordinates captured at check-in.",
             },
         ),
     )
-    readonly_fields = ("distance_m", "within_geofence")
+    readonly_fields = ("ts",)
     list_per_page = 50
     show_full_result_count = False
 
@@ -358,19 +775,33 @@ def _get_any_attr(obj, *names, default=None):
 
 
 if Doc is not None:
+
     class DocItemInline(admin.TabularInline):
         model = DocItem
         extra = 0
         autocomplete_fields = tuple(n for n in ("product",) if DocItem and _field_exists(DocItem, n))
-        fields = [n for n in ("product", "description", "qty", "unit_price", "line_total") if DocItem and _field_exists(DocItem, n)]
+        fields = [
+            n
+            for n in ("product", "description", "qty", "unit_price", "line_total")
+            if DocItem and _field_exists(DocItem, n)
+        ]
         readonly_fields = tuple(n for n in ("line_total",) if DocItem and _field_exists(DocItem, n))
         show_change_link = False
 
         def get_queryset(self, request):
             qs = super().get_queryset(request)
             # If line_total is not stored, annotate it
-            if DocItem and _field_exists(DocItem, "unit_price") and _field_exists(DocItem, "qty") and not _field_exists(DocItem, "line_total"):
-                return qs.annotate(line_total=ExpressionWrapper(F("unit_price") * F("qty"), output_field=DecimalField(max_digits=12, decimal_places=2)))
+            if (
+                DocItem
+                and _field_exists(DocItem, "unit_price")
+                and _field_exists(DocItem, "qty")
+                and not _field_exists(DocItem, "line_total")
+            ):
+                return qs.annotate(
+                    line_total=ExpressionWrapper(
+                        F("unit_price") * F("qty"), output_field=DecimalField(max_digits=12, decimal_places=2)
+                    )
+                )
             return qs
 
     class DocAdmin(admin.ModelAdmin):
@@ -383,8 +814,11 @@ if Doc is not None:
           - customer / customer_name / client_name
           - total/amount/grand_total (or computed from items)
         """
+
         inlines = [DocItemInline] if DocItem is not None else []
-        date_hierarchy = next((f for f in ("created_at", "issued_at", "created", "date") if _field_exists(Doc, f)), None)
+        date_hierarchy = next(
+            (f for f in ("created_at", "issued_at", "created", "date") if _field_exists(Doc, f)), None
+        )
         ordering = ("-id",)
 
         # Basic columns (computed if missing)
@@ -508,6 +942,8 @@ def _safe_register(model, admin_class):
 _safe_register(Location, LocationAdmin)
 _safe_register(AgentProfile, AgentProfileAdmin)
 _safe_register(Product, ProductAdmin)
+if MerchProduct:
+    _safe_register(MerchProduct, MerchProductAdmin)
 _safe_register(InventoryItem, InventoryItemAdmin)
 _safe_register(InventoryAudit, InventoryAuditAdmin)
 _safe_register(TimeLog, TimeLogAdmin)
@@ -517,6 +953,7 @@ _safe_register(AgentPasswordReset, AgentPasswordResetAdmin)
 
 # Optional: register AuditLog proxy if present
 if AuditLog is not None:
+
     class AuditLogAdmin(InventoryAuditAdmin):
         pass
 
@@ -530,5 +967,3 @@ try:
     from . import admin_verticals  # noqa
 except ImportError:
     pass  # Verticals not yet migrated
-
-

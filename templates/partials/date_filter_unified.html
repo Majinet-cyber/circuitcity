@@ -1,0 +1,629 @@
+{% comment %}
+Unified Date Filter Component - ALL OPTIONS RESTORED
+Mobile-first, premium glass design
+Supports: All time, Month, MTD, Last 7 Days, Custom Range
+Usage: {% include "partials/date_filter_unified.html" with filter_mode=filter_mode period=period month=month year=year custom_start=custom_start custom_end=custom_end range_label=range_label %}
+{% endcomment %}
+
+<!-- Filter Button -->
+<div class="unified-date-filter" data-date-filter>
+  <button type="button" class="filter-trigger-btn" data-filter-trigger data-testid="dashboard-filter-button">
+    <i class="bi bi-funnel"></i>
+    <span>Filter</span>
+    {% if range_label %}
+      <span class="filter-badge">{{ range_label }}</span>
+    {% endif %}
+  </button>
+
+  <!-- Filter Dropdown/Modal -->
+  <div class="filter-panel" data-filter-panel>
+    <div class="filter-panel-content">
+      <div class="filter-header">
+        <h3>Date Filter</h3>
+        <button type="button" class="filter-close" data-filter-close aria-label="Close">
+          <i class="bi bi-x-lg"></i>
+        </button>
+      </div>
+
+      <div class="filter-body">
+        <!-- UNIFIED FILTER MODE SELECTOR -->
+        <div class="filter-section">
+          <h4 class="filter-section-title">Select Period</h4>
+          <div class="filter-mode-options">
+            <!-- All time -->
+            <a href="?period=all" class="filter-mode-option {% if filter_mode == 'all' %}active{% endif %}" data-mode="all" data-testid="date-filter-mode-all">
+              <i class="bi bi-infinity"></i>
+              <span>All time</span>
+            </a>
+            
+            <!-- Month -->
+            <button type="button" class="filter-mode-option {% if filter_mode == 'month' %}active{% endif %}" data-mode="month" data-mode-toggle data-testid="date-filter-mode-month">
+              <i class="bi bi-calendar-month"></i>
+              <span>Month</span>
+            </button>
+            
+            <!-- MTD -->
+            <a href="?range=mtd" class="filter-mode-option {% if filter_mode == 'mtd' %}active{% endif %}" data-mode="mtd" data-testid="date-filter-mode-mtd">
+              <i class="bi bi-calendar-event"></i>
+              <span>MTD</span>
+            </a>
+            
+            <!-- Last 7 Days -->
+            <a href="?range=last7" class="filter-mode-option {% if filter_mode == 'last7' %}active{% endif %}" data-mode="last7" data-testid="date-filter-mode-last7">
+              <i class="bi bi-calendar-week"></i>
+              <span>Last 7 days</span>
+            </a>
+            
+            <!-- Custom Range -->
+            <button type="button" class="filter-mode-option {% if filter_mode == 'custom' %}active{% endif %}" data-mode="custom" data-mode-toggle data-testid="date-filter-mode-custom">
+              <i class="bi bi-calendar2-range"></i>
+              <span>Custom</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- MONTH PICKER FORM (shown when Month is selected) -->
+        <form method="get" class="filter-conditional-form" data-form="month" style="display:{% if filter_mode == 'month' %}block{% else %}none{% endif %}">
+          <input type="hidden" name="period" value="month">
+          
+          <div class="filter-form-group">
+            <label for="filterMonth">Select month</label>
+            <select id="filterMonth" name="month" required class="filter-select" data-testid="date-filter-month">
+              <option value="">Choose...</option>
+              <option value="1" {% if month == 1 %}selected{% endif %}>January</option>
+              <option value="2" {% if month == 2 %}selected{% endif %}>February</option>
+              <option value="3" {% if month == 3 %}selected{% endif %}>March</option>
+              <option value="4" {% if month == 4 %}selected{% endif %}>April</option>
+              <option value="5" {% if month == 5 %}selected{% endif %}>May</option>
+              <option value="6" {% if month == 6 %}selected{% endif %}>June</option>
+              <option value="7" {% if month == 7 %}selected{% endif %}>July</option>
+              <option value="8" {% if month == 8 %}selected{% endif %}>August</option>
+              <option value="9" {% if month == 9 %}selected{% endif %}>September</option>
+              <option value="10" {% if month == 10 %}selected{% endif %}>October</option>
+              <option value="11" {% if month == 11 %}selected{% endif %}>November</option>
+              <option value="12" {% if month == 12 %}selected{% endif %}>December</option>
+            </select>
+          </div>
+
+          <div class="filter-form-group">
+            <label for="filterYear">Year (optional)</label>
+            <input type="number" id="filterYear" name="year" 
+                   value="{% if year %}{{ year }}{% endif %}" 
+                   placeholder="Current year" 
+                   min="2000" 
+                   max="2100"
+                   class="filter-input"
+                   data-testid="date-filter-year">
+          </div>
+
+          <div class="filter-actions">
+            <button type="submit" class="btn-filter-apply" data-testid="date-filter-apply">
+              <i class="bi bi-check-circle"></i> Apply
+            </button>
+          </div>
+        </form>
+
+        <!-- CUSTOM RANGE FORM (shown when Custom is selected) -->
+        <form method="get" class="filter-conditional-form" data-form="custom" style="display:{% if filter_mode == 'custom' %}block{% else %}none{% endif %}">
+          <input type="hidden" name="range" value="custom">
+          
+          <div class="filter-form-row">
+            <div class="filter-form-group">
+              <label for="filterStartDate">Start date</label>
+              <input type="date" id="filterStartDate" name="start" 
+                     value="{% if custom_start %}{{ custom_start|date:'Y-m-d' }}{% endif %}" 
+                     required
+                     class="filter-input"
+                     data-testid="date-filter-start">
+            </div>
+            <div class="filter-form-group">
+              <label for="filterEndDate">End date</label>
+              <input type="date" id="filterEndDate" name="end" 
+                     value="{% if custom_end %}{{ custom_end|date:'Y-m-d' }}{% endif %}" 
+                     required
+                     class="filter-input"
+                     data-testid="date-filter-end">
+            </div>
+          </div>
+
+          <div class="filter-actions">
+            <button type="submit" class="btn-filter-apply" data-testid="date-filter-apply">
+              <i class="bi bi-check-circle"></i> Apply
+            </button>
+          </div>
+        </form>
+
+        <!-- RESET ACTION -->
+        <div class="filter-actions" style="margin-top:16px;padding-top:16px;border-top:1px solid rgba(0,0,0,0.06)">
+          <button type="button" class="btn-filter-reset" data-filter-reset data-testid="date-filter-reset">
+            <i class="bi bi-arrow-counterclockwise"></i> Reset to All time
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Backdrop -->
+  <div class="filter-backdrop" data-filter-backdrop></div>
+</div>
+
+<style>
+/* === Unified Date Filter Styles === */
+.unified-date-filter {
+  position: relative;
+  display: inline-block;
+}
+
+/* Filter Trigger Button */
+.filter-trigger-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0.05));
+  backdrop-filter: blur(12px) saturate(180%);
+  -webkit-backdrop-filter: blur(12px) saturate(180%);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  color: var(--ink, #0f172a);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.filter-trigger-btn:hover {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.25), rgba(255, 255, 255, 0.1));
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+.filter-trigger-btn:active {
+  transform: translateY(0);
+}
+
+.filter-badge {
+  padding: 3px 10px;
+  border-radius: 8px;
+  background: rgba(59, 130, 246, 0.15);
+  color: #2563eb;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+/* Filter Panel (Desktop: Dropdown, Mobile: Bottom Sheet) */
+.filter-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 1000;
+  width: 420px;
+  max-width: calc(100vw - 32px);
+  background: rgba(255, 255, 255, 0.98);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: 16px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-12px);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.filter-panel.open {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+.filter-panel-content {
+  padding: 20px;
+}
+
+.filter-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.filter-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--ink, #0f172a);
+}
+
+.filter-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.05);
+  color: var(--muted, #64748b);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.filter-close:hover {
+  background: rgba(0, 0, 0, 0.1);
+  color: var(--ink, #0f172a);
+}
+
+/* Filter Section */
+.filter-section {
+  margin-bottom: 20px;
+}
+
+.filter-section:last-child {
+  margin-bottom: 0;
+}
+
+.filter-section-title {
+  margin: 0 0 12px 0;
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--muted, #64748b);
+}
+
+/* Filter Mode Options (unified grid) */
+.filter-mode-options {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.filter-mode-option {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px 12px;
+  border: 2px solid rgba(0, 0, 0, 0.08);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.6);
+  color: var(--muted, #64748b);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: center;
+}
+
+.filter-mode-option:hover {
+  background: rgba(59, 130, 246, 0.08);
+  border-color: rgba(59, 130, 246, 0.3);
+  color: #2563eb;
+  transform: translateY(-1px);
+}
+
+.filter-mode-option.active {
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  border-color: #2563eb;
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+  transform: translateY(-1px);
+}
+
+.filter-mode-option i {
+  font-size: 16px;
+}
+
+/* Conditional Forms */
+.filter-conditional-form {
+  padding-top: 16px;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+  margin-top: 12px;
+}
+
+.filter-form-group {
+  margin-bottom: 14px;
+}
+
+.filter-form-group label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted, #64748b);
+}
+
+.filter-select,
+.filter-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.8);
+  font-size: 14px;
+  font-family: inherit;
+  transition: all 0.2s ease;
+}
+
+.filter-select:focus,
+.filter-input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+
+/* Custom Form */
+.filter-custom-form {
+  padding-top: 16px;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.filter-form-row {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.filter-form-group input[type="date"] {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.8);
+  font-size: 14px;
+  font-family: inherit;
+  transition: all 0.2s ease;
+}
+
+.filter-form-group input[type="date"]:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+
+/* Filter Actions */
+.filter-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.btn-filter-apply,
+.btn-filter-clear,
+.btn-filter-clear-all {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 12px 16px;
+  border: none;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-filter-apply {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25);
+}
+
+.btn-filter-apply:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(16, 185, 129, 0.35);
+}
+
+.btn-filter-clear,
+.btn-filter-clear-all {
+  background: rgba(0, 0, 0, 0.05);
+  color: var(--muted, #64748b);
+}
+
+.btn-filter-clear:hover,
+.btn-filter-clear-all:hover {
+  background: rgba(0, 0, 0, 0.1);
+  color: var(--ink, #0f172a);
+}
+
+/* Backdrop */
+.filter-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 999;
+  background: rgba(0, 0, 0, 0.3);
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.25s ease;
+}
+
+.filter-backdrop.open {
+  opacity: 1;
+  visibility: visible;
+}
+
+/* === MOBILE-FIRST RESPONSIVE === */
+@media (max-width: 768px) {
+  /* Bottom Sheet on Mobile */
+  .filter-panel {
+    position: fixed;
+    top: auto;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    width: 100%;
+    max-width: 100%;
+    border-radius: 24px 24px 0 0;
+    transform: translateY(100%);
+  }
+
+  .filter-panel.open {
+    transform: translateY(0);
+  }
+
+  .filter-panel-content {
+    max-height: 85vh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .filter-presets {
+    grid-template-columns: 1fr;
+  }
+
+  .filter-form-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Small phones */
+@media (max-width: 400px) {
+  .filter-trigger-btn {
+    padding: 8px 14px;
+    font-size: 13px;
+  }
+
+  .filter-badge {
+    display: none;
+  }
+}
+</style>
+
+<script>
+(function() {
+  'use strict';
+  
+  const filterContainer = document.querySelector('[data-date-filter]');
+  if (!filterContainer) return;
+  
+  const trigger = filterContainer.querySelector('[data-filter-trigger]');
+  const panel = filterContainer.querySelector('[data-filter-panel]');
+  const backdrop = filterContainer.querySelector('[data-filter-backdrop]');
+  const closeBtn = filterContainer.querySelector('[data-filter-close]');
+  const resetBtn = filterContainer.querySelector('[data-filter-reset]');
+  const modeToggles = filterContainer.querySelectorAll('[data-mode-toggle]');
+  const conditionalForms = filterContainer.querySelectorAll('[data-form]');
+  
+  // Open filter
+  function openFilter() {
+    panel.classList.add('open');
+    backdrop.classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+  
+  // Close filter
+  function closeFilter() {
+    panel.classList.remove('open');
+    backdrop.classList.remove('open');
+    document.body.style.overflow = '';
+  }
+  
+  // Toggle conditional form
+  function toggleForm(mode) {
+    // Hide all forms
+    conditionalForms.forEach(form => {
+      form.style.display = 'none';
+    });
+    
+    // Show the form for this mode (if it exists)
+    const form = filterContainer.querySelector(`[data-form="${mode}"]`);
+    if (form) {
+      form.style.display = 'block';
+    }
+  }
+  
+  // Reset to All time
+  function resetFilter() {
+    window.location.href = window.location.pathname + '?period=all';
+  }
+  
+  // Event listeners
+  if (trigger) trigger.addEventListener('click', openFilter);
+  if (closeBtn) closeBtn.addEventListener('click', closeFilter);
+  if (backdrop) backdrop.addEventListener('click', closeFilter);
+  if (resetBtn) resetBtn.addEventListener('click', resetFilter);
+  
+  // Mode toggle buttons (month, custom)
+  modeToggles.forEach(toggle => {
+    toggle.addEventListener('click', function(e) {
+      e.preventDefault();
+      const mode = this.getAttribute('data-mode');
+      toggleForm(mode);
+      
+      // Update active state
+      filterContainer.querySelectorAll('.filter-mode-option').forEach(opt => {
+        opt.classList.remove('active');
+      });
+      this.classList.add('active');
+    });
+  });
+  
+  // Close on Escape
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape' && panel.classList.contains('open')) {
+      closeFilter();
+    }
+  });
+  
+  // Preserve other query params when clicking mode links
+  const modeLinks = filterContainer.querySelectorAll('.filter-mode-option[href]');
+  modeLinks.forEach(link => {
+    link.addEventListener('click', function(e) {
+      e.preventDefault();
+      const url = new URL(window.location.href);
+      const targetUrl = new URL(this.href, window.location.origin);
+      
+      // Preserve location, agent, etc. params
+      const preserveParams = ['location', 'agent', 'staff_id', 'payment_method', 'category'];
+      preserveParams.forEach(param => {
+        const value = url.searchParams.get(param);
+        if (value) {
+          targetUrl.searchParams.set(param, value);
+        }
+      });
+      
+      window.location.href = targetUrl.toString();
+    });
+  });
+  
+  // Preserve other query params when submitting forms
+  conditionalForms.forEach(form => {
+    form.addEventListener('submit', function(e) {
+      e.preventDefault();
+      const url = new URL(window.location.href);
+      const formData = new FormData(this);
+      
+      // Build new URL with form data
+      const newUrl = new URL(window.location.pathname, window.location.origin);
+      formData.forEach((value, key) => {
+        if (value) {
+          newUrl.searchParams.set(key, value);
+        }
+      });
+      
+      // Preserve other params
+      const preserveParams = ['location', 'agent', 'staff_id', 'payment_method', 'category'];
+      preserveParams.forEach(param => {
+        const value = url.searchParams.get(param);
+        if (value) {
+          newUrl.searchParams.set(param, value);
+        }
+      });
+      
+      window.location.href = newUrl.toString();
+    });
+  });
+})();
+</script>
+

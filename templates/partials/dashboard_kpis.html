@@ -1,0 +1,269 @@
+{% comment %}
+    Universal Dashboard KPIs Component - CLICKABLE VERSION
+    
+    Shows: Revenue, COGS, Profit, Stock Value with date range filters.
+    Mobile-first, premium design.
+    EVERY KPI CARD IS CLICKABLE and navigates to breakdown page.
+    
+    Required context variables:
+    - kpi_revenue: Decimal
+    - kpi_cogs: Decimal (Cost of Goods Sold)
+    - kpi_profit: Decimal
+    - kpi_stock_value: Decimal (current snapshot, not date-filtered)
+    - selected_date_range: str (optional, e.g., "today", "7days", "30days", "custom")
+    - custom_start_date: str (optional, for custom range)
+    - custom_end_date: str (optional, for custom range)
+    - vertical: str (optional, for vertical-specific breakdown URLs)
+    
+    Usage:
+    {% include "partials/dashboard_kpis.html" with kpi_revenue=total_revenue kpi_cogs=total_cogs kpi_profit=total_profit kpi_stock_value=stock_value selected_date_range=date_range %}
+{% endcomment %}
+{% load static %}
+{% load humanize %}
+
+<link rel="stylesheet" href="{% static 'css/numeric-display.css' %}">
+<link rel="stylesheet" href="{% static 'css/glassmorphic-design-system.css' %}">
+
+<style>
+/* Premium mobile-first KPI styling */
+.kpi-section {
+    margin-bottom: 2rem;
+}
+
+.kpi-filters {
+    background: white;
+    border-radius: 12px;
+    padding: 1.25rem;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.kpi-filters h5 {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #1f2937;
+    margin-bottom: 1rem;
+}
+
+.filter-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.filter-btn {
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    border: 2px solid #e5e7eb;
+    background: white;
+    color: #6b7280;
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-decoration: none;
+    display: inline-block;
+}
+
+.filter-btn:hover {
+    border-color: #667eea;
+    color: #667eea;
+    background: #eef2ff;
+}
+
+.filter-btn.active {
+    border-color: #667eea;
+    background: #667eea;
+    color: white;
+}
+
+.custom-range-form {
+    display: none;
+    padding: 1rem;
+    background: #f9fafb;
+    border-radius: 8px;
+    margin-top: 1rem;
+}
+
+.custom-range-form.show {
+    display: block;
+}
+
+.kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+@media (max-width: 640px) {
+    .kpi-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+.kpi-card {
+    background: white;
+    border-radius: 12px;
+    padding: 1.5rem 1.25rem;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+    border-left: 4px solid;
+    transition: all 0.2s;
+    overflow: hidden;
+    cursor: pointer;
+}
+
+.kpi-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.15);
+}
+
+.no-underline {
+    text-decoration: none !important;
+}
+
+.no-underline:hover {
+    text-decoration: none !important;
+}
+
+.kpi-card.revenue {
+    border-left-color: #10b981;
+    background: linear-gradient(135deg, #ffffff 0%, #f0fdf4 100%);
+}
+
+.kpi-card.cogs {
+    border-left-color: #f59e0b;
+    background: linear-gradient(135deg, #ffffff 0%, #fffbeb 100%);
+}
+
+.kpi-card.profit {
+    border-left-color: #3b82f6;
+    background: linear-gradient(135deg, #ffffff 0%, #eff6ff 100%);
+}
+
+.kpi-card.stock-value {
+    border-left-color: #8b5cf6;
+    background: linear-gradient(135deg, #ffffff 0%, #f5f3ff 100%);
+}
+
+.kpi-label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #6b7280;
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.kpi-value {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: #1f2937;
+    margin: 0;
+    line-height: 1.2;
+}
+
+@media (max-width: 640px) {
+    .kpi-value {
+        font-size: 1.4rem;
+    }
+}
+
+.kpi-icon {
+    font-size: 1.2rem;
+}
+
+.kpi-subtitle {
+    font-size: 0.75rem;
+    color: #9ca3af;
+    margin-top: 0.5rem;
+}
+
+.kpi-info-box {
+    background: #eff6ff;
+    border-left: 3px solid #3b82f6;
+    padding: 0.75rem 1rem;
+    border-radius: 6px;
+    margin-bottom: 1rem;
+    font-size: 0.85rem;
+    color: #1e40af;
+}
+</style>
+
+<div class="kpi-section">
+    <!-- Date Range Filters (Single Button) -->
+    <div class="kpi-filters">
+        <div style="display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap">
+            <div style="display:flex;gap:12px;align-items:center">
+                <h5 style="margin:0">📅 Date Range</h5>
+                {% include "partials/date_filter_unified.html" with range_key=selected_date_range start_date=custom_start_date end_date=custom_end_date range_label=date_range_label %}
+            </div>
+            <div style="font-size:.9rem;color:#64748b">
+                <strong>Showing:</strong> {{ date_range_label|default:"Last 7 days" }}
+            </div>
+        </div>
+    </div>
+    
+    <div class="kpi-info-box">
+        <strong>💡 Note:</strong> Stock Value is a current snapshot and is not affected by the date range.
+    </div>
+    
+    <!-- KPI Cards - ALL CLICKABLE -->
+    <div class="kpi-grid">
+        <!-- Revenue - CLICKABLE -->
+        <a href="/inventory/breakdown/revenue/?date_range={{ selected_date_range|default:'7days' }}" class="kpi-card revenue no-underline" style="text-decoration:none;color:inherit;display:block">
+            <div class="kpi-label">
+                <span class="kpi-icon">💵</span>
+                Revenue
+            </div>
+            <div class="kpi-value">MWK {{ kpi_revenue|floatformat:0|default:"0" }}</div>
+            <div class="kpi-subtitle">Total sales in period</div>
+            <div style="margin-top:0.5rem;font-size:0.75rem;color:#6b7280;opacity:0.7">Click for breakdown →</div>
+        </a>
+        
+        <!-- COGS - CLICKABLE -->
+        <a href="/inventory/breakdown/cogs/?date_range={{ selected_date_range|default:'7days' }}" class="kpi-card cogs no-underline" style="text-decoration:none;color:inherit;display:block">
+            <div class="kpi-label">
+                <span class="kpi-icon">📦</span>
+                COGS
+            </div>
+            <div class="kpi-value">MWK {{ kpi_cogs|floatformat:0|default:"0" }}</div>
+            <div class="kpi-subtitle">Cost of goods sold</div>
+            <div style="margin-top:0.5rem;font-size:0.75rem;color:#6b7280;opacity:0.7">Click for breakdown →</div>
+        </a>
+        
+        <!-- Profit - CLICKABLE -->
+        <a href="/inventory/breakdown/profit/?date_range={{ selected_date_range|default:'7days' }}" class="kpi-card profit no-underline" style="text-decoration:none;color:inherit;display:block">
+            <div class="kpi-label">
+                <span class="kpi-icon">📈</span>
+                Profit
+            </div>
+            <div class="kpi-value">MWK {{ kpi_profit|floatformat:0|default:"0" }}</div>
+            <div class="kpi-subtitle">Revenue - COGS</div>
+            <div style="margin-top:0.5rem;font-size:0.75rem;color:#6b7280;opacity:0.7">Click for breakdown →</div>
+        </a>
+        
+        <!-- Stock Value - CLICKABLE -->
+        <a href="/inventory/breakdown/stock-value/" class="kpi-card stock-value no-underline" style="text-decoration:none;color:inherit;display:block">
+            <div class="kpi-label">
+                <span class="kpi-icon">🏪</span>
+                Stock Value
+            </div>
+            <div class="kpi-value">MWK {{ kpi_stock_value|floatformat:0|default:"0" }}</div>
+            <div class="kpi-subtitle">Current (at cost basis)</div>
+            <div style="margin-top:0.5rem;font-size:0.75rem;color:#6b7280;opacity:0.7">Click for breakdown →</div>
+        </a>
+    </div>
+</div>
+
+<script>
+function toggleCustomRange() {
+    const form = document.getElementById('customRangeForm');
+    form.classList.toggle('show');
+}
+</script>
+

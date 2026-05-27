@@ -1,0 +1,283 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Add {{ category_display }} · Clothing{% endblock %}
+
+{% block content %}
+
+<style>
+.add-container {
+  max-width: 700px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.page-header {
+  background: linear-gradient(135deg, #0ea5e9 0%, #3b82f6 100%);
+  color: white;
+  padding: 28px;
+  border-radius: 20px;
+  margin-bottom: 32px;
+  box-shadow: 0 12px 40px rgba(14, 165, 233, 0.25);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.category-icon-large {
+  font-size: 3.5rem;
+}
+
+.header-text h1 {
+  margin: 0 0 4px 0;
+  font-size: clamp(1.6rem, 4vw, 2.1rem);
+  font-weight: 800;
+}
+
+.header-text p {
+  margin: 0;
+  opacity: 0.95;
+  font-size: 1rem;
+}
+
+.form-card {
+  background: white;
+  border-radius: 20px;
+  padding: 32px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  border: 1px solid #e2e8f0;
+}
+
+.form-group {
+  margin-bottom: 24px;
+}
+
+.form-group label {
+  display: block;
+  font-weight: 600;
+  color: #334155;
+  margin-bottom: 8px;
+  font-size: 0.95rem;
+}
+
+.form-group input,
+.form-group select {
+  width: 100%;
+  padding: 12px 16px;
+  border: 2px solid #e2e8f0;
+  border-radius: 12px;
+  font-size: 1rem;
+  transition: all 0.2s;
+}
+
+.form-group input:focus,
+.form-group select:focus {
+  outline: none;
+  border-color: #0ea5e9;
+  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.1);
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.submit-btn {
+  width: 100%;
+  padding: 16px;
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-weight: 700;
+  font-size: 1.1rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-top: 8px;
+}
+
+.submit-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(16, 185, 129, 0.3);
+}
+
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #64748b;
+  text-decoration: none;
+  font-weight: 600;
+  margin-bottom: 20px;
+  transition: color 0.2s;
+}
+
+.back-link:hover {
+  color: #0ea5e9;
+}
+
+.field-help {
+  font-size: 0.85rem;
+  color: #94a3b8;
+  margin-top: 4px;
+}
+
+.optional-badge {
+  display: inline-block;
+  background: #f1f5f9;
+  color: #64748b;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  margin-left: 6px;
+}
+</style>
+
+<div class="add-container">
+  <a href="{% url 'verticals:clothing_quick_add_step1' %}" class="back-link">
+    ← Back to Categories
+  </a>
+
+  <div class="page-header">
+    <div class="category-icon-large">{{ category_icon }}</div>
+    <div class="header-text">
+      <h1>Add {{ category_display }}</h1>
+      <p>Step 2 of 2: Product details</p>
+    </div>
+  </div>
+
+  <div class="form-card">
+    <form method="post">
+      {% csrf_token %}
+      
+      <div class="form-group">
+        <label for="{{ form.brand.id_for_label }}">
+          Brand
+          <span class="optional-badge">OPTIONAL</span>
+        </label>
+        {{ form.brand }}
+        <div class="field-help">e.g., Nike, Balenciaga, Adidas</div>
+      </div>
+
+      <div class="form-group">
+        <label for="{{ form.name.id_for_label }}">Product Name *</label>
+        {{ form.name }}
+        <div class="field-help">Descriptive name for this item</div>
+      </div>
+
+      {% if form.size %}
+      <div class="form-row">
+        <div class="form-group" style="flex:1;">
+          <label>Size <span class="optional-badge">OPTIONAL</span></label>
+          {# Clickable size pills when sizes are available; fall back to text input #}
+          {% if sizes %}
+          <div id="sizePillGroup" style="display:flex;flex-wrap:wrap;gap:.45rem;margin-bottom:.5rem;">
+            {% for sz in sizes %}
+            <button type="button"
+                    onclick="selectSize('{{ sz }}')"
+                    id="size-pill-{{ sz }}"
+                    style="padding:.38rem .85rem;border-radius:999px;font-size:.82rem;font-weight:700;
+                           border:2px solid #e2e8f0;background:#f8fafc;color:#475569;cursor:pointer;
+                           transition:all .12s;user-select:none;"
+                    onmouseover="this.style.borderColor='#0ea5e9';this.style.color='#0369a1';"
+                    onmouseout="if(!this.classList.contains('sz-active')){this.style.borderColor='#e2e8f0';this.style.color='#475569';}">
+              {{ sz }}
+            </button>
+            {% endfor %}
+          </div>
+          {# Hidden input for the size value #}
+          <input type="hidden" name="{{ form.size.html_name }}" id="sizeHiddenInput">
+          {# Visible fallback text (also editable for custom sizes) #}
+          <input type="text" id="sizeTextDisplay" placeholder="Click size above or type custom"
+                 style="padding:8px 12px;border:2px solid #e2e8f0;border-radius:10px;font-size:.9rem;width:100%;margin-top:.35rem;"
+                 oninput="document.getElementById('sizeHiddenInput').value=this.value;">
+          {% else %}
+          {# No size list for this category (e.g. accessories) — plain input #}
+          {{ form.size }}
+          {% endif %}
+        </div>
+        
+        <div class="form-group">
+          <label for="{{ form.color.id_for_label }}">
+            Color
+            <span class="optional-badge">OPTIONAL</span>
+          </label>
+          {{ form.color }}
+        </div>
+      </div>
+      {% else %}
+      <div class="form-group">
+        <label for="{{ form.color.id_for_label }}">
+          Color
+          <span class="optional-badge">OPTIONAL</span>
+        </label>
+        {{ form.color }}
+      </div>
+      {% endif %}
+
+      <div class="form-row">
+        <div class="form-group">
+          <label for="{{ form.selling_price.id_for_label }}">Selling Price (K) *</label>
+          {{ form.selling_price }}
+        </div>
+        
+        <div class="form-group">
+          <label for="{{ form.cost_price.id_for_label }}">Cost Price (K) *</label>
+          {{ form.cost_price }}
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="{{ form.quantity.id_for_label }}">
+          Stock Now
+          <span class="optional-badge">OPTIONAL</span>
+        </label>
+        {{ form.quantity }}
+        <div class="field-help">Add initial stock (you can stock more later)</div>
+      </div>
+
+      <div class="form-group">
+        <label for="{{ form.barcode.id_for_label }}">
+          Barcode
+          <span class="optional-badge">OPTIONAL</span>
+        </label>
+        {{ form.barcode }}
+        <div class="field-help">Not required - system auto-generates SKU</div>
+      </div>
+
+      <button type="submit" class="submit-btn">
+        ✅ Add Product
+      </button>
+    </form>
+  </div>
+</div>
+
+<script>
+function selectSize(sz) {
+  // Update hidden input
+  document.getElementById('sizeHiddenInput').value = sz;
+  // Update visible text
+  var disp = document.getElementById('sizeTextDisplay');
+  if (disp) disp.value = sz;
+  // Update pill styles
+  document.querySelectorAll('#sizePillGroup button').forEach(function(btn) {
+    var active = btn.id === 'size-pill-' + sz;
+    btn.classList.toggle('sz-active', active);
+    if (active) {
+      btn.style.background    = '#0ea5e9';
+      btn.style.borderColor   = '#0ea5e9';
+      btn.style.color         = '#fff';
+      btn.style.boxShadow     = '0 2px 8px rgba(14,165,233,.35)';
+    } else {
+      btn.style.background  = '#f8fafc';
+      btn.style.borderColor = '#e2e8f0';
+      btn.style.color       = '#475569';
+      btn.style.boxShadow   = '';
+    }
+  });
+}
+</script>
+{% endblock %}
+

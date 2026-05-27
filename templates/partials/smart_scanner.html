@@ -1,0 +1,422 @@
+{% comment %}
+Smart Scanner Partial
+=====================
+Reusable intelligent scanner component for CircuitCity
+
+Usage:
+  {% include "partials/smart_scanner.html" with
+    scanner_title="Scan IMEI"
+    scanner_target_input_id="id_imei"
+    scanner_mode="imei"
+    scanner_container_id="scannerContainer"
+    scanner_video_id="scannerVideo"
+    scanner_scanline_id="scannerScanline"
+  %}
+
+Parameters:
+  - scanner_title (optional): Title shown above scanner, default "Scan Code"
+  - scanner_target_input_id (required): ID of input field to fill with scanned value
+  - scanner_mode (optional): "imei", "sku", or "barcode", default "barcode"
+  - scanner_container_id (optional): Custom container ID, default "smartScannerContainer"
+  - scanner_video_id (optional): Custom video element ID, default "smartScannerVideo"
+  - scanner_scanline_id (optional): Custom scanline element ID, default "smartScannerScanline"
+  - scanner_auto_start (optional): Auto-start camera on page load, default false
+{% endcomment %}
+
+{% load static %}
+
+{# Set defaults #}
+{% firstof scanner_container_id "smartScannerContainer" as container_id %}
+{% firstof scanner_video_id "smartScannerVideo" as video_id %}
+{% firstof scanner_scanline_id "smartScannerScanline" as scanline_id %}
+{% firstof scanner_title "Scan Code" as title %}
+{% firstof scanner_mode "barcode" as mode %}
+
+{# Ensure smart_scanner.js is loaded (only once per page) #}
+{% if not smart_scanner_js_loaded %}
+<script src="{% static 'js/smart_scanner.js' %}?v={{ BUILD_ID|default:STATIC_VERSION|default:'1' }}"></script>
+<script>window._smartScannerJsLoaded = true;</script>
+{% endif %}
+
+{# Scanner styles (scoped to this component) #}
+<style>
+  /* Smart Scanner Component Styles */
+  .smart-scanner-container {
+    margin-top: 8px;
+    display: none;
+    background: var(--cc-panel, #ffffff);
+    border: 1px dashed var(--cc-border, #e2e8f0);
+    border-radius: 14px;
+    padding: 12px;
+  }
+  
+  .smart-scanner-shell {
+    position: relative;
+    border-radius: 14px;
+    overflow: hidden;
+    background: #000;
+    box-shadow: 0 6px 18px rgba(2, 6, 23, .08);
+  }
+  
+  .smart-scanner-video {
+    width: 100%;
+    max-height: 360px;
+    min-height: 220px;
+    background: #000;
+    display: block;
+    object-fit: cover;
+  }
+  
+  .smart-scanner-overlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+  
+  .smart-scanner-frame {
+    position: absolute;
+    inset: 10% 8%;
+    border: 2px solid rgba(255, 255, 255, .25);
+    border-radius: 12px;
+    box-shadow: inset 0 0 0 9999px rgba(0, 0, 0, .20);
+  }
+  
+  .smart-scanner-scanline {
+    position: absolute;
+    left: 8%;
+    right: 8%;
+    height: 2px;
+    border-radius: 2px;
+    background: linear-gradient(90deg, transparent, #00ff5a, transparent);
+    box-shadow: 0 0 10px #00ff5a, 0 0 20px rgba(0, 255, 90, .6);
+    animation: smart-scanner-sweep 2.0s linear infinite alternate;
+  }
+  
+  .smart-scanner-scanline.paused {
+    animation-play-state: paused;
+  }
+  
+  @keyframes smart-scanner-sweep {
+    from { top: 10%; }
+    to { top: 90%; }
+  }
+  
+  .smart-scanner-controls {
+    margin-top: 8px;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  
+  .smart-scanner-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--cc-muted, #64748b);
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  
+  .smart-scanner-status {
+    font-size: 13px;
+    color: var(--cc-muted, #64748b);
+    padding: 8px 10px;
+    background: rgba(0, 0, 0, .05);
+    border-radius: 8px;
+    text-align: center;
+    margin-top: 8px;
+  }
+  
+  .smart-scanner-status.success {
+    color: #065f46;
+    background: #dcfce7;
+  }
+  
+  .smart-scanner-status.error {
+    color: #991b1b;
+    background: #fee2e2;
+  }
+  
+  /* Button styles (use existing .btn classes but provide fallback) */
+  .smart-scanner-btn {
+    appearance: none;
+    border: 1px solid var(--cc-border, #e2e8f0);
+    color: var(--cc-text, #0f172a);
+    background: var(--cc-panel, #ffffff);
+    border-radius: 10px;
+    padding: 8px 14px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 14px;
+    min-height: 40px;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  
+  .smart-scanner-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(2, 6, 23, .1);
+  }
+  
+  .smart-scanner-btn[disabled] {
+    opacity: .5;
+    cursor: not-allowed;
+    transform: none;
+  }
+  
+  .smart-scanner-btn-primary {
+    background: linear-gradient(135deg, #1f6feb, #1a5fd4);
+    color: #fff;
+    border-color: #1f6feb;
+  }
+  
+  .smart-scanner-btn-primary:hover {
+    background: linear-gradient(135deg, #1a5fd4, #164fb1);
+  }
+  
+  .smart-scanner-btn-success {
+    background: linear-gradient(135deg, #10b981, #059669);
+    color: #fff;
+    border-color: #10b981;
+  }
+  
+  .smart-scanner-btn-success:hover {
+    background: linear-gradient(135deg, #059669, #047857);
+  }
+</style>
+
+{# Scanner HTML markup #}
+<div class="smart-scanner-title">
+  <i class="bi bi-camera"></i>
+  {{ title }}
+</div>
+
+<div class="smart-scanner-controls">
+  <button type="button" 
+          id="{{ container_id }}_btnStart" 
+          class="smart-scanner-btn smart-scanner-btn-success">
+    <i class="bi bi-camera-video"></i> Start Camera
+  </button>
+  <button type="button" 
+          id="{{ container_id }}_btnStop" 
+          class="smart-scanner-btn" 
+          style="display:none;">
+    <i class="bi bi-stop-circle"></i> Stop
+  </button>
+  <select id="{{ container_id }}_selectCamera" 
+          class="smart-scanner-btn" 
+          style="min-width:180px;display:none;" 
+          aria-label="Choose camera">
+    <option value="">Select camera...</option>
+  </select>
+  <button type="button" 
+          id="{{ container_id }}_btnTorch" 
+          class="smart-scanner-btn" 
+          style="display:none;">
+    <i class="bi bi-lightbulb"></i> Torch
+  </button>
+</div>
+
+<div class="smart-scanner-container" id="{{ container_id }}">
+  <div class="smart-scanner-shell">
+    <video id="{{ video_id }}" 
+           class="smart-scanner-video" 
+           autoplay 
+           playsinline 
+           muted></video>
+    <div class="smart-scanner-overlay" aria-hidden="true">
+      <div class="smart-scanner-frame"></div>
+      <div id="{{ scanline_id }}" class="smart-scanner-scanline"></div>
+    </div>
+  </div>
+  <div id="{{ container_id }}_status" class="smart-scanner-status" style="display:none;"></div>
+</div>
+
+{# Scanner JavaScript initialization #}
+<script>
+(function() {
+  'use strict';
+  
+  const containerId = '{{ container_id }}';
+  const videoId = '{{ video_id }}';
+  const scanlineId = '{{ scanline_id }}';
+  const targetInputId = '{{ scanner_target_input_id }}';
+  const scanMode = '{{ mode }}';
+  const autoStart = {{ scanner_auto_start|default:"false"|lower }};
+  
+  const container = document.getElementById(containerId);
+  const btnStart = document.getElementById(containerId + '_btnStart');
+  const btnStop = document.getElementById(containerId + '_btnStop');
+  const selectCamera = document.getElementById(containerId + '_selectCamera');
+  const btnTorch = document.getElementById(containerId + '_btnTorch');
+  const statusEl = document.getElementById(containerId + '_status');
+  
+  let scanner = null;
+  let torchOn = false;
+  
+  function showStatus(msg, type = 'info') {
+    if (!statusEl) return;
+    statusEl.textContent = msg;
+    statusEl.className = 'smart-scanner-status';
+    if (type === 'success') statusEl.classList.add('success');
+    if (type === 'error') statusEl.classList.add('error');
+    statusEl.style.display = 'block';
+    
+    if (type !== 'error') {
+      setTimeout(() => { statusEl.style.display = 'none'; }, 3000);
+    }
+  }
+  
+  async function listCameras() {
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const cams = devices.filter(d => d.kind === 'videoinput');
+      
+      if (selectCamera) {
+        selectCamera.innerHTML = '';
+        cams.forEach((c, i) => {
+          const opt = document.createElement('option');
+          opt.value = c.deviceId;
+          opt.textContent = c.label || `Camera ${i + 1}`;
+          selectCamera.appendChild(opt);
+        });
+      }
+      
+      return cams;
+    } catch (e) {
+      console.error('[SmartScanner] Camera enumeration error:', e);
+      return [];
+    }
+  }
+  
+  async function startScanner() {
+    if (!window.SmartScanner) {
+      showStatus('Scanner library not loaded.', 'error');
+      return;
+    }
+    
+    try {
+      // Create scanner instance
+      scanner = window.SmartScanner.create({
+        videoElementId: videoId,
+        targetInputId: targetInputId,
+        scanMode: scanMode,
+        scanLineElementId: scanlineId,
+        showToast: showStatus,
+        onDetect: function(value) {
+          showStatus('✅ Scanned: ' + value, 'success');
+        },
+        onError: function(error) {
+          showStatus('Camera error. Use manual entry.', 'error');
+        }
+      });
+      
+      // Enumerate cameras
+      const cams = await listCameras();
+      
+      // Start with first camera (usually rear on mobile)
+      const firstId = (cams[0] && cams[0].deviceId) || undefined;
+      await scanner.start(firstId);
+      
+      // Update UI
+      container.style.display = 'block';
+      btnStart.style.display = 'none';
+      btnStop.style.display = 'inline-flex';
+      if (cams.length > 1) {
+        selectCamera.style.display = 'inline-flex';
+      }
+      btnTorch.style.display = 'inline-flex';
+      
+      showStatus('📹 Camera active - point at code', 'success');
+      
+    } catch (error) {
+      console.error('[SmartScanner] Start error:', error);
+      let message = 'Camera not available. ';
+      if (error.name === 'NotAllowedError') {
+        message += 'Permission denied.';
+      } else if (error.name === 'NotFoundError') {
+        message += 'No camera found.';
+      } else {
+        message += 'Use manual entry.';
+      }
+      showStatus(message, 'error');
+      btnStart.style.display = 'inline-flex';
+    }
+  }
+  
+  function stopScanner() {
+    if (scanner) {
+      scanner.stop();
+      scanner = null;
+    }
+    
+    container.style.display = 'none';
+    btnStart.style.display = 'inline-flex';
+    btnStart.textContent = '▶ Restart Camera';
+    btnStop.style.display = 'none';
+    selectCamera.style.display = 'none';
+    btnTorch.style.display = 'none';
+    torchOn = false;
+    
+    showStatus('Camera stopped', 'info');
+  }
+  
+  async function switchCamera() {
+    if (!scanner) return;
+    
+    stopScanner();
+    
+    try {
+      await startScanner();
+      if (selectCamera && selectCamera.value) {
+        await scanner.start(selectCamera.value);
+      }
+    } catch (error) {
+      showStatus('Could not switch camera', 'error');
+    }
+  }
+  
+  function toggleTorch() {
+    if (!scanner) return;
+    torchOn = !torchOn;
+    scanner.enableTorch(torchOn);
+    btnTorch.style.opacity = torchOn ? '1' : '0.6';
+  }
+  
+  // Wire up button events
+  if (btnStart) {
+    btnStart.addEventListener('click', startScanner);
+  }
+  
+  if (btnStop) {
+    btnStop.addEventListener('click', stopScanner);
+  }
+  
+  if (selectCamera) {
+    selectCamera.addEventListener('change', switchCamera);
+  }
+  
+  if (btnTorch) {
+    btnTorch.addEventListener('click', toggleTorch);
+  }
+  
+  // Pause camera when tab hidden (battery save)
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden && scanner) {
+      stopScanner();
+    }
+  });
+  
+  // Auto-start if requested
+  if (autoStart && window.isSecureContext) {
+    window.addEventListener('load', () => {
+      setTimeout(startScanner, 500);
+    });
+  }
+})();
+</script>
+

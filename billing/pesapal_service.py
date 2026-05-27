@@ -40,53 +40,53 @@ def is_pesapal_configured() -> bool:
 def get_access_token(force_refresh: bool = False) -> Optional[str]:
     """
     Get Pesapal access token (cached for efficiency).
-    
+
     Args:
         force_refresh: If True, bypass cache and request new token
-    
+
     Returns:
         Access token string or None if failed
     """
     if not requests:
         logger.error("requests module not installed")
         return None
-    
+
     if not is_pesapal_configured():
         logger.error("Pesapal not configured (missing consumer key/secret/base URL)")
         return None
-    
+
     # Try cache first
     if not force_refresh:
         cached = cache.get(PESAPAL_TOKEN_CACHE_KEY)
         if cached:
             return cached
-    
+
     # Request new token
     base_url = settings.PESAPAL_BASE_URL
     consumer_key = settings.PESAPAL_CONSUMER_KEY
     consumer_secret = settings.PESAPAL_CONSUMER_SECRET
-    
+
     url = f"{base_url.rstrip('/')}/Auth/RequestToken"
     payload = {
         "consumer_key": consumer_key,
         "consumer_secret": consumer_secret,
     }
-    
+
     try:
         response = requests.post(url, json=payload, timeout=15)
         response.raise_for_status()
         data = response.json()
-        
+
         token = data.get("token")
         if not token:
             logger.error(f"Pesapal token response missing 'token': {data}")
             return None
-        
+
         # Cache token
         cache.set(PESAPAL_TOKEN_CACHE_KEY, token, PESAPAL_TOKEN_CACHE_TTL)
         logger.info("Pesapal access token obtained and cached")
         return token
-    
+
     except requests.exceptions.RequestException as e:
         logger.error(f"Pesapal token request failed: {e}")
         return None
@@ -106,7 +106,7 @@ def submit_order_request(
 ) -> Dict[str, Any]:
     """
     Submit an order to Pesapal for payment.
-    
+
     Args:
         business: Business instance
         plan: SubscriptionPlan instance
@@ -114,7 +114,7 @@ def submit_order_request(
         notification_url: IPN URL (optional, uses PESAPAL_IPN_ID from settings if not provided)
         user_email: Customer email
         user_phone: Customer phone
-    
+
     Returns:
         Dict with:
             - 'redirect_url': URL to redirect user for payment
@@ -125,22 +125,22 @@ def submit_order_request(
     """
     if not requests:
         return {"status": "error", "message": "requests module not installed"}
-    
+
     if not is_pesapal_configured():
         return {"status": "error", "message": "Pesapal not configured"}
-    
+
     access_token = get_access_token()
     if not access_token:
         return {"status": "error", "message": "Failed to obtain Pesapal access token"}
-    
+
     # Build merchant reference (unique per order)
     timestamp = int(time.time())
     merchant_reference = f"sub-{business.id}-{plan.code}-{timestamp}"
-    
+
     # Amount in Pesapal format (decimal)
     amount = float(plan.amount)
     currency = plan.currency
-    
+
     # Build billing address (use business or defaults)
     billing_address = {
         "email_address": user_email or getattr(business, "email", "") or "noreply@example.com",
@@ -155,10 +155,10 @@ def submit_order_request(
         "postal_code": "",
         "zip_code": "",
     }
-    
+
     # Notification ID (IPN)
     ipn_id = getattr(settings, "PESAPAL_IPN_ID", "")
-    
+
     # Build payload
     payload = {
         "id": merchant_reference,
@@ -170,7 +170,7 @@ def submit_order_request(
         "branch": business.name[:50],  # Branch name
         "billing_address": billing_address,
     }
-    
+
     # Submit order
     base_url = settings.PESAPAL_BASE_URL
     url = f"{base_url.rstrip('/')}/Transactions/SubmitOrderRequest"
@@ -179,28 +179,25 @@ def submit_order_request(
         "Content-Type": "application/json",
         "Accept": "application/json",
     }
-    
+
     try:
         response = requests.post(url, json=payload, headers=headers, timeout=20)
         response.raise_for_status()
         data = response.json()
-        
+
         # Extract response fields
         order_tracking_id = data.get("order_tracking_id")
         redirect_url = data.get("redirect_url")
-        
+
         if not order_tracking_id or not redirect_url:
             logger.error(f"Pesapal order response missing fields: {data}")
             return {
                 "status": "error",
                 "message": f"Invalid Pesapal response: {data}",
             }
-        
-        logger.info(
-            f"Pesapal order submitted: tracking_id={order_tracking_id}, "
-            f"merchant_ref={merchant_reference}"
-        )
-        
+
+        logger.info(f"Pesapal order submitted: tracking_id={order_tracking_id}, " f"merchant_ref={merchant_reference}")
+
         return {
             "status": "success",
             "redirect_url": redirect_url,
@@ -208,7 +205,7 @@ def submit_order_request(
             "merchant_reference": merchant_reference,
             "message": "Order submitted successfully",
         }
-    
+
     except requests.exceptions.RequestException as e:
         logger.error(f"Pesapal order submission failed: {e}")
         return {"status": "error", "message": f"Request failed: {e}"}
@@ -223,11 +220,11 @@ def get_transaction_status(
 ) -> Dict[str, Any]:
     """
     Get transaction status from Pesapal.
-    
+
     Args:
         order_tracking_id: Pesapal order tracking ID
         merchant_reference: Our merchant reference (optional but recommended)
-    
+
     Returns:
         Dict with:
             - 'payment_method': e.g. 'Mobile Money', 'Card'
@@ -240,31 +237,31 @@ def get_transaction_status(
     """
     if not requests:
         return {"status": "ERROR", "error": "requests module not installed"}
-    
+
     if not is_pesapal_configured():
         return {"status": "ERROR", "error": "Pesapal not configured"}
-    
+
     access_token = get_access_token()
     if not access_token:
         return {"status": "ERROR", "error": "Failed to obtain Pesapal access token"}
-    
+
     base_url = settings.PESAPAL_BASE_URL
     url = f"{base_url.rstrip('/')}/Transactions/GetTransactionStatus"
-    
+
     params = {"orderTrackingId": order_tracking_id}
     headers = {
         "Authorization": f"Bearer {access_token}",
         "Accept": "application/json",
     }
-    
+
     try:
         response = requests.get(url, params=params, headers=headers, timeout=15)
         response.raise_for_status()
         data = response.json()
-        
+
         # Parse status
         status_code = data.get("payment_status_code", -1)
-        
+
         # Map status codes to readable statuses
         # Pesapal status codes (from documentation):
         # 0 = Invalid, 1 = Completed, 2 = Failed, 3 = Reversed
@@ -275,7 +272,7 @@ def get_transaction_status(
             3: "REVERSED",
         }
         status = status_map.get(status_code, "UNKNOWN")
-        
+
         return {
             "status": status,
             "status_code": status_code,
@@ -287,7 +284,7 @@ def get_transaction_status(
             "message": data.get("message", ""),
             "confirmation_code": data.get("confirmation_code", ""),
         }
-    
+
     except requests.exceptions.RequestException as e:
         logger.error(f"Pesapal status check failed: {e}")
         return {"status": "ERROR", "error": f"Request failed: {e}"}
@@ -299,12 +296,12 @@ def get_transaction_status(
 def parse_ipn_notification(query_params: Dict[str, Any]) -> Dict[str, Any]:
     """
     Parse IPN notification query parameters from Pesapal.
-    
+
     Pesapal sends GET request with:
         - OrderTrackingId
         - OrderMerchantReference
         - OrderNotificationType (e.g. 'COMPLETED')
-    
+
     Returns:
         Dict with parsed fields
     """
@@ -318,27 +315,27 @@ def parse_ipn_notification(query_params: Dict[str, Any]) -> Dict[str, Any]:
 def register_ipn_url(ipn_url: str, notification_type: str = "POST") -> Dict[str, Any]:
     """
     Register IPN URL with Pesapal (optional, usually done once via dashboard).
-    
+
     Args:
         ipn_url: Full IPN URL (e.g. https://example.com/billing/pesapal/ipn/)
         notification_type: 'POST' or 'GET' (Pesapal uses GET by default)
-    
+
     Returns:
         Dict with 'ipn_id' and 'status'
     """
     if not requests:
         return {"status": "error", "message": "requests module not installed"}
-    
+
     if not is_pesapal_configured():
         return {"status": "error", "message": "Pesapal not configured"}
-    
+
     access_token = get_access_token()
     if not access_token:
         return {"status": "error", "message": "Failed to obtain Pesapal access token"}
-    
+
     base_url = settings.PESAPAL_BASE_URL
     url = f"{base_url.rstrip('/')}/URLSetup/RegisterIPN"
-    
+
     payload = {
         "url": ipn_url,
         "ipn_notification_type": notification_type,
@@ -348,28 +345,27 @@ def register_ipn_url(ipn_url: str, notification_type: str = "POST") -> Dict[str,
         "Content-Type": "application/json",
         "Accept": "application/json",
     }
-    
+
     try:
         response = requests.post(url, json=payload, headers=headers, timeout=15)
         response.raise_for_status()
         data = response.json()
-        
+
         ipn_id = data.get("ipn_id")
         if not ipn_id:
             logger.error(f"Pesapal IPN registration missing ipn_id: {data}")
             return {"status": "error", "message": f"Invalid response: {data}"}
-        
+
         logger.info(f"Pesapal IPN registered: ipn_id={ipn_id}, url={ipn_url}")
         return {
             "status": "success",
             "ipn_id": ipn_id,
             "url": ipn_url,
         }
-    
+
     except requests.exceptions.RequestException as e:
         logger.error(f"Pesapal IPN registration failed: {e}")
         return {"status": "error", "message": f"Request failed: {e}"}
     except Exception as e:
         logger.error(f"Unexpected error registering Pesapal IPN: {e}")
         return {"status": "error", "message": f"Unexpected error: {e}"}
-

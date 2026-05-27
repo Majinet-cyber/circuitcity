@@ -21,6 +21,7 @@ class BillingConfig(AppConfig):
         try:
             # Ensure signal receivers are registered
             import billing.signals  # noqa: F401
+
             # Optional: uncomment to see this once in logs
             # logger.debug("billing.signals registered")
         except Exception as exc:
@@ -28,5 +29,3 @@ class BillingConfig(AppConfig):
             # Optional: log at DEBUG to avoid noisy prod logs
             logger.debug("billing.signals registration skipped due to import error: %s", exc)
             pass
-
-

@@ -16,11 +16,13 @@ import math
 # Django / app imports
 # ──────────────────────────────────────────────────────────────────────────────
 from django.contrib.auth.decorators import login_required
+from django.conf import settings
 from django.views.decorators.http import require_http_methods, require_POST
 from django.views.decorators.csrf import csrf_exempt, ensure_csrf_cookie
 from django.db import transaction, IntegrityError, DatabaseError, models
 from django.db.transaction import TransactionManagementError
 from django.http import HttpRequest, HttpResponse, JsonResponse
+from django.urls import reverse
 from django.utils import timezone
 from django.utils.timezone import make_aware
 from django.utils.dateparse import parse_date
@@ -33,6 +35,7 @@ from tenants.utils import (
     ensure_active_business_id,
 )
 
+
 # Optional imports (these may not exist in all installs)
 def _try_import(modpath: str, attr: str | None = None):
     try:
@@ -41,8 +44,10 @@ def _try_import(modpath: str, attr: str | None = None):
     except Exception:
         return None
 
-Sale  = _try_import("sales.models", "Sale")
-Order = _try_import("sales.models", "Order")
+
+Sale = _try_import("sales.models", "Sale")
+# Try wallet.AdminPurchaseOrder first (purchase orders to suppliers), then sales.Order
+Order = _try_import("wallet.models", "AdminPurchaseOrder") or _try_import("sales.models", "Order")
 
 scoped = (
     _try_import("circuitcity.tenants.utils", "scoped")
@@ -64,14 +69,17 @@ _get_active_business = (
     or (lambda _request: None)
 )
 
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Convenience wrappers
 # ──────────────────────────────────────────────────────────────────────────────
 def _biz_and_loc(request: HttpRequest) -> tuple[Optional[int], Optional[int]]:
     return active_scope(request)
 
+
 def _stock_qs(request: HttpRequest):
     return stock_queryset_for_request(request)
+
 
 def _default_location_for_request(request: HttpRequest):
     biz = _get_active_business(request)
@@ -79,9 +87,11 @@ def _default_location_for_request(request: HttpRequest):
         return None
     try:
         from inventory.models import Location  # local to avoid cycles
+
         return Location.ensure_default_for_business(biz)
     except Exception:
         return None
+
 
 def _manager(model):
     if hasattr(model, "_base_manager"):
@@ -89,6 +99,7 @@ def _manager(model):
     if hasattr(model, "all_objects"):
         return model.all_objects
     return model.objects
+
 
 def _active_scope(request: HttpRequest) -> tuple[int | None, int | None]:
     if callable(_active_scope_func):
@@ -110,6 +121,7 @@ def _active_scope(request: HttpRequest) -> tuple[int | None, int | None]:
         loc_id = None
     return biz_id, loc_id
 
+
 def _stock_queryset_for_request(request: HttpRequest):
     if callable(_stock_qs_for_request_func):
         try:
@@ -120,12 +132,14 @@ def _stock_queryset_for_request(request: HttpRequest):
     InventoryItem = Stock = None
     try:
         from .models import InventoryItem as _InventoryItem
+
         InventoryItem = _InventoryItem
     except Exception:
         pass
     if InventoryItem is None:
         try:
             from .models import Stock as _Stock
+
             Stock = _Stock
         except Exception:
             pass
@@ -165,19 +179,27 @@ def _stock_queryset_for_request(request: HttpRequest):
                     except Exception:
                         continue
 
-    if "sold_at" in fields: qs = qs.filter(sold_at__isnull=True)
-    if "is_active" in fields: qs = qs.filter(is_active=True)
-    if "archived" in fields: qs = qs.filter(archived=False)
+    if "sold_at" in fields:
+        qs = qs.filter(sold_at__isnull=True)
+    if "is_active" in fields:
+        qs = qs.filter(is_active=True)
+    if "archived" in fields:
+        qs = qs.filter(archived=False)
     if "status" in fields:
         try:
             qs = qs.exclude(status__iexact="sold")
         except Exception:
             pass
-    if "sold" in fields: qs = qs.filter(sold=False)
-    if "is_sold" in fields: qs = qs.filter(is_sold=False)
-    if "in_stock" in fields: qs = qs.filter(in_stock=True)
-    if "available" in fields: qs = qs.filter(available=True)
-    if "availability" in fields: qs = qs.filter(availability=True)
+    if "sold" in fields:
+        qs = qs.filter(sold=False)
+    if "is_sold" in fields:
+        qs = qs.filter(is_sold=False)
+    if "in_stock" in fields:
+        qs = qs.filter(in_stock=True)
+    if "available" in fields:
+        qs = qs.filter(available=True)
+    if "availability" in fields:
+        qs = qs.filter(availability=True)
 
     joinable = [j for j in ("product", "current_location", "location", "store", "business") if j in fields]
     if joinable:
@@ -188,6 +210,7 @@ def _stock_queryset_for_request(request: HttpRequest):
 
     return qs
 
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Models (optional presence)
 # ──────────────────────────────────────────────────────────────────────────────
@@ -196,11 +219,13 @@ normalize_imei = None
 
 try:
     from .models import InventoryItem as _InventoryItem, normalize_imei as _normalize_imei
+
     InventoryItem = _InventoryItem
     normalize_imei = _normalize_imei
 except Exception:
     try:
         from .models import InventoryItem as _InventoryItem
+
         InventoryItem = _InventoryItem
     except Exception:
         pass
@@ -208,30 +233,35 @@ except Exception:
 if InventoryItem is None:
     try:
         from .models import Stock as _Stock
+
         Stock = _Stock
     except Exception:
         pass
 
 try:
     from .models import Product as _Product
+
     Product = _Product
 except Exception:
     pass
 
 try:
     from .models import AuditLog as _AuditLog
+
     AuditLog = _AuditLog
 except Exception:
     pass
 
 try:
     from .models import Location as _Location
+
     Location = _Location
 except Exception:
     pass
 
 try:
     from .models import TimeLog as _TimeLog
+
     TimeLog = _TimeLog
 except Exception:
     pass
@@ -242,17 +272,38 @@ except Exception:
 IMEI_RX = re.compile(r"^\d{15}$")
 
 PRICE_FIELD_CANDIDATES: tuple[str, ...] = (
-    "sold_price", "selling_price", "sale_price", "final_selling_price", "final_price", "last_price",
-    "sell_price", "price_selling", "price_sell", "price_sale",
-    "price", "amount", "total", "grand_total",
-    "sold_amount", "amount_sold", "final_amount", "net_total",
+    "sold_price",
+    "selling_price",
+    "sale_price",
+    "final_selling_price",
+    "final_price",
+    "last_price",
+    "sell_price",
+    "price_selling",
+    "price_sell",
+    "price_sale",
+    "price",
+    "amount",
+    "total",
+    "grand_total",
+    "sold_amount",
+    "amount_sold",
+    "final_amount",
+    "net_total",
 )
 
 ORDER_PRICE_FIELD_CANDIDATES: tuple[str, ...] = (
-    "cost_price", "purchase_price", "buying_price", "order_price",
-    "price_cost", "unit_cost", "cost",
-    "total_cost", "amount_cost",
+    "cost_price",
+    "purchase_price",
+    "buying_price",
+    "order_price",
+    "price_cost",
+    "unit_cost",
+    "cost",
+    "total_cost",
+    "amount_cost",
 )
+
 
 def _hasf_model(Model, name: str) -> bool:
     try:
@@ -260,8 +311,10 @@ def _hasf_model(Model, name: str) -> bool:
     except Exception:
         return False
 
+
 def _sum_candidates(qs, candidates: tuple[str, ...]) -> float:
     from django.db.models import Sum
+
     Model = qs.model
     for f in candidates:
         if _hasf_model(Model, f):
@@ -276,30 +329,48 @@ def _sum_candidates(qs, candidates: tuple[str, ...]) -> float:
                 continue
     return 0.0
 
+
 def _sold_q_for(Model):
     from django.db.models import Q
+
     q = Q()
-    if _hasf_model(Model, "status"):     q |= Q(status__iexact="sold")
-    if _hasf_model(Model, "sold_at"):    q |= Q(sold_at__isnull=False)
-    if _hasf_model(Model, "is_sold"):    q |= Q(is_sold=True)
-    if _hasf_model(Model, "in_stock"):   q |= Q(in_stock=False)
-    if _hasf_model(Model, "quantity"):   q |= Q(quantity=0)
-    if _hasf_model(Model, "qty"):        q |= Q(qty=0)
+    if _hasf_model(Model, "status"):
+        q |= Q(status__iexact="sold")
+    if _hasf_model(Model, "sold_at"):
+        q |= Q(sold_at__isnull=False)
+    if _hasf_model(Model, "is_sold"):
+        q |= Q(is_sold=True)
+    if _hasf_model(Model, "in_stock"):
+        q |= Q(in_stock=False)
+    if _hasf_model(Model, "quantity"):
+        q |= Q(quantity=0)
+    if _hasf_model(Model, "qty"):
+        q |= Q(qty=0)
     return q
+
 
 def _unsold_q_for(Model):
     from django.db.models import Q
+
     q = Q()
-    if _hasf_model(Model, "status"):     q &= ~Q(status__iexact="sold")
-    if _hasf_model(Model, "sold_at"):    q &= Q(sold_at__isnull=True)
-    if _hasf_model(Model, "is_sold"):    q &= Q(is_sold=False)
-    if _hasf_model(Model, "in_stock"):   q &= Q(in_stock=True)
-    if _hasf_model(Model, "quantity"):   q &= (Q(quantity__gt=0) | Q(quantity__isnull=True))
-    if _hasf_model(Model, "qty"):        q &= (Q(qty__gt=0) | Q(qty__isnull=True))
+    if _hasf_model(Model, "status"):
+        q &= ~Q(status__iexact="sold")
+    if _hasf_model(Model, "sold_at"):
+        q &= Q(sold_at__isnull=True)
+    if _hasf_model(Model, "is_sold"):
+        q &= Q(is_sold=False)
+    if _hasf_model(Model, "in_stock"):
+        q &= Q(in_stock=True)
+    if _hasf_model(Model, "quantity"):
+        q &= Q(quantity__gt=0) | Q(quantity__isnull=True)
+    if _hasf_model(Model, "qty"):
+        q &= Q(qty__gt=0) | Q(qty__isnull=True)
     return q
+
 
 def _sum_by_candidates_with_breakdown(qs, Model, candidates):
     from django.db.models import Sum
+
     breakdown: Dict[str, float] = {}
     for f in candidates:
         if _hasf_model(Model, f):
@@ -317,8 +388,10 @@ def _sum_by_candidates_with_breakdown(qs, Model, candidates):
             break
     return total, first_field, breakdown
 
+
 def _digits(s: str) -> str:
     return "".join(ch for ch in (s or "") if ch.isdigit())
+
 
 def _ok(payload: Any = None, **extra) -> JsonResponse:
     data: Dict[str, Any] = {"ok": True}
@@ -328,11 +401,13 @@ def _ok(payload: Any = None, **extra) -> JsonResponse:
         data.update(extra)
     return JsonResponse(data, status=200)
 
+
 def _err(msg: str, status: int = 400, **extra) -> JsonResponse:
     data = {"ok": False, "error": msg}
     if extra:
         data.update(extra)
     return JsonResponse(data, status=status)
+
 
 def _tester_html(title: str, post_path: str) -> HttpResponse:
     return HttpResponse(
@@ -353,6 +428,7 @@ def _tester_html(title: str, post_path: str) -> HttpResponse:
         content_type="text/html",
     )
 
+
 def _parse_json_body(request: HttpRequest) -> Dict[str, Any]:
     try:
         if request.body:
@@ -360,6 +436,7 @@ def _parse_json_body(request: HttpRequest) -> Dict[str, Any]:
     except Exception:
         pass
     return {}
+
 
 def _get_code(request: HttpRequest) -> str:
     data = _parse_json_body(request)
@@ -370,14 +447,17 @@ def _get_code(request: HttpRequest) -> str:
     raw = request.POST.get("code") or ""
     return (raw or "").strip()
 
+
 def _normalize_code(code: str) -> str:
     d = _digits(code or "")
     if len(d) >= 15:
         return d[-15:]
     return (code or "").strip()
 
+
 def _get_qty(obj) -> int:
     return int(getattr(obj, "quantity", getattr(obj, "qty", 0)) or 0)
+
 
 def _set_qty(obj, value: int) -> None:
     if hasattr(obj, "quantity"):
@@ -385,9 +465,11 @@ def _set_qty(obj, value: int) -> None:
     elif hasattr(obj, "qty"):
         setattr(obj, "qty", value)
 
+
 def _set_if_has(obj, field: str, value) -> None:
     if hasattr(obj, field):
         setattr(obj, field, value)
+
 
 def _get_location_from_item(it) -> Tuple[Optional[int], Optional[str]]:
     loc = None
@@ -398,6 +480,7 @@ def _get_location_from_item(it) -> Tuple[Optional[int], Optional[str]]:
     if loc:
         return getattr(loc, "id", None), getattr(loc, "name", None)
     return None, None
+
 
 def _serialize_item(it) -> Dict[str, Any]:
     product = getattr(it, "product", None)
@@ -432,6 +515,7 @@ def _serialize_item(it) -> Dict[str, Any]:
         "business_id": getattr(business, "id", None),
     }
 
+
 def _attach_business_and_location(obj, request: HttpRequest) -> None:
     b = get_active_business(request)
     if b is not None:
@@ -447,6 +531,7 @@ def _attach_business_and_location(obj, request: HttpRequest) -> None:
         except Exception:
             pass
 
+
 def _audit(kind: str, request: HttpRequest, **details) -> None:
     if AuditLog is None:
         return
@@ -458,6 +543,7 @@ def _audit(kind: str, request: HttpRequest, **details) -> None:
         )
     except Exception:
         pass
+
 
 def _defaults_for_ui(request: HttpRequest) -> Dict[str, Any]:
     defaults: Dict[str, Any] = {
@@ -477,12 +563,14 @@ def _defaults_for_ui(request: HttpRequest) -> Dict[str, Any]:
             pass
     return defaults
 
+
 def _field_required(model, fname: str) -> bool:
     try:
         f = model._meta.get_field(fname)  # type: ignore[attr-defined]
         return getattr(f, "null", True) is False
     except Exception:
         return False
+
 
 def _candidate_code_fields(model) -> Iterable[str]:
     names = ("imei", "imei1", "imei_1", "sku", "barcode", "serial", "code")
@@ -494,6 +582,7 @@ def _candidate_code_fields(model) -> Iterable[str]:
         if n in fields:
             yield n
 
+
 def _force_sold_db_update(obj) -> None:
     try:
         model = obj.__class__
@@ -502,13 +591,20 @@ def _force_sold_db_update(obj) -> None:
         except Exception:
             fields = set()
         update = {}
-        if "status" in fields:       update["status"] = "SOLD"
-        if "sold_at" in fields:      update["sold_at"] = timezone.now()
-        if "sold" in fields:         update["sold"] = True
-        if "is_sold" in fields:      update["is_sold"] = True
-        if "in_stock" in fields:     update["in_stock"] = False
-        if "available" in fields:    update["available"] = False
-        if "availability" in fields: update["availability"] = False
+        if "status" in fields:
+            update["status"] = "SOLD"
+        if "sold_at" in fields:
+            update["sold_at"] = timezone.now()
+        if "sold" in fields:
+            update["sold"] = True
+        if "is_sold" in fields:
+            update["is_sold"] = True
+        if "in_stock" in fields:
+            update["in_stock"] = False
+        if "available" in fields:
+            update["available"] = False
+        if "availability" in fields:
+            update["availability"] = False
         if "quantity" in fields or "qty" in fields:
             update["quantity"] = 0
         if update:
@@ -516,11 +612,13 @@ def _force_sold_db_update(obj) -> None:
     except Exception:
         pass
 
+
 def _model_has_field(Model, name: str) -> bool:
     try:
         return any(getattr(f, "name", None) == name for f in Model._meta.get_fields())
     except Exception:
         return False
+
 
 def _haversine_m(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     R = 6371000.0
@@ -529,6 +627,7 @@ def _haversine_m(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     dlambda = math.radians(lon2 - lon1)
     a = math.sin(dphi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlambda / 2) ** 2
     return 2 * R * math.atan2(math.sqrt(1 - a), math.sqrt(a))
+
 
 def _resolve_sale_location(request: HttpRequest, item, loc_id_raw) -> Optional[int]:
     def _to_int(v) -> Optional[int]:
@@ -593,6 +692,7 @@ def _resolve_sale_location(request: HttpRequest, item, loc_id_raw) -> Optional[i
         return candidates[0] if candidates else None
 
     return None
+
 
 # ---------- tolerant in-stock lookup (single source of truth via IN_STOCK_Q) ----------
 def _find_in_stock_by_code(
@@ -676,9 +776,9 @@ def _find_in_stock_by_code(
 
         # Quantity > 0 (or null counts as OK)
         if "quantity" in fieldnames:
-            q &= (models.Q(quantity__gt=0) | models.Q(quantity__isnull=True))
+            q &= models.Q(quantity__gt=0) | models.Q(quantity__isnull=True)
         if "qty" in fieldnames:
-            q &= (models.Q(qty__gt=0) | models.Q(qty__isnull=True))
+            q &= models.Q(qty__gt=0) | models.Q(qty__isnull=True)
 
         return qs.filter(q)
 
@@ -693,9 +793,7 @@ def _find_in_stock_by_code(
             fieldnames = set()
         if "business" in fieldnames or "business_id" in fieldnames:
             try:
-                return qs.filter(
-                    models.Q(business=business) | models.Q(business_id=getattr(business, "id", None))
-                )
+                return qs.filter(models.Q(business=business) | models.Q(business_id=getattr(business, "id", None)))
             except Exception:
                 return qs
         # Indirect scope via item__business (e.g., Sales models; here we’re on InventoryItem so not needed)
@@ -830,6 +928,7 @@ def _find_in_stock_by_code(
 
     return None, None
 
+
 def _stock_counts(request: HttpRequest) -> Dict[str, int]:
     in_count = sold_count = 0
     qs_in = _stock_queryset_for_request(request)
@@ -839,7 +938,7 @@ def _stock_counts(request: HttpRequest) -> Dict[str, int]:
         in_count = 0
 
     try:
-        model = (qs_in.model if qs_in is not None else (InventoryItem or Stock))
+        model = qs_in.model if qs_in is not None else (InventoryItem or Stock)
         if model:
             qs_all = scoped(_manager(model).all(), request)
             fields = {f.name for f in model._meta.get_fields()}  # type: ignore[attr-defined]
@@ -875,6 +974,7 @@ def _stock_counts(request: HttpRequest) -> Dict[str, int]:
 
     return {"in_stock": int(in_count), "sold": int(sold_count)}
 
+
 def _inventory_summary(request: HttpRequest) -> Dict[str, Any]:
     qs_in = _stock_queryset_for_request(request)
     in_stock_count = 0
@@ -895,15 +995,23 @@ def _inventory_summary(request: HttpRequest) -> Dict[str, Any]:
     qs_all = scoped(manager.all(), request)
 
     from django.db.models import Q
-    def _hasf(name: str) -> bool: return _hasf_model(Model, name)
+
+    def _hasf(name: str) -> bool:
+        return _hasf_model(Model, name)
 
     sold_q = Q()
-    if _hasf("status"):   sold_q |= Q(status__iexact="sold")
-    if _hasf("sold_at"):  sold_q |= Q(sold_at__isnull=False)
-    if _hasf("is_sold"):  sold_q |= Q(is_sold=True)
-    if _hasf("in_stock"): sold_q |= Q(in_stock=False)
-    if _hasf("quantity"): sold_q |= Q(quantity=0)
-    if _hasf("qty"):      sold_q |= Q(qty=0)
+    if _hasf("status"):
+        sold_q |= Q(status__iexact="sold")
+    if _hasf("sold_at"):
+        sold_q |= Q(sold_at__isnull=False)
+    if _hasf("is_sold"):
+        sold_q |= Q(is_sold=True)
+    if _hasf("in_stock"):
+        sold_q |= Q(in_stock=False)
+    if _hasf("quantity"):
+        sold_q |= Q(quantity=0)
+    if _hasf("qty"):
+        sold_q |= Q(qty=0)
 
     qs_sold = qs_all.filter(sold_q)
     qs_unsold = qs_all.exclude(pk__in=qs_sold.values("pk"))
@@ -925,6 +1033,7 @@ def _inventory_summary(request: HttpRequest) -> Dict[str, Any]:
         "sum_sold_amount": float(sum_sold_amount),
     }
 
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Tiny pages (set CSRF)
 # ──────────────────────────────────────────────────────────────────────────────
@@ -934,17 +1043,20 @@ def _inventory_summary(request: HttpRequest) -> Dict[str, Any]:
 def scan_in_page(_request: HttpRequest) -> HttpResponse:
     return _tester_html("Scan In", "/inventory/api/scan-in/")
 
+
 @login_required
 @require_http_methods(["GET"])
 @ensure_csrf_cookie
 def scan_sold_page(_request: HttpRequest) -> HttpResponse:
     return _tester_html("Scan Sold", "/inventory/api/scan-sold/")
 
+
 @login_required
 @require_http_methods(["GET"])
 @ensure_csrf_cookie
 def place_order_page(_request: HttpRequest) -> HttpResponse:
     return _tester_html("Place Order", "/inventory/place-order/")
+
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Time Logs (page + JSON feed)
@@ -954,12 +1066,18 @@ from django.shortcuts import render
 from tenants.models import Membership
 from .models_attendance import TimeLog as _TL_MODEL  # if path differs, adjust
 
+
 def _biz_id(request: HttpRequest) -> Optional[int]:
-    _, bid = get_active_business(request)
+    biz = get_active_business(request)
+    if isinstance(biz, tuple):
+        _, bid = biz
+    else:
+        bid = getattr(biz, "id", None)
     try:
         return int(bid) if bid is not None else None
     except Exception:
         return None
+
 
 def _is_manager_for_business(user, business_id: Optional[int]) -> bool:
     if not user or not user.is_authenticated:
@@ -968,15 +1086,12 @@ def _is_manager_for_business(user, business_id: Optional[int]) -> bool:
         return True
     if business_id is None:
         return False
-    role = (
-        Membership.objects.filter(user=user, business_id=business_id)
-        .values_list("role", flat=True)
-        .first()
-    )
+    role = Membership.objects.filter(user=user, business_id=business_id).values_list("role", flat=True).first()
     if not role:
         return False
     role_s = str(role).strip().upper()
     return role_s in {"OWNER", "ADMIN", "MANAGER", "SUPERVISOR"}
+
 
 def _serialize_log(row: TimeLog) -> Dict[str, Any]:
     u = getattr(row, "user", None)
@@ -1003,6 +1118,7 @@ def _serialize_log(row: TimeLog) -> Dict[str, Any]:
         "note": getattr(row, "note", None),
     }
 
+
 @login_required
 @require_http_methods(["GET"])
 @ensure_csrf_cookie
@@ -1017,10 +1133,7 @@ def time_logs_page(request: HttpRequest) -> HttpResponse:
 
     qs = base.filter(business_id=bid) if bid else None
     if qs is None or not qs.exists():
-        biz_ids = list(
-            Membership.objects.filter(user=request.user)
-            .values_list("business_id", flat=True)
-        )
+        biz_ids = list(Membership.objects.filter(user=request.user).values_list("business_id", flat=True))
         if biz_ids:
             qs = base.filter(business_id__in=biz_ids)
 
@@ -1040,6 +1153,7 @@ def time_logs_page(request: HttpRequest) -> HttpResponse:
     }
     return render(request, "inventory/time_logs.html", ctx)
 
+
 @login_required
 @require_http_methods(["GET"])
 def time_logs_api(request: HttpRequest) -> JsonResponse:
@@ -1048,10 +1162,7 @@ def time_logs_api(request: HttpRequest) -> JsonResponse:
 
     qs = base.filter(business_id=bid) if bid else None
     if qs is None or not qs.exists():
-        biz_ids = list(
-            Membership.objects.filter(user=request.user)
-            .values_list("business_id", flat=True)
-        )
+        biz_ids = list(Membership.objects.filter(user=request.user).values_list("business_id", flat=True))
         qs = base.filter(business_id__in=biz_ids) if biz_ids else base.filter(user=request.user)
 
     try:
@@ -1064,11 +1175,13 @@ def time_logs_api(request: HttpRequest) -> JsonResponse:
     data = [_serialize_log(r) for r in rows]
     return JsonResponse({"ok": True, "count": len(data), "logs": data})
 
+
 @login_required
 @require_http_methods(["GET"])
 @ensure_csrf_cookie
 def time_logs(request: HttpRequest) -> JsonResponse:
     return _ok({"logs": [], "now": timezone.now().isoformat()})
+
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Stock list / Orders / Product endpoints
@@ -1099,7 +1212,7 @@ def stock_list(request: HttpRequest) -> JsonResponse:
             except Exception:
                 pass
         if loc_id:
-            for fk in ("current_location_id","location_id","store_id","branch_id","warehouse_id"):
+            for fk in ("current_location_id", "location_id", "store_id", "branch_id", "warehouse_id"):
                 if _hasf_model(Model, fk):
                     try:
                         base_qs = base_qs.filter(**{fk: loc_id})
@@ -1108,9 +1221,9 @@ def stock_list(request: HttpRequest) -> JsonResponse:
                         pass
 
         status = (request.GET.get("status") or "in_stock").lower()
-        if status in {"sold","completed","closed"}:
+        if status in {"sold", "completed", "closed"}:
             qs = base_qs.filter(_sold_q_for(Model))
-        elif status in {"all","any"}:
+        elif status in {"all", "any"}:
             qs = base_qs
         else:
             qs = base_qs.filter(_unsold_q_for(Model))
@@ -1119,7 +1232,7 @@ def stock_list(request: HttpRequest) -> JsonResponse:
         if q:
             d = "".join(ch for ch in q if ch.isdigit())
             if IMEI_RX.match(d):
-                for f in ("imei","imei1","imei_1","barcode","serial","sku","code"):
+                for f in ("imei", "imei1", "imei_1", "barcode", "serial", "sku", "code"):
                     if _hasf_model(Model, f):
                         try:
                             qs = qs.filter(**{f: d})
@@ -1128,8 +1241,9 @@ def stock_list(request: HttpRequest) -> JsonResponse:
                             pass
             else:
                 from django.db import models as djm
+
                 where = djm.Q()
-                for f in ("imei","imei1","imei_1","barcode","serial","sku","code"):
+                for f in ("imei", "imei1", "imei_1", "barcode", "serial", "sku", "code"):
                     if _hasf_model(Model, f):
                         where |= djm.Q(**{f"{f}__icontains": q})
                 try:
@@ -1169,6 +1283,7 @@ def stock_list(request: HttpRequest) -> JsonResponse:
     except Exception as e:
         return _err(f"stock_list failed: {e}", status=500)
 
+
 def _serialize_order(o) -> Dict[str, Any]:
     def _get(*names, default=None):
         for n in names:
@@ -1184,15 +1299,20 @@ def _serialize_order(o) -> Dict[str, Any]:
     except Exception:
         total = None
 
+    # For AdminPurchaseOrder (wallet.models), use supplier_name field
+    supplier = _get("supplier_name") or getattr(getattr(o, "supplier", None), "name", None)
+
     return {
         "id": getattr(o, "id", None),
-        "reference": _get("reference", "number", "code"),
+        "reference": _get("reference", "number", "code", default=f"PO-{getattr(o, 'id', '')}"),
         "status": _get("status"),
-        "supplier": getattr(getattr(o, "supplier", None), "name", None),
+        "supplier_name": supplier,
+        "supplier": supplier,  # backwards compat
         "total": total,
         "created_at": getattr(o, "created_at", None).isoformat() if getattr(o, "created_at", None) else None,
         "updated_at": getattr(o, "updated_at", None).isoformat() if getattr(o, "updated_at", None) else None,
     }
+
 
 def _demo_orders_payload(n: int = 8) -> List[Dict[str, Any]]:
     base = timezone.localtime()
@@ -1201,27 +1321,57 @@ def _demo_orders_payload(n: int = 8) -> List[Dict[str, Any]]:
     for i in range(n):
         oid = 1000 + i
         created = base - timedelta(days=i)
-        rows.append({
-            "id": oid,
-            "reference": f"PO-25-{(i+1):04d}",
-            "status": statuses[i % len(statuses)],
-            "supplier": None,
-            "total": round(650 + (i * 153.27), 2),
-            "created_at": created.strftime("%Y-%m-%dT%H:%M:%S"),
-            "updated_at": created.strftime("%Y-%m-%dT%H:%M:%S"),
-        })
+        rows.append(
+            {
+                "id": oid,
+                "reference": f"PO-25-{(i+1):04d}",
+                "status": statuses[i % len(statuses)],
+                "supplier": None,
+                "total": round(650 + (i * 153.27), 2),
+                "created_at": created.strftime("%Y-%m-%dT%H:%M:%S"),
+                "updated_at": created.strftime("%Y-%m-%dT%H:%M:%S"),
+            }
+        )
     return rows
+
 
 @login_required
 @require_http_methods(["GET"])
 def orders_list_api(request: HttpRequest) -> JsonResponse:
-    force_demo = (request.GET.get("demo") in {"1", "true", "yes"})
+    force_demo = request.GET.get("demo") in {"1", "true", "yes"}
     if Order is None or force_demo:
         demo_rows = _demo_orders_payload()
-        return _ok(demo_rows, count=len(demo_rows), demo=True, note=("Order model not available" if Order is None else "demo=1"))
+        return _ok(
+            demo_rows,
+            count=len(demo_rows),
+            demo=True,
+            note=("Order model not available" if Order is None else "demo=1"),
+        )
 
     try:
         qs = scoped(_manager(Order).all(), request)
+        biz = get_active_business(request)
+        if not (getattr(request.user, "is_superuser", False) and biz is None):
+            try:
+                order_fields = {f.name for f in Order._meta.get_fields()}
+            except Exception:
+                order_fields = set()
+            used_business_scope = False
+            if biz is not None and ("business" in order_fields or "business_id" in order_fields):
+                try:
+                    biz_qs = qs.filter(business=biz)
+                    if biz_qs.exists():
+                        qs = biz_qs
+                        used_business_scope = True
+                except Exception:
+                    pass
+            if biz is not None and not used_business_scope and ("created_by" in order_fields or "created_by_id" in order_fields):
+                try:
+                    from tenants.models import Membership
+                    user_ids = list(Membership.objects.filter(business=biz, status="ACTIVE").values_list("user_id", flat=True))
+                    qs = qs.filter(created_by_id__in=user_ids)
+                except Exception:
+                    pass
         try:
             qs = qs.order_by("-id")
         except Exception:
@@ -1257,6 +1407,7 @@ def orders_list_api(request: HttpRequest) -> JsonResponse:
     except Exception as e:
         return _err(f"orders_list_api failed: {e}", status=500)
 
+
 def _to_decimal_price(v) -> Optional[Decimal]:
     if v in (None, ""):
         return None
@@ -1266,6 +1417,181 @@ def _to_decimal_price(v) -> Optional[Decimal]:
         return d.quantize(Decimal("1.00"))
     except Exception:
         return None
+
+
+def _product_money(value) -> Decimal:
+    try:
+        from wallet.money import q2
+        return q2(value)
+    except Exception:
+        try:
+            return Decimal(str(value or "0")).quantize(Decimal("0.01"))
+        except Exception:
+            return Decimal("0.00")
+
+
+def _product_label(product) -> str:
+    bits = [getattr(product, "brand", ""), getattr(product, "model", ""), getattr(product, "variant", "")]
+    label = " ".join(str(b).strip() for b in bits if str(b or "").strip())
+    return label or getattr(product, "name", "") or f"Product {getattr(product, 'id', '')}"
+
+
+def _stock_count_for_product(product, business) -> int:
+    if InventoryItem is None:
+        return 0
+    try:
+        qs = InventoryItem.objects.filter(product=product)
+        fields = {f.name for f in InventoryItem._meta.get_fields()}
+        if business is not None and ("business" in fields or "business_id" in fields):
+            qs = qs.filter(business=business)
+        if "status" in fields:
+            qs = qs.exclude(status__iexact="sold")
+        if "sold_at" in fields:
+            qs = qs.filter(sold_at__isnull=True)
+        if "is_sold" in fields:
+            qs = qs.filter(is_sold=False)
+        return qs.count()
+    except Exception:
+        return 0
+
+
+def _seed_demo_products_if_allowed(business) -> None:
+    name = str(getattr(business, "name", "") or "").lower()
+    if not getattr(settings, "DEBUG", False) or not any(token in name for token in ("demo", "test", "codex")):
+        return
+    samples = [
+        ("DEMO-PHONE-001", "Tecno", "Spark Demo", Decimal("85000.00"), Decimal("115000.00")),
+        ("DEMO-PHONE-002", "Itel", "A70 Demo", Decimal("65000.00"), Decimal("90000.00")),
+        ("DEMO-ACC-001", "Generic", "Fast Charger Demo", Decimal("4500.00"), Decimal("8000.00")),
+    ]
+    for code, brand, model_name, cost, sale in samples:
+        try:
+            Product.objects.get_or_create(
+                code=code,
+                defaults={"brand": brand, "model": model_name, "name": model_name, "cost_price": cost, "sale_price": sale},
+            )
+        except Exception:
+            continue
+
+
+@login_required
+@require_http_methods(["GET"])
+def api_stock_models(request: HttpRequest) -> JsonResponse:
+    if Product is None:
+        return _ok({"items": [], "models": []}, count=0)
+    q = (request.GET.get("q") or "").strip()
+    business = get_active_business(request)
+    if not Product.objects.exists():
+        _seed_demo_products_if_allowed(business)
+    qs = Product.objects.all().order_by("brand", "model", "variant", "name")
+    if q:
+        qs = qs.filter(
+            models.Q(brand__icontains=q)
+            | models.Q(model__icontains=q)
+            | models.Q(variant__icontains=q)
+            | models.Q(name__icontains=q)
+            | models.Q(code__icontains=q)
+        )
+    rows = []
+    for product in qs[:120]:
+        cost = _product_money(getattr(product, "cost_price", Decimal("0.00")))
+        sale = _product_money(getattr(product, "sale_price", Decimal("0.00")))
+        row = {
+            "id": product.id,
+            "product_id": product.id,
+            "label": _product_label(product),
+            "product": _product_label(product),
+            "name": getattr(product, "name", "") or _product_label(product),
+            "brand": getattr(product, "brand", "") or "",
+            "model": getattr(product, "model", "") or "",
+            "variant": getattr(product, "variant", "") or "",
+            "code": getattr(product, "code", "") or "",
+            "sku": getattr(product, "code", "") or "",
+            "cost_price": str(cost),
+            "sale_price": str(sale),
+            "default_price": str(cost),
+            "on_hand": _stock_count_for_product(product, business),
+        }
+        rows.append(row)
+    return _ok({"items": rows, "models": rows}, count=len(rows))
+
+
+@login_required
+@csrf_exempt
+@require_http_methods(["POST"])
+def api_place_order(request: HttpRequest) -> JsonResponse:
+    try:
+        from wallet.models import AdminPurchaseOrder, AdminPurchaseOrderItem, PurchaseOrderStatus
+    except Exception:
+        return _err("Purchase order module is not available.", status=501)
+    business = get_active_business(request)
+    data = _parse_json_body(request) or request.POST
+    items = data.get("items") or []
+    if not isinstance(items, list) or not items:
+        return _err("Add at least one product before saving the purchase order.")
+
+    supplier_name = (data.get("supplier_name") or "").strip()
+    supplier_email = (data.get("supplier_email") or "").strip()
+    supplier_phone = (data.get("supplier_phone") or "").strip()
+    expected_delivery = parse_date(data.get("expected_delivery_date") or "") if data.get("expected_delivery_date") else None
+    payment_terms = (data.get("payment_terms") or "").strip()
+    notes = (data.get("notes") or "").strip()
+
+    clean_items = []
+    for item in items:
+        try:
+            product_id = int(item.get("product_id") or item.get("id"))
+            quantity = int(item.get("quantity") or item.get("qty") or 1)
+        except (TypeError, ValueError):
+            return _err("Choose valid products and quantities.")
+        if quantity < 1:
+            return _err("Quantity must be at least one.")
+        product = Product.objects.filter(pk=product_id).first() if Product is not None else None
+        if product is None:
+            return _err("One selected product no longer exists. Refresh and try again.", status=404)
+        unit_raw = item.get("unit_price")
+        unit_price = _product_money(unit_raw if unit_raw not in (None, "") else getattr(product, "cost_price", Decimal("0.00")))
+        clean_items.append((product, quantity, unit_price))
+
+    try:
+        with transaction.atomic():
+            po = AdminPurchaseOrder.objects.create(
+                business=business,
+                created_by=request.user,
+                supplier_name=supplier_name,
+                supplier_email=supplier_email,
+                supplier_phone=supplier_phone,
+                agent_name=(data.get("agent_name") or "").strip(),
+                expected_delivery_date=expected_delivery,
+                payment_terms=payment_terms,
+                notes=notes,
+                status=PurchaseOrderStatus.DRAFT,
+            )
+            for product, quantity, unit_price in clean_items:
+                AdminPurchaseOrderItem.objects.create(
+                    po=po,
+                    product=product,
+                    quantity=quantity,
+                    unit_price=unit_price,
+                )
+            po.recompute_totals(save=True)
+    except IntegrityError:
+        return _err("Could not save the purchase order because one item conflicts with existing data. Refresh products and try again.", status=409)
+    except Exception as exc:
+        return _err(f"Could not save the purchase order: {exc}", status=400)
+
+    invoice_url = reverse("inventory:po_invoice", args=[po.id])
+    download_url = reverse("inventory:po_invoice_download", args=[po.id])
+    return _ok(
+        {
+            "id": po.id,
+            "reference": f"PO-{po.id:05d}",
+            "total": str(po.total),
+            "invoice_url": invoice_url,
+            "download_url": download_url,
+        }
+    )
+
 
 @login_required
 @csrf_exempt
@@ -1278,25 +1604,38 @@ def api_product_create(request: HttpRequest) -> JsonResponse:
     model_name = (data.get("model") or data.get("model_name") or "").strip()
     sku = (data.get("sku") or data.get("code") or "").strip()
     price = _to_decimal_price(data.get("price"))
+    sale_price = _to_decimal_price(data.get("sale_price") or data.get("selling_price"))
 
     if Product is None:
         return _ok(
-            {"id": None, "created": False, "name": name, "brand": brand, "model": model_name, "sku": sku, "price": float(price) if price is not None else None},
-            note="Product model not available; no-op create"
+            {
+                "id": None,
+                "created": False,
+                "name": name,
+                "brand": brand,
+                "model": model_name,
+                "sku": sku,
+                "price": float(price) if price is not None else None,
+            },
+            note="Product model not available; no-op create",
         )
 
     try:
         qs = scoped(_manager(Product).all(), request)
+        field_names = {f.name for f in Product._meta.get_fields()}
+        if "code" in field_names and not sku:
+            return _err("Product code is required. If this item already exists, select it from products instead.")
         obj = None
         for field in ("sku", "code"):
-            if hasattr(Product, field) and sku:
+            if field in field_names and sku:
                 try:
-                    obj = qs.filter(**{field: sku}).first()
+                    lookup_qs = Product.objects.filter(**{field: sku}) if field == "code" else qs.filter(**{field: sku})
+                    obj = lookup_qs.first()
                     if obj:
                         break
                 except Exception:
                     pass
-        if obj is None and hasattr(Product, "name") and name:
+        if obj is None and "name" in field_names and name:
             try:
                 obj = qs.filter(name=name).first()
             except Exception:
@@ -1312,28 +1651,43 @@ def api_product_create(request: HttpRequest) -> JsonResponse:
                 ("sku", sku or None),
                 ("code", sku or None),
                 ("price", price or None),
+                ("cost_price", price or None),
+                ("sale_price", sale_price or None),
                 ("business", get_active_business(request)),
             ):
-                if v is not None and hasattr(Product, k):
+                if v is not None and k in field_names:
                     kwargs[k] = v
             obj = Product(**kwargs)  # type: ignore[call-arg]
-            obj.save()
-            created = True
+            try:
+                obj.save()
+                created = True
+            except IntegrityError:
+                if sku and "code" in field_names:
+                    obj = Product.objects.filter(code=sku).first()
+                if obj is None:
+                    raise
         else:
             touched = []
-            if price is not None and hasattr(obj, "price"):
+            for price_field in ("price", "cost_price"):
+                if price is not None and price_field in field_names:
+                    try:
+                        setattr(obj, price_field, price)
+                        touched.append(price_field)
+                    except Exception:
+                        pass
+            if sale_price is not None and "sale_price" in field_names:
                 try:
-                    obj.price = price
-                    touched.append("price")
+                    obj.sale_price = sale_price
+                    touched.append("sale_price")
                 except Exception:
                     pass
-            if brand and hasattr(obj, "brand"):
+            if brand and "brand" in field_names:
                 try:
                     obj.brand = brand
                     touched.append("brand")
                 except Exception:
                     pass
-            if model_name and hasattr(obj, "model"):
+            if model_name and "model" in field_names:
                 try:
                     obj.model = model_name
                     touched.append("model")
@@ -1353,22 +1707,26 @@ def api_product_create(request: HttpRequest) -> JsonResponse:
                 "brand": getattr(obj, "brand", None),
                 "model": getattr(obj, "model", None),
                 "sku": getattr(obj, "sku", None) or getattr(obj, "code", None),
-                "price": float(getattr(obj, "price", None)) if getattr(obj, "price", None) is not None else None,
+                "price": float(getattr(obj, "price", None) or getattr(obj, "cost_price", 0) or 0),
+                "sale_price": float(getattr(obj, "sale_price", 0) or 0),
             }
         )
     except Exception as e:
         return _err(f"product_create_failed: {e}", status=400)
 
+
 @login_required
 @csrf_exempt
 @require_http_methods(["POST"])
-def api_product_update_price(request: HttpRequest) -> JsonResponse:
+def api_product_update_price(request: HttpRequest, product_id: int = None) -> JsonResponse:
     data = _parse_json_body(request) | request.POST.dict()
     price = _to_decimal_price(data.get("price"))
     if price is None:
         return _err("Invalid or missing 'price'.")
 
-    product_id = data.get("product_id")
+    # Use URL parameter if provided, otherwise fall back to POST data
+    if product_id is None:
+        product_id = data.get("product_id")
     sku = (data.get("sku") or data.get("code") or "").strip()
 
     if Product is not None:
@@ -1425,6 +1783,7 @@ def api_product_update_price(request: HttpRequest) -> JsonResponse:
 
     return _ok({"updated": False, "note": "No matching record; nothing updated."})
 
+
 def _to_decimal_clean(v, default=None) -> Optional[Decimal]:
     if v is None or v == "":
         return default
@@ -1437,12 +1796,101 @@ def _to_decimal_clean(v, default=None) -> Optional[Decimal]:
     except Exception:
         return None
 
+
 def _has_field(model, name: str) -> bool:
     try:
         model._meta.get_field(name)  # type: ignore[attr-defined]
         return True
     except Exception:
         return False
+
+
+@login_required
+@csrf_exempt
+@require_POST
+@transaction.atomic
+def api_stock_update_instock(request: HttpRequest, pk: int) -> JsonResponse:
+    """
+    Manager-only API endpoint to update IN_STOCK item (IMEI and/or selling_price).
+
+    POST params:
+        - imei: (optional) New IMEI (15 digits)
+        - selling_price: (optional) New selling price
+
+    Only works for IN_STOCK items. For phones, validates selling_price against MIN_PHONE_SELLING_PRICE_MK.
+    """
+    biz = _get_active_business(request)
+    if not biz:
+        return _err("No active business", status=400)
+
+    if not _is_manager_for_business(request.user, getattr(biz, "id", None)):
+        return _err("Forbidden: manager only", status=403)
+
+    # Get the stock item
+    try:
+        item = InventoryItem.objects.get(pk=pk, business=biz)
+    except InventoryItem.DoesNotExist:
+        return _err("Item not found", status=404)
+
+    # Only allow editing IN_STOCK items
+    if item.status != "IN_STOCK" or not item.is_active:
+        return _err("Only IN_STOCK items can be edited", status=400)
+
+    # Parse request data (JSON body or POST)
+    try:
+        import json
+
+        if request.content_type and "json" in request.content_type.lower():
+            body = json.loads(request.body.decode("utf-8"))
+        else:
+            body = request.POST.dict()
+    except Exception:
+        body = request.POST.dict()
+
+    new_imei = body.get("imei", "").strip() or None
+    new_price_raw = body.get("selling_price") or body.get("price")
+
+    # Validate phone selling price if provided
+    if new_price_raw is not None:
+        try:
+            from decimal import Decimal
+            from inventory.utils_pricing import validate_phone_selling_price
+
+            new_price = Decimal(str(new_price_raw))
+
+            # Check if this is a phone business
+            from tenants.models import Business
+            from inventory.business_kinds import BusinessKind
+
+            if hasattr(biz, "business_kind") and biz.business_kind == BusinessKind.PHONES:
+                # Apply phone price validation
+                is_valid, error_msg, suggested_price = validate_phone_selling_price(new_price, is_blocking=True)
+                if not is_valid:
+                    return _err(
+                        error_msg, status=400, suggested_price=float(suggested_price) if suggested_price else None
+                    )
+        except (ValueError, Exception) as e:
+            return _err(f"Invalid price: {e}", status=400)
+    else:
+        new_price = None
+
+    # Use the model's apply_instock_update method (handles validation and audit)
+    try:
+        item.apply_instock_update(
+            new_imei=new_imei, new_price=float(new_price) if new_price is not None else None, by_user=request.user
+        )
+    except Exception as e:
+        return _err(str(e), status=400)
+
+    return _ok(
+        {
+            "item_id": item.id,
+            "imei": item.imei,
+            "selling_price": float(item.selling_price) if item.selling_price else None,
+        },
+        message="Stock updated successfully",
+    )
+
 
 @login_required
 @csrf_exempt
@@ -1478,8 +1926,18 @@ def api_inventory_update_price(request: HttpRequest) -> JsonResponse:
         return _err("No price field on model.", status=400)
 
     _manager(model).filter(pk=getattr(item, "pk")).update(**updates)
-    _audit("price_update_ok", request, code=_normalize_code(code), price=float(price), field=target_field, item_id=getattr(item, "id", None))
-    return _ok({"item_id": getattr(item, "id", None), "field": target_field, "price": float(price)}, message="price updated")
+    _audit(
+        "price_update_ok",
+        request,
+        code=_normalize_code(code),
+        price=float(price),
+        field=target_field,
+        item_id=getattr(item, "id", None),
+    )
+    return _ok(
+        {"item_id": getattr(item, "id", None), "field": target_field, "price": float(price)}, message="price updated"
+    )
+
 
 @login_required
 @csrf_exempt
@@ -1504,15 +1962,24 @@ def api_inventory_delete_unsold(request: HttpRequest) -> JsonResponse:
 
     if qty and qty > 1:
         updates = {}
-        if _has_field(model, "quantity"): updates["quantity"] = qty - 1
-        if _has_field(model, "qty"):       updates["qty"] = qty - 1
+        if _has_field(model, "quantity"):
+            updates["quantity"] = qty - 1
+        if _has_field(model, "qty"):
+            updates["qty"] = qty - 1
         _manager(model).filter(pk=getattr(item, "pk")).update(**updates)
-        _audit("delete_unsold_decrement", request, code=_normalize_code(code), new_qty=qty-1, item_id=getattr(item, "id", None))
-        return _ok({"item_id": getattr(item, "id", None), "action": "decrement", "remaining_qty": qty-1})
+        _audit(
+            "delete_unsold_decrement",
+            request,
+            code=_normalize_code(code),
+            new_qty=qty - 1,
+            item_id=getattr(item, "id", None),
+        )
+        return _ok({"item_id": getattr(item, "id", None), "action": "decrement", "remaining_qty": qty - 1})
     else:
         _audit("delete_unsold_row", request, code=_normalize_code(code), item_id=getattr(item, "id", None))
         _manager(model).filter(pk=getattr(item, "pk")).delete()
         return _ok({"action": "delete", "code": _normalize_code(code)})
+
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Scan In / Scan Sold (quick)
@@ -1564,10 +2031,14 @@ def scan_in(request: HttpRequest):
             obj.save()
 
         _audit("scan_in", request, code=code, id=getattr(obj, "id", None))
-        return _ok({"code": code, "id": getattr(obj, "id", None)}, message="scan_in: inventory updated",
-                   summary=_inventory_summary(request))
+        return _ok(
+            {"code": code, "id": getattr(obj, "id", None)},
+            message="scan_in: inventory updated",
+            summary=_inventory_summary(request),
+        )
     except Exception as e:
         return _err(f"scan_in failed: {e}", status=500)
+
 
 @login_required
 @require_http_methods(["GET", "POST"])
@@ -1597,16 +2068,26 @@ def scan_sold(request: HttpRequest):
         qty_now = _get_qty(current)
 
         updates: Dict[str, Any] = {}
-        if hasattr(model, "status"):       updates["status"] = "SOLD"
-        if hasattr(model, "sold_at"):      updates["sold_at"] = timezone.now()
-        if hasattr(model, "sold"):         updates["sold"] = True
-        if hasattr(model, "is_sold"):      updates["is_sold"] = True
-        if hasattr(model, "in_stock"):     updates["in_stock"] = False
-        if hasattr(model, "available"):    updates["available"] = False
-        if hasattr(model, "availability"): updates["availability"] = False
-        if hasattr(model, "is_active"):    updates["is_active"] = False
-        if hasattr(model, "quantity"):     updates["quantity"] = max(0, qty_now - 1)
-        if hasattr(model, "qty"):          updates["qty"] = max(0, qty_now - 1)
+        if hasattr(model, "status"):
+            updates["status"] = "SOLD"
+        if hasattr(model, "sold_at"):
+            updates["sold_at"] = timezone.now()
+        if hasattr(model, "sold"):
+            updates["sold"] = True
+        if hasattr(model, "is_sold"):
+            updates["is_sold"] = True
+        if hasattr(model, "in_stock"):
+            updates["in_stock"] = False
+        if hasattr(model, "available"):
+            updates["available"] = False
+        if hasattr(model, "availability"):
+            updates["availability"] = False
+        if hasattr(model, "is_active"):
+            updates["is_active"] = False
+        if hasattr(model, "quantity"):
+            updates["quantity"] = max(0, qty_now - 1)
+        if hasattr(model, "qty"):
+            updates["qty"] = max(0, qty_now - 1)
         if (hasattr(model, "sold_by") or hasattr(model, "sold_by_id")) and getattr(request.user, "id", None):
             updates["sold_by_id"] = request.user.id
 
@@ -1631,6 +2112,7 @@ def scan_sold(request: HttpRequest):
     except Exception as e:
         return _err(f"scan_sold failed: {e}", status=500)
 
+
 @login_required
 @csrf_exempt
 @require_POST
@@ -1638,8 +2120,13 @@ def scan_sold(request: HttpRequest):
 def api_mark_sold(request: HttpRequest):
     data = _parse_json_body(request)
     code = (
-        data.get("imei") or data.get("code") or data.get("sku") or data.get("serial")
-        or request.POST.get("imei") or request.POST.get("code") or ""
+        data.get("imei")
+        or data.get("code")
+        or data.get("sku")
+        or data.get("serial")
+        or request.POST.get("imei")
+        or request.POST.get("code")
+        or ""
     ).strip()
     if not code:
         return _err("Missing 'imei' (or code/sku/serial).")
@@ -1649,6 +2136,7 @@ def api_mark_sold(request: HttpRequest):
         if v not in (None, "") and d is None:
             d = Decimal("0.00")
         return d
+
     price_val = _money(data.get("price") or request.POST.get("price"))
     commission_val = _money(data.get("commission") or data.get("commission_pct") or request.POST.get("commission"))
 
@@ -1674,14 +2162,22 @@ def api_mark_sold(request: HttpRequest):
         except Exception:
             updates["qty"] = 0
 
-    if _has_field(model, "status"):       updates["status"] = "SOLD"
-    if _has_field(model, "sold_at"):      updates["sold_at"] = timezone.now()
-    if _has_field(model, "is_sold"):      updates["is_sold"] = True
-    if _has_field(model, "sold"):         updates["sold"] = True
-    if _has_field(model, "in_stock"):     updates["in_stock"] = False
-    if _has_field(model, "available"):    updates["available"] = False
-    if _has_field(model, "availability"): updates["availability"] = False
-    if _has_field(model, "is_active"):    updates["is_active"] = False
+    if _has_field(model, "status"):
+        updates["status"] = "SOLD"
+    if _has_field(model, "sold_at"):
+        updates["sold_at"] = timezone.now()
+    if _has_field(model, "is_sold"):
+        updates["is_sold"] = True
+    if _has_field(model, "sold"):
+        updates["sold"] = True
+    if _has_field(model, "in_stock"):
+        updates["in_stock"] = False
+    if _has_field(model, "available"):
+        updates["available"] = False
+    if _has_field(model, "availability"):
+        updates["availability"] = False
+    if _has_field(model, "is_active"):
+        updates["is_active"] = False
 
     if price_val is not None:
         for f in PRICE_FIELD_CANDIDATES:
@@ -1693,7 +2189,11 @@ def api_mark_sold(request: HttpRequest):
             if _has_field(model, f):
                 updates[f] = commission_val
 
-    if (_has_field(model, "sold_by") or _has_field(model, "sold_by_id")) and getattr(request, "user", None) and getattr(request.user, "id", None):
+    if (
+        (_has_field(model, "sold_by") or _has_field(model, "sold_by_id"))
+        and getattr(request, "user", None)
+        and getattr(request.user, "id", None)
+    ):
         updates["sold_by_id"] = request.user.id
 
     _manager(model).filter(pk=getattr(item, "pk")).update(**updates)
@@ -1725,10 +2225,12 @@ def api_mark_sold(request: HttpRequest):
         item_id=getattr(item, "id", None),
     )
 
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Stock status (stitched: Part 2 helpers + Part 3 logic)
 # ──────────────────────────────────────────────────────────────────────────────
 from django.db.models import Q as _Q  # already imported models.Q above; just alias if needed
+
 
 @login_required
 @require_http_methods(["GET"])
@@ -1739,12 +2241,14 @@ def api_stock_status(request: HttpRequest) -> JsonResponse:
     Stock_local = None
     try:
         from inventory.models import InventoryItem as _InventoryItem  # type: ignore
+
         InventoryItem_local = _InventoryItem
     except Exception:
         pass
     if InventoryItem_local is None:
         try:
             from inventory.models import Stock as _Stock  # type: ignore
+
             Stock_local = _Stock
         except Exception:
             pass
@@ -1765,16 +2269,18 @@ def api_stock_status(request: HttpRequest) -> JsonResponse:
 
     def _is_soldish(x) -> bool:
         status_val = str(getattr(x, "status", "") or "").strip().lower()
-        return any([
-            bool(getattr(x, "sold_at", None)),
-            bool(getattr(x, "is_sold", False)),
-            status_val in {"sold", "completed", "closed"},
-            (hasattr(x, "in_stock") and getattr(x, "in_stock") is False),
-            (hasattr(x, "available") and getattr(x, "available") is False),
-            (hasattr(x, "availability") and not getattr(x, "availability")),
-            (hasattr(x, "quantity") and int(getattr(x, "quantity") or 0) <= 0),
-            (hasattr(x, "qty") and int(getattr(x, "qty") or 0) <= 0),
-        ])
+        return any(
+            [
+                bool(getattr(x, "sold_at", None)),
+                bool(getattr(x, "is_sold", False)),
+                status_val in {"sold", "completed", "closed"},
+                (hasattr(x, "in_stock") and getattr(x, "in_stock") is False),
+                (hasattr(x, "available") and getattr(x, "available") is False),
+                (hasattr(x, "availability") and not getattr(x, "availability")),
+                (hasattr(x, "quantity") and int(getattr(x, "quantity") or 0) <= 0),
+                (hasattr(x, "qty") and int(getattr(x, "qty") or 0) <= 0),
+            ]
+        )
 
     def _obj_loc_tuple(obj) -> Tuple[Optional[int], Optional[str]]:
         loc_id = None
@@ -1783,9 +2289,8 @@ def api_stock_status(request: HttpRequest) -> JsonResponse:
                 loc_id = getattr(obj, fk) or None
                 if loc_id:
                     break
-        loc_name = (
-            getattr(getattr(obj, "current_location", None), "name", None)
-            or getattr(getattr(obj, "location", None), "name", None)
+        loc_name = getattr(getattr(obj, "current_location", None), "name", None) or getattr(
+            getattr(obj, "location", None), "name", None
         )
         return loc_id, loc_name
 
@@ -1941,15 +2446,19 @@ def api_stock_status(request: HttpRequest) -> JsonResponse:
 
     return JsonResponse({"ok": True, "in_stock": False, "data": {"in_stock": False}}, status=200)
 
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Restock Heatmap (with graceful fallback hook)
 # ──────────────────────────────────────────────────────────────────────────────
 @login_required
 @require_http_methods(["GET"])
 def restock_heatmap(_request: HttpRequest) -> JsonResponse:
-    payload = {"labels": ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"],
-               "series": [{"name": "Restocks", "data": [0,0,0,0,0,0,0]}]}
+    payload = {
+        "labels": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+        "series": [{"name": "Restocks", "data": [0, 0, 0, 0, 0, 0, 0]}],
+    }
     return _ok(payload)
+
 
 @login_required
 @require_http_methods(["GET"])
@@ -1969,6 +2478,7 @@ def restock_heatmap_api(request: HttpRequest) -> JsonResponse:
             except Exception:
                 break
     return restock_heatmap(request)
+
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Sales Trend / Top Models / Value Trend (flat payloads for charts)
@@ -2046,13 +2556,20 @@ def api_sales_trend(request: HttpRequest) -> JsonResponse:
             return False
 
     from django.db.models import Q
+
     sold_q = Q()
-    if _hasf("status"):     sold_q |= Q(status__iexact="sold")
-    if _hasf("sold_at"):    sold_q |= Q(sold_at__isnull=False)
-    if _hasf("is_sold"):    sold_q |= Q(is_sold=True)
-    if _hasf("in_stock"):   sold_q |= Q(in_stock=False)
-    if _hasf("quantity"):   sold_q |= Q(quantity=0)
-    if _hasf("qty"):        sold_q |= Q(qty=0)
+    if _hasf("status"):
+        sold_q |= Q(status__iexact="sold")
+    if _hasf("sold_at"):
+        sold_q |= Q(sold_at__isnull=False)
+    if _hasf("is_sold"):
+        sold_q |= Q(is_sold=True)
+    if _hasf("in_stock"):
+        sold_q |= Q(in_stock=False)
+    if _hasf("quantity"):
+        sold_q |= Q(quantity=0)
+    if _hasf("qty"):
+        sold_q |= Q(qty=0)
     qs = qs.filter(sold_q)
 
     time_fields = [f for f in ("sold_at", "updated_at", "created_at") if _hasf(f)]
@@ -2066,8 +2583,10 @@ def api_sales_trend(request: HttpRequest) -> JsonResponse:
                 break
 
     pull = ["id"]
-    if ts_field: pull.append(ts_field)
-    if price_field: pull.append(price_field)
+    if ts_field:
+        pull.append(ts_field)
+    if price_field:
+        pull.append(price_field)
     try:
         rows = list(qs.values(*pull)[:8000])
     except Exception:
@@ -2075,6 +2594,7 @@ def api_sales_trend(request: HttpRequest) -> JsonResponse:
 
     # DEBUG: Log queryset info to help diagnose why sales aren't detected
     import logging
+
     log = logging.getLogger(__name__)
     biz = get_active_business(request)
     log.info(
@@ -2185,11 +2705,15 @@ def api_top_models(request: HttpRequest) -> JsonResponse:
 
     biz = get_active_business(request)
     if _hasf("business_id"):
-        try: qs = qs.filter(business_id=getattr(biz, "id", None))
-        except Exception: pass
+        try:
+            qs = qs.filter(business_id=getattr(biz, "id", None))
+        except Exception:
+            pass
     elif _hasf("business"):
-        try: qs = qs.filter(business=biz)
-        except Exception: pass
+        try:
+            qs = qs.filter(business=biz)
+        except Exception:
+            pass
 
     loc_id = request.GET.get("location_id") or request.GET.get("location")
     if loc_id:
@@ -2210,12 +2734,18 @@ def api_top_models(request: HttpRequest) -> JsonResponse:
                         pass
 
     sold_q = Q()
-    if _hasf("status"):     sold_q |= Q(status__iexact="sold")
-    if _hasf("sold_at"):    sold_q |= Q(sold_at__isnull=False)
-    if _hasf("is_sold"):    sold_q |= Q(is_sold=True)
-    if _hasf("in_stock"):   sold_q |= Q(in_stock=False)
-    if _hasf("quantity"):   sold_q |= Q(quantity=0)
-    if _hasf("qty"):        sold_q |= Q(qty=0)
+    if _hasf("status"):
+        sold_q |= Q(status__iexact="sold")
+    if _hasf("sold_at"):
+        sold_q |= Q(sold_at__isnull=False)
+    if _hasf("is_sold"):
+        sold_q |= Q(is_sold=True)
+    if _hasf("in_stock"):
+        sold_q |= Q(in_stock=False)
+    if _hasf("quantity"):
+        sold_q |= Q(quantity=0)
+    if _hasf("qty"):
+        sold_q |= Q(qty=0)
     qs = qs.filter(sold_q)
 
     time_field = None
@@ -2238,8 +2768,10 @@ def api_top_models(request: HttpRequest) -> JsonResponse:
     fields = ["id"]
     if _hasf("product"):
         fields.append("product__name")
-        try: qs = qs.select_related("product")
-        except Exception: pass
+        try:
+            qs = qs.select_related("product")
+        except Exception:
+            pass
     if _hasf("name"):
         fields.append("name")
     if price_field:
@@ -2254,6 +2786,7 @@ def api_top_models(request: HttpRequest) -> JsonResponse:
 
     # DEBUG: Log queryset info
     import logging
+
     log = logging.getLogger(__name__)
     biz = get_active_business(request)
     log.info(
@@ -2277,7 +2810,7 @@ def api_top_models(request: HttpRequest) -> JsonResponse:
     items = sorted(
         ({"name": k, "count": v["count"], "amount": float(v["amount"])} for k, v in agg.items()),
         key=lambda x: (x["count"], x["amount"]),
-        reverse=True
+        reverse=True,
     )[:5]
 
     # REMOVED: Demo data fallback (previously lines 2270-2318)
@@ -2327,7 +2860,7 @@ def api_value_trend(request: HttpRequest) -> JsonResponse:
     elif period_raw in {"all", "all_time", "alltime"}:
         labels, bins = [], []
         for i in range(11, -1, -1):
-            start = (now.replace(day=1, hour=0, minute=0, second=0, microsecond=0) - timedelta(days=30*i))
+            start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0) - timedelta(days=30 * i)
             end = (start + timedelta(days=32)).replace(day=1)
             labels.append(start.strftime("%b %Y"))
             bins.append((start, end))
@@ -2341,7 +2874,9 @@ def api_value_trend(request: HttpRequest) -> JsonResponse:
         Model = InventoryItem or Stock
 
     if Model is None:
-        return _ok({"labels": labels, "series": [{"name": metric.title(), "data": [0 for _ in labels]}], "source": "inventory"})
+        return _ok(
+            {"labels": labels, "series": [{"name": metric.title(), "data": [0 for _ in labels]}], "source": "inventory"}
+        )
 
     manager = _manager(Model)
     qs = scoped(manager.all(), request)
@@ -2353,12 +2888,18 @@ def api_value_trend(request: HttpRequest) -> JsonResponse:
             return False
 
     sold_q = Q()
-    if _hasf("status"):     sold_q |= Q(status__iexact="sold")
-    if _hasf("sold_at"):    sold_q |= Q(sold_at__isnull=False)
-    if _hasf("is_sold"):    sold_q |= Q(is_sold=True)
-    if _hasf("in_stock"):   sold_q |= Q(in_stock=False)
-    if _hasf("quantity"):   sold_q |= Q(quantity=0)
-    if _hasf("qty"):        sold_q |= Q(qty=0)
+    if _hasf("status"):
+        sold_q |= Q(status__iexact="sold")
+    if _hasf("sold_at"):
+        sold_q |= Q(sold_at__isnull=False)
+    if _hasf("is_sold"):
+        sold_q |= Q(is_sold=True)
+    if _hasf("in_stock"):
+        sold_q |= Q(in_stock=False)
+    if _hasf("quantity"):
+        sold_q |= Q(quantity=0)
+    if _hasf("qty"):
+        sold_q |= Q(qty=0)
     qs = qs.filter(sold_q)
 
     ts_field = None
@@ -2380,9 +2921,12 @@ def api_value_trend(request: HttpRequest) -> JsonResponse:
             break
 
     fields = ["id"]
-    if ts_field: fields.append(ts_field)
-    if revenue_field: fields.append(revenue_field)
-    if cost_field: fields.append(cost_field)
+    if ts_field:
+        fields.append(ts_field)
+    if revenue_field:
+        fields.append(revenue_field)
+    if cost_field:
+        fields.append(cost_field)
 
     try:
         rows = list(qs.values(*fields)[:12000])
@@ -2414,11 +2958,15 @@ def api_value_trend(request: HttpRequest) -> JsonResponse:
         for i, (start, end) in enumerate(bins):
             if start <= dt < end:
                 if revenue_field:
-                    try: out_rev[i] += float(r.get(revenue_field) or 0.0)
-                    except Exception: pass
+                    try:
+                        out_rev[i] += float(r.get(revenue_field) or 0.0)
+                    except Exception:
+                        pass
                 if cost_field:
-                    try: out_cost[i] += float(r.get(cost_field) or 0.0)
-                    except Exception: pass
+                    try:
+                        out_cost[i] += float(r.get(cost_field) or 0.0)
+                    except Exception:
+                        pass
                 break
 
     if sum(out_rev) == 0 and sum(out_cost) == 0:
@@ -2446,6 +2994,7 @@ def api_value_trend(request: HttpRequest) -> JsonResponse:
 
     return _ok({"labels": labels, "series": [{"name": name, "data": data}], "source": "inventory"})
 
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Time logs / geo helpers (public API JSON)
 # ──────────────────────────────────────────────────────────────────────────────
@@ -2462,6 +3011,7 @@ def api_time_logs(request: HttpRequest) -> JsonResponse:
         if q_bid_int:
             try:
                 from tenants.models import Business
+
                 b = Business.objects.filter(id=q_bid_int).first()
                 if b:
                     set_active_business(request, b)
@@ -2485,18 +3035,20 @@ def api_time_logs(request: HttpRequest) -> JsonResponse:
         now = timezone.localtime(timezone.now())
         day = now.date()
 
-    start_dt = make_aware(datetime.combine(day, time.min))   # fixed: class method + time.min
-    end_dt   = make_aware(datetime.combine(day, time.max))   # fixed: class method + time.max
+    start_dt = make_aware(datetime.combine(day, time.min))  # fixed: class method + time.min
+    end_dt = make_aware(datetime.combine(day, time.max))  # fixed: class method + time.max
 
     rows: list[dict] = []
 
     if TimeLog is None:
-        return _ok({
-            "business_id": biz_id,
-            "day": day.isoformat(),
-            "shift_hours": shift_hours,
-            "rows": rows,
-        })
+        return _ok(
+            {
+                "business_id": biz_id,
+                "day": day.isoformat(),
+                "shift_hours": shift_hours,
+                "rows": rows,
+            }
+        )
 
     try:
         qs = TimeLog.objects.all()
@@ -2505,11 +3057,11 @@ def api_time_logs(request: HttpRequest) -> JsonResponse:
             qs = qs.filter(business_id=biz_id)
 
         if _model_has_field(TimeLog, "logged_at"):
-            qs = qs.filter( logged_at__gte=start_dt, logged_at__lte=end_dt )
+            qs = qs.filter(logged_at__gte=start_dt, logged_at__lte=end_dt)
         elif _model_has_field(TimeLog, "event_time"):
-            qs = qs.filter( event_time__gte=start_dt, event_time__lte=end_dt )
+            qs = qs.filter(event_time__gte=start_dt, event_time__lte=end_dt)
         elif _model_has_field(TimeLog, "created"):
-            qs = qs.filter( created__gte=start_dt, created__lte=end_dt )
+            qs = qs.filter(created__gte=start_dt, created__lte=end_dt)
 
         if _model_has_field(TimeLog, "logged_at"):
             qs = qs.order_by("-logged_at")
@@ -2523,18 +3075,14 @@ def api_time_logs(request: HttpRequest) -> JsonResponse:
         qs = qs.select_related("user", "location")[:500]
 
         for tl in qs:
+
             def g(obj, name, default=None):
                 try:
                     return getattr(obj, name)
                 except Exception:
                     return default
 
-            logged_at = (
-                g(tl, "logged_at")
-                or g(tl, "event_time")
-                or g(tl, "created")
-                or timezone.now()
-            )
+            logged_at = g(tl, "logged_at") or g(tl, "event_time") or g(tl, "created") or timezone.now()
             user_name = None
             u = g(tl, "user")
             if u:
@@ -2591,12 +3139,15 @@ def api_time_logs(request: HttpRequest) -> JsonResponse:
     except Exception as e:
         return JsonResponse({"ok": False, "error": f"time_logs_query_failed: {e}"}, status=500)
 
-    return _ok({
-        "business_id": biz_id,
-        "day": day.isoformat(),
-        "shift_hours": shift_hours,
-        "rows": rows,
-    })
+    return _ok(
+        {
+            "business_id": biz_id,
+            "day": day.isoformat(),
+            "shift_hours": shift_hours,
+            "rows": rows,
+        }
+    )
+
 
 @login_required
 @require_http_methods(["POST"])
@@ -2609,8 +3160,14 @@ def api_time_checkin(request: HttpRequest) -> JsonResponse:
         return _err("no_active_business", status=400)
 
     data = _parse_json_body(request)
-    lat = data.get("latitude"); lon = data.get("longitude"); acc = data.get("accuracy_m")
+    lat = data.get("latitude")
+    lon = data.get("longitude")
+    acc = data.get("accuracy_m")
     ctype = (data.get("checkin_type") or "ARRIVAL").upper()
+    if ctype in {"CHECK_IN", "CHECKIN", "START"}:
+        ctype = "ARRIVAL"
+    elif ctype in {"CHECK_OUT", "CHECKOUT", "END"}:
+        ctype = "DEPARTURE"
     location_id = data.get("location_id")
 
     if lat is None or lon is None:
@@ -2638,16 +3195,35 @@ def api_time_checkin(request: HttpRequest) -> JsonResponse:
             pass
 
     try:
+        start = timezone.localtime().replace(hour=0, minute=0, second=0, microsecond=0)
+        end = start + timedelta(days=1)
+        if ctype in {"ARRIVAL", "DEPARTURE"} and _model_has_field(TimeLog, "kind"):
+            latest = (
+                TimeLog.objects.filter(business_id=biz_id, user=request.user, ts__gte=start, ts__lt=end)
+                .order_by("-ts", "-id")
+                .first()
+            )
+            open_shift = bool(latest and getattr(latest, "kind", "") == "ARRIVAL")
+            if ctype == "ARRIVAL" and open_shift:
+                return _err("already_checked_in", status=409)
+            if ctype == "DEPARTURE" and not open_shift:
+                return _err("not_checked_in", status=409)
+
         kwargs = dict(
             user=request.user if _model_has_field(TimeLog, "user") else None,
+            kind=ctype if _model_has_field(TimeLog, "kind") else None,
             checkin_type=ctype if _model_has_field(TimeLog, "checkin_type") else None,
             event=ctype if _model_has_field(TimeLog, "event") else None,
+            ts=timezone.now() if _model_has_field(TimeLog, "ts") else None,
+            lat=lat if _model_has_field(TimeLog, "lat") else None,
+            lon=lon if _model_has_field(TimeLog, "lon") else None,
             latitude=lat if _model_has_field(TimeLog, "latitude") else None,
             longitude=lon if _model_has_field(TimeLog, "longitude") else None,
             accuracy_m=acc if _model_has_field(TimeLog, "accuracy_m") else None,
             distance_m=distance_m if _model_has_field(TimeLog, "distance_m") else None,
             within_geofence=within if _model_has_field(TimeLog, "within_geofence") else None,
             geofence=within if _model_has_field(TimeLog, "geofence") else None,
+            geofence_status=("Inside Zone" if within else "Outside Zone") if _model_has_field(TimeLog, "geofence_status") else None,
             note="" if _model_has_field(TimeLog, "note") else None,
             logged_at=timezone.now() if _model_has_field(TimeLog, "logged_at") else None,
         )
@@ -2661,18 +3237,20 @@ def api_time_checkin(request: HttpRequest) -> JsonResponse:
     except Exception as e:
         return _err(f"save failed: {e}", status=500)
 
-    return _ok({
-        "id": getattr(log, "id", None),
-        "logged_at": getattr(log, "logged_at", timezone.now()).isoformat()
-                    if hasattr(log, "logged_at") else timezone.now().isoformat(),
-        "checkin_type": ctype,
-        "location": getattr(loc_obj, "name", "") or "",
-        "distance_m": distance_m,
-        "within_geofence": within,
-        "latitude": lat,
-        "longitude": lon,
-        "business_id": biz_id,
-    })
+    return _ok(
+        {
+            "id": getattr(log, "id", None),
+            "logged_at": getattr(log, "logged_at", getattr(log, "ts", timezone.now())).isoformat(),
+            "checkin_type": ctype,
+            "location": getattr(loc_obj, "name", "") or "",
+            "distance_m": distance_m,
+            "within_geofence": within,
+            "latitude": lat,
+            "longitude": lon,
+            "business_id": biz_id,
+        }
+    )
+
 
 @login_required
 @csrf_exempt
@@ -2681,7 +3259,9 @@ def api_geo_ping(request: HttpRequest) -> JsonResponse:
     biz_id = ensure_active_business_id(request, auto_select_single=True)
 
     data = _parse_json_body(request)
-    lat = data.get("lat"); lon = data.get("lon"); acc = data.get("accuracy")
+    lat = data.get("lat")
+    lon = data.get("lon")
+    acc = data.get("accuracy")
     if lat is None or lon is None:
         return _err("lat/lon required", status=400)
 
@@ -2705,6 +3285,7 @@ def api_geo_ping(request: HttpRequest) -> JsonResponse:
             pass
 
     return _ok({"note": "pong", "business_id": biz_id})
+
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Public dashboard summary

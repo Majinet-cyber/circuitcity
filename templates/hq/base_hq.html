@@ -3,40 +3,111 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>{% block title %}HQ Dashboard - Emajinet{% endblock %}</title>
-  
+
   <!-- Bootstrap 5 -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
-  
-  {% block extra_css %}{% endblock %}
-</head>
-<body>
+  <link rel="stylesheet" href="{% static 'vendor/bootstrap-icons/bootstrap-icons.min.css' %}">
 
-<div class="d-flex">
-  <!-- HQ Sidebar -->
+  <!-- Mobile-First UI System (NEW) -->
+  <link href="{% static 'css/mobile-system.css' %}" rel="stylesheet">
+
+  <!-- HQ Mobile-First Responsive CSS -->
+  <link href="{% static 'css/hq-mobile.css' %}" rel="stylesheet">
+  <link href="{% static 'css/hq-mobile-responsive.css' %}" rel="stylesheet">
+  <!-- HQ Admin Layout CSS (Full Width) -->
+  <link href="{% static 'css/hq_admin.css' %}" rel="stylesheet">
+  <!-- HQ Sidebar Fix: Sticky on Desktop, Offcanvas on Mobile (2026-01-08) -->
+  <link href="{% static 'css/hq_sidebar_fix.css' %}" rel="stylesheet">
+
+  {% block extra_css %}{% endblock %}
+  
+  <!-- HQ Layout CSS — single source of truth, loaded LAST -->
+  <link href="{% static 'css/hq_layout.css' %}?v=20260428-2" rel="stylesheet">
+</head>
+<body data-layout="hq">
+
+<!-- HQ Layout Wrapper (Grid-based, never collapses) -->
+<div class="hq-layout">
+  <!-- Sidebar (always visible, locked left) -->
   {% include "hq/sidebar_hq.html" %}
 
-  <!-- Main content -->
-  <div style="margin-left: 260px; width: calc(100% - 260px); min-height: 100vh; background: #f8f9fa;">
-    {% if messages %}
-    <div class="container-fluid pt-3">
-      {% for message in messages %}
-      <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
-        {{ message }}
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  <!-- Main Content Area -->
+  <div class="hq-main">
+    <!-- Mobile Topbar (Hidden on Desktop) -->
+    <header class="hq-topbar">
+      <button id="hqSidebarToggle" class="hq-icon-btn" aria-controls="hqSidebar" aria-expanded="false" aria-label="Toggle navigation">
+        <i class="bi bi-list"></i>
+      </button>
+      <div class="hq-topbar-title">{% block topbar_title %}Emajinet HQ{% endblock %}</div>
+      <div class="hq-topbar-actions">
+        {% block topbar_actions %}
+        <!-- Optional: Add search icon, profile, etc. -->
+        {% endblock %}
       </div>
-      {% endfor %}
-    </div>
-    {% endif %}
+    </header>
 
-    {% block content %}{% endblock %}
+    <!-- Main Content -->
+    <main class="hq-content hq-page">
+      {% if messages %}
+      <div class="mb-3">
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+          {{ message }}
+          <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      {% block content %}
+        {% block page_content %}{% endblock %}
+      {% endblock %}
+    </main>
   </div>
-</div>
+
+  <!-- Backdrop for Mobile Sidebar (expanded state only) -->
+  <div id="hqBackdrop" class="hq-backdrop" hidden></div>
+</div><!-- /.hq-layout -->
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<!-- HQ Mobile Navigation -->
+<script src="{% static 'js/hq-mobile.js' %}"></script>
+
+<script>
+  /**
+   * Global HQ POST helper - makes POST requests with CSRF protection
+   * Gracefully falls back to GET if POST fails
+   */
+  window.hqPost = function(url, data) {
+    // Get CSRF token
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value ||
+                      document.cookie.split('; ')
+                        .find(row => row.startsWith('csrftoken='))
+                        ?.split('=')[1];
+
+    return fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': csrfToken || '',
+      },
+      body: JSON.stringify(data),
+    })
+    .then(response => {
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      return response.json();
+    });
+  };
+
+  // Notifications API URL (set by backend)
+  window.HQ_NOTIFICATIONS_URL = "{% url 'hq:hq_notifications_api' %}";
+</script>
+
 {% block extra_js %}{% endblock %}
 </body>
 </html>
-

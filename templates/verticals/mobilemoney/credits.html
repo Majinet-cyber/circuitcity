@@ -1,0 +1,313 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Credits & Debts · Mobile Money · {{ business.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+.mm-wrap { max-width: 1100px; margin: 0 auto; padding: 20px 14px; }
+.mm-nav { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 22px; }
+.mm-nav-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 9px 16px; border-radius: 10px; font-weight: 700; font-size: 0.82rem;
+  text-decoration: none; border: 1px solid; transition: all 0.15s;
+  background: #fff; border-color: #e2e8f0; color: #0f172a;
+}
+.mm-nav-btn:hover { background: #f8fafc; }
+.mm-nav-btn.active { background: #0f172a; color: #fff; border-color: #0f172a; }
+
+/* Summary bar */
+.summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 22px; }
+.summary-card {
+  border-radius: 14px; padding: 18px 20px;
+}
+.summary-card .sc-label { font-size: 0.72rem; text-transform: uppercase; font-weight: 800; letter-spacing: 0.07em; margin-bottom: 6px; }
+.summary-card .sc-value { font-size: 1.8rem; font-weight: 900; line-height: 1; }
+.summary-card .sc-sub { font-size: 0.78rem; margin-top: 5px; }
+
+/* Form / list grid */
+.cd-grid { display: grid; grid-template-columns: 380px 1fr; gap: 20px; }
+.mm-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 20px; }
+
+/* Credit item */
+.credit-item {
+  border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px;
+  margin-bottom: 10px; transition: border-color 0.15s;
+}
+.credit-item:hover { border-color: #cbd5e1; }
+.credit-item.overdue { border-color: #fca5a5; background: #fff5f5; }
+.credit-item.agent-debt { border-color: #bfdbfe; background: #f0f9ff; }
+
+/* Status badge */
+.status-badge {
+  display: inline-block; padding: 3px 10px; border-radius: 99px;
+  font-size: 0.7rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em;
+}
+.status-pending  { background: #fef9c3; color: #854d0e; }
+.status-partial  { background: #dbeafe; color: #1d4ed8; }
+.status-paid     { background: #dcfce7; color: #15803d; }
+.status-overdue  { background: #fee2e2; color: #991b1b; }
+
+/* Credit type pill */
+.ctype-credit { background: #dcfce7; color: #15803d; }
+.ctype-debt   { background: #dbeafe; color: #1d4ed8; }
+
+/* Tab switcher */
+.tab-switcher { display: flex; gap: 0; border-radius: 10px; overflow: hidden; border: 1px solid #e2e8f0; margin-bottom: 16px; }
+.tab-btn { flex: 1; padding: 9px 14px; border: none; background: #fff; font-size: 0.82rem; font-weight: 700; color: #64748b; cursor: pointer; transition: all 0.15s; }
+.tab-btn.active { background: #0f172a; color: #fff; }
+
+/* Urgency indicator */
+.urgency-bar { height: 4px; border-radius: 2px; background: #f1f5f9; overflow: hidden; margin-top: 6px; }
+.urgency-fill { height: 100%; border-radius: 2px; }
+
+@media (max-width: 800px) { .cd-grid { grid-template-columns: 1fr; } .summary-grid { grid-template-columns: 1fr; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="mm-wrap" data-testid="mm-credits">
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+    <a href="{% url 'mobilemoney:dashboard' %}" style="color:#64748b;font-size:0.875rem;">&larr; Dashboard</a>
+    <h1 style="margin:0;font-size:1.4rem;font-weight:900;color:#0f172a;">Credits & Debts</h1>
+  </div>
+
+  <div class="mm-nav">
+    <a href="{% url 'mobilemoney:transactions' %}" class="mm-nav-btn">Transactions</a>
+    <a href="{% url 'mobilemoney:credits' %}" class="mm-nav-btn active">Credits & Debts</a>
+    <a href="{% url 'mobilemoney:commissions' %}" class="mm-nav-btn">Commissions</a>
+    <a href="{% url 'mobilemoney:reconciliation' %}" class="mm-nav-btn">End of Day</a>
+    <a href="{% url 'mobilemoney:settlements' %}" class="mm-nav-btn">Settlements</a>
+  </div>
+
+  {% if messages %}
+  {% for msg in messages %}
+  <div style="padding:12px 16px;border-radius:10px;margin-bottom:12px;font-weight:600;{% if 'error' in msg.tags %}background:#fee2e2;color:#991b1b;{% else %}background:#dcfce7;color:#15803d;{% endif %}">{{ msg }}</div>
+  {% endfor %}
+  {% endif %}
+
+  <!-- Summary -->
+  <div class="summary-grid">
+    <div class="summary-card" style="background:#f0fdf4;border:1px solid #bbf7d0;">
+      <div class="sc-label" style="color:#15803d;">Customers Owe Us</div>
+      <div class="sc-value" style="color:#15803d;">MK {{ credits_outstanding|floatformat:0|intcomma }}</div>
+      <div class="sc-sub" style="color:#16a34a;">
+        Outstanding credits · {{ customer_credits.count }} record{% if customer_credits.count != 1 %}s{% endif %}
+        {% if overdue_credits.count > 0 %}<strong style="color:#dc2626;"> · {{ overdue_credits.count }} overdue</strong>{% endif %}
+      </div>
+    </div>
+    <div class="summary-card" style="background:#eff6ff;border:1px solid #bfdbfe;">
+      <div class="sc-label" style="color:#1d4ed8;">We Owe Others</div>
+      <div class="sc-value" style="color:#1d4ed8;">MK {{ debts_outstanding|floatformat:0|intcomma }}</div>
+      <div class="sc-sub" style="color:#1d4ed8;">
+        Agent debts · {{ agent_debts.count }} record{% if agent_debts.count != 1 %}s{% endif %}
+        {% if overdue_debts.count > 0 %}<strong style="color:#dc2626;"> · {{ overdue_debts.count }} overdue</strong>{% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="cd-grid">
+    <!-- Form -->
+    <div class="mm-card">
+      <h3 style="font-weight:800;margin:0 0 16px;font-size:0.95rem;color:#0f172a;">Record Credit / Debt</h3>
+
+      <form method="post" data-testid="credit-form">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="create">
+
+        <div class="mb-3">
+          <label class="form-label fw-semibold" style="font-size:0.85rem;">Type *</label>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+            <label style="cursor:pointer;">
+              <input type="radio" name="credit_type" value="customer_credit" checked id="ct_customer" style="display:none;">
+              <div id="ct_customer_btn" onclick="selectCreditType('customer_credit')"
+                style="border:2px solid #10b981;border-radius:10px;padding:10px;text-align:center;background:#f0fdf4;color:#15803d;font-weight:700;font-size:0.82rem;cursor:pointer;">
+                📤 Customer Owes Us
+              </div>
+            </label>
+            <label style="cursor:pointer;">
+              <input type="radio" name="credit_type" value="agent_debt" id="ct_debt" style="display:none;">
+              <div id="ct_debt_btn" onclick="selectCreditType('agent_debt')"
+                style="border:2px solid #e2e8f0;border-radius:10px;padding:10px;text-align:center;background:#fff;color:#64748b;font-weight:700;font-size:0.82rem;cursor:pointer;">
+                📥 We Owe Agent
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label fw-semibold" style="font-size:0.85rem;" id="nameLabel">Customer Name *</label>
+          <input type="text" name="customer_name" class="form-control form-control-sm" required placeholder="Full name">
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold" style="font-size:0.85rem;">Phone</label>
+          <input type="text" name="customer_phone" class="form-control form-control-sm" placeholder="0999 xxx xxx">
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold" style="font-size:0.85rem;">Amount (MWK) *</label>
+          <input type="number" name="amount_credited" class="form-control form-control-sm" required min="1" step="0.01" placeholder="0.00">
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold" style="font-size:0.85rem;">Reason</label>
+          <input type="text" name="reason" class="form-control form-control-sm" placeholder="e.g. Sent money, forgot to collect">
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold" style="font-size:0.85rem;">Due Date</label>
+          <input type="date" name="due_date" class="form-control form-control-sm">
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold" style="font-size:0.85rem;">Notes</label>
+          <textarea name="notes" class="form-control form-control-sm" rows="2" placeholder="Additional notes..."></textarea>
+        </div>
+        <button type="submit" class="btn btn-primary w-100 fw-bold">Save Record</button>
+      </form>
+    </div>
+
+    <!-- Records list -->
+    <div>
+      <!-- Tab switcher -->
+      <div class="tab-switcher" style="margin-bottom:16px;">
+        <button class="tab-btn active" id="tabCustomer" onclick="showTab('customer')">
+          Customer Credits ({{ customer_credits.count }})
+        </button>
+        <button class="tab-btn" id="tabDebt" onclick="showTab('debt')">
+          Agent Debts ({{ agent_debts.count }})
+        </button>
+      </div>
+
+      <!-- Customer credits -->
+      <div id="panelCustomer">
+        {% if overdue_credits %}
+        <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:10px;padding:10px 14px;margin-bottom:12px;font-size:0.82rem;color:#991b1b;font-weight:600;">
+          ⚠️ {{ overdue_credits.count }} overdue credit{% if overdue_credits.count != 1 %}s{% endif %} — follow up urgently
+        </div>
+        {% endif %}
+
+        {% for credit in customer_credits %}
+        <div class="credit-item {% if credit.status == 'overdue' %}overdue{% endif %}">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
+            <div style="flex:1;min-width:0;">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+                <strong style="color:#0f172a;font-size:0.95rem;">{{ credit.customer_name }}</strong>
+                <span class="status-badge status-{{ credit.status }}">{{ credit.get_status_display }}</span>
+              </div>
+              {% if credit.customer_phone %}<div style="font-size:0.78rem;color:#64748b;">📞 {{ credit.customer_phone }}</div>{% endif %}
+              {% if credit.reason %}<div style="font-size:0.78rem;color:#94a3b8;margin-top:2px;">{{ credit.reason }}</div>{% endif %}
+              {% if credit.due_date %}
+              <div style="font-size:0.75rem;margin-top:3px;{% if credit.status == 'overdue' %}color:#dc2626;font-weight:700;{% else %}color:#64748b;{% endif %}">
+                Due: {{ credit.due_date }}{% if credit.status == 'overdue' %} — OVERDUE{% endif %}
+              </div>
+              {% endif %}
+              {% if credit.status != 'paid' %}
+              <!-- Progress bar -->
+              <div style="margin-top:6px;">
+                <div style="display:flex;justify-content:space-between;font-size:0.7rem;color:#94a3b8;margin-bottom:2px;">
+                  <span>Repaid MK {{ credit.amount_repaid|floatformat:0|intcomma }}</span>
+                  <span>of MK {{ credit.amount_credited|floatformat:0|intcomma }}</span>
+                </div>
+                <div class="urgency-bar">
+                  {% with pct=credit.amount_repaid|floatformat:0 %}
+                  <div class="urgency-fill" style="width:{% widthratio credit.amount_repaid credit.amount_credited 100 %}%;background:{% if credit.status == 'overdue' %}#ef4444{% elif credit.status == 'partial' %}#f59e0b{% else %}#e2e8f0{% endif %};"></div>
+                  {% endwith %}
+                </div>
+              </div>
+              {% endif %}
+            </div>
+            <div style="text-align:right;flex-shrink:0;">
+              <div style="font-size:1.1rem;font-weight:900;color:{% if credit.status == 'overdue' %}#dc2626{% elif credit.status == 'paid' %}#16a34a{% else %}#0f172a{% endif %};">
+                MK {{ credit.balance|floatformat:0|intcomma }}
+              </div>
+              <div style="font-size:0.7rem;color:#94a3b8;">balance</div>
+            </div>
+          </div>
+          {% if credit.status != 'paid' %}
+          <form method="post" action="{% url 'mobilemoney:credit_repayment' credit.id %}" style="display:flex;gap:8px;margin-top:10px;">
+            {% csrf_token %}
+            <input type="number" name="amount" class="form-control form-control-sm" placeholder="Repayment amount" min="1" step="0.01" style="flex:1;">
+            <button type="submit" class="btn btn-sm btn-success fw-bold" style="white-space:nowrap;">Record Payment</button>
+          </form>
+          {% endif %}
+        </div>
+        {% empty %}
+        <div style="text-align:center;padding:40px 0;color:#94a3b8;">
+          <div style="font-size:2rem;margin-bottom:8px;">✅</div>
+          <p style="margin:0;font-size:0.875rem;">No customer credits on record.</p>
+        </div>
+        {% endfor %}
+      </div>
+
+      <!-- Agent debts -->
+      <div id="panelDebt" style="display:none;">
+        {% if overdue_debts %}
+        <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:10px 14px;margin-bottom:12px;font-size:0.82rem;color:#1d4ed8;font-weight:600;">
+          ⚠️ {{ overdue_debts.count }} overdue debt{% if overdue_debts.count != 1 %}s{% endif %} — settle soon
+        </div>
+        {% endif %}
+
+        {% for debt in agent_debts %}
+        <div class="credit-item agent-debt {% if debt.status == 'overdue' %}overdue{% endif %}">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
+            <div style="flex:1;min-width:0;">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+                <strong style="color:#0f172a;font-size:0.95rem;">{{ debt.customer_name }}</strong>
+                <span class="status-badge status-{{ debt.status }}">{{ debt.get_status_display }}</span>
+              </div>
+              {% if debt.customer_phone %}<div style="font-size:0.78rem;color:#64748b;">📞 {{ debt.customer_phone }}</div>{% endif %}
+              {% if debt.reason %}<div style="font-size:0.78rem;color:#94a3b8;margin-top:2px;">{{ debt.reason }}</div>{% endif %}
+              {% if debt.due_date %}
+              <div style="font-size:0.75rem;margin-top:3px;{% if debt.status == 'overdue' %}color:#dc2626;font-weight:700;{% else %}color:#64748b;{% endif %}">
+                Due: {{ debt.due_date }}{% if debt.status == 'overdue' %} — OVERDUE{% endif %}
+              </div>
+              {% endif %}
+            </div>
+            <div style="text-align:right;flex-shrink:0;">
+              <div style="font-size:1.1rem;font-weight:900;color:#1d4ed8;">
+                MK {{ debt.balance|floatformat:0|intcomma }}
+              </div>
+              <div style="font-size:0.7rem;color:#94a3b8;">we owe</div>
+            </div>
+          </div>
+          {% if debt.status != 'paid' %}
+          <form method="post" action="{% url 'mobilemoney:credit_repayment' debt.id %}" style="display:flex;gap:8px;margin-top:10px;">
+            {% csrf_token %}
+            <input type="number" name="amount" class="form-control form-control-sm" placeholder="Amount paid back" min="1" step="0.01" style="flex:1;">
+            <button type="submit" class="btn btn-sm btn-primary fw-bold" style="white-space:nowrap;">Mark Paid</button>
+          </form>
+          {% endif %}
+        </div>
+        {% empty %}
+        <div style="text-align:center;padding:40px 0;color:#94a3b8;">
+          <div style="font-size:2rem;margin-bottom:8px;">✅</div>
+          <p style="margin:0;font-size:0.875rem;">No agent debts on record.</p>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function showTab(tab) {
+  document.getElementById('panelCustomer').style.display = tab === 'customer' ? 'block' : 'none';
+  document.getElementById('panelDebt').style.display = tab === 'debt' ? 'block' : 'none';
+  document.getElementById('tabCustomer').classList.toggle('active', tab === 'customer');
+  document.getElementById('tabDebt').classList.toggle('active', tab === 'debt');
+}
+
+function selectCreditType(type) {
+  document.getElementById('ct_customer').checked = type === 'customer_credit';
+  document.getElementById('ct_debt').checked = type === 'agent_debt';
+  const cb = document.getElementById('ct_customer_btn');
+  const db = document.getElementById('ct_debt_btn');
+  if (type === 'customer_credit') {
+    cb.style.borderColor = '#10b981'; cb.style.background = '#f0fdf4'; cb.style.color = '#15803d';
+    db.style.borderColor = '#e2e8f0'; db.style.background = '#fff'; db.style.color = '#64748b';
+    document.getElementById('nameLabel').textContent = 'Customer Name *';
+  } else {
+    db.style.borderColor = '#3b82f6'; db.style.background = '#eff6ff'; db.style.color = '#1d4ed8';
+    cb.style.borderColor = '#e2e8f0'; cb.style.background = '#fff'; cb.style.color = '#64748b';
+    document.getElementById('nameLabel').textContent = 'Agent Name *';
+  }
+}
+</script>
+{% endblock %}

@@ -1,6 +1,11 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block title %}Phone Products · Emajinet{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/premium-products.css' %}">
+{% endblock %}
 
 {% block content %}
 
@@ -96,17 +101,26 @@
               
               {% if product.has_pricing %}
                 <div class="product-pricing">
-                  <div>
-                    <span style="color:#64748b">Cost:</span>
-                    <strong style="color:#0f172a">MK {{ product.default_cost_price|floatformat:0 }}</strong>
+                  <div style="display:flex;align-items:center;justify-content:space-between">
+                    <div>
+                      <span style="color:#64748b">Cost:</span>
+                      <strong style="color:#0f172a" id="cost-price-{{ product.id }}">MK {{ product.default_cost_price|floatformat:0 }}</strong>
+                    </div>
+                    {% if IS_MANAGER %}
+                      <button type="button" class="btn-edit-price" data-product-id="{{ product.id }}" data-cost-price="{{ product.default_cost_price|default:'' }}" data-selling-price="{{ product.default_selling_price|default:'' }}" style="background:none;border:none;color:#64748b;cursor:pointer;padding:2px 4px;font-size:0.85rem" title="Edit prices">
+                        <i class="bi bi-pencil"></i>
+                      </button>
+                    {% endif %}
                   </div>
-                  <div>
-                    <span style="color:#64748b">Selling:</span>
-                    <strong style="color:#16a34a">MK {{ product.default_selling_price|floatformat:0 }}</strong>
+                  <div style="display:flex;align-items:center;justify-content:space-between">
+                    <div>
+                      <span style="color:#64748b">Selling:</span>
+                      <strong style="color:#16a34a" id="selling-price-{{ product.id }}">MK {{ product.default_selling_price|floatformat:0 }}</strong>
+                    </div>
                   </div>
                   <div>
                     <span style="color:#64748b">Margin:</span>
-                    <strong style="color:#3b82f6">
+                    <strong style="color:#3b82f6" id="margin-{{ product.id }}">
                       MK {{ product.default_selling_price|add:"-"|add:product.default_cost_price|floatformat:0 }}
                     </strong>
                   </div>
@@ -114,6 +128,11 @@
               {% else %}
                 <div class="product-pricing">
                   <div style="color:#94a3b8;font-style:italic">No pricing set</div>
+                  {% if IS_MANAGER %}
+                    <button type="button" class="btn-edit-price" data-product-id="{{ product.id }}" data-cost-price="" data-selling-price="" style="background:none;border:none;color:#64748b;cursor:pointer;padding:2px 4px;font-size:0.85rem;margin-top:4px" title="Edit prices">
+                      <i class="bi bi-pencil"></i> Set Prices
+                    </button>
+                  {% endif %}
                 </div>
               {% endif %}
               
@@ -154,6 +173,42 @@
   {% endif %}
 </div>
 
+<!-- Price Edit Modal -->
+{% if IS_MANAGER %}
+<div class="modal fade" id="priceEditModal" tabindex="-1" aria-labelledby="priceEditModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="priceEditModalLabel">Edit Prices</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <form id="priceEditForm">
+          {% csrf_token %}
+          <input type="hidden" id="edit-product-id" name="product_id">
+          <div class="mb-3">
+            <label for="edit-order-price" class="form-label">Order Price (Cost)</label>
+            <input type="text" class="form-control" id="edit-order-price" name="order_price" placeholder="e.g., 35000 or 35,000">
+            <small class="form-text text-muted">Enter cost price. Commas and spaces are automatically removed.</small>
+          </div>
+          <div class="mb-3">
+            <label for="edit-selling-price" class="form-label">Selling Price</label>
+            <input type="text" class="form-control" id="edit-selling-price" name="selling_price" placeholder="e.g., 45000 or 45,000">
+            <small class="form-text text-muted">Enter selling price. Commas and spaces are automatically removed.</small>
+          </div>
+          <div id="price-edit-error" class="alert alert-danger" style="display:none"></div>
+          <div id="price-edit-warning" class="alert alert-warning" style="display:none"></div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" id="save-price-btn">Save Prices</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
 <script>
 function filterByBrand(brand) {
   const url = new URL(window.location);
@@ -164,6 +219,120 @@ function filterByBrand(brand) {
   }
   window.location = url;
 }
+
+{% if IS_MANAGER %}
+// Price edit functionality
+(function() {
+  const modal = new bootstrap.Modal(document.getElementById('priceEditModal'));
+  const form = document.getElementById('priceEditForm');
+  const errorDiv = document.getElementById('price-edit-error');
+  const warningDiv = document.getElementById('price-edit-warning');
+  const saveBtn = document.getElementById('save-price-btn');
+  
+  // Open modal when edit button is clicked
+  document.querySelectorAll('.btn-edit-price').forEach(btn => {
+    btn.addEventListener('click', function() {
+      const productId = this.getAttribute('data-product-id');
+      const costPrice = this.getAttribute('data-cost-price') || '';
+      const sellingPrice = this.getAttribute('data-selling-price') || '';
+      
+      document.getElementById('edit-product-id').value = productId;
+      document.getElementById('edit-order-price').value = costPrice ? parseFloat(costPrice).toLocaleString('en-US', {maximumFractionDigits: 0}) : '';
+      document.getElementById('edit-selling-price').value = sellingPrice ? parseFloat(sellingPrice).toLocaleString('en-US', {maximumFractionDigits: 0}) : '';
+      errorDiv.style.display = 'none';
+      warningDiv.style.display = 'none';
+      modal.show();
+    });
+  });
+  
+  // Handle form submission
+  saveBtn.addEventListener('click', function() {
+    const productId = document.getElementById('edit-product-id').value;
+    const orderPrice = document.getElementById('edit-order-price').value.trim();
+    const sellingPrice = document.getElementById('edit-selling-price').value.trim();
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    
+    errorDiv.style.display = 'none';
+    warningDiv.style.display = 'none';
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Saving...';
+    
+    const formData = new FormData();
+    formData.append('csrfmiddlewaretoken', csrfToken);
+    if (orderPrice) formData.append('order_price', orderPrice);
+    if (sellingPrice) formData.append('selling_price', sellingPrice);
+    
+    fetch(`/inventory/phone-products/${productId}/update-prices/`, {
+      method: 'POST',
+      body: formData,
+      headers: {
+        'X-CSRFToken': csrfToken
+      }
+    })
+    .then(response => response.json())
+    .then(data => {
+      if (data.ok) {
+        // Update displayed prices
+        const costEl = document.getElementById(`cost-price-${productId}`);
+        const sellingEl = document.getElementById(`selling-price-${productId}`);
+        const marginEl = document.getElementById(`margin-${productId}`);
+        
+        if (data.order_price && costEl) {
+          costEl.textContent = 'MK ' + parseFloat(data.order_price).toLocaleString('en-US', {maximumFractionDigits: 0});
+          // Update button data attribute
+          const editBtn = document.querySelector(`.btn-edit-price[data-product-id="${productId}"]`);
+          if (editBtn) editBtn.setAttribute('data-cost-price', data.order_price);
+        }
+        if (data.selling_price && sellingEl) {
+          sellingEl.textContent = 'MK ' + parseFloat(data.selling_price).toLocaleString('en-US', {maximumFractionDigits: 0});
+          // Update button data attribute
+          const editBtn = document.querySelector(`.btn-edit-price[data-product-id="${productId}"]`);
+          if (editBtn) editBtn.setAttribute('data-selling-price', data.selling_price);
+        }
+        if (marginEl) {
+          // Get updated values from response or fall back to DOM
+          const cost = data.order_price ? parseFloat(data.order_price) : (costEl ? parseFloat(costEl.textContent.replace(/[^0-9.]/g, '')) : 0);
+          const selling = data.selling_price ? parseFloat(data.selling_price) : (sellingEl ? parseFloat(sellingEl.textContent.replace(/[^0-9.]/g, '')) : 0);
+          const margin = selling - cost;
+          marginEl.textContent = 'MK ' + margin.toLocaleString('en-US', {maximumFractionDigits: 0});
+        }
+        
+        // Show success message
+        const alertDiv = document.createElement('div');
+        alertDiv.className = 'alert alert-success alert-dismissible fade show';
+        alertDiv.style.position = 'fixed';
+        alertDiv.style.top = '20px';
+        alertDiv.style.right = '20px';
+        alertDiv.style.zIndex = '9999';
+        alertDiv.innerHTML = `
+          <strong>Success!</strong> ${data.message}
+          <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+        document.body.appendChild(alertDiv);
+        setTimeout(() => alertDiv.remove(), 3000);
+        
+        modal.hide();
+      } else {
+        errorDiv.textContent = data.error || 'An error occurred';
+        errorDiv.style.display = 'block';
+      }
+      
+      if (data.warning) {
+        warningDiv.textContent = data.warning;
+        warningDiv.style.display = 'block';
+      }
+    })
+    .catch(error => {
+      errorDiv.textContent = 'Network error: ' + error.message;
+      errorDiv.style.display = 'block';
+    })
+    .finally(() => {
+      saveBtn.disabled = false;
+      saveBtn.textContent = 'Save Prices';
+    });
+  });
+})();
+{% endif %}
 </script>
 
 {% endblock %}

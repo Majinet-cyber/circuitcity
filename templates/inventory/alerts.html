@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Alerts & Notifications · {{ business.name }}{% endblock %}
+
+{% block extra_head %}
+<style>
+  .alerts-container{max-width:1000px;margin:0 auto;padding:24px}
+  .alerts-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:24px}
+  .alerts-header h1{margin:0;font-size:1.8rem;font-weight:800}
+  .filters{display:flex;gap:10px;margin-bottom:20px}
+  .btn{padding:10px 20px;border:1px solid #e2e8f0;border-radius:10px;background:#fff;cursor:pointer;font-weight:600;transition:all .2s;text-decoration:none;display:inline-block}
+  .btn:hover{background:#f1f5f9}
+  .btn.primary{background:#3b82f6;color:#fff;border-color:#3b82f6}
+  .btn.primary:hover{background:#2563eb}
+  
+  .alert-card{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:16px;margin-bottom:12px;transition:all .2s}
+  .alert-card:hover{box-shadow:0 4px 12px rgba(0,0,0,.08)}
+  .alert-card.unread{border-left:4px solid #3b82f6;background:#f0f9ff}
+  .alert-card.priority-high{border-left-color:#ef4444}
+  .alert-card.priority-urgent{border-left-color:#dc2626;background:#fef2f2}
+  
+  .alert-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px}
+  .alert-title{font-weight:700;font-size:1.05rem;color:#0f172a;margin:0}
+  .alert-meta{display:flex;gap:10px;align-items:center;font-size:.85rem;color:#64748b}
+  .alert-message{color:#475569;line-height:1.5;margin:8px 0}
+  .alert-actions{display:flex;gap:8px;margin-top:12px}
+  .alert-actions button{padding:6px 12px;border:1px solid #e2e8f0;border-radius:6px;background:#fff;cursor:pointer;font-size:.85rem;font-weight:600}
+  .alert-actions button:hover{background:#f1f5f9}
+  
+  .badge{display:inline-block;padding:4px 10px;border-radius:6px;font-size:.75rem;font-weight:700;text-transform:uppercase}
+  .badge.high{background:#fef2f2;color:#dc2626}
+  .badge.medium{background:#fef3c7;color:#d97706}
+  .badge.low{background:#f0f9ff;color:#2563eb}
+  
+  .empty-state{text-align:center;padding:60px 20px;color:#94a3b8}
+  .empty-state svg{width:80px;height:80px;margin-bottom:16px;opacity:.5}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="alerts-container">
+  <div class="alerts-header">
+    <h1>🔔 Alerts & Notifications</h1>
+    <button class="btn primary" onclick="markAllRead()">Mark All as Read</button>
+  </div>
+  
+  <div class="filters">
+    <a href="?show_read=false" class="btn {% if not show_read %}primary{% endif %}">Unread Only</a>
+    <a href="?show_read=true" class="btn {% if show_read %}primary{% endif %}">Show All</a>
+    <a href="?type=out_of_stock" class="btn">Out of Stock</a>
+    <a href="?type=low_stock" class="btn">Low Stock</a>
+    <a href="?type=top_agent" class="btn">Top Agents</a>
+  </div>
+  
+  {% if alerts %}
+    {% for alert in alerts %}
+    <div class="alert-card {% if not alert.is_read %}unread{% endif %} priority-{{ alert.priority }}" data-alert-id="{{ alert.id }}">
+      <div class="alert-header">
+        <h3 class="alert-title">{{ alert.title }}</h3>
+        <div class="alert-meta">
+          <span class="badge {{ alert.priority }}">{{ alert.get_priority_display }}</span>
+          <span>{{ alert.created_at|timesince }} ago</span>
+        </div>
+      </div>
+      <p class="alert-message">{{ alert.message }}</p>
+      <div class="alert-actions">
+        {% if not alert.is_read %}
+        <button onclick="markRead({{ alert.id }})">✓ Mark as Read</button>
+        {% endif %}
+        <button onclick="dismiss({{ alert.id }})">✕ Dismiss</button>
+      </div>
+    </div>
+    {% endfor %}
+  {% else %}
+    <div class="empty-state">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <h2>No alerts</h2>
+      <p>You're all caught up! No new alerts at this time.</p>
+    </div>
+  {% endif %}
+</div>
+
+<script>
+  async function markRead(alertId) {
+    try {
+      const resp = await fetch(`/inventory/api/alerts/${alertId}/read/`, {method: 'POST', headers: {'X-CSRFToken': '{{ csrf_token }}'}});
+      if (resp.ok) {
+        const card = document.querySelector(`[data-alert-id="${alertId}"]`);
+        card.classList.remove('unread');
+        card.querySelector('.alert-actions').innerHTML = '<button onclick="dismiss(' + alertId + ')">✕ Dismiss</button>';
+      }
+    } catch (err) {
+      console.error('Failed to mark as read:', err);
+    }
+  }
+  
+  async function dismiss(alertId) {
+    try {
+      const resp = await fetch(`/inventory/api/alerts/${alertId}/dismiss/`, {method: 'POST', headers: {'X-CSRFToken': '{{ csrf_token }}'}});
+      if (resp.ok) {
+        const card = document.querySelector(`[data-alert-id="${alertId}"]`);
+        card.style.opacity = '0';
+        setTimeout(() => card.remove(), 300);
+      }
+    } catch (err) {
+      console.error('Failed to dismiss:', err);
+    }
+  }
+  
+  async function markAllRead() {
+    try {
+      const resp = await fetch('/inventory/api/alerts/mark-all-read/', {method: 'POST', headers: {'X-CSRFToken': '{{ csrf_token }}'}});
+      if (resp.ok) {
+        document.querySelectorAll('.alert-card.unread').forEach(card => {
+          card.classList.remove('unread');
+        });
+        alert('All alerts marked as read!');
+      }
+    } catch (err) {
+      console.error('Failed to mark all as read:', err);
+    }
+  }
+</script>
+{% endblock %}
+

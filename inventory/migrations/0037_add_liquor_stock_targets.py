@@ -5,7 +5,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("inventory", "0036_monthlysalestarget"),
         ("tenants", "0012_add_business_logo"),
@@ -15,9 +14,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name="merchproduct",
             name="auto_adjust_enabled",
-            field=models.BooleanField(
-                default=True, help_text="Enable smart auto-adjust based on sales demand"
-            ),
+            field=models.BooleanField(default=True, help_text="Enable smart auto-adjust based on sales demand"),
         ),
         migrations.AddField(
             model_name="merchproduct",
@@ -30,9 +27,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name="merchproduct",
             name="target_bottles",
-            field=models.PositiveIntegerField(
-                default=0, help_text="Desired full stock for this product in bottles"
-            ),
+            field=models.PositiveIntegerField(default=0, help_text="Desired full stock for this product in bottles"),
         ),
         migrations.CreateModel(
             name="LiquorStockSettings",
@@ -48,39 +43,27 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "beer_target",
-                    models.PositiveIntegerField(
-                        default=600, help_text="Default target for beer category"
-                    ),
+                    models.PositiveIntegerField(default=600, help_text="Default target for beer category"),
                 ),
                 (
                     "cider_target",
-                    models.PositiveIntegerField(
-                        default=600, help_text="Default target for cider category"
-                    ),
+                    models.PositiveIntegerField(default=600, help_text="Default target for cider category"),
                 ),
                 (
                     "spirits_target",
-                    models.PositiveIntegerField(
-                        default=600, help_text="Default target for spirits category"
-                    ),
+                    models.PositiveIntegerField(default=600, help_text="Default target for spirits category"),
                 ),
                 (
                     "whiskey_target",
-                    models.PositiveIntegerField(
-                        default=600, help_text="Default target for whiskey category"
-                    ),
+                    models.PositiveIntegerField(default=600, help_text="Default target for whiskey category"),
                 ),
                 (
                     "wine_target",
-                    models.PositiveIntegerField(
-                        default=600, help_text="Default target for wine category"
-                    ),
+                    models.PositiveIntegerField(default=600, help_text="Default target for wine category"),
                 ),
                 (
                     "other_target",
-                    models.PositiveIntegerField(
-                        default=600, help_text="Default target for other category"
-                    ),
+                    models.PositiveIntegerField(default=600, help_text="Default target for other category"),
                 ),
                 (
                     "default_auto_adjust_pct",

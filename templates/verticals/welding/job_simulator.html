@@ -1,0 +1,900 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Job Cost Simulator - Welding Workshop{% endblock %}
+
+{% block extra_css %}
+<style>
+:root {
+  --weld-primary: #2563eb;
+  --weld-accent: #0ea5e9;
+  --weld-dark: #ffffff;
+  --weld-surface: #f8fafc;
+  --weld-card: #ffffff;
+  --weld-border: #e2e8f0;
+  --weld-text: #111827;
+  --weld-muted: #64748b;
+  --weld-success: #22c55e;
+}
+
+.welding-page {
+  background: linear-gradient(135deg, #eff6ff 0%, #f8fafc 34%, #ffffff 100%);
+  min-height: 100vh;
+  color: var(--weld-text);
+  overflow-x: hidden;
+}
+
+.welding-container {
+  width: 100%;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: clamp(0.875rem, 3vw, 1.5rem);
+  padding-bottom: calc(5.5rem + env(safe-area-inset-bottom));
+  box-sizing: border-box;
+}
+
+.page-header {
+  margin-bottom: 2rem;
+}
+
+.page-title {
+  font-size: 2rem;
+  font-weight: 800;
+  color: #111827;
+  margin-bottom: 0.5rem;
+}
+
+.page-subtitle {
+  color: var(--weld-muted);
+  font-size: 1rem;
+}
+
+/* Section Cards */
+.section-card {
+  background: var(--weld-card);
+  border: 1px solid var(--weld-border);
+  border-radius: 20px;
+  margin-bottom: 1.5rem;
+  overflow: hidden;
+  min-width: 0;
+  box-shadow: 0 14px 36px rgba(15, 23, 42, 0.08);
+}
+
+.section-header {
+  padding: 1rem 1.5rem;
+  background: linear-gradient(135deg, #ffffff, #eff6ff);
+  border-bottom: 1px solid var(--weld-border);
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.section-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, var(--weld-primary), var(--weld-accent));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+}
+
+.section-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.section-body {
+  padding: 1.5rem;
+}
+
+/* Template Grid */
+.template-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.template-card {
+  padding: 1.25rem;
+  background: #ffffff;
+  border: 2px solid var(--weld-border);
+  border-radius: 16px;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: center;
+}
+
+.template-card:hover {
+  border-color: var(--weld-primary);
+  transform: translateY(-2px);
+}
+
+.template-card.selected {
+  border-color: var(--weld-primary);
+  background: rgba(37, 99, 235, 0.1);
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.15);
+}
+
+.template-icon {
+  font-size: 2.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.template-name {
+  font-weight: 700;
+  font-size: 0.95rem;
+  margin-bottom: 0.25rem;
+}
+
+.template-meta {
+  font-size: 0.8rem;
+  color: var(--weld-muted);
+}
+
+/* Form Controls */
+.form-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.form-group {
+  margin-bottom: 0;
+}
+
+.form-label {
+  display: block;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--weld-text);
+  margin-bottom: 0.5rem;
+}
+
+.form-control {
+  width: 100%;
+  padding: 0.875rem 1rem;
+  font-size: 1rem;
+  background: #ffffff;
+  border: 1px solid var(--weld-border);
+  border-radius: 12px;
+  color: var(--weld-text);
+}
+
+.form-control:focus {
+  outline: none;
+  border-color: var(--weld-primary);
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12);
+}
+
+.mode-switch {
+  display: inline-grid;
+  grid-template-columns: repeat(2, minmax(150px, 1fr));
+  gap: 0.35rem;
+  padding: 0.35rem;
+  background: #ffffff;
+  border: 1px solid var(--weld-border);
+  border-radius: 14px;
+  margin-bottom: 1.25rem;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.06);
+}
+
+.mode-switch a {
+  color: var(--weld-muted);
+  text-decoration: none;
+  font-weight: 700;
+  text-align: center;
+  padding: 0.75rem 1rem;
+  border-radius: 10px;
+}
+
+.mode-switch a.active {
+  color: #fff;
+  background: linear-gradient(135deg, var(--weld-primary), var(--weld-accent));
+}
+
+.material-table-wrap {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+  padding-bottom: 0.2rem;
+}
+
+.material-table {
+  width: 100%;
+  min-width: 760px;
+  border-collapse: separate;
+  border-spacing: 0 0.65rem;
+}
+
+.material-table th {
+  color: var(--weld-muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-align: left;
+  text-transform: uppercase;
+  padding: 0 0.5rem;
+}
+
+.material-table td {
+  padding: 0 0.35rem;
+  vertical-align: top;
+}
+
+.material-table .form-control {
+  min-width: 105px;
+  padding: 0.7rem 0.75rem;
+  border-radius: 10px;
+}
+
+.material-table .material-name {
+  min-width: 190px;
+}
+
+.icon-btn {
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  border: 1px solid var(--weld-border);
+  background: #ffffff;
+  color: var(--weld-text);
+  cursor: pointer;
+}
+
+.summary-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 0.85rem;
+  margin-bottom: 1.25rem;
+}
+
+.summary-card {
+  background: #ffffff;
+  border: 1px solid var(--weld-border);
+  border-radius: 14px;
+  padding: 1rem;
+  min-width: 0;
+}
+
+.summary-label {
+  color: var(--weld-muted);
+  font-size: 0.82rem;
+  margin-bottom: 0.35rem;
+}
+
+.summary-value {
+  color: var(--weld-text);
+  font-size: clamp(0.98rem, 4vw, 1.12rem);
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+/* Buttons */
+.btn {
+  padding: 0.875rem 1.5rem;
+  font-size: 1rem;
+  font-weight: 700;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  text-decoration: none;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--weld-primary), var(--weld-accent));
+  color: white;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+}
+
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(37, 99, 235, 0.4);
+}
+
+.btn-success {
+  background: linear-gradient(135deg, var(--weld-success), #16a34a);
+  color: white;
+  box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);
+}
+
+.btn-success:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(34, 197, 94, 0.4);
+}
+
+.btn-secondary {
+  background: #ffffff;
+  border: 1px solid var(--weld-border);
+  color: var(--weld-text);
+}
+
+/* Results Section */
+.results-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 1.5rem;
+}
+
+.bom-table {
+  width: 100%;
+  min-width: 620px;
+  border-collapse: collapse;
+}
+
+.bom-table th {
+  text-align: left;
+  padding: 0.75rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--weld-muted);
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--weld-border);
+}
+
+.bom-table td {
+  padding: 0.75rem;
+  border-bottom: 1px solid var(--weld-border);
+}
+
+.bom-table tr:last-child td {
+  border-bottom: none;
+}
+
+/* Cost Summary */
+.cost-summary {
+  background: linear-gradient(135deg, #ffffff, #eff6ff);
+  border: 2px solid var(--weld-primary);
+  border-radius: 16px;
+  padding: 1.5rem;
+  min-width: 0;
+}
+
+.cost-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.5rem 0;
+}
+
+.cost-label {
+  color: var(--weld-muted);
+}
+
+.cost-value {
+  font-weight: 600;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.cost-row.total {
+  border-top: 2px solid var(--weld-border);
+  margin-top: 0.5rem;
+  padding-top: 1rem;
+  font-size: 1.25rem;
+}
+
+.cost-row.total .cost-value {
+  color: var(--weld-primary);
+  font-weight: 800;
+}
+
+.recommended-prices {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--weld-border);
+}
+
+.recommended-title {
+  font-size: 0.9rem;
+  color: var(--weld-muted);
+  margin-bottom: 0.5rem;
+}
+
+.price-suggestion {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.5rem 0;
+}
+
+.price-label {
+  font-size: 0.9rem;
+}
+
+.price-value {
+  font-weight: 700;
+  color: var(--weld-success);
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+/* Create Quote Form */
+.quote-form {
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--weld-border);
+}
+
+.quote-form-title {
+  font-weight: 700;
+  margin-bottom: 1rem;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .results-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .template-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .mode-switch {
+    width: 100%;
+    grid-template-columns: 1fr;
+  }
+
+  .material-table {
+    min-width: 760px;
+  }
+}
+
+@media (max-width: 430px) {
+  .page-title {
+    font-size: 1.55rem;
+  }
+
+  .section-header,
+  .section-body {
+    padding: 1rem;
+  }
+
+  .template-grid,
+  .summary-cards {
+    grid-template-columns: 1fr;
+  }
+
+  .cost-summary {
+    padding: 1rem;
+  }
+
+  .cost-row,
+  .price-suggestion {
+    align-items: flex-start;
+  }
+
+  .cost-row.total {
+    font-size: 1.05rem;
+  }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="welding-page">
+  <div class="welding-container">
+    <!-- Header -->
+    <div class="page-header">
+      <h1 class="page-title">🧠 Job Cost Simulator</h1>
+      <p class="page-subtitle">Estimate materials and costs for any job. The "brain" that helps you price accurately.</p>
+    </div>
+    
+    <div class="mode-switch" aria-label="Simulator mode">
+      <a href="#templateEstimator" class="{% if simulator_mode != 'general' %}active{% endif %}">Template estimator</a>
+      <a href="#workshopEstimator" class="{% if simulator_mode == 'general' %}active{% endif %}">Workshop simulator</a>
+    </div>
+
+    <!-- Template Selection -->
+    <form method="post" id="simulatorForm">
+      {% csrf_token %}
+      <input type="hidden" name="simulator_mode" value="template">
+      
+      <div class="section-card" id="templateEstimator">
+        <div class="section-header">
+          <div class="section-icon">📋</div>
+          <div class="section-title">Template Estimator</div>
+        </div>
+        <div class="section-body">
+          <div class="template-grid" data-testid="welding-simulator-templates">
+            {% for template in templates %}
+            <div class="template-card {% if selected_template and selected_template.code == template.code %}selected{% endif %}" 
+                 onclick="selectTemplate(this, '{{ template.code }}')">
+              <div class="template-icon">
+                {% if 'BED' in template.code %}🛏️
+                {% elif 'TV' in template.code %}📺
+                {% elif 'WINDOW' in template.code %}🪟
+                {% elif 'DOOR' in template.code %}🚪
+                {% elif 'GATE' in template.code %}🚧
+                {% elif 'BURGLAR' in template.code %}🔒
+                {% elif 'SHELF' in template.code or 'RACK' in template.code %}📦
+                {% else %}🔧{% endif %}
+              </div>
+              <div class="template-name">{{ template.name }}</div>
+              <div class="template-meta">~{{ template.default_labour_hours }}hrs</div>
+              <input type="radio" name="template_code" value="{{ template.code }}" style="display: none;"
+                     {% if selected_template and selected_template.code == template.code %}checked{% endif %}>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+      
+      <!-- Configuration -->
+      <div class="section-card">
+        <div class="section-header">
+          <div class="section-icon">⚙️</div>
+          <div class="section-title">Template Configuration</div>
+        </div>
+        <div class="section-body">
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Wastage/Overhead %</label>
+              <input type="number" class="form-control" name="wastage_pct" value="10" min="0" max="50">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Labour Rate (MWK/hr)</label>
+              <input type="number" class="form-control" name="labour_rate" value="5000" min="0" step="100">
+            </div>
+          </div>
+          
+          <button type="submit" class="btn btn-primary" data-testid="welding-simulator-calculate">
+            <i class="bi bi-calculator"></i> Calculate Costs
+          </button>
+        </div>
+      </div>
+    </form>
+
+    <form method="post" id="workshopEstimator">
+      {% csrf_token %}
+      <input type="hidden" name="simulator_mode" value="general">
+
+      <div class="section-card">
+        <div class="section-header">
+          <div class="section-icon">🧰</div>
+          <div class="section-title">General Workshop / Material Simulator</div>
+        </div>
+        <div class="section-body">
+          <div class="material-table-wrap">
+            <table class="material-table" id="materialRows">
+              <thead>
+                <tr>
+                  <th>Type</th>
+                  <th>Material / Cost</th>
+                  <th>Qty</th>
+                  <th>Unit</th>
+                  <th>Unit Cost</th>
+                  <th>Waste %</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in default_workshop_rows %}
+                <tr>
+                  <td>
+                    <select class="form-control" name="material_category">
+                      {% for code, label in material_categories %}
+                      <option value="{{ code }}" {% if row.category == code %}selected{% endif %}>{{ label }}</option>
+                      {% endfor %}
+                    </select>
+                  </td>
+                  <td><input class="form-control material-name" type="text" name="material_name" value="{{ row.name }}"></td>
+                  <td><input class="form-control" type="number" name="quantity" min="0" step="0.01" value="{{ row.quantity }}"></td>
+                  <td>
+                    <select class="form-control" name="unit">
+                      {% for code, label in unit_choices %}
+                      <option value="{{ code }}" {% if row.unit == code %}selected{% endif %}>{{ label }}</option>
+                      {% endfor %}
+                    </select>
+                  </td>
+                  <td><input class="form-control" type="number" name="unit_cost" min="0" step="0.01" value="{{ row.unit_cost }}"></td>
+                  <td><input class="form-control" type="number" name="waste_percent" min="0" max="100" step="0.1" value="{{ row.waste_percent }}"></td>
+                  <td><button type="button" class="icon-btn" onclick="removeMaterialRow(this)" aria-label="Remove row">×</button></td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+
+          <button type="button" class="btn btn-secondary" onclick="addMaterialRow()" style="margin-bottom: 1rem;">
+            <i class="bi bi-plus-lg"></i> Add material row
+          </button>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Labour Hours</label>
+              <input type="number" class="form-control" name="labour_hours" value="8" min="0" step="0.25">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Labour Rate (MWK/hr)</label>
+              <input type="number" class="form-control" name="workshop_labour_rate" value="5000" min="0" step="100">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Transport (MWK)</label>
+              <input type="number" class="form-control" name="transport_cost" value="0" min="0" step="100">
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Overhead %</label>
+              <input type="number" class="form-control" name="overhead_percent" value="10" min="0" max="100" step="0.1">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Profit %</label>
+              <input type="number" class="form-control" name="profit_percent" value="25" min="0" max="100" step="0.1">
+            </div>
+          </div>
+
+          <button type="submit" class="btn btn-primary" data-testid="welding-workshop-calculate">
+            <i class="bi bi-calculator"></i> Calculate Custom Estimate
+          </button>
+        </div>
+      </div>
+    </form>
+    
+    <!-- Results -->
+    {% if simulation_result %}
+    <div class="section-card">
+      <div class="section-header">
+        <div class="section-icon">📊</div>
+        <div class="section-title">Simulation Results: {{ simulation_result.template.name }}</div>
+      </div>
+      <div class="section-body">
+        <div class="results-grid">
+          <!-- BOM Table -->
+          <div>
+            <h4 style="margin-bottom: 1rem;">Bill of Materials</h4>
+            <div class="material-table-wrap">
+            <table class="bom-table">
+              <thead>
+                <tr>
+                  <th>Material</th>
+                  <th>Qty</th>
+                  <th>Unit Price</th>
+                  <th>Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for item in simulation_result.bom %}
+                <tr>
+                  <td>{{ item.material_name }}</td>
+                  <td>{{ item.quantity }} {{ item.unit }}</td>
+                  <td>MWK {{ item.unit_price_mwk|floatformat:0|intcomma }}</td>
+                  <td>MWK {{ item.line_total_mwk|floatformat:0|intcomma }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+            </div>
+          </div>
+          
+          <!-- Cost Summary -->
+          <div>
+            <div class="cost-summary">
+              <h4 style="margin-bottom: 1rem;">Cost Breakdown</h4>
+              
+              <div class="cost-row">
+                <span class="cost-label">Materials</span>
+                <span class="cost-value">MWK {{ simulation_result.materials_cost|floatformat:0|intcomma }}</span>
+              </div>
+              <div class="cost-row">
+                <span class="cost-label">Labour</span>
+                <span class="cost-value">MWK {{ simulation_result.labour_cost|floatformat:0|intcomma }}</span>
+              </div>
+              <div class="cost-row">
+                <span class="cost-label">Overhead/Wastage</span>
+                <span class="cost-value">MWK {{ simulation_result.overhead_cost|floatformat:0|intcomma }}</span>
+              </div>
+              <div class="cost-row total">
+                <span class="cost-label"><strong>Total Cost</strong></span>
+                <span class="cost-value">MWK {{ simulation_result.total_cost|floatformat:0|intcomma }}</span>
+              </div>
+              
+              <div class="recommended-prices">
+                <div class="recommended-title">Suggested Selling Prices:</div>
+                <div class="price-suggestion">
+                  <span class="price-label">With 25% margin:</span>
+                  <span class="price-value">MWK {{ simulation_result.recommended_price_25|floatformat:0|intcomma }}</span>
+                </div>
+                <div class="price-suggestion">
+                  <span class="price-label">With 30% margin:</span>
+                  <span class="price-value">MWK {{ simulation_result.recommended_price_30|floatformat:0|intcomma }}</span>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Convert to Quote -->
+            <div class="quote-form">
+              <div class="quote-form-title">Create Quote from Simulation</div>
+              <form method="post" action="{% url 'verticals:welding_simulator_to_quote' %}">
+                {% csrf_token %}
+                <input type="hidden" name="template_code" value="{{ simulation_result.template.code }}">
+                
+                <div class="form-group" style="margin-bottom: 0.75rem;">
+                  <input type="text" class="form-control" name="customer_name" placeholder="Customer / Company Name" required>
+                </div>
+                <div class="form-group" style="margin-bottom: 0.75rem;">
+                  <input type="text" class="form-control" name="customer_contact_person" placeholder="Contact person (optional)">
+                </div>
+                <div class="form-group" style="margin-bottom: 0.75rem;">
+                  <input type="tel" class="form-control" name="customer_phone" placeholder="Phone (optional)">
+                </div>
+                <div class="form-group" style="margin-bottom: 0.75rem;">
+                  <input type="email" class="form-control" name="customer_email" placeholder="Email (optional)">
+                </div>
+                <div class="form-group" style="margin-bottom: 0.75rem;">
+                  <textarea class="form-control" name="customer_address" rows="2" placeholder="Address / location (optional)"></textarea>
+                </div>
+                <div class="form-group" style="margin-bottom: 0.75rem;">
+                  <select class="form-control" name="margin_pct">
+                    <option value="25">25% Margin</option>
+                    <option value="30">30% Margin</option>
+                    <option value="20">20% Margin</option>
+                    <option value="15">15% Margin</option>
+                  </select>
+                </div>
+                
+                <button type="submit" class="btn btn-success" style="width: 100%;">
+                  <i class="bi bi-file-plus"></i> Create Quote
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    {% if workshop_result %}
+    <div class="section-card">
+      <div class="section-header">
+        <div class="section-icon">📊</div>
+        <div class="section-title">Workshop Estimate Results</div>
+      </div>
+      <div class="section-body">
+        <div class="summary-cards">
+          <div class="summary-card">
+            <div class="summary-label">Materials + Waste</div>
+            <div class="summary-value">MWK {{ workshop_result.materials_total|floatformat:0|intcomma }}</div>
+          </div>
+          <div class="summary-card">
+            <div class="summary-label">Labour</div>
+            <div class="summary-value">MWK {{ workshop_result.labour_cost|floatformat:0|intcomma }}</div>
+          </div>
+          <div class="summary-card">
+            <div class="summary-label">Overhead</div>
+            <div class="summary-value">MWK {{ workshop_result.overhead_cost|floatformat:0|intcomma }}</div>
+          </div>
+          <div class="summary-card">
+            <div class="summary-label">Profit</div>
+            <div class="summary-value">MWK {{ workshop_result.profit_amount|floatformat:0|intcomma }}</div>
+          </div>
+          <div class="summary-card">
+            <div class="summary-label">Final Estimate</div>
+            <div class="summary-value">MWK {{ workshop_result.final_estimate|floatformat:0|intcomma }}</div>
+          </div>
+        </div>
+
+        <div class="results-grid">
+          <div>
+            <h4 style="margin-bottom: 1rem;">Material Rows</h4>
+            <div class="material-table-wrap">
+              <table class="bom-table">
+                <thead>
+                  <tr>
+                    <th>Material</th>
+                    <th>Qty</th>
+                    <th>Base</th>
+                    <th>Waste</th>
+                    <th>Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for row in workshop_result.rows %}
+                  <tr>
+                    <td>{{ row.name }}</td>
+                    <td>{{ row.quantity }} {{ row.unit }}</td>
+                    <td>MWK {{ row.base_cost|floatformat:0|intcomma }}</td>
+                    <td>{{ row.waste_percent|floatformat:1 }}% / MWK {{ row.waste_cost|floatformat:0|intcomma }}</td>
+                    <td>MWK {{ row.line_total|floatformat:0|intcomma }}</td>
+                  </tr>
+                  {% empty %}
+                  <tr>
+                    <td colspan="5">No material rows were entered.</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div>
+            <div class="cost-summary">
+              <h4 style="margin-bottom: 1rem;">Cost Build-up</h4>
+              <div class="cost-row">
+                <span class="cost-label">Material subtotal</span>
+                <span class="cost-value">MWK {{ workshop_result.materials_subtotal|floatformat:0|intcomma }}</span>
+              </div>
+              <div class="cost-row">
+                <span class="cost-label">Waste allowance</span>
+                <span class="cost-value">MWK {{ workshop_result.waste_cost|floatformat:0|intcomma }}</span>
+              </div>
+              <div class="cost-row">
+                <span class="cost-label">Labour</span>
+                <span class="cost-value">MWK {{ workshop_result.labour_cost|floatformat:0|intcomma }}</span>
+              </div>
+              <div class="cost-row">
+                <span class="cost-label">Transport</span>
+                <span class="cost-value">MWK {{ workshop_result.transport_cost|floatformat:0|intcomma }}</span>
+              </div>
+              <div class="cost-row">
+                <span class="cost-label">Overhead</span>
+                <span class="cost-value">MWK {{ workshop_result.overhead_cost|floatformat:0|intcomma }}</span>
+              </div>
+              <div class="cost-row">
+                <span class="cost-label">Profit</span>
+                <span class="cost-value">MWK {{ workshop_result.profit_amount|floatformat:0|intcomma }}</span>
+              </div>
+              <div class="cost-row total">
+                <span class="cost-label"><strong>Final Estimate</strong></span>
+                <span class="cost-value">MWK {{ workshop_result.final_estimate|floatformat:0|intcomma }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+    
+    <!-- Back Link -->
+    <div style="margin-top: 1rem;">
+      <a href="{% url 'verticals:welding_dashboard' %}" class="btn btn-secondary">
+        <i class="bi bi-arrow-left"></i> Back to Dashboard
+      </a>
+    </div>
+  </div>
+</div>
+
+<script>
+function selectTemplate(card, code) {
+  document.querySelectorAll('.template-card').forEach(c => c.classList.remove('selected'));
+  card.classList.add('selected');
+  card.querySelector('input[type="radio"]').checked = true;
+}
+
+function addMaterialRow() {
+  const tbody = document.querySelector('#materialRows tbody');
+  const source = tbody.querySelector('tr:last-child');
+  if (!source) return;
+  const clone = source.cloneNode(true);
+  clone.querySelectorAll('input').forEach(input => {
+    if (input.name === 'quantity') input.value = '1';
+    else if (input.name === 'waste_percent') input.value = '10';
+    else input.value = '';
+  });
+  clone.querySelectorAll('select').forEach(select => {
+    select.selectedIndex = 0;
+  });
+  tbody.appendChild(clone);
+}
+
+function removeMaterialRow(button) {
+  const rows = document.querySelectorAll('#materialRows tbody tr');
+  if (rows.length <= 1) return;
+  button.closest('tr').remove();
+}
+</script>
+{% endblock %}
+

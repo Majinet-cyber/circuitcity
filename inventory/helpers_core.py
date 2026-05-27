@@ -1,42 +1,115 @@
-﻿# inventory/helpers.py
+# inventory/helpers.py
 from __future__ import annotations
 
-from typing import Optional, Dict, Iterable
-from django.urls import reverse, NoReverseMatch
+from typing import Dict, Iterable, Optional
+
+from django.urls import NoReverseMatch, reverse
 
 # ------------------------------------------------------------------
 # Canonical vertical keys
 # ------------------------------------------------------------------
-PHONES   = "phones"
+PHONES = "phones"
 PHARMACY = "pharmacy"
 CLOTHING = "clothing"
-LIQUOR   = "liquor"
-GROCERY  = "grocery"
-GYM      = "gym"
-GENERIC  = "generic"
+LIQUOR = "liquor"
+GROCERY = "grocery"
+GYM = "gym"
+CEMENT = "cement"
+FARM = "farm"
+WELDING = "welding"
+CAR_HIRE = "car_hire"
+CAR_DEALER = "car_dealer"
+ENERGY = "energy"
+GENERIC = "generic"
 
 # Synonyms / legacy labels -> canonical keys
 _ALIASES: Dict[str, str] = {
     # phones / electronics
-    "phone": PHONES, "phones": PHONES, "mobile": PHONES, "mobiles": PHONES,
-    "electronics": PHONES, "phones & electronics": PHONES, "merch": PHONES,
+    "phone": PHONES,
+    "phones": PHONES,
+    "mobile": PHONES,
+    "mobiles": PHONES,
+    "electronics": PHONES,
+    "phones & electronics": PHONES,
+    "merch": PHONES,
     # pharmacy
-    "pharmacy": PHARMACY, "chemist": PHARMACY, "medicine": PHARMACY, "drugstore": PHARMACY,
+    "pharmacy": PHARMACY,
+    "chemist": PHARMACY,
+    "medicine": PHARMACY,
+    "drugstore": PHARMACY,
     # clothing / fashion
-    "clothing": CLOTHING, "clothes": CLOTHING, "apparel": CLOTHING,
-    "fashion": CLOTHING, "fashion & clothing": CLOTHING,
+    "clothing": CLOTHING,
+    "clothes": CLOTHING,
+    "apparel": CLOTHING,
+    "fashion": CLOTHING,
+    "fashion & clothing": CLOTHING,
     # liquor
-    "liquor": LIQUOR, "alcohol": LIQUOR, "bar": LIQUOR, "bottle-store": LIQUOR, "bottle store": LIQUOR,
+    "liquor": LIQUOR,
+    "alcohol": LIQUOR,
+    "bar": LIQUOR,
+    "bottle-store": LIQUOR,
+    "bottle store": LIQUOR,
     # grocery / retail
-    "grocery": GROCERY, "groceries": GROCERY, "supermarket": GROCERY, "retail": GROCERY,
+    "grocery": GROCERY,
+    "groceries": GROCERY,
+    "supermarket": GROCERY,
+    "retail": GROCERY,
     "supermarket & groceries": GROCERY,
     # gym / fitness
-    "gym": GYM, "fitness": GYM, "fit": GYM,
+    "gym": GYM,
+    "fitness": GYM,
+    "fit": GYM,
+    # cement / hardware
+    "cement": CEMENT,
+    "hardware": CEMENT,
+    "building materials": CEMENT,
+    # farm / agriculture
+    "farm": FARM,
+    "farming": FARM,
+    "agriculture": FARM,
+    "farm manager": FARM,
+    "agribusiness": FARM,
+    # welding / fabrication
+    "welding": WELDING,
+    "welder": WELDING,
+    "welding workshop": WELDING,
+    "fabrication": WELDING,
+    "metalwork": WELDING,
+    # car hire / fleet
+    "car_hire": CAR_HIRE,
+    "car hire": CAR_HIRE,
+    "car hire service": CAR_HIRE,
+    "vehicle rental": CAR_HIRE,
+    "car rental": CAR_HIRE,
+    "fleet": CAR_HIRE,
+    "fleet management": CAR_HIRE,
+    # car dealer / dealership
+    "car_dealer": CAR_DEALER,
+    "car dealer": CAR_DEALER,
+    "car dealership": CAR_DEALER,
+    "vehicle dealership": CAR_DEALER,
+    "auto dealer": CAR_DEALER,
+    "dealership": CAR_DEALER,
+    # renewable energy
+    "energy": ENERGY,
+    "renewable energy": ENERGY,
+    "solar": ENERGY,
+    "solar energy": ENERGY,
+    "energy management": ENERGY,
+    "renewable": ENERGY,
 }
 
 # Which fields on Business we will probe to determine vertical
 _BIZ_FIELDS: tuple[str, ...] = (
-    "template_key", "vertical", "category", "industry", "type", "kind", "sector", "business_kind", "business_type"
+    "template_key",
+    "vertical",
+    "category",
+    "industry",
+    "type",
+    "kind",
+    "sector",
+    "business_kind",
+    "business_type",
 )
 
 # Session keys that might carry a business id or a vertical override
@@ -55,6 +128,7 @@ def _norm_label(v: Optional[str]) -> str:
     """
     key = (v or "").strip().lower()
     return _ALIASES.get(key, PHONES)
+
 
 def _try_reverse(names: Iterable[str]) -> str:
     """
@@ -104,6 +178,7 @@ def get_active_business(request):
     if bid:
         try:
             from tenants.models import Business
+
             return Business.objects.filter(id=bid).first()
         except Exception:
             return None
@@ -150,21 +225,34 @@ def product_mode_from_business(business) -> str:
 
 def business_vertical(request) -> str:
     """
-    Single source of truth for vertical from a request:
-      1) Session override (active_business_vertical)
-      2) Active business fields
-      3) Default PHONES
+    Single source of truth for vertical from a request.
+
+    Active business wins over session — fixes stale mobile nav after workspace switch:
+    ``active_business_vertical`` must not override the current tenant's vertical.
     """
+    biz = get_active_business(request)
+    from_biz = product_mode_from_business(biz)
+
+    sess_v = None
     try:
         sess = getattr(request, "session", {}) or {}
-        sess_v = sess.get(_SESS_VERTICAL_KEY)
-        if isinstance(sess_v, str) and sess_v.strip():
-            return _norm_label(sess_v)
+        raw = sess.get(_SESS_VERTICAL_KEY)
+        if isinstance(raw, str) and raw.strip():
+            sess_v = _norm_label(raw)
     except Exception:
         pass
 
-    biz = get_active_business(request)
-    return product_mode_from_business(biz)
+    if biz is not None:
+        if sess_v and sess_v != from_biz:
+            try:
+                request.session[_SESS_VERTICAL_KEY] = from_biz
+            except Exception:
+                pass
+        return from_biz
+
+    if sess_v:
+        return sess_v
+    return from_biz
 
 
 def is_phone_business(obj) -> bool:
@@ -194,16 +282,20 @@ def product_new_url_for_business(business) -> str:
         return _try_reverse(("inventory:pharmacy_product_new",))
 
     if mode == CLOTHING:
-        return _try_reverse((
-            "inventory:clothing_product_new_v2",  # v2 (preferred)
-            "inventory:clothing_product_new",     # legacy
-        ))
+        return _try_reverse(
+            (
+                "inventory:clothing_product_new_v2",  # v2 (preferred)
+                "inventory:clothing_product_new",  # legacy
+            )
+        )
 
     if mode == LIQUOR:
-        return _try_reverse((
-            "inventory:liquor_product_new_v2",    # v2 (preferred)
-            "inventory:liquor_product_new",       # legacy
-        ))
+        return _try_reverse(
+            (
+                "inventory:liquor_product_new_v2",  # v2 (preferred)
+                "inventory:liquor_product_new",  # legacy
+            )
+        )
 
     if mode == GROCERY:
         return _try_reverse(("inventory:product_create_grocery",))
@@ -238,5 +330,3 @@ def add_product_entry_url() -> str:
         return reverse("inventory:product_new_entry")
     except NoReverseMatch:
         return "/inventory/products/new/"
-
-

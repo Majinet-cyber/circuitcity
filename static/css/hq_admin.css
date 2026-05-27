@@ -1,0 +1,47 @@
+/**
+ * HQ Admin Content CSS
+ * Content-level styling (cards, containers, rows).
+ * Layout (shell / sidebar / main) is in hq_sidebar_fix.css — DO NOT duplicate here.
+ */
+
+/* Remove nested container max-width constraints inside HQ content */
+.hq-content > .container,
+.hq-content > .container-fluid,
+.hq-content > .container-lg,
+.hq-content > .container-xl,
+.hq-content .container,
+.hq-content .container-fluid {
+  max-width: none !important;
+  width: 100% !important;
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+
+@media (min-width: 768px) {
+  .hq-content > .container,
+  .hq-content > .container-fluid,
+  .hq-content .container,
+  .hq-content .container-fluid {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+  }
+}
+
+/* Ensure rows and columns work properly inside content */
+.hq-content .row {
+  margin-left: 0;
+  margin-right: 0;
+}
+
+.hq-content [class*="col-"] {
+  padding-left: 0.75rem;
+  padding-right: 0.75rem;
+}
+
+/* Utility overrides: cards & tables should be full width */
+.hq-content .card,
+.hq-content .table-responsive,
+.hq-content table {
+  max-width: none !important;
+  width: 100% !important;
+}

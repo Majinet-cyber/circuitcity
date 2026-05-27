@@ -1,30 +1,12 @@
-{% extends "base.html" %}
+{% extends "accounts/_settings_shell.html" %}
 {% load static %}
 
 {% block title %}Settings · Security{% endblock %}
 {% block header_title %}Settings{% endblock %}
 
-{# Hide Layby + Notifications only on settings pages #}
-{% block extra_head %}
-<style>
-  .cc-header .cc-actions { display: none !important; }
-</style>
-{% endblock %}
+{% block settings_page_title %}Account Settings{% endblock %}
 
-{% block content %}
-<div class="container my-4">
-  <h2 class="fw-bold mb-3">Account Settings</h2>
-  {% include "accounts/_settings_nav.html" %}
-
-  {% if messages %}
-    {% for message in messages %}
-      <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
-        {{ message }}
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-      </div>
-    {% endfor %}
-  {% endif %}
-
+{% block settings_content %}
   <div class="row g-4">
     <!-- Password change -->
     <div class="col-lg-6">
@@ -67,7 +49,7 @@
               </div>
             {% endif %}
 
-            <button type="submit" class="btn btn-primary px-4">
+            <button type="submit" class="btn btn-cc-primary px-4">
               <i class="bi bi-save me-1"></i> Update Password
             </button>
           </form>
@@ -75,46 +57,103 @@
       </div>
     </div>
 
-    <!-- Two-Factor Authentication -->
+    <!-- Two-Factor Authentication (SMS OTP) -->
     <div class="col-lg-6">
       <div class="card shadow-sm border-0 rounded-3">
         <div class="card-body p-4">
-          <h5 class="fw-semibold mb-2"><i class="bi bi-shield-lock me-1"></i> Two-Factor Authentication (2FA)</h5>
+          <h5 class="fw-semibold mb-2"><i class="bi bi-shield-lock me-1"></i> Two-Factor Authentication</h5>
           <p class="text-muted mb-3">
-            Add a second step to sign in using an authenticator app (TOTP) and backup codes.
+            Add an extra layer of security by requiring a verification code sent to your phone.
           </p>
 
-          <div class="d-flex align-items-center mb-3">
-            {% if request.user.otp_device %}
+          {% if twofactor.sms_enabled %}
+            {# 2FA is ENABLED - show status and disable option #}
+            <div class="d-flex align-items-center mb-3">
               <span class="badge bg-success me-2">Enabled</span>
-              <small class="text-muted">A TOTP device is registered for your account.</small>
-            {% else %}
-              <span class="badge bg-secondary me-2">Not enabled</span>
-              <small class="text-muted">Protect your account by enabling 2FA.</small>
-            {% endif %}
-          </div>
+              <small class="text-muted">SMS verification is active for your account.</small>
+            </div>
 
-          {# Resolve the URL only if the two_factor namespace is available #}
-          {% url 'two_factor:profile' as two_factor_url %}
-          {% if two_factor_url %}
-            <a class="btn btn-outline-primary" href="{{ two_factor_url }}">
-              Manage Two-Factor Authentication
-            </a>
-            <div class="mt-3 small text-muted">
-              You’ll be able to scan a QR code with an authenticator app (e.g., Google Authenticator, Authy)
-              and generate backup codes. You can also disable 2FA from that page if needed.
+            <div class="mb-3">
+              <strong>Phone:</strong> 
+              <code class="text-muted">
+                {% load account_extras %}
+                {{ twofactor.phone_e164|mask_phone }}
+              </code>
             </div>
-          {% else %}
-            <div class="alert alert-warning d-flex align-items-start mt-2" role="alert">
-              <i class="bi bi-exclamation-triangle me-2"></i>
-              <div>
-                2FA management isn’t available because the <code>django-two-factor-auth</code> package isn’t installed or its URLs aren’t included.
+
+            {# Disable flow: send OTP -> verify -> disable #}
+            {% if request.session.twofa_disable_flow %}
+              <form method="post" action="{% url 'accounts:twofa_sms_disable_verify' %}" class="mb-3">
+                {% csrf_token %}
+                <div class="mb-3">
+                  <label class="form-label fw-semibold">Enter verification code</label>
+                  <input type="text" name="code" class="form-control" placeholder="123456" maxlength="6" pattern="[0-9]{6}" required autofocus>
+                  <div class="form-text">Enter the 6-digit code sent to your phone.</div>
+                </div>
+                <button type="submit" class="btn btn-danger">
+                  <i class="bi bi-shield-x me-1"></i> Verify & Disable 2FA
+                </button>
+                <a href="{% url 'accounts:settings_security' %}" class="btn btn-secondary ms-2">Cancel</a>
+              </form>
+            {% else %}
+              <form method="post" action="{% url 'accounts:twofa_sms_disable_start' %}">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-outline-danger">
+                  <i class="bi bi-shield-x me-1"></i> Disable 2FA
+                </button>
+              </form>
+              <div class="mt-2 small text-muted">
+                You'll need to verify your identity with a code sent to your phone.
               </div>
+            {% endif %}
+
+          {% else %}
+            {# 2FA is DISABLED - show enable option #}
+            <div class="d-flex align-items-center mb-3">
+              <span class="badge bg-secondary me-2">Not enabled</span>
+              <small class="text-muted">Protect your account by enabling SMS 2FA.</small>
             </div>
+
+            {# Check if Twilio is configured #}
+            {% if not settings.TWILIO_VERIFY_ENABLED %}
+              <div class="alert alert-warning d-flex align-items-start" role="alert">
+                <i class="bi bi-exclamation-triangle me-2"></i>
+                <div>
+                  SMS verification is not available. Configure Twilio to enable SMS 2FA.
+                </div>
+              </div>
+            {% else %}
+              {# Enable flow: enter phone + send OTP -> verify -> enable #}
+              {% if request.session.twofa_enable_flow %}
+                <form method="post" action="{% url 'accounts:twofa_sms_enable_verify' %}" class="mb-3">
+                  {% csrf_token %}
+                  <div class="mb-3">
+                    <label class="form-label fw-semibold">Enter verification code</label>
+                    <input type="text" name="code" class="form-control" placeholder="123456" maxlength="6" pattern="[0-9]{6}" required autofocus>
+                    <div class="form-text">Enter the 6-digit code sent to {{ request.session.twofa_pending_phone|default:"your phone" }}.</div>
+                  </div>
+                  <button type="submit" class="btn btn-success">
+                    <i class="bi bi-shield-check me-1"></i> Verify & Enable 2FA
+                  </button>
+                  <a href="{% url 'accounts:settings_security' %}" class="btn btn-secondary ms-2">Cancel</a>
+                </form>
+              {% else %}
+                <form method="post" action="{% url 'accounts:twofa_sms_enable_start' %}" class="mb-3">
+                  {% csrf_token %}
+                  <div class="mb-3">
+                    <label class="form-label fw-semibold">Phone number</label>
+                    <input type="tel" name="phone" class="form-control" placeholder="+265991234567" required>
+                    <div class="form-text">Enter your phone number in international format (e.g. +265991234567)</div>
+                  </div>
+                  <button type="submit" class="btn btn-cc-primary">
+                    <i class="bi bi-telephone me-1"></i> Send Verification Code
+                  </button>
+                </form>
+              {% endif %}
+            {% endif %}
           {% endif %}
         </div>
       </div>
     </div>
   </div>
-</div>
 {% endblock %}

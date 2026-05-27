@@ -38,6 +38,7 @@ from .views import (
     _back_to,
 )
 
+
 # ---------------------------
 # Small local helpers
 # ---------------------------
@@ -227,14 +228,26 @@ def sub_extend(request, pk: int):
                 sub.current_period_end = new_dt
             if _field(Subscription, "next_billing_date"):
                 sub.next_billing_date = new_dt
-            sub.save(update_fields=[f for f in ["trial_end", "status", "current_period_end", "next_billing_date", "updated_at"] if _field(Subscription, f)])
-            
+            sub.save(
+                update_fields=[
+                    f
+                    for f in ["trial_end", "status", "current_period_end", "next_billing_date", "updated_at"]
+                    if _field(Subscription, f)
+                ]
+            )
+
             # Log the action
             from audit.utils import log_hq_action
-            log_hq_action(request, action="EXTEND_SUBSCRIPTION", entity_type="BusinessSubscription", 
-                         entity_id=sub.pk, message=f"Extended subscription trial to {d.isoformat()} for business {sub.business.name}", 
-                         business=sub.business)
-            
+
+            log_hq_action(
+                request,
+                action="EXTEND_SUBSCRIPTION",
+                entity_type="BusinessSubscription",
+                entity_id=sub.pk,
+                message=f"Extended subscription trial to {d.isoformat()} for business {sub.business.name}",
+                business=sub.business,
+            )
+
             if request.method == "GET":
                 messages.success(request, f"Trial extended to {d.isoformat()}.")
                 return _back_to(request)
@@ -260,14 +273,22 @@ def sub_extend(request, pk: int):
             if _field(Subscription, "current_period_end"):
                 sub.current_period_end = sub.trial_end
             sub.status = "trial"
-            sub.save(update_fields=[f for f in ["trial_end", "current_period_end", "status"] if _field(Subscription, f)])
-        
+            sub.save(
+                update_fields=[f for f in ["trial_end", "current_period_end", "status"] if _field(Subscription, f)]
+            )
+
         # Log the action
         from audit.utils import log_hq_action
-        log_hq_action(request, action="EXTEND_SUBSCRIPTION", entity_type="BusinessSubscription", 
-                     entity_id=sub.pk, message=f"Extended subscription by {days} days for business {sub.business.name}", 
-                     business=sub.business)
-        
+
+        log_hq_action(
+            request,
+            action="EXTEND_SUBSCRIPTION",
+            entity_type="BusinessSubscription",
+            entity_id=sub.pk,
+            message=f"Extended subscription by {days} days for business {sub.business.name}",
+            business=sub.business,
+        )
+
         if request.method == "GET":
             messages.success(request, f"Trial adjusted by {days} day(s).")
             return _back_to(request)
@@ -293,13 +314,19 @@ def sub_revoke_trial(request, pk: int):
             else:
                 sub.status = "canceled"
                 sub.save(update_fields=["trial_end", "status", "updated_at"])
-        
+
         # Log the action
         from audit.utils import log_hq_action
-        log_hq_action(request, action="REVOKE_SUBSCRIPTION", entity_type="BusinessSubscription", 
-                     entity_id=sub.pk, message=f"Revoked subscription/trial for business {sub.business.name}", 
-                     business=sub.business)
-        
+
+        log_hq_action(
+            request,
+            action="REVOKE_SUBSCRIPTION",
+            entity_type="BusinessSubscription",
+            entity_id=sub.pk,
+            message=f"Revoked subscription/trial for business {sub.business.name}",
+            business=sub.business,
+        )
+
         if request.method == "GET":
             messages.success(request, "Trial revoked.")
             return _back_to(request)
@@ -318,13 +345,19 @@ def sub_activate_now(request, pk: int):
     try:
         # Your model likely defines activate_now(period_days=...)
         sub.activate_now(period_days=30)
-        
+
         # Log the action
         from audit.utils import log_hq_action
-        log_hq_action(request, action="ACTIVATE_SUBSCRIPTION", entity_type="BusinessSubscription", 
-                     entity_id=sub.pk, message=f"Activated subscription for business {sub.business.name}", 
-                     business=sub.business)
-        
+
+        log_hq_action(
+            request,
+            action="ACTIVATE_SUBSCRIPTION",
+            entity_type="BusinessSubscription",
+            entity_id=sub.pk,
+            message=f"Activated subscription for business {sub.business.name}",
+            business=sub.business,
+        )
+
         if request.method == "GET":
             messages.success(request, "Subscription activated.")
             return _back_to(request)
@@ -366,9 +399,9 @@ def sub_set_plan(request, pk: int):
                 kwargs["interval"] = "month"
 
             plan_obj = (
-                Plan.objects.filter(
-                    Q(code=kwargs.get("code", None)) | Q(name__iexact=catalog["name"])
-                ).order_by("-id").first()
+                Plan.objects.filter(Q(code=kwargs.get("code", None)) | Q(name__iexact=catalog["name"]))
+                .order_by("-id")
+                .first()
             )
             if not plan_obj:
                 plan_obj = Plan.objects.create(**kwargs)
@@ -376,9 +409,11 @@ def sub_set_plan(request, pk: int):
             sub.plan = plan_obj
             update_fields = ["plan"]
             if _field(Subscription, "plan_code"):
-                sub.plan_code = catalog["code"]; update_fields.append("plan_code")
+                sub.plan_code = catalog["code"]
+                update_fields.append("plan_code")
             if _field(Subscription, "amount"):
-                sub.amount = catalog["amount"]; update_fields.append("amount")
+                sub.amount = catalog["amount"]
+                update_fields.append("amount")
             if _field(Subscription, "updated_at"):
                 update_fields.append("updated_at")
             sub.save(update_fields=update_fields)
@@ -386,19 +421,27 @@ def sub_set_plan(request, pk: int):
             # No Plan model: store amount and optional plan_code directly on subscription
             update_fields = []
             if _field(Subscription, "amount"):
-                sub.amount = catalog["amount"]; update_fields.append("amount")
+                sub.amount = catalog["amount"]
+                update_fields.append("amount")
             if _field(Subscription, "plan_code"):
-                sub.plan_code = catalog["code"]; update_fields.append("plan_code")
+                sub.plan_code = catalog["code"]
+                update_fields.append("plan_code")
             if _field(Subscription, "updated_at"):
                 update_fields.append("updated_at")
             sub.save(update_fields=update_fields)
 
         # Log the action
         from audit.utils import log_hq_action
-        log_hq_action(request, action="CHANGE_PLAN", entity_type="BusinessSubscription", 
-                     entity_id=sub.pk, message=f"Changed plan to {catalog['name']} for business {sub.business.name}", 
-                     business=sub.business)
-        
+
+        log_hq_action(
+            request,
+            action="CHANGE_PLAN",
+            entity_type="BusinessSubscription",
+            entity_id=sub.pk,
+            message=f"Changed plan to {catalog['name']} for business {sub.business.name}",
+            business=sub.business,
+        )
+
         if request.method == "GET":
             messages.success(request, f"Plan set to {catalog['name']}.")
             return _back_to(request)
@@ -408,5 +451,3 @@ def sub_set_plan(request, pk: int):
             messages.error(request, "Could not change plan.")
             return _back_to(request)
         return JsonResponse({"ok": False}, status=400)
-
-

@@ -1,0 +1,1175 @@
+{% extends "base.html" %}
+{% load static %}
+{% load money %}
+
+{% block title %}Analytics - {{ business.name|default:"Dashboard" }}{% endblock %}
+
+{% block content %}
+<div class="cc-page">
+  <div class="cc-header">
+    <div class="topbar">
+      <h1>Analytics</h1>
+    </div>
+  </div>
+
+  <main class="content">
+    <!-- Single Filter Button -->
+    <div class="glass-card mb-4" style="padding: 16px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <button type="button" id="filterToggleBtn" class="filter-main-btn">
+            <i class="bi bi-funnel"></i> Filters
+            <span id="filterBadge" class="filter-badge" style="display: none;">0</span>
+          </button>
+          <span id="filterSummary" class="filter-summary">{{ date_params.active_range|default:"All time" }}</span>
+        </div>
+        <form method="get" style="display: inline;">
+          {% for key, value in request.GET.items %}
+            {% if key != 'export' %}
+            <input type="hidden" name="{{ key }}" value="{{ value }}">
+            {% endif %}
+          {% endfor %}
+          <button type="submit" name="export" value="csv" class="btn-export">
+            <i class="bi bi-download"></i> Export CSV
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Filter Offcanvas/Modal -->
+    <div id="filterOffcanvas" class="filter-offcanvas">
+      <div class="filter-offcanvas-content">
+        <div class="filter-offcanvas-header">
+          <h3><i class="bi bi-funnel"></i> Filters</h3>
+          <button type="button" id="filterCloseBtn" class="filter-close-btn" aria-label="Close filters">
+            <i class="bi bi-x-lg"></i>
+          </button>
+        </div>
+        
+        <form method="get" id="analyticsFilterForm" class="filter-offcanvas-body">
+          <!-- Date Range Presets -->
+          <div class="filter-section">
+            <label class="filter-section-label">Date Range</label>
+            <div class="filter-pills-vertical">
+              <button type="button" class="filter-pill-option {% if date_params.active_range == 'today' %}active{% endif %}" data-preset="today">
+                Today
+              </button>
+              <button type="button" class="filter-pill-option {% if date_params.active_range == 'yesterday' %}active{% endif %}" data-preset="yesterday">
+                Yesterday
+              </button>
+              <button type="button" class="filter-pill-option {% if date_params.active_range == 'last_7_days' %}active{% endif %}" data-preset="last_7_days">
+                Last 7 Days
+              </button>
+              <button type="button" class="filter-pill-option {% if date_params.active_range == 'last_30_days' %}active{% endif %}" data-preset="last_30_days">
+                Last 30 Days
+              </button>
+              <button type="button" class="filter-pill-option {% if date_params.active_range == 'this_month' %}active{% endif %}" data-preset="this_month">
+                This Month
+              </button>
+              <button type="button" class="filter-pill-option {% if date_params.active_range == 'last_month' %}active{% endif %}" data-preset="last_month">
+                Last Month
+              </button>
+              <button type="button" class="filter-pill-option {% if date_params.active_range == 'custom' %}active{% endif %}" data-preset="custom">
+                Custom Range
+              </button>
+            </div>
+            <input type="hidden" name="preset" id="presetInput" value="{{ date_params.active_range }}">
+            
+            <div id="customDateRange" style="{% if date_params.active_range != 'custom' %}display: none;{% endif %} margin-top: 12px;">
+              <div style="display: flex; gap: 8px; flex-direction: column;">
+                <input type="date" name="start" value="{{ date_params.start_date|date:'Y-m-d' }}" class="filter-input">
+                <span style="text-align: center; color: #64748b; font-size: 0.875rem;">to</span>
+                <input type="date" name="end" value="{{ date_params.end_date|date:'Y-m-d' }}" class="filter-input">
+              </div>
+            </div>
+          </div>
+          
+          <!-- Location Filter -->
+          {% if locations %}
+          <div class="filter-section">
+            <label class="filter-section-label">Location</label>
+            <select name="location" class="filter-input">
+              <option value="">All locations</option>
+              {% for loc in locations %}
+              <option value="{{ loc.id }}" {% if selected_location and selected_location.id == loc.id %}selected{% endif %}>{{ loc.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          {% endif %}
+          
+          <!-- Staff Filter -->
+          {% if staff_list %}
+          <div class="filter-section">
+            <label class="filter-section-label">{% if vertical == 'gym' %}Trainer{% elif vertical == 'pharmacy' %}Cashier{% else %}Agent{% endif %}</label>
+            <select name="staff_id" class="filter-input">
+              <option value="">All staff</option>
+              {% for staff in staff_list %}
+              <option value="{{ staff.id }}" {% if selected_staff and selected_staff.id == staff.id %}selected{% endif %}>
+                {{ staff.user.get_full_name|default:staff.user.username }}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+          {% endif %}
+          
+          <!-- Payment Method Filter -->
+          <div class="filter-section">
+            <label class="filter-section-label">Payment Method</label>
+            <select name="payment_method" class="filter-input">
+              <option value="">All methods</option>
+              <option value="CASH" {% if payment_mode == 'CASH' %}selected{% endif %}>Cash</option>
+              <option value="BANK" {% if payment_mode == 'BANK' %}selected{% endif %}>Bank</option>
+              <option value="MOBILE_MONEY" {% if payment_mode == 'MOBILE_MONEY' %}selected{% endif %}>Mobile Money</option>
+              <option value="CREDIT" {% if payment_mode == 'CREDIT' %}selected{% endif %}>Credit</option>
+            </select>
+          </div>
+          
+          <!-- Search Query -->
+          <div class="filter-section">
+            <label class="filter-section-label">Search</label>
+            <input type="text" name="q" value="{{ search_query }}" placeholder="Product, customer, IMEI..." class="filter-input">
+          </div>
+          
+          <!-- Preserve other filters -->
+          {% for section in selected_sections %}
+          <input type="hidden" name="sections" value="{{ section }}">
+          {% endfor %}
+          
+          <div class="filter-offcanvas-footer">
+            <button type="button" id="filterResetBtn" class="btn-filter-reset">
+              <i class="bi bi-arrow-counterclockwise"></i> Reset
+            </button>
+            <button type="submit" class="btn-filter-apply">
+              <i class="bi bi-check-lg"></i> Apply Filters
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+    <div id="filterBackdrop" class="filter-backdrop"></div>
+
+    <!-- KPI Cards Row (Excel-style) -->
+    <div class="kpi-grid mb-4">
+      {% if 'sales' in selected_sections %}
+      <div class="kpi-card">
+        <div class="kpi-label">Revenue</div>
+        <div class="kpi-value money">{{ analytics_data.kpis.revenue|default:0|format_mwk }}</div>
+      </div>
+      {% endif %}
+      
+      {% if 'profit' in selected_sections %}
+      <div class="kpi-card">
+        <div class="kpi-label">Profit</div>
+        <div class="kpi-value money {% if analytics_data.kpis.profit and analytics_data.kpis.profit < 0 %}text-danger{% else %}text-success{% endif %}">
+          {{ analytics_data.kpis.profit|default:0|format_mwk }}
+        </div>
+      </div>
+      {% endif %}
+      
+      {% if 'sales' in selected_sections and vertical != 'gym' %}
+      <div class="kpi-card">
+        <div class="kpi-label">Total Sales</div>
+        <div class="kpi-value">{{ analytics_data.kpis.total_sales|default:analytics_data.kpis.units_sold|default:0 }}</div>
+      </div>
+      {% endif %}
+      
+      {% if 'stock_value' in selected_sections and vertical != 'gym' %}
+      <div class="kpi-card">
+        <div class="kpi-label">Stock Value</div>
+        <div class="kpi-value money">{{ analytics_data.kpis.inventory_value|default:0|format_mwk }}</div>
+      </div>
+      {% endif %}
+      
+      {% if 'retail_value' in selected_sections and vertical != 'gym' %}
+      <div class="kpi-card">
+        <div class="kpi-label">Retail Value</div>
+        <div class="kpi-value money">{{ analytics_data.kpis.retail_value|default:0|format_mwk }}</div>
+      </div>
+      {% endif %}
+      
+      {% if 'expected_margin' in selected_sections and vertical != 'gym' %}
+      <div class="kpi-card">
+        <div class="kpi-label">Expected Margin</div>
+        <div class="kpi-value money">{{ analytics_data.kpis.expected_margin|default:0|format_mwk }}</div>
+      </div>
+      {% endif %}
+      
+      {% if vertical == 'gym' and 'members' in selected_sections %}
+      <div class="kpi-card">
+        <div class="kpi-label">Total Members</div>
+        <div class="kpi-value">{{ analytics_data.kpis.total_members|default:0 }}</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Active Memberships</div>
+        <div class="kpi-value">{{ analytics_data.kpis.active_memberships|default:0 }}</div>
+      </div>
+      {% endif %}
+      
+      {% if vertical == 'gym' and 'new_members' in selected_sections %}
+      <div class="kpi-card">
+        <div class="kpi-label">New Members Today</div>
+        <div class="kpi-value">{{ analytics_data.kpis.new_members_today|default:0 }}</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">New Members This Month</div>
+        <div class="kpi-value">{{ analytics_data.kpis.new_members_this_month|default:0 }}</div>
+      </div>
+      {% endif %}
+      
+      {% if vertical == 'gym' and 'profit' in selected_sections %}
+      <div class="kpi-card">
+        <div class="kpi-label">Payments Today</div>
+        <div class="kpi-value money">{{ analytics_data.kpis.payments_today|default:0|format_mwk }}</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Payments This Month</div>
+        <div class="kpi-value money">{{ analytics_data.kpis.payments_this_month|default:0|format_mwk }}</div>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Stock Overview Panel (Cross-Vertical) -->
+    {% if vertical != 'gym' %}
+    <div class="glass-card mb-4">
+      <div style="padding: 20px;">
+        <h3 style="margin: 0 0 16px; font-size: 1.25rem; font-weight: 700; color: #0f172a;">📦 Stock Overview</h3>
+        <div style="position: relative; height: 300px; margin-bottom: 16px;">
+          <canvas id="stockOverviewChart"></canvas>
+        </div>
+        <div id="stockOverviewEmpty" style="display: none; text-align: center; padding: 40px 20px; color: #64748b;">
+          <p style="margin: 0;">No stock data available yet.</p>
+        </div>
+        <!-- Summary Chips -->
+        <div id="stockOverviewSummary" style="display: flex; gap: 12px; flex-wrap: wrap; justify-content: center;">
+          <div class="stock-chip" style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 8px 16px; display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 0.875rem; color: #1e40af; font-weight: 600;">Total Units:</span>
+            <span id="stockTotalUnits" style="font-size: 1rem; font-weight: 700; color: #1e3a8a;">-</span>
+          </div>
+          <div class="stock-chip" style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 8px 16px; display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 0.875rem; color: #15803d; font-weight: 600;">Most Stocked:</span>
+            <span id="stockMostStocked" style="font-size: 1rem; font-weight: 700; color: #14532d;">-</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Charts Row -->
+    <div class="charts-grid mb-4">
+      <!-- Sales Trend Chart (Daily) -->
+      {% if analytics_data.charts.sales_trend %}
+      <div class="chart-card">
+        <div class="chart-header">
+          <h3 class="chart-title">Sales Trend (Daily)</h3>
+          <div class="chart-toggle">
+            <button type="button" class="toggle-btn active" data-metric="amount" onclick="toggleChartMetric('amount')">Amount</button>
+            <button type="button" class="toggle-btn" data-metric="count" onclick="toggleChartMetric('count')">Count</button>
+          </div>
+        </div>
+        <div class="chart-container">
+          <canvas id="salesTrendChart" height="250"></canvas>
+        </div>
+      </div>
+      {% endif %}
+      
+      <!-- Cash Mix Chart -->
+      {% if 'cash_mix' in selected_sections and analytics_data.charts.payment_mix %}
+      <div class="chart-card">
+        <div class="chart-header">
+          <h3 class="chart-title">Cash Mix</h3>
+        </div>
+        <div class="chart-container">
+          <canvas id="paymentMixChart" height="250"></canvas>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Composition Panels Row -->
+    <div class="composition-grid mb-4">
+      <!-- Top Products/Models (hidden for gym) -->
+      {% if 'top_products' in selected_sections and analytics_data.top_items and vertical != 'gym' %}
+      <div class="composition-card">
+        <h3 class="composition-title">
+          {% if vertical == 'phones' %}Top Models{% else %}Top Products{% endif %}
+        </h3>
+        <div class="table-responsive">
+          <table class="composition-table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th class="text-end">Units</th>
+                <th class="text-end">Revenue</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in analytics_data.top_items|slice:":10" %}
+              <tr>
+                <td>{{ item.product__name|default:item.name|default:item.brand|default:item.model|default:"Unknown" }}</td>
+                <td class="text-end">{{ item.units_sold|default:item.units|default:item.count|default:0 }}</td>
+                <td class="text-end money">{{ item.revenue|default:item.amount|default:0|format_mwk }}</td>
+              </tr>
+              {% empty %}
+              <tr>
+                <td colspan="3" class="text-muted text-center">No data available</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {% endif %}
+      
+      <!-- Gym Member Metrics Panel -->
+      {% if vertical == 'gym' and 'members' in selected_sections %}
+      <div class="composition-card">
+        <h3 class="composition-title">Member Metrics</h3>
+        <div class="table-responsive">
+          <table class="composition-table">
+            <thead>
+              <tr>
+                <th>Metric</th>
+                <th class="text-end">Value</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Total Members</td>
+                <td class="text-end">{{ analytics_data.kpis.total_members|default:0 }}</td>
+              </tr>
+              <tr>
+                <td>Active Memberships</td>
+                <td class="text-end">{{ analytics_data.kpis.active_memberships|default:0 }}</td>
+              </tr>
+              <tr>
+                <td>New Members Today</td>
+                <td class="text-end">{{ analytics_data.kpis.new_members_today|default:0 }}</td>
+              </tr>
+              <tr>
+                <td>New Members This Month</td>
+                <td class="text-end">{{ analytics_data.kpis.new_members_this_month|default:0 }}</td>
+              </tr>
+              <tr>
+                <td>Payments Today</td>
+                <td class="text-end money">{{ analytics_data.kpis.payments_today|default:0|format_mwk }}</td>
+              </tr>
+              <tr>
+                <td>Payments This Month</td>
+                <td class="text-end money">{{ analytics_data.kpis.payments_this_month|default:0|format_mwk }}</td>
+              </tr>
+              <tr>
+                <td>Revenue Today</td>
+                <td class="text-end money">{{ analytics_data.kpis.revenue_today|default:0|format_mwk }}</td>
+              </tr>
+              <tr>
+                <td>Revenue This Month</td>
+                <td class="text-end money">{{ analytics_data.kpis.revenue_this_month|default:0|format_mwk }}</td>
+              </tr>
+              {% if analytics_data.kpis.churned_members is not None %}
+              <tr>
+                <td>Churned Members</td>
+                <td class="text-end">{{ analytics_data.kpis.churned_members|default:0 }}</td>
+              </tr>
+              {% endif %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {% endif %}
+      
+      <!-- Category Mix (if available, hidden for gym) -->
+      {% if 'top_categories' in selected_sections and analytics_data.categories and vertical != 'gym' %}
+      <div class="composition-card">
+        <h3 class="composition-title">Top Categories</h3>
+        <div class="category-list">
+          {% for cat in analytics_data.categories|slice:":10" %}
+          <div class="category-item">
+            <div class="category-name">{{ cat.name|default:cat.category|default:"Unknown" }}</div>
+            <div class="category-bar-container">
+              <div class="category-bar" style="width: {{ cat.percentage|default:0 }}%"></div>
+            </div>
+            <div class="category-value money">{{ cat.total|default:cat.amount|default:0|format_mwk }}</div>
+          </div>
+          {% empty %}
+          <div class="text-muted text-center py-3">No category data available</div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+    </div>
+  </main>
+</div>
+
+{% include 'partials/bottomnav.html' with active_tab='analytics' %}
+
+<style>
+  /* Single Filter Button */
+  .filter-main-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+    color: #fff;
+    border: none;
+    border-radius: 12px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+  }
+  
+  .filter-main-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
+  }
+  
+  .filter-main-btn:active {
+    transform: translateY(0);
+  }
+  
+  .filter-badge {
+    background: rgba(255, 255, 255, 0.3);
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 12px;
+    font-weight: 700;
+  }
+  
+  .filter-summary {
+    color: #64748b;
+    font-size: 14px;
+    font-weight: 500;
+  }
+  
+  .btn-export {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 16px;
+    background: #10b981;
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  
+  .btn-export:hover {
+    background: #059669;
+  }
+  
+  /* Filter Offcanvas */
+  .filter-offcanvas {
+    position: fixed;
+    top: 0;
+    right: -100%;
+    width: 100%;
+    max-width: 400px;
+    height: 100vh;
+    background: #fff;
+    box-shadow: -4px 0 24px rgba(0, 0, 0, 0.15);
+    z-index: 1050;
+    transition: right 0.3s ease;
+    overflow-y: auto;
+  }
+  
+  .filter-offcanvas.show {
+    right: 0;
+  }
+  
+  .filter-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 1040;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+  }
+  
+  .filter-backdrop.show {
+    opacity: 1;
+    visibility: visible;
+  }
+  
+  .filter-offcanvas-content {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+  }
+  
+  .filter-offcanvas-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px;
+    border-bottom: 1px solid #e2e8f0;
+    background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+  }
+  
+  .filter-offcanvas-header h3 {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #0f172a;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  
+  .filter-close-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    background: transparent;
+    border: none;
+    color: #64748b;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    transition: all 0.2s;
+  }
+  
+  .filter-close-btn:hover {
+    background: #e2e8f0;
+    color: #0f172a;
+  }
+  
+  .filter-offcanvas-body {
+    flex: 1;
+    padding: 20px;
+    overflow-y: auto;
+  }
+  
+  .filter-section {
+    margin-bottom: 24px;
+  }
+  
+  .filter-section-label {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    color: #0f172a;
+    margin-bottom: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  
+  .filter-pills-vertical {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .filter-pill-option {
+    padding: 12px 16px;
+    border: 2px solid #e2e8f0;
+    background: #fff;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 500;
+    color: #475569;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: left;
+  }
+  
+  .filter-pill-option:hover {
+    background: #f8fafc;
+    border-color: #cbd5e1;
+  }
+  
+  .filter-pill-option.active {
+    background: linear-gradient(135deg, #dbeafe, #e0e7ff);
+    border-color: #3b82f6;
+    color: #1e40af;
+    font-weight: 600;
+  }
+  
+  .filter-input {
+    width: 100%;
+    padding: 12px 14px;
+    border: 2px solid #e2e8f0;
+    border-radius: 10px;
+    font-size: 14px;
+    background: #fff;
+    transition: all 0.2s;
+  }
+  
+  .filter-input:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  }
+  
+  .filter-offcanvas-footer {
+    padding: 20px;
+    border-top: 1px solid #e2e8f0;
+    background: #f8fafc;
+    display: flex;
+    gap: 12px;
+  }
+  
+  .btn-filter-reset {
+    flex: 1;
+    padding: 12px 20px;
+    background: #fff;
+    color: #64748b;
+    border: 2px solid #e2e8f0;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+  }
+  
+  .btn-filter-reset:hover {
+    background: #f1f5f9;
+    border-color: #cbd5e1;
+  }
+  
+  .btn-filter-apply {
+    flex: 2;
+    padding: 12px 20px;
+    background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+  }
+  
+  .btn-filter-apply:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
+  }
+  
+  .btn-filter-apply:active {
+    transform: translateY(0);
+  }
+  
+  /* KPI Grid (Excel-style cards) */
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 16px;
+  }
+  
+  .kpi-card {
+    background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 20px;
+    text-align: center;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+  
+  .kpi-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  }
+  
+  .kpi-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+  }
+  
+  .kpi-value {
+    font-size: 24px;
+    font-weight: 700;
+    color: #0f172a;
+    line-height: 1.2;
+  }
+  
+  /* Charts Grid */
+  .charts-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 16px;
+  }
+  
+  .chart-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  }
+  
+  .chart-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+  }
+  
+  .chart-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: #0f172a;
+    margin: 0;
+  }
+  
+  .chart-toggle {
+    display: flex;
+    gap: 4px;
+    background: #f1f5f9;
+    border-radius: 6px;
+    padding: 2px;
+  }
+  
+  .toggle-btn {
+    padding: 4px 12px;
+    border: none;
+    background: transparent;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 500;
+    color: #64748b;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  
+  .toggle-btn.active {
+    background: #ffffff;
+    color: #2563eb;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  }
+  
+  .chart-container {
+    position: relative;
+    height: 250px;
+  }
+  
+  /* Composition Panels */
+  .composition-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 16px;
+  }
+  
+  .composition-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  }
+  
+  .composition-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: #0f172a;
+    margin: 0 0 16px 0;
+  }
+  
+  .composition-table {
+    width: 100%;
+    font-size: 13px;
+  }
+  
+  .composition-table thead {
+    border-bottom: 2px solid #e2e8f0;
+  }
+  
+  .composition-table th {
+    padding: 10px;
+    text-align: left;
+    font-weight: 600;
+    color: #64748b;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  
+  .composition-table td {
+    padding: 10px;
+    border-bottom: 1px solid #f1f5f9;
+  }
+  
+  .composition-table tbody tr:hover {
+    background: #f8fafc;
+  }
+  
+  /* Category List */
+  .category-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  
+  .category-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  
+  .category-name {
+    font-size: 13px;
+    font-weight: 500;
+    color: #0f172a;
+    min-width: 120px;
+  }
+  
+  .category-bar-container {
+    flex: 1;
+    height: 8px;
+    background: #f1f5f9;
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  
+  .category-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #2563eb, #3b82f6);
+    border-radius: 4px;
+    transition: width 0.3s;
+  }
+  
+  .category-value {
+    font-size: 13px;
+    font-weight: 600;
+    color: #0f172a;
+    min-width: 80px;
+    text-align: right;
+  }
+  
+  /* Mobile Responsive */
+  @media (max-width: 768px) {
+    .analytics-filters {
+      flex-direction: column;
+      align-items: stretch;
+    }
+    
+    .filter-pills {
+      flex-wrap: wrap;
+    }
+    
+    .kpi-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .charts-grid,
+    .composition-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+  // Filter Offcanvas functionality
+  (function() {
+    const filterBtn = document.getElementById('filterToggleBtn');
+    const filterOffcanvas = document.getElementById('filterOffcanvas');
+    const filterBackdrop = document.getElementById('filterBackdrop');
+    const filterCloseBtn = document.getElementById('filterCloseBtn');
+    const filterResetBtn = document.getElementById('filterResetBtn');
+    const presetInput = document.getElementById('presetInput');
+    const customDateRange = document.getElementById('customDateRange');
+    
+    function openFilter() {
+      filterOffcanvas.classList.add('show');
+      filterBackdrop.classList.add('show');
+      document.body.style.overflow = 'hidden';
+    }
+    
+    function closeFilter() {
+      filterOffcanvas.classList.remove('show');
+      filterBackdrop.classList.remove('show');
+      document.body.style.overflow = '';
+    }
+    
+    if (filterBtn) {
+      filterBtn.addEventListener('click', openFilter);
+    }
+    
+    if (filterCloseBtn) {
+      filterCloseBtn.addEventListener('click', closeFilter);
+    }
+    
+    if (filterBackdrop) {
+      filterBackdrop.addEventListener('click', closeFilter);
+    }
+    
+    // Handle preset date range buttons
+    document.querySelectorAll('.filter-pill-option').forEach(btn => {
+      btn.addEventListener('click', function() {
+        const preset = this.getAttribute('data-preset');
+        
+        // Update active state
+        document.querySelectorAll('.filter-pill-option').forEach(b => b.classList.remove('active'));
+        this.classList.add('active');
+        
+        // Update hidden input
+        if (presetInput) {
+          presetInput.value = preset;
+        }
+        
+        // Show/hide custom date range
+        if (customDateRange) {
+          customDateRange.style.display = preset === 'custom' ? 'block' : 'none';
+        }
+      });
+    });
+    
+    // Reset filters
+    if (filterResetBtn) {
+      filterResetBtn.addEventListener('click', function() {
+        window.location.href = window.location.pathname;
+      });
+    }
+    
+    // Close on Escape key
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape' && filterOffcanvas.classList.contains('show')) {
+        closeFilter();
+      }
+    });
+  })();
+  
+  let salesTrendChart = null;
+  const metricView = "{{ request.GET.metric_view|default:'amount' }}";
+  
+  // Sales Trend Chart with Amount/Count toggle
+  {% if analytics_data.charts.sales_trend %}
+  const salesTrendData = {{ analytics_data.charts.sales_trend|safe }};
+  const salesTrendCtx = document.getElementById('salesTrendChart');
+  
+  function updateSalesTrendChart(metric) {
+    if (!salesTrendChart || !salesTrendData) return;
+    
+    const isAmount = metric === 'amount';
+    salesTrendChart.data.datasets[0].label = isAmount ? 'Revenue (Amount)' : 'Sales (Count)';
+    salesTrendChart.data.datasets[0].data = salesTrendData.map(d => 
+      isAmount ? parseFloat(d.revenue || 0) : parseInt(d.count || 0)
+    );
+    salesTrendChart.update();
+  }
+  
+  function toggleChartMetric(metric) {
+    // Update toggle buttons
+    document.querySelectorAll('.toggle-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.metric === metric);
+    });
+    updateSalesTrendChart(metric);
+  }
+  
+  if (salesTrendCtx && salesTrendData && salesTrendData.length > 0) {
+    const isAmount = metricView === 'amount';
+    salesTrendChart = new Chart(salesTrendCtx, {
+      type: 'line',
+      data: {
+        labels: salesTrendData.map(d => d.date_short || d.date),
+        datasets: [{
+          label: isAmount ? 'Revenue (Amount)' : 'Sales (Count)',
+          data: salesTrendData.map(d => isAmount ? parseFloat(d.revenue || 0) : parseInt(d.count || 0)),
+          borderColor: '#2563eb',
+          backgroundColor: 'rgba(37, 99, 235, 0.1)',
+          borderWidth: 3,
+          tension: 0.4,
+          fill: true,
+          showLine: true,
+          pointRadius: 5,
+          pointHoverRadius: 8,
+          pointBackgroundColor: '#2563eb',
+          pointBorderColor: '#fff',
+          pointBorderWidth: 2,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            display: true,
+            position: 'top',
+          },
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            ticks: {
+              callback: function(value) {
+                return isAmount ? 'MWK ' + value.toLocaleString() : value;
+              }
+            }
+          }
+        }
+      }
+    });
+  }
+  {% endif %}
+  
+  // Payment Mix Chart (Cash Mix)
+  {% if 'cash_mix' in selected_sections and analytics_data.charts.payment_mix %}
+  const paymentMixData = {{ analytics_data.charts.payment_mix|safe }};
+  const paymentMixCtx = document.getElementById('paymentMixChart');
+  if (paymentMixCtx && paymentMixData && paymentMixData.length > 0) {
+    new Chart(paymentMixCtx, {
+      type: 'doughnut',
+      data: {
+        labels: paymentMixData.map(d => d.method_display || d.method),
+        datasets: [{
+          data: paymentMixData.map(d => parseFloat(d.total || d.amount || 0)),
+          backgroundColor: [
+            '#2563eb', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'
+          ]
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            position: 'bottom',
+          },
+          tooltip: {
+            callbacks: {
+              label: function(context) {
+                const label = context.label || '';
+                const value = context.parsed || 0;
+                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                const percentage = ((value / total) * 100).toFixed(1);
+                return label + ': MWK ' + value.toLocaleString() + ' (' + percentage + '%)';
+              }
+            }
+          }
+        }
+      }
+    });
+  }
+  {% endif %}
+  
+  // Stock Overview Chart (Cross-Vertical)
+  {% if vertical != 'gym' %}
+  (function() {
+    const stockCanvas = document.getElementById('stockOverviewChart');
+    const stockEmpty = document.getElementById('stockOverviewEmpty');
+    const stockSummary = document.getElementById('stockOverviewSummary');
+    const stockTotalUnits = document.getElementById('stockTotalUnits');
+    const stockMostStocked = document.getElementById('stockMostStocked');
+    
+    if (!stockCanvas) return;
+    
+    // Fetch stock overview data from API
+    const location = '{{ selected_location.id|default:"" }}';
+    const apiUrl = '/app/analytics/stock-overview-cross-vertical.json' + (location ? '?location=' + location : '');
+    
+    fetch(apiUrl)
+      .then(response => response.json())
+      .then(data => {
+        if (!data.ok || !data.labels || data.labels.length === 0) {
+          // No stock data - show empty state
+          if (stockCanvas) stockCanvas.style.display = 'none';
+          if (stockEmpty) stockEmpty.style.display = 'block';
+          if (stockSummary) stockSummary.style.display = 'none';
+          return;
+        }
+        
+        // Update summary chips
+        if (stockTotalUnits) stockTotalUnits.textContent = data.total_units.toLocaleString();
+        if (stockMostStocked) stockMostStocked.textContent = data.most_stocked_vertical;
+        
+        // Render bar chart
+        const colors = [
+          '#2563eb', // Blue for Phones
+          '#f59e0b', // Amber for Liquor
+          '#10b981', // Green for Pharmacy
+          '#8b5cf6', // Purple for Clothing
+        ];
+        
+        new Chart(stockCanvas, {
+          type: 'bar',
+          data: {
+            labels: data.labels,
+            datasets: [{
+              label: 'Units in Stock',
+              data: data.values,
+              backgroundColor: colors.slice(0, data.labels.length),
+              borderRadius: 8,
+              borderSkipped: false,
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: {
+                display: false,
+              },
+              tooltip: {
+                backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                padding: 12,
+                borderRadius: 8,
+                callbacks: {
+                  label: function(context) {
+                    return ' ' + context.parsed.y.toLocaleString() + ' units';
+                  }
+                }
+              }
+            },
+            scales: {
+              y: {
+                beginAtZero: true,
+                ticks: {
+                  callback: function(value) {
+                    if (value >= 1000) return (value / 1000).toFixed(1) + 'K';
+                    return value;
+                  }
+                },
+                grid: {
+                  color: 'rgba(0, 0, 0, 0.05)'
+                }
+              },
+              x: {
+                grid: {
+                  display: false
+                }
+              }
+            },
+            animation: {
+              duration: 750,
+              easing: 'easeInOutQuart'
+            }
+          }
+        });
+      })
+      .catch(error => {
+        console.error('Error loading stock overview:', error);
+        if (stockCanvas) stockCanvas.style.display = 'none';
+        if (stockEmpty) {
+          stockEmpty.style.display = 'block';
+          stockEmpty.innerHTML = '<p style="margin: 0; color: #ef4444;">Error loading stock data. Please refresh the page.</p>';
+        }
+        if (stockSummary) stockSummary.style.display = 'none';
+      });
+  })();
+  {% endif %}
+</script>
+{% endblock %}

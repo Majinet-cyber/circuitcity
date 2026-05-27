@@ -1,0 +1,182 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}{{ action }} Batch · Pharmacy · Emajinet{% endblock %}
+
+{% block content %}
+
+<style>
+  .form-page{max-width:800px;margin:0 auto;padding:18px;display:flex;flex-direction:column;gap:18px}
+  .page-header{background:linear-gradient(120deg,#06b6d4,#3b82f6);padding:24px;border-radius:20px;color:#fff}
+  .page-header h1{margin:0;font-size:clamp(24px,3vw,32px)}
+  .page-header p{margin:8px 0 0;opacity:0.9}
+  
+  .form-card{background:#fff;border-radius:18px;padding:24px;box-shadow:0 10px 30px rgba(15,23,42,.08)}
+  .form-group{margin-bottom:20px}
+  .form-group label{display:block;font-weight:600;color:#475569;margin-bottom:6px}
+  .form-group label span{color:#ef4444}
+  .form-group input, .form-group select, .form-group textarea{width:100%;border-radius:8px;border:2px solid #e2e8f0;padding:10px 12px;font-size:1rem}
+  .form-group input:focus, .form-group select:focus, .form-group textarea:focus{outline:none;border-color:#3b82f6;box-shadow:0 0 0 3px rgba(59,130,246,0.1)}
+  .form-group small{color:#64748b;font-size:0.9rem}
+  
+  .form-actions{display:flex;gap:12px;margin-top:24px}
+  .btn{border-radius:999px;padding:12px 24px;font-weight:700;text-decoration:none;border:none;cursor:pointer;transition:all .2s}
+  .btn-primary{background:#3b82f6;color:#fff}
+  .btn-primary:hover{background:#2563eb}
+  .btn-secondary{background:#f1f5f9;color:#475569}
+  .btn-secondary:hover{background:#e2e8f0}
+  
+  .alert{padding:12px 16px;border-radius:12px;margin-bottom:16px}
+  .alert-danger{background:#fee2e2;color:#991b1b;border:1px solid #fecaca}
+</style>
+
+<div class="form-page">
+  <!-- Header -->
+  <div class="page-header">
+    <h1>{{ action }} Pharmacy Batch</h1>
+    <p>{% if batch %}Edit batch details{% else %}Create a new batch for tracking{% endif %}</p>
+  </div>
+  
+  <!-- Messages -->
+  {% if messages %}
+    {% for message in messages %}
+      <div class="alert alert-{{ message.tags }}">
+        {{ message }}
+      </div>
+    {% endfor %}
+  {% endif %}
+  
+  <!-- Form -->
+  <div class="form-card">
+    <form method="post">
+      {% csrf_token %}
+      
+      {% if not batch %}
+        <!-- Product selection (create only) -->
+        <div class="form-group">
+          <label for="product">Product <span>*</span></label>
+          <select name="product" id="product" required>
+            <option value="">— Select a product —</option>
+            {% for product in products %}
+              <option value="{{ product.id }}">{{ product.name }}</option>
+            {% endfor %}
+          </select>
+          <small>Select the product this batch belongs to</small>
+        </div>
+      {% else %}
+        <!-- Product display (edit mode) -->
+        <div class="form-group">
+          <label>Product</label>
+          <input type="text" value="{{ batch.merch_product.name }}" disabled style="background:#f8fafc">
+          <small>Product cannot be changed after batch creation</small>
+        </div>
+      {% endif %}
+      
+      <!-- Batch number -->
+      <div class="form-group">
+        <label for="batch_number">Batch Number <span>*</span></label>
+        <input type="text" name="batch_number" id="batch_number" 
+               value="{% if batch %}{{ batch.batch_number }}{% endif %}" 
+               placeholder="e.g., LOT12345" required>
+        <small>Manufacturer's batch/lot number</small>
+      </div>
+      
+      <!-- Expiry date -->
+      <div class="form-group">
+        <label for="expiry_date">Expiry Date <span>*</span></label>
+        <input type="date" name="expiry_date" id="expiry_date" 
+               value="{% if batch %}{{ batch.expiry_date|date:'Y-m-d' }}{% endif %}" required>
+        <small>When this batch expires</small>
+      </div>
+      
+      <!-- Quantity and reorder level -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+        <div class="form-group">
+          <label for="quantity">Quantity <span>*</span></label>
+          <input type="number" name="quantity" id="quantity" min="0"
+                 value="{% if batch %}{{ batch.quantity }}{% else %}0{% endif %}" required>
+          <small>Units in stock</small>
+        </div>
+        
+        <div class="form-group">
+          <label for="reorder_level">Reorder Level</label>
+          <input type="number" name="reorder_level" id="reorder_level" min="1"
+                 value="{% if batch %}{{ batch.reorder_level }}{% else %}10{% endif %}">
+          <small>Alert when stock drops to this level</small>
+        </div>
+      </div>
+      
+      <!-- Pricing -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+        <div class="form-group">
+          <label for="cost_price">Cost Price (MWK) <span>*</span></label>
+          <input type="number" name="cost_price" id="cost_price" step="0.01" min="0"
+                 value="{% if batch %}{{ batch.cost_price }}{% else %}0.00{% endif %}" required>
+          <small>Per unit cost</small>
+        </div>
+        
+        <div class="form-group">
+          <label for="selling_price">Selling Price (MWK) <span>*</span></label>
+          <input type="number" name="selling_price" id="selling_price" step="0.01" min="0"
+                 value="{% if batch %}{{ batch.selling_price }}{% else %}0.00{% endif %}" required>
+          <small>Per unit selling price</small>
+        </div>
+      </div>
+      
+      <!-- Supplier -->
+      <div class="form-group">
+        <label for="supplier">Supplier</label>
+        <input type="text" name="supplier" id="supplier" 
+               value="{% if batch %}{{ batch.supplier }}{% endif %}" 
+               placeholder="Supplier name (optional)">
+        <small>Who supplied this batch</small>
+      </div>
+      
+      <!-- Received date -->
+      <div class="form-group">
+        <label for="received_date">Received Date</label>
+        <input type="date" name="received_date" id="received_date" 
+               value="{% if batch %}{{ batch.received_date|date:'Y-m-d' }}{% else %}{{ today|date:'Y-m-d' }}{% endif %}">
+        <small>When this batch was received</small>
+      </div>
+      
+      <!-- Actions -->
+      <div class="form-actions">
+        <button type="submit" class="btn btn-primary">
+          {% if batch %}💾 Save Changes{% else %}✨ Create Batch{% endif %}
+        </button>
+        <a href="{% url 'pharmacy:batch_list' %}" class="btn btn-secondary">Cancel</a>
+      </div>
+    </form>
+  </div>
+  
+  {% if batch %}
+    <!-- Batch Info Card -->
+    <div class="form-card">
+      <h3 style="margin:0 0 16px;color:#0f172a">Batch Information</h3>
+      <div style="display:grid;gap:12px">
+        <div style="display:flex;justify-content:space-between;border-bottom:1px solid #f1f5f9;padding-bottom:8px">
+          <span style="color:#64748b">Created:</span>
+          <strong>{{ batch.created_at|date:"Y-m-d H:i" }}</strong>
+        </div>
+        <div style="display:flex;justify-content:space-between;border-bottom:1px solid #f1f5f9;padding-bottom:8px">
+          <span style="color:#64748b">Last Updated:</span>
+          <strong>{{ batch.updated_at|date:"Y-m-d H:i" }}</strong>
+        </div>
+        <div style="display:flex;justify-content:space-between;border-bottom:1px solid #f1f5f9;padding-bottom:8px">
+          <span style="color:#64748b">Days to Expiry:</span>
+          <strong style="color:{% if batch.is_expired %}#ef4444{% elif batch.days_to_expiry <= 30 %}#f59e0b{% else %}#10b981{% endif %}">
+            {{ batch.days_to_expiry }} days
+          </strong>
+        </div>
+        <div style="display:flex;justify-content:space-between">
+          <span style="color:#64748b">Stock Value (Selling):</span>
+          <strong>MWK {{ batch.stock_value_selling|floatformat:2|intcomma }}</strong>
+        </div>
+      </div>
+    </div>
+  {% endif %}
+</div>
+
+{% endblock %}
+

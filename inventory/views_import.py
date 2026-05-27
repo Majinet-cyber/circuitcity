@@ -39,7 +39,7 @@ def import_opening_stock(request):
         if form.is_valid():
             raw = form.cleaned_data["csv_file"].read().decode("utf-8", errors="ignore")
             reader = csv.DictReader(io.StringIO(raw))
-            required = {"product_code","product_name","location","quantity"}
+            required = {"product_code", "product_name", "location", "quantity"}
             headers = {(h or "").strip() for h in (reader.fieldnames or [])}
             missing = required - headers
             if missing:
@@ -78,13 +78,16 @@ def import_opening_stock(request):
                             prod = Product.objects.get(code=code)
                             touched = False
                             if cost and prod.cost_price != cost:
-                                prod.cost_price = cost; touched = True
+                                prod.cost_price = cost
+                                touched = True
                             if price and prod.sale_price != price:
-                                prod.sale_price = price; touched = True
+                                prod.sale_price = price
+                                touched = True
                             if name and not prod.name:
-                                prod.name = name; touched = True
+                                prod.name = name
+                                touched = True
                             if touched:
-                                prod.save(update_fields=["cost_price","sale_price","name"])
+                                prod.save(update_fields=["cost_price", "sale_price", "name"])
                         except Product.DoesNotExist:
                             if not create_missing:
                                 raise ValueError(f"Unknown product_code '{code}'")
@@ -103,29 +106,33 @@ def import_opening_stock(request):
 
                         # Create items
                         if imei:
-                            to_create.append(InventoryItem(
-                                product=prod,
-                                imei=imei,
-                                current_location=loc,
-                                status="IN_STOCK",
-                                received_at=received_at,
-                                order_price=cost,
-                                selling_price=price if price > 0 else None,
-                            ))
+                            to_create.append(
+                                InventoryItem(
+                                    product=prod,
+                                    imei=imei,
+                                    current_location=loc,
+                                    status="IN_STOCK",
+                                    received_at=received_at,
+                                    order_price=cost,
+                                    selling_price=price if price > 0 else None,
+                                )
+                            )
                         else:
                             if qty < 0:
                                 raise ValueError("quantity cannot be negative")
                             if qty > max_expand:
                                 raise ValueError(f"quantity too large ({qty} > {max_expand})")
                             for _ in range(qty):
-                                to_create.append(InventoryItem(
-                                    product=prod,
-                                    current_location=loc,
-                                    status="IN_STOCK",
-                                    received_at=received_at,
-                                    order_price=cost,
-                                    selling_price=price if price > 0 else None,
-                                ))
+                                to_create.append(
+                                    InventoryItem(
+                                        product=prod,
+                                        current_location=loc,
+                                        status="IN_STOCK",
+                                        received_at=received_at,
+                                        order_price=cost,
+                                        selling_price=price if price > 0 else None,
+                                    )
+                                )
 
                     except Exception as e:
                         raise ValueError(f"Import error at line {i}: {e}") from e
@@ -139,5 +146,3 @@ def import_opening_stock(request):
         form = CSVImportForm()
 
     return render(request, "inventory/import_opening_stock.html", {"form": form})
-
-

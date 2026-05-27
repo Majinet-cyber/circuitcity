@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+{% load humanize static %}
+
+{% block title %}Business Health Check - {{ business.name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-3 px-md-4 py-4" style="max-width:1180px;margin:0 auto;">
+  <nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb mb-0" style="font-size:.85rem;">
+      <li class="breadcrumb-item"><a href="{% url 'dashboard:home' %}">Dashboard</a></li>
+      <li class="breadcrumb-item active" aria-current="page">Books Balance</li>
+    </ol>
+  </nav>
+
+  <div class="d-flex align-items-start justify-content-between gap-3 flex-wrap mb-4">
+    <div>
+      <div class="text-uppercase fw-bold mb-1" style="font-size:.76rem;letter-spacing:.08em;color:#059669;">Daily reconciliation</div>
+      <h1 class="fw-black mb-1" style="font-size:clamp(1.8rem,4vw,2.65rem);color:#0f172a;">Cash Command Health Check</h1>
+      <p class="text-muted mb-0" style="max-width:720px;">
+        Emajinet compares cash, stock, receivables, sales, costs, and owner movements so you can see whether the books make sense today.
+      </p>
+    </div>
+    <form method="post" class="m-0">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-primary rounded-3 fw-bold px-3">
+        <i class="bi bi-arrow-repeat me-1"></i> Recalculate
+      </button>
+    </form>
+  </div>
+
+  {% include "dashboard/partials/books_balance_card.html" %}
+
+  <div class="row g-3 mb-4">
+    <div class="col-6 col-lg-3">
+      <div class="card border-0 shadow-sm rounded-4 h-100 p-3">
+        <span class="text-muted text-uppercase fw-bold" style="font-size:.72rem;letter-spacing:.05em;">Opening cash</span>
+        <strong class="mt-1" style="font-size:1.3rem;color:#0f172a;">MWK {{ books_balance.opening_cash|floatformat:0|intcomma }}</strong>
+      </div>
+    </div>
+    <div class="col-6 col-lg-3">
+      <div class="card border-0 shadow-sm rounded-4 h-100 p-3">
+        <span class="text-muted text-uppercase fw-bold" style="font-size:.72rem;letter-spacing:.05em;">Current cash</span>
+        <strong class="mt-1" style="font-size:1.3rem;color:#0f172a;">MWK {{ books_balance.current_cash|floatformat:0|intcomma }}</strong>
+      </div>
+    </div>
+    <div class="col-6 col-lg-3">
+      <div class="card border-0 shadow-sm rounded-4 h-100 p-3">
+        <span class="text-muted text-uppercase fw-bold" style="font-size:.72rem;letter-spacing:.05em;">Stock value</span>
+        <strong class="mt-1" style="font-size:1.3rem;color:#0f172a;">MWK {{ books_balance.current_stock_value|floatformat:0|intcomma }}</strong>
+      </div>
+    </div>
+    <div class="col-6 col-lg-3">
+      <div class="card border-0 shadow-sm rounded-4 h-100 p-3">
+        <span class="text-muted text-uppercase fw-bold" style="font-size:.72rem;letter-spacing:.05em;">Receivables</span>
+        <strong class="mt-1" style="font-size:1.3rem;color:#0f172a;">MWK {{ books_balance.current_receivables|floatformat:0|intcomma }}</strong>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-3 mb-4">
+    <div class="col-lg-7">
+      <div class="card border-0 shadow-sm rounded-4 h-100 p-4">
+        <div class="d-flex align-items-center justify-content-between gap-3 flex-wrap mb-3">
+          <div>
+            <h2 class="h5 fw-bold mb-1" style="color:#0f172a;">Movement Today</h2>
+            <p class="text-muted mb-0" style="font-size:.9rem;">How value moved through the business today.</p>
+          </div>
+          <span class="badge rounded-pill text-bg-light border">Tolerance MWK {{ books_balance.tolerance|floatformat:0|intcomma }}</span>
+        </div>
+        <div class="row g-3">
+          <div class="col-6">
+            <div class="p-3 rounded-4" style="background:#f0fdf4;border:1px solid #bbf7d0;">
+              <span class="text-success fw-bold text-uppercase" style="font-size:.72rem;">Sales revenue</span>
+              <div class="fw-black" style="font-size:1.25rem;color:#065f46;">MWK {{ books_balance.sales_revenue|floatformat:0|intcomma }}</div>
+            </div>
+          </div>
+          <div class="col-6">
+            <div class="p-3 rounded-4" style="background:#fff7ed;border:1px solid #fed7aa;">
+              <span class="fw-bold text-uppercase" style="font-size:.72rem;color:#c2410c;">COGS</span>
+              <div class="fw-black" style="font-size:1.25rem;color:#7c2d12;">MWK {{ books_balance.cost_of_goods_sold|floatformat:0|intcomma }}</div>
+            </div>
+          </div>
+          <div class="col-6">
+            <div class="p-3 rounded-4" style="background:#fef2f2;border:1px solid #fecaca;">
+              <span class="fw-bold text-uppercase" style="font-size:.72rem;color:#dc2626;">Recorded expenses</span>
+              <div class="fw-black" style="font-size:1.25rem;color:#7f1d1d;">MWK {{ books_balance.recorded_expenses|floatformat:0|intcomma }}</div>
+            </div>
+          </div>
+          <div class="col-6">
+            <div class="p-3 rounded-4" style="background:#eff6ff;border:1px solid #bfdbfe;">
+              <span class="fw-bold text-uppercase" style="font-size:.72rem;color:#2563eb;">Profit signal</span>
+              <div class="fw-black" style="font-size:1.25rem;color:#1e3a8a;">MWK {{ books_balance.meta.profit|floatformat:0|intcomma }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-5">
+      <div class="card border-0 shadow-sm rounded-4 h-100 p-4">
+        <h2 class="h5 fw-bold mb-3" style="color:#0f172a;">Suggested Actions</h2>
+        <div class="d-grid gap-2">
+          {% for action in books_balance.actions %}
+          <a href="{{ action.url }}" class="btn btn-light border rounded-3 text-start fw-bold">
+            <i class="bi {{ action.icon }} me-2 text-success"></i>{{ action.label }}
+          </a>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm rounded-4 p-4">
+    <div class="d-flex align-items-center justify-content-between gap-3 flex-wrap mb-3">
+      <div>
+        <h2 class="h5 fw-bold mb-1" style="color:#0f172a;">This Month's Checks</h2>
+        <p class="text-muted mb-0" style="font-size:.9rem;">Daily records are stored per business for trend review.</p>
+      </div>
+    </div>
+    <div class="row g-3">
+      {% for item in history.month %}
+      <div class="col-md-6 col-xl-4">
+        <div class="border rounded-4 p-3 h-100" style="background:#fff;">
+          <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+            <strong style="color:#0f172a;">{{ item.date|date:"M j" }}</strong>
+            <span class="badge rounded-pill {% if item.status_color == 'green' %}text-bg-success{% elif item.status_color == 'amber' %}text-bg-warning{% elif item.status_color == 'red' %}text-bg-danger{% else %}text-bg-secondary{% endif %}">
+              {{ item.status_label }}
+            </span>
+          </div>
+          <div class="text-muted" style="font-size:.86rem;">Variance MWK {{ item.variance_abs|floatformat:0|intcomma }}</div>
+          <div class="mt-2" style="height:7px;background:#e2e8f0;border-radius:999px;overflow:hidden;">
+            <div style="height:100%;width:{{ item.score }}%;background:{% if item.status_color == 'green' %}#059669{% elif item.status_color == 'amber' %}#f59e0b{% elif item.status_color == 'red' %}#dc2626{% else %}#64748b{% endif %};"></div>
+          </div>
+        </div>
+      </div>
+      {% empty %}
+      <div class="col-12">
+        <div class="text-center text-muted py-4">No stored checks yet. Recalculate today to start the history.</div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endblock %}

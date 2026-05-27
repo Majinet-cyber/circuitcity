@@ -4,12 +4,10 @@ from django.db import migrations
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('inventory', '0040_add_product_type_field'),
-        ('inventory', '0042_pharmacy_cosmetics_upgrade'),
-        ('inventory', '0047_extend_merchproduct_category_field'),
+        ("inventory", "0040_add_product_type_field"),
+        ("inventory", "0042_pharmacy_cosmetics_upgrade"),
+        ("inventory", "0047_extend_merchproduct_category_field"),
     ]
 
-    operations = [
-    ]
+    operations = []

@@ -1,0 +1,30 @@
+<!-- Beer Step 1: Quantity (Crate-based) -->
+<div class="step-header">
+  <div class="step-icon">📦</div>
+  <div class="step-title">
+    <h2>Step 1: Quantity</h2>
+    <div class="step-subtitle">Enter crates and loose bottles</div>
+  </div>
+</div>
+
+<div id="error-message" class="error-message"></div>
+
+<div class="form-group">
+  <label class="form-label">
+    Number of Crates <span class="required">*</span>
+  </label>
+  <input type="number" class="form-control form-control-lg" id="crates" name="crates" min="0" value="0" required>
+  <div class="form-hint">1 crate = 20 bottles</div>
+</div>
+
+<div class="form-group">
+  <label class="form-label">
+    Loose Bottles
+  </label>
+  <input type="number" class="form-control" id="loose_bottles" name="loose_bottles" min="0" value="0">
+  <div class="form-hint">Optional: Additional bottles not in full crates</div>
+</div>
+
+
+
+

@@ -6,6 +6,7 @@ from datetime import timedelta
 from inventory.models import InventoryItem, WarrantyCheckLog
 from inventory.warranty import CarlcareClient
 
+
 class Command(BaseCommand):
     help = (
         "Re-check IMEIs and alert if activation without sale is older than "
@@ -13,22 +14,12 @@ class Command(BaseCommand):
     )
 
     def add_arguments(self, parser):
+        parser.add_argument("--limit", type=int, default=0, help="Limit number of items to check (useful for testing).")
+        parser.add_argument("--imei", type=str, default="", help="Check only this IMEI (bypasses sold_at filter).")
         parser.add_argument(
-            "--limit", type=int, default=0,
-            help="Limit number of items to check (useful for testing)."
+            "--dry-run", action="store_true", help="Run without sending emails or saving updates (read-only)."
         )
-        parser.add_argument(
-            "--imei", type=str, default="",
-            help="Check only this IMEI (bypasses sold_at filter)."
-        )
-        parser.add_argument(
-            "--dry-run", action="store_true",
-            help="Run without sending emails or saving updates (read-only)."
-        )
-        parser.add_argument(
-            "--verbose-items", action="store_true",
-            help="Print per-item status lines."
-        )
+        parser.add_argument("--verbose-items", action="store_true", help="Print per-item status lines.")
 
     def handle(self, *args, **opts):
         client = CarlcareClient(timeout=getattr(settings, "WARRANTY_REQUEST_TIMEOUT", 12))
@@ -40,14 +31,9 @@ class Command(BaseCommand):
         if opts["imei"]:
             qs = InventoryItem.objects.filter(imei=opts["imei"])
         else:
-            qs = (
-                InventoryItem.objects
-                .filter(sold_at__isnull=True)
-                .exclude(imei__isnull=True)
-                .exclude(imei__exact="")
-            )
+            qs = InventoryItem.objects.filter(sold_at__isnull=True).exclude(imei__isnull=True).exclude(imei__exact="")
         if opts["limit"] > 0:
-            qs = qs.order_by("id")[:opts["limit"]]
+            qs = qs.order_by("id")[: opts["limit"]]
 
         total = 0
         activated = 0
@@ -72,7 +58,7 @@ class Command(BaseCommand):
             item.warranty_expires_at = w.expires_at
             item.warranty_last_checked_at = now
 
-            is_activated = (w.status == "UNDER_WARRANTY" and w.expires_at is not None)
+            is_activated = w.status == "UNDER_WARRANTY" and w.expires_at is not None
             if is_activated:
                 activated += 1
                 if not item.activation_detected_at:
@@ -93,10 +79,14 @@ class Command(BaseCommand):
                         )
 
             if not opts["dry_run"]:
-                item.save(update_fields=[
-                    "warranty_status", "warranty_expires_at",
-                    "warranty_last_checked_at", "activation_detected_at"
-                ])
+                item.save(
+                    update_fields=[
+                        "warranty_status",
+                        "warranty_expires_at",
+                        "warranty_last_checked_at",
+                        "activation_detected_at",
+                    ]
+                )
 
             if opts["verbose_items"]:
                 self.stdout.write(
@@ -111,5 +101,3 @@ class Command(BaseCommand):
                 + (" (dry-run)" if opts["dry_run"] else "")
             )
         )
-
-

@@ -1,56 +1,62 @@
 {% extends "base.html" %}
 {% load humanize %}
 
-{% block title %}Issue Single Payslip · Wallet Admin{% endblock %}
-{% block header_title %}<i class="bi bi-receipt me-2"></i>Issue Single Payslip{% endblock %}
+{% block title %}Issue Payslip - Wallet Admin{% endblock %}
+{% block header_title %}<i class="bi bi-receipt me-2"></i>Issue Payslip{% endblock %}
 
 {% block body %}
 <div class="container-xxl px-0">
-
-  <div class="alert alert-light border d-flex align-items-start gap-2 mb-3" role="alert">
-    <i class="bi bi-info-circle mt-1"></i>
-    <div class="small">
-      This will compute <b>base salary + commissions + bonuses</b>, subtract <b>deductions</b> for
-      the chosen period, create/update a payslip, and (optionally) email it immediately.
-    </div>
-  </div>
-
   <div class="card shadow-sm border-0">
     <div class="card-body">
-      <form method="post" action="{% url 'wallet:admin_issue_payslip' %}">
+      <form method="post" action="{% url 'wallet:admin_issue_payslip' %}" id="payslipForm">
         {% csrf_token %}
-
         <div class="row g-3">
           <div class="col-12">
-            <label class="form-label fw-semibold">Agent</label>
-            <select name="agent_id" class="form-select" required>
-              {% for a in agents %}
-                <option value="{{ a.id }}">{{ a.get_full_name|default:a.username }}</option>
-              {% endfor %}
-            </select>
+            <h5 class="mb-2">Employee</h5>
+            {% if staff_options %}
+              <label class="form-label fw-semibold">Select existing staff/agent</label>
+              <select name="agent_id" id="agentSelect" class="form-select">
+                <option value="">Manual employee entry</option>
+                {% for a in staff_options %}
+                  <option value="{{ a.id }}" data-name="{{ a.name }}" data-role="{{ a.role }}" data-email="{{ a.email }}" data-phone="{{ a.phone }}" data-identifier="{{ a.identifier }}">{{ a.label }}</option>
+                {% endfor %}
+              </select>
+            {% else %}
+              <div class="alert alert-light border mb-0">No staff found. Enter employee manually or add staff first.</div>
+            {% endif %}
           </div>
 
-          <div class="col-md-4">
-            <label class="form-label fw-semibold">Year</label>
-            <input type="number" name="year" class="form-control"
-                   min="2020" max="2100" value="{{ year }}" required>
-          </div>
+          <div class="col-md-6"><label class="form-label fw-semibold">Employee full name</label><input class="form-control" name="employee_name" id="employeeName" required></div>
+          <div class="col-md-6"><label class="form-label fw-semibold">Role / position</label><input class="form-control" name="employee_role" id="employeeRole"></div>
+          <div class="col-md-4"><label class="form-label fw-semibold">Phone</label><input class="form-control" name="employee_phone" id="employeePhone"></div>
+          <div class="col-md-4"><label class="form-label fw-semibold">Email</label><input class="form-control" type="email" name="employee_email" id="employeeEmail"></div>
+          <div class="col-md-4"><label class="form-label fw-semibold">Employee ID</label><input class="form-control" name="employee_identifier" id="employeeIdentifier"></div>
 
-          <div class="col-md-4">
-            <label class="form-label fw-semibold">Month</label>
-            <input type="number" name="month" class="form-control"
-                   min="1" max="12" value="{{ month }}" required>
-          </div>
+          <div class="col-12"><hr><h5 class="mb-2">Pay Period</h5></div>
+          <div class="col-md-3"><label class="form-label fw-semibold">Month</label><input type="number" name="month" class="form-control" min="1" max="12" value="{{ month }}" required></div>
+          <div class="col-md-3"><label class="form-label fw-semibold">Year</label><input type="number" name="year" class="form-control" min="2020" max="2100" value="{{ year }}" required></div>
+          <div class="col-md-3"><label class="form-label fw-semibold">Start date</label><input type="date" name="period_start" class="form-control"></div>
+          <div class="col-md-3"><label class="form-label fw-semibold">End date</label><input type="date" name="period_end" class="form-control"></div>
 
-          <div class="col-md-4">
-            <label class="form-label fw-semibold">Payment Method (optional / future)</label>
-            <select name="method" class="form-select">
-              <option value="">—</option>
-              <option value="MANUAL">Manual</option>
-              <option value="NB">National Bank</option>
-              <option value="SB">Standard Bank</option>
-              <option value="AM">Airtel Money</option>
-            </select>
+          <div class="col-12"><hr><h5 class="mb-2">Earnings</h5></div>
+          <div class="col-md-4"><label class="form-label fw-semibold">Basic salary</label><input class="form-control money" type="number" step="0.01" min="0" name="base_salary" value="0"></div>
+          <div class="col-md-4"><label class="form-label fw-semibold">Allowances</label><input class="form-control money" type="number" step="0.01" min="0" name="allowances" value="0"></div>
+          <div class="col-md-4"><label class="form-label fw-semibold">Bonuses</label><input class="form-control money" type="number" step="0.01" min="0" name="bonuses" value="0"></div>
+          <div class="col-md-4"><label class="form-label fw-semibold">Commission</label><input class="form-control money" type="number" step="0.01" min="0" name="commission" value="0"></div>
+          <div class="col-md-4"><label class="form-label fw-semibold">Other earnings</label><input class="form-control money" type="number" step="0.01" min="0" name="other_earnings" value="0"></div>
+          <div class="col-md-4"><label class="form-label fw-semibold">Payment method</label><select name="method" class="form-select"><option value="MANUAL">Manual</option><option value="NB">National Bank</option><option value="SB">Standard Bank</option><option value="AM">Airtel Money</option></select></div>
+
+          <div class="col-12"><hr><h5 class="mb-2">Deductions</h5></div>
+          <div class="col-md-4"><label class="form-label fw-semibold">Advances</label><input class="form-control money" type="number" step="0.01" min="0" name="advances" value="0"></div>
+          <div class="col-md-4"><label class="form-label fw-semibold">Penalties</label><input class="form-control money" type="number" step="0.01" min="0" name="penalties" value="0"></div>
+          <div class="col-md-4"><label class="form-label fw-semibold">Other deductions</label><input class="form-control money" type="number" step="0.01" min="0" name="other_deductions" value="0"></div>
+
+          <div class="col-12">
+            <div class="alert alert-success d-flex justify-content-between flex-wrap gap-2">
+              <span>Gross: <strong id="grossPay">MWK 0</strong></span>
+              <span>Deductions: <strong id="deductionsPay">MWK 0</strong></span>
+              <span>Net: <strong id="netPay">MWK 0</strong></span>
+            </div>
           </div>
 
           <div class="col-12">
@@ -61,14 +67,47 @@
           </div>
         </div>
 
-        <div class="mt-3">
-          <button class="btn btn-primary">
-            <i class="bi bi-send-check me-1"></i>Issue Payslip
-          </button>
-          <a href="{% url 'wallet:admin_payslips' %}" class="btn btn-outline-secondary ms-2">Back</a>
+        <div class="mt-3 d-flex gap-2 flex-wrap">
+          <button class="btn btn-outline-secondary" name="action" value="preview" type="submit"><i class="bi bi-eye me-1"></i>Preview Payslip</button>
+          <button class="btn btn-primary" name="action" value="issue" type="submit"><i class="bi bi-check2-circle me-1"></i>Mark as Issued</button>
+          <button class="btn btn-success" name="action" value="generate_pdf" type="submit"><i class="bi bi-file-pdf me-1"></i>Generate PDF</button>
+          <a href="{% url 'wallet:admin_payslips' %}" class="btn btn-outline-secondary">History</a>
         </div>
       </form>
     </div>
   </div>
+
+  {% if preview_payslip %}
+  <div class="card shadow-sm border-0 mt-3">
+    <div class="card-body">
+      <h5>Preview</h5>
+      <p class="mb-1"><strong>{{ preview_payslip.display_employee_name }}</strong> - {{ preview_payslip.employee_role|default:"Employee" }}</p>
+      <p class="mb-0">Gross MWK {{ preview_payslip.gross|floatformat:2|intcomma }} - Deductions MWK {{ preview_payslip.deductions|floatformat:2|intcomma }} - Net <strong>MWK {{ preview_payslip.net|floatformat:2|intcomma }}</strong></p>
+    </div>
+  </div>
+  {% endif %}
 </div>
+
+<script>
+const fmt = n => 'MWK ' + Number(n || 0).toLocaleString(undefined,{maximumFractionDigits:2});
+function recalc(){
+  const v = name => Number(document.querySelector(`[name="${name}"]`)?.value || 0);
+  const gross = v('base_salary') + v('allowances') + v('bonuses') + v('commission') + v('other_earnings');
+  const deductions = v('advances') + v('penalties') + v('other_deductions');
+  document.getElementById('grossPay').textContent = fmt(gross);
+  document.getElementById('deductionsPay').textContent = fmt(deductions);
+  document.getElementById('netPay').textContent = fmt(gross - deductions);
+}
+document.querySelectorAll('.money').forEach(el => el.addEventListener('input', recalc));
+document.getElementById('agentSelect')?.addEventListener('change', function(){
+  const o = this.selectedOptions[0];
+  if(!o || !o.value) return;
+  document.getElementById('employeeName').value = o.dataset.name || '';
+  document.getElementById('employeeRole').value = o.dataset.role || '';
+  document.getElementById('employeeEmail').value = o.dataset.email || '';
+  document.getElementById('employeePhone').value = o.dataset.phone || '';
+  document.getElementById('employeeIdentifier').value = o.dataset.identifier || '';
+});
+recalc();
+</script>
 {% endblock %}

@@ -2,6 +2,7 @@
 from django.contrib.auth import get_user_model
 import os
 
+
 class Command(BaseCommand):
     help = "Create/update a superuser from env vars."
 
@@ -21,5 +22,3 @@ class Command(BaseCommand):
         u.set_password(pw)
         u.save()
         self.stdout.write("ensure_superuser: OK")
-
-

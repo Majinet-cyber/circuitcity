@@ -1,0 +1,693 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Add Product · Mixed Retail · {{ business.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+.form-wrap { max-width: 760px; margin: 0 auto; padding: 24px 16px 40px; }
+
+/* ── Step indicator ── */
+.step-bar {
+  display: flex; align-items: center; gap: 0; margin-bottom: 24px;
+  background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 14px 20px;
+  overflow-x: auto;
+}
+.step-item { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+.step-num {
+  width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center;
+  justify-content: center; font-size: .72rem; font-weight: 800; flex-shrink: 0;
+  background: #f1f5f9; color: #94a3b8; border: 2px solid #e2e8f0;
+}
+.step-item.active .step-num { background: #f97316; border-color: #f97316; color: #fff; }
+.step-item.done .step-num  { background: #10b981; border-color: #10b981; color: #fff; }
+.step-label { font-size: .78rem; font-weight: 700; color: #94a3b8; }
+.step-item.active .step-label { color: #0f172a; }
+.step-item.done .step-label  { color: #10b981; }
+.step-arrow { color: #cbd5e1; font-size: .75rem; margin: 0 8px; flex-shrink: 0; }
+@media (max-width: 500px) { .step-arrow { margin: 0 5px; } .step-label { font-size: .7rem; } }
+
+/* ── Form section ── */
+.form-section {
+  background: #fff; border: 1px solid #e2e8f0; border-radius: 14px;
+  padding: 20px; margin-bottom: 16px;
+}
+.form-section-title {
+  font-size: .72rem; text-transform: uppercase; letter-spacing: .07em;
+  font-weight: 800; color: #475569; margin-bottom: 16px;
+  display: flex; align-items: center; gap: 7px;
+}
+.form-section-title i { color: #10b981; font-size: .9rem; }
+
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 520px) { .form-row { grid-template-columns: 1fr; } }
+.form-group { margin-bottom: 12px; }
+.form-label { display: block; font-size: .82rem; font-weight: 700; color: #374151; margin-bottom: 5px; }
+.form-control {
+  width: 100%; padding: 9px 12px; border: 1px solid #d1d5db; border-radius: 8px;
+  font-size: .9rem; box-sizing: border-box; background: #fff;
+}
+.form-control:focus { outline: none; border-color: #10b981; box-shadow: 0 0 0 3px rgba(16,185,129,.1); }
+.form-hint { font-size: .73rem; color: #94a3b8; margin-top: 3px; }
+
+/* ── Department pills ── */
+.dept-pills { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+.dept-pill {
+  display: flex; align-items: center; gap: 6px;
+  padding: 7px 14px; background: #f8fafc; border: 2px solid #e2e8f0;
+  border-radius: 99px; font-size: .83rem; font-weight: 700; color: #374151;
+  cursor: pointer; transition: all .12s; user-select: none;
+}
+.dept-pill:hover { background: #f0fdf4; border-color: #34d399; color: #065f46; }
+.dept-pill.selected { background: #d1fae5; border-color: #10b981; color: #065f46; }
+.dept-pill i { font-size: .85rem; color: #10b981; }
+
+/* ── Template browser ── */
+#template-section {
+  border: 1px solid #bfdbfe; background: #eff6ff; border-radius: 12px;
+  padding: 16px; margin-bottom: 0; margin-top: 4px;
+}
+.tpl-section-header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 12px; flex-wrap: wrap; gap: 8px;
+}
+.tpl-section-title { font-size: .8rem; font-weight: 800; color: #1e40af; display: flex; align-items: center; gap: 6px; }
+.tpl-count { font-size: .72rem; background: #dbeafe; color: #1d4ed8; padding: 2px 9px; border-radius: 99px; font-weight: 700; }
+
+/* Search inside templates */
+#tpl-search {
+  width: 100%; padding: 7px 12px; border: 1px solid #bfdbfe; border-radius: 8px;
+  font-size: .85rem; box-sizing: border-box; background: #fff; margin-bottom: 12px;
+}
+#tpl-search:focus { outline: none; border-color: #3b82f6; }
+
+.template-chips { display: flex; flex-wrap: wrap; gap: 7px; }
+.tpl-chip {
+  padding: 6px 14px; background: #fff; border: 1.5px solid #bfdbfe;
+  border-radius: 99px; font-size: .82rem; font-weight: 600; color: #1e40af;
+  cursor: pointer; transition: all .12s; user-select: none;
+  display: flex; align-items: center; gap: 5px;
+}
+.tpl-chip:hover { background: #dbeafe; border-color: #3b82f6; color: #1e3a8a; }
+.tpl-chip.selected { background: #1d4ed8; border-color: #1d4ed8; color: #fff; }
+.tpl-chip-unit { font-size: .68rem; opacity: .7; font-weight: 500; }
+
+.custom-chip {
+  padding: 6px 14px; background: #fff; border: 1.5px dashed #d1d5db;
+  border-radius: 99px; font-size: .82rem; font-weight: 600; color: #64748b;
+  cursor: pointer; transition: all .12s; user-select: none;
+}
+.custom-chip:hover { background: #f8fafc; border-color: #94a3b8; color: #374151; }
+.custom-chip.selected { background: #f8fafc; border-color: #94a3b8; color: #374151; border-style: solid; }
+
+/* Template empty state */
+.tpl-empty { text-align: center; padding: 20px 10px; color: #64748b; font-size: .82rem; }
+
+/* Selected template indicator */
+#selected-tpl-banner {
+  display: none; margin-top: 10px; padding: 8px 12px;
+  background: #d1fae5; border: 1px solid #6ee7b7; border-radius: 8px;
+  font-size: .82rem; font-weight: 700; color: #065f46;
+  display: flex; align-items: center; gap: 8px;
+}
+
+/* ── Optional fields collapsible ── */
+.optional-fields { display: none; }
+.optional-fields.show { display: block; }
+.toggle-optional { cursor: pointer; font-size: .78rem; color: #64748b; font-weight: 600; display: flex; align-items: center; gap: 5px; margin-top: 4px; }
+
+/* ── No dept warning ── */
+.no-dept-warn {
+  background: #fffbeb; border: 1px solid #fcd34d; border-radius: 12px;
+  padding: 16px 18px; margin-bottom: 16px; display: flex; gap: 12px; align-items: flex-start;
+}
+.no-dept-warn i { font-size: 1.2rem; color: #d97706; flex-shrink: 0; margin-top: 1px; }
+
+/* ── Margin preview ── */
+#margin-preview { font-size: .82rem; color: #64748b; margin-top: 6px; min-height: 20px; }
+#margin-preview.good { color: #059669; font-weight: 700; }
+#margin-preview.warn { color: #d97706; font-weight: 700; }
+
+/* ── Submit button ── */
+.btn-submit {
+  width: 100%; padding: 13px; background: #f97316; color: #fff;
+  border: none; border-radius: 10px; font-size: 1rem; font-weight: 800; cursor: pointer;
+  transition: background .15s;
+}
+.btn-submit:hover { background: #ea6c0a; }
+.btn-submit:disabled { opacity: .5; cursor: not-allowed; }
+
+/* ── Loading spinner ── */
+.tpl-loading { text-align: center; padding: 16px; color: #64748b; font-size: .85rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="form-wrap">
+
+  <!-- Header -->
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+    <div>
+      <h1 style="font-size:1.4rem;font-weight:900;color:#0f172a;margin:0;">Add Product</h1>
+      <p style="font-size:.82rem;color:#64748b;margin:3px 0 0;">Choose a department, pick a template, customise, and save.</p>
+    </div>
+    <a href="{% url 'mixed_retail:products' %}" style="color:#64748b;font-size:.85rem;text-decoration:none;display:flex;align-items:center;gap:5px;">
+      <i class="bi bi-arrow-left"></i> Products
+    </a>
+  </div>
+
+  <!-- Step indicator -->
+  <div class="step-bar">
+    <div class="step-item active" id="step1-el">
+      <div class="step-num">1</div>
+      <div class="step-label">Department</div>
+    </div>
+    <div class="step-arrow">›</div>
+    <div class="step-item" id="step2-el">
+      <div class="step-num">2</div>
+      <div class="step-label">Template</div>
+    </div>
+    <div class="step-arrow">›</div>
+    <div class="step-item" id="step3-el">
+      <div class="step-num">3</div>
+      <div class="step-label">Details</div>
+    </div>
+    <div class="step-arrow">›</div>
+    <div class="step-item" id="step4-el">
+      <div class="step-num">4</div>
+      <div class="step-label">Price & Stock</div>
+    </div>
+    <div class="step-arrow">›</div>
+    <div class="step-item" id="step5-el">
+      <div class="step-num">5</div>
+      <div class="step-label">Save</div>
+    </div>
+  </div>
+
+  <!-- Messages -->
+  {% if messages %}
+    {% for msg in messages %}
+    <div class="msg msg-{{ msg.tags }}" style="margin-bottom:12px;">{{ msg }}</div>
+    {% endfor %}
+  {% endif %}
+
+  <!-- No departments warning -->
+  {% if no_departments %}
+  <div class="no-dept-warn">
+    <i class="bi bi-exclamation-triangle"></i>
+    <div>
+      <div style="font-weight:800;color:#92400e;margin-bottom:4px;">No departments enabled yet</div>
+      <div style="font-size:.83rem;color:#78350f;">
+        Enable at least one department before adding products.
+        <a href="{% url 'mixed_retail:departments' %}" style="color:#f97316;font-weight:700;">Go to Departments →</a>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <form method="post" id="product-form">
+    {% csrf_token %}
+
+    <!-- STEP 1 + 2: Department & Template Browser -->
+    <div class="form-section">
+      <div class="form-section-title"><i class="bi bi-grid-3x3-gap"></i> Step 1 — Choose Department</div>
+
+      {% if departments %}
+      <!-- Department pills (visual selection) -->
+      <div class="dept-pills" id="dept-pills">
+        {% for dept in departments %}
+        <div class="dept-pill {% if preselect_dept and preselect_dept.id == dept.id %}selected{% endif %}"
+             data-dept-id="{{ dept.id }}"
+             data-dept-name="{{ dept.name }}"
+             onclick="chooseDept(this)">
+          <i class="bi {{ dept.icon }}"></i>
+          {{ dept.name }}
+        </div>
+        {% endfor %}
+      </div>
+
+      <!-- Hidden select for form submission -->
+      <select name="department_id" id="department_id" style="display:none;">
+        <option value="">—</option>
+        {% for dept in departments %}
+        <option value="{{ dept.id }}" {% if preselect_dept and preselect_dept.id == dept.id %}selected{% endif %}>{{ dept.name }}</option>
+        {% endfor %}
+      </select>
+      <select name="category_id" id="category_id" style="display:none;">
+        <option value="">—</option>
+        {% for cat in preselect_cats %}
+        <option value="{{ cat.id }}">{{ cat.name }}</option>
+        {% endfor %}
+      </select>
+      {% else %}
+      <div style="font-size:.84rem;color:#64748b;">No departments enabled. <a href="{% url 'mixed_retail:departments' %}" style="color:#f97316;font-weight:700;">Enable departments first →</a></div>
+      {% endif %}
+
+      <!-- Category dropdown (shown after dept selected, only if categories exist) -->
+      <div id="cat-row" style="{% if not preselect_cats %}display:none;{% endif %}margin-top:14px;">
+        <label class="form-label">Category <span style="font-weight:400;color:#94a3b8;">(optional)</span></label>
+        <select id="cat_visible" class="form-control" onchange="syncCat(this)">
+          <option value="">— Select Category —</option>
+          {% for cat in preselect_cats %}
+          <option value="{{ cat.id }}">{{ cat.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <!-- STEP 2: Template browser (revealed after dept selection) -->
+      <div id="template-section" style="{% if not preselect_templates %}display:none;{% endif %}margin-top:16px;">
+        <div class="tpl-section-header">
+          <div class="tpl-section-title">
+            <i class="bi bi-lightning-charge-fill"></i>
+            Step 2 — Pick a Product Template
+            <span class="tpl-count" id="tpl-count">0 templates</span>
+          </div>
+        </div>
+        <input type="text" id="tpl-search" placeholder="Search templates…" oninput="filterTemplates(this.value)">
+        <div class="template-chips" id="template-chips">
+          {% for tpl in preselect_templates %}
+          <div class="tpl-chip" data-name="{{ tpl.name }}" data-unit="{{ tpl.suggested_unit }}" onclick="selectTemplate(this)">
+            {{ tpl.name }} <span class="tpl-chip-unit">{{ tpl.suggested_unit }}</span>
+          </div>
+          {% endfor %}
+          <div class="custom-chip" id="custom-chip" onclick="selectCustom()">
+            <i class="bi bi-pencil-square"></i> Custom Product
+          </div>
+        </div>
+        <div class="tpl-empty" id="tpl-empty" style="display:none;">No templates match your search.</div>
+        <div id="selected-tpl-banner" style="display:none;margin-top:10px;padding:8px 12px;background:#d1fae5;border:1px solid #6ee7b7;border-radius:8px;font-size:.82rem;font-weight:700;color:#065f46;align-items:center;gap:8px;">
+          <i class="bi bi-check-circle-fill"></i>
+          <span id="selected-tpl-text">Template selected</span>
+          <span style="font-size:.73rem;font-weight:400;color:#065f46;">— customise name, brand, price and stock below.</span>
+        </div>
+        {% if not preselect_templates %}
+        <!-- Hint when no dept selected yet -->
+        {% endif %}
+      </div>
+
+      <!-- Hint when no department chosen yet -->
+      {% if not preselect_templates and departments %}
+      <div id="tpl-hint" style="margin-top:12px;font-size:.82rem;color:#64748b;display:flex;align-items:center;gap:7px;">
+        <i class="bi bi-info-circle" style="color:#3b82f6;"></i>
+        Select a department above to see product templates for quick product creation.
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Section: Product Details -->
+    <div class="form-section">
+      <div class="form-section-title"><i class="bi bi-tag"></i> Step 3 — Product Details</div>
+
+      <div class="form-group">
+        <label class="form-label">Product Name *</label>
+        <input type="text" name="name" id="product-name" class="form-control"
+               placeholder="e.g. Samsung A15, Office Chair, White Rice 2kg" required autofocus>
+        <div class="form-hint" id="name-hint" style="display:none;color:#059669;">
+          <i class="bi bi-check-circle"></i> Pre-filled from template — edit freely.
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Brand</label>
+          <input type="text" name="brand" class="form-control" placeholder="e.g. Samsung, Nike, Generic">
+        </div>
+        <div class="form-group">
+          <label class="form-label">SKU / Code</label>
+          <input type="text" name="sku" class="form-control" placeholder="e.g. SAM-A15-BLK">
+        </div>
+      </div>
+    </div>
+
+    <!-- Section: Pricing & Stock -->
+    <div class="form-section">
+      <div class="form-section-title"><i class="bi bi-currency-exchange"></i> Step 4 — Pricing & Stock</div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Cost Price (MWK)</label>
+          <input type="number" name="cost_price" id="cost_price" step="0.01" min="0" class="form-control" value="0" oninput="updateMargin()">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Selling Price (MWK)</label>
+          <input type="number" name="selling_price" id="selling_price" step="0.01" min="0" class="form-control" value="0" oninput="updateMargin()">
+        </div>
+      </div>
+      <div id="margin-preview"></div>
+
+      <div class="form-row" style="margin-top:8px;">
+        <div class="form-group">
+          <label class="form-label">Opening Stock</label>
+          <input type="number" name="stock_quantity" id="stock_qty" step="0.01" min="0" class="form-control" value="0" oninput="updateMargin()">
+          <div class="form-hint">Leave 0 and stock in later via Stock In</div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Reorder Level</label>
+          <input type="number" name="reorder_level" step="0.01" min="0" class="form-control" value="5">
+          <div class="form-hint">Alert when stock falls below this</div>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Unit</label>
+        <select name="unit" id="unit_select" class="form-control">
+          {% for val, label in unit_choices %}
+          <option value="{{ val }}">{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <!-- Live preview -->
+      <div id="live-preview" style="display:none;margin-top:12px;padding:12px 14px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;font-size:.82rem;color:#065f46;">
+        <div style="font-weight:700;margin-bottom:6px;"><i class="bi bi-graph-up-arrow"></i> Live Preview</div>
+        <div style="display:flex;flex-wrap:wrap;gap:16px;">
+          <div><span style="color:#64748b;font-weight:600;">Margin:</span> <span id="prev-margin">—</span></div>
+          <div><span style="color:#64748b;font-weight:600;">Margin %:</span> <span id="prev-pct">—</span></div>
+          <div><span style="color:#64748b;font-weight:600;">Stock Value:</span> <span id="prev-stock-val">—</span></div>
+          <div><span style="color:#64748b;font-weight:600;">Revenue if sold:</span> <span id="prev-revenue">—</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section: Optional Attributes (collapsed) -->
+    <div class="form-section">
+      <div class="form-section-title" style="justify-content:space-between;">
+        <span><i class="bi bi-sliders"></i> Optional Attributes</span>
+        <span class="toggle-optional" id="opt-toggle" onclick="toggleOpt()">
+          <i class="bi bi-chevron-down" id="opt-chevron"></i> expand
+        </span>
+      </div>
+      <div id="opt-fields" class="optional-fields">
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Size</label>
+            <input type="text" name="size" class="form-control" placeholder="S, M, L, 42, etc.">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Color</label>
+            <input type="text" name="color" class="form-control" placeholder="Black, Red, etc.">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Material</label>
+            <input type="text" name="material" class="form-control">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Condition</label>
+            <select name="condition" class="form-control">
+              {% for val, label in condition_choices %}
+              <option value="{{ val }}">{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">IMEI (phones/tablets)</label>
+            <input type="text" name="imei" class="form-control" maxlength="20">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Serial Number</label>
+            <input type="text" name="serial_number" class="form-control">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Warranty (months)</label>
+            <input type="number" name="warranty_months" class="form-control" min="0">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Supplier Name</label>
+            <input type="text" name="supplier_name" class="form-control">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Notes</label>
+          <textarea name="notes" class="form-control" rows="2"></textarea>
+        </div>
+      </div>
+    </div>
+
+    <button type="submit" class="btn-submit" {% if no_departments %}disabled{% endif %} id="submit-btn">
+      <i class="bi bi-check-circle"></i> Save Product
+    </button>
+  </form>
+</div>
+
+<script>
+const TEMPLATES_API = "{% url 'mixed_retail:api_product_templates' %}";
+const CATEGORIES_API = "{% url 'mixed_retail:api_categories' %}";
+
+let allTemplates = [];
+let deptChosen = {% if preselect_dept %}true{% else %}false{% endif %};
+let templateChosen = false;
+
+// Pre-populate template count if pre-selected dept
+{% if preselect_templates %}
+allTemplates = [{% for t in preselect_templates %}{"name":"{{ t.name|escapejs }}","unit":"{{ t.suggested_unit|escapejs }}"},{% endfor %}];
+updateTplCount(allTemplates.length);
+{% endif %}
+
+function chooseDept(el) {
+  // Deselect all pills
+  document.querySelectorAll('.dept-pill').forEach(p => p.classList.remove('selected'));
+  el.classList.add('selected');
+
+  const deptId = el.dataset.deptId;
+  // Sync hidden select
+  const sel = document.getElementById('department_id');
+  for (let i = 0; i < sel.options.length; i++) {
+    if (sel.options[i].value == deptId) { sel.selectedIndex = i; break; }
+  }
+
+  deptChosen = true;
+  advanceStep(1);
+  loadDeptData(deptId);
+}
+
+function loadDeptData(deptId) {
+  if (!deptId) return;
+
+  // Load categories
+  fetch(`${CATEGORIES_API}?dept_id=${deptId}`)
+    .then(r => r.json())
+    .then(data => {
+      const catSel = document.getElementById('category_id');
+      const catVis = document.getElementById('cat_visible');
+      catSel.innerHTML = '<option value="">—</option>';
+      catVis.innerHTML = '<option value="">— Select Category —</option>';
+      if (data.categories && data.categories.length > 0) {
+        data.categories.forEach(c => {
+          const o1 = document.createElement('option');
+          o1.value = c.id; o1.text = c.name;
+          catSel.appendChild(o1);
+          const o2 = document.createElement('option');
+          o2.value = c.id; o2.text = c.name;
+          catVis.appendChild(o2);
+        });
+        document.getElementById('cat-row').style.display = 'block';
+      } else {
+        document.getElementById('cat-row').style.display = 'none';
+      }
+    }).catch(() => {});
+
+  // Load templates
+  const tplSection = document.getElementById('template-section');
+  const chips = document.getElementById('template-chips');
+  chips.innerHTML = '<div class="tpl-loading"><i class="bi bi-hourglass-split"></i> Loading templates…</div>';
+  tplSection.style.display = 'block';
+  const hint = document.getElementById('tpl-hint');
+  if (hint) hint.style.display = 'none';
+
+  fetch(`${TEMPLATES_API}?dept_id=${deptId}`)
+    .then(r => r.json())
+    .then(data => {
+      allTemplates = data.templates || [];
+      renderTemplates(allTemplates);
+      updateTplCount(allTemplates.length);
+    }).catch(() => {
+      chips.innerHTML = '<div class="tpl-empty">Could not load templates. You can still create a custom product.</div>';
+      appendCustomChip();
+    });
+}
+
+function renderTemplates(templates) {
+  const chips = document.getElementById('template-chips');
+  chips.innerHTML = '';
+  templates.forEach(t => {
+    const chip = document.createElement('div');
+    chip.className = 'tpl-chip';
+    chip.dataset.name = t.name;
+    chip.dataset.unit = t.unit;
+    chip.innerHTML = `${escHtml(t.name)} <span class="tpl-chip-unit">${escHtml(t.unit)}</span>`;
+    chip.onclick = function() { selectTemplate(this); };
+    chips.appendChild(chip);
+  });
+  appendCustomChip();
+}
+
+function appendCustomChip() {
+  const chips = document.getElementById('template-chips');
+  const cc = document.createElement('div');
+  cc.id = 'custom-chip';
+  cc.className = 'custom-chip';
+  cc.innerHTML = '<i class="bi bi-pencil-square"></i> Custom Product';
+  cc.onclick = selectCustom;
+  chips.appendChild(cc);
+}
+
+function updateTplCount(n) {
+  const el = document.getElementById('tpl-count');
+  if (el) el.textContent = `${n} template${n !== 1 ? 's' : ''}`;
+}
+
+function filterTemplates(q) {
+  const lower = q.toLowerCase();
+  const chips = document.getElementById('template-chips');
+  const visible = [];
+  chips.querySelectorAll('.tpl-chip').forEach(chip => {
+    const name = (chip.dataset.name || '').toLowerCase();
+    if (!lower || name.includes(lower)) {
+      chip.style.display = '';
+      visible.push(chip);
+    } else {
+      chip.style.display = 'none';
+    }
+  });
+  const empty = document.getElementById('tpl-empty');
+  if (empty) empty.style.display = visible.length === 0 ? 'block' : 'none';
+}
+
+function selectTemplate(el) {
+  const wasSelected = el.classList.contains('selected');
+  document.querySelectorAll('.tpl-chip, .custom-chip').forEach(c => c.classList.remove('selected'));
+
+  const banner = document.getElementById('selected-tpl-banner');
+  const nameHint = document.getElementById('name-hint');
+
+  if (!wasSelected) {
+    el.classList.add('selected');
+    const name = el.dataset.name;
+    const unit = el.dataset.unit;
+
+    // Pre-fill name
+    const nameInput = document.getElementById('product-name');
+    nameInput.value = name;
+    if (nameHint) nameHint.style.display = 'block';
+
+    // Pre-fill unit
+    const unitSel = document.getElementById('unit_select');
+    if (unitSel && unit) {
+      for (let i = 0; i < unitSel.options.length; i++) {
+        if (unitSel.options[i].value === unit) { unitSel.selectedIndex = i; break; }
+      }
+    }
+
+    // Show banner
+    if (banner) {
+      document.getElementById('selected-tpl-text').textContent = name + ' selected';
+      banner.style.display = 'flex';
+    }
+
+    templateChosen = true;
+    advanceStep(2);
+    nameInput.focus();
+  } else {
+    if (banner) banner.style.display = 'none';
+    if (nameHint) nameHint.style.display = 'none';
+    templateChosen = false;
+  }
+}
+
+function selectCustom() {
+  document.querySelectorAll('.tpl-chip, .custom-chip').forEach(c => c.classList.remove('selected'));
+  const cc = document.getElementById('custom-chip');
+  if (cc) cc.classList.add('selected');
+
+  const banner = document.getElementById('selected-tpl-banner');
+  const nameHint = document.getElementById('name-hint');
+  if (banner) banner.style.display = 'none';
+  if (nameHint) nameHint.style.display = 'none';
+
+  // Clear pre-fill
+  const nameInput = document.getElementById('product-name');
+  nameInput.value = '';
+  nameInput.placeholder = 'Type your custom product name';
+  nameInput.focus();
+
+  templateChosen = true;
+  advanceStep(2);
+}
+
+function syncCat(el) {
+  const catSel = document.getElementById('category_id');
+  for (let i = 0; i < catSel.options.length; i++) {
+    if (catSel.options[i].value === el.value) { catSel.selectedIndex = i; break; }
+  }
+}
+
+function advanceStep(step) {
+  // step=1 means dept chosen, step=2 means template chosen
+  const s2 = document.getElementById('step2-el');
+  const s3 = document.getElementById('step3-el');
+  const s4 = document.getElementById('step4-el');
+  const s1 = document.getElementById('step1-el');
+
+  if (step >= 1) {
+    s1.classList.remove('active'); s1.classList.add('done');
+    s1.querySelector('.step-num').innerHTML = '<i class="bi bi-check"></i>';
+    s2.classList.add('active');
+  }
+  if (step >= 2) {
+    s2.classList.remove('active'); s2.classList.add('done');
+    s2.querySelector('.step-num').innerHTML = '<i class="bi bi-check"></i>';
+    s3.classList.add('active');
+    s4.classList.add('active');
+  }
+}
+
+function toggleOpt() {
+  const el = document.getElementById('opt-fields');
+  const chevron = document.getElementById('opt-chevron');
+  const toggle = document.getElementById('opt-toggle');
+  el.classList.toggle('show');
+  const isOpen = el.classList.contains('show');
+  chevron.className = 'bi bi-chevron-' + (isOpen ? 'up' : 'down');
+  toggle.innerHTML = `<i class="bi bi-chevron-${isOpen ? 'up' : 'down'}" id="opt-chevron"></i> ${isOpen ? 'collapse' : 'expand'}`;
+}
+
+function updateMargin() {
+  const cost = parseFloat(document.getElementById('cost_price').value) || 0;
+  const sell = parseFloat(document.getElementById('selling_price').value) || 0;
+  const qty  = parseFloat(document.getElementById('stock_qty').value) || 0;
+  const el = document.getElementById('margin-preview');
+
+  if (sell > 0) {
+    const margin = sell - cost;
+    const pct = (margin / sell * 100).toFixed(1);
+    el.textContent = `Margin: MWK ${margin.toLocaleString()} (${pct}%)`;
+    el.className = pct < 5 ? 'warn' : 'good';
+
+    // Live preview
+    const preview = document.getElementById('live-preview');
+    preview.style.display = 'block';
+    document.getElementById('prev-margin').textContent = `MWK ${margin.toLocaleString()}`;
+    document.getElementById('prev-pct').textContent = `${pct}%`;
+    document.getElementById('prev-stock-val').textContent = `MWK ${(cost * qty).toLocaleString()}`;
+    document.getElementById('prev-revenue').textContent = `MWK ${(sell * qty).toLocaleString()}`;
+  } else {
+    el.textContent = ''; el.className = '';
+    document.getElementById('live-preview').style.display = 'none';
+  }
+}
+
+function escHtml(str) {
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// On load: if dept pre-selected, trigger count display
+{% if preselect_dept and preselect_templates %}
+advanceStep(1);
+updateTplCount({{ preselect_templates|length }});
+{% endif %}
+</script>
+{% endblock %}

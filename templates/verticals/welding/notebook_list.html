@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Welding Notebook{% endblock %}
+
+{% block extra_css %}
+<style>
+.weld-notebook { background: linear-gradient(135deg,#eff6ff,#ffffff 52%,#f8fafc); min-height: 100vh; color: #0f172a; padding-bottom: 5rem; }
+.weld-wrap { max-width: 1180px; margin: 0 auto; padding: 1.25rem; }
+.weld-hero { background: linear-gradient(135deg,#1d4ed8,#2563eb 55%,#0ea5e9); border: 1px solid #bfdbfe; border-radius: 18px; padding: 1.25rem; display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; align-items: center; box-shadow: 0 18px 44px rgba(37,99,235,.16); }
+.weld-hero h1 { margin: 0; font-weight: 800; color: #ffffff; }
+.weld-hero .text-muted { color: rgba(255,255,255,.78) !important; }
+.filter-card,.note-card { background: #ffffff; border: 1px solid #dbeafe; border-radius: 16px; box-shadow: 0 10px 28px rgba(15,23,42,.06); }
+.note-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(260px,1fr)); gap: 1rem; margin-top: 1rem; }
+.note-card { padding: 1rem; color: #0f172a; text-decoration: none; display: block; transition: transform .15s, border-color .15s; }
+.note-card:hover { transform: translateY(-2px); border-color: #2563eb; color: #0f172a; }
+.badge-soft { border-radius: 999px; padding: .35rem .65rem; font-size: .78rem; font-weight: 700; }
+.badge-draft { background:#e0f2fe; color:#075985; }
+.badge-quoted { background:#1d4ed8; color:#dbeafe; }
+.badge-in_progress { background:#92400e; color:#ffedd5; }
+.badge-completed { background:#166534; color:#dcfce7; }
+.badge-lost { background:#7f1d1d; color:#fee2e2; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="weld-notebook">
+  <div class="weld-wrap">
+    <div class="weld-hero">
+      <div>
+        <div class="text-uppercase small text-secondary fw-bold">Site Diary</div>
+        <h1>Welding Notebook</h1>
+        <p class="mb-0 text-secondary">Measurements, materials, budgets, and follow-ups from site visits.</p>
+      </div>
+      <div class="d-flex gap-2 flex-wrap">
+        <a href="{% url 'verticals:welding_notebook_create' %}" class="btn btn-light btn-lg text-primary"><i class="bi bi-plus-circle"></i> New Note</a>
+        <a href="{% url 'verticals:welding_marketplace_publish' %}" class="btn btn-outline-light btn-lg"><i class="bi bi-shop"></i> Marketplace</a>
+      </div>
+    </div>
+
+    <form method="get" class="filter-card p-3 mt-3 row g-2">
+      <div class="col-md-7"><input type="search" name="q" class="form-control" value="{{ q }}" placeholder="Search customer, phone, address, measurements"></div>
+      <div class="col-md-3">
+        <select name="status" class="form-select">
+          <option value="">All statuses</option>
+          {% for value,label in status_choices %}
+          <option value="{{ value }}" {% if status == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2 d-grid"><button class="btn btn-primary">Filter</button></div>
+    </form>
+
+    <div class="note-grid">
+      {% for entry in entries %}
+      <a class="note-card" href="{% url 'verticals:welding_notebook_detail' entry.id %}">
+        <div class="d-flex justify-content-between gap-2 align-items-start mb-2">
+          <h5 class="mb-0">{{ entry.site_customer_name }}</h5>
+          <span class="badge-soft badge-{{ entry.status }}">{{ entry.get_status_display }}</span>
+        </div>
+        <div class="text-secondary small mb-2">{{ entry.visit_at|date:"d M Y H:i" }} · {{ entry.get_job_type_display }}</div>
+        {% if entry.customer_phone %}<div><i class="bi bi-phone"></i> {{ entry.customer_phone }}</div>{% endif %}
+        {% if entry.customer_address %}<div class="text-secondary small mt-1">{{ entry.customer_address|truncatechars:90 }}</div>{% endif %}
+        {% if entry.estimated_budget %}<div class="mt-3 fw-bold text-warning">MWK {{ entry.estimated_budget|floatformat:0|intcomma }}</div>{% endif %}
+      </a>
+      {% empty %}
+      <div class="filter-card p-4 text-center text-secondary">No notebook entries yet.</div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,1349 @@
+# tests/test_marketplace_home.py
+"""
+Tests for the public marketplace home view (/marketplace/).
+
+Verifies:
+- marketplace home loads with 200 status
+- page does not 500 when there are zero listings
+- only live listings appear in the paginated listing
+- default status for new listings is 'draft'
+- queryset filters by status correctly
+- landing page contains Marketplace nav link
+- signup CTA from marketplace resolves to a valid route (no 404)
+- farm sale page renders with expected content
+- landing page includes farm in marketplace messaging
+"""
+import tempfile
+from io import BytesIO
+from io import StringIO
+from types import SimpleNamespace
+from unittest.mock import patch
+
+import pytest
+from PIL import Image
+from django.core.files.base import ContentFile
+from django.core.files.uploadedfile import SimpleUploadedFile
+from django.core.management import call_command
+from django.db import OperationalError
+from django.test import override_settings
+from django.test import TestCase, Client
+from django.urls import reverse, resolve, NoReverseMatch
+
+from inventory.models_marketplace import (
+    MarketplaceListing,
+    MarketplaceListingImage,
+    MarketplaceOrder,
+    MarketplaceOrderStatus,
+    MarketplaceStorefrontProfile,
+    ListingStatus,
+)
+from inventory.services.marketplace_media import listing_media
+from inventory.services.welding_marketplace import create_welding_marketplace_listing
+from tenants.models import Business, Membership
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
+
+
+def _make_biz(slug, kind="phones"):
+    return Business.objects.create(name=f"Shop {slug}", slug=slug, business_kind=kind)
+
+
+def _make_listing(biz, title, status):
+    return MarketplaceListing.objects.create(business=biz, title=title, status=status)
+
+
+def _png_upload(name, color="blue"):
+    buf = BytesIO()
+    Image.new("RGB", (24, 24), color).save(buf, format="PNG")
+    return SimpleUploadedFile(name, buf.getvalue(), content_type="image/png")
+
+
+# ---------------------------------------------------------------------------
+# Marketplace Home: empty state
+# ---------------------------------------------------------------------------
+
+@pytest.mark.django_db
+class MarketplaceHomeEmptyTests(TestCase):
+    """Marketplace home should return 200 even with no listings."""
+
+    def test_home_loads_200_empty(self):
+        url = reverse("marketplace:home")
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+
+    def test_home_does_not_500(self):
+        url = reverse("marketplace:home")
+        try:
+            response = self.client.get(url)
+            self.assertNotEqual(response.status_code, 500)
+        except Exception as exc:
+            self.fail(f"marketplace home raised exception: {exc}")
+
+
+# ---------------------------------------------------------------------------
+# Marketplace Home: listing visibility
+# ---------------------------------------------------------------------------
+
+@pytest.mark.django_db
+class MarketplaceHomeListingTests(TestCase):
+
+    def setUp(self):
+        self.biz = _make_biz("home-test-shop")
+        self.live = _make_listing(self.biz, "Live Widget", "live")
+        self.draft = _make_listing(self.biz, "Draft Widget", "draft")
+        self.offline = _make_listing(self.biz, "Offline Widget", "offline")
+        self.sold = _make_listing(self.biz, "Sold Widget", "sold")
+        self.oos = _make_listing(self.biz, "OOS Widget", "out_of_stock")
+        self.client = Client()
+
+    def test_live_listing_appears(self):
+        url = reverse("marketplace:home")
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Live Widget")
+
+    def test_draft_listing_hidden(self):
+        url = reverse("marketplace:home")
+        response = self.client.get(url)
+        self.assertNotContains(response, "Draft Widget")
+
+    def test_offline_listing_hidden(self):
+        url = reverse("marketplace:home")
+        response = self.client.get(url)
+        self.assertNotContains(response, "Offline Widget")
+
+    def test_sold_listing_hidden(self):
+        url = reverse("marketplace:home")
+        response = self.client.get(url)
+        self.assertNotContains(response, "Sold Widget")
+
+    def test_out_of_stock_listing_hidden(self):
+        url = reverse("marketplace:home")
+        response = self.client.get(url)
+        self.assertNotContains(response, "OOS Widget")
+
+
+# ---------------------------------------------------------------------------
+# Marketplace Home: search + vertical filter
+# ---------------------------------------------------------------------------
+
+@pytest.mark.django_db
+class MarketplaceHomeFilterTests(TestCase):
+
+    def setUp(self):
+        self.biz = _make_biz("filter-shop")
+        _make_listing(self.biz, "Red Phone", "live")
+        _make_listing(self.biz, "Blue Shirt", "live")
+        self.client = Client()
+
+    def test_search_filters_results(self):
+        url = reverse("marketplace:home") + "?q=Red+Phone"
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Red Phone")
+        self.assertNotContains(response, "Blue Shirt")
+
+    def test_vertical_filter_works(self):
+        biz2 = _make_biz("gym-shop", kind="gym")
+        _make_listing(biz2, "Gym Pass", "live")
+        url = reverse("marketplace:home") + "?vertical=phones"
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+
+    def test_invalid_page_graceful(self):
+        url = reverse("marketplace:home") + "?page=999"
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+
+
+# ---------------------------------------------------------------------------
+# Default status = 'draft'
+# ---------------------------------------------------------------------------
+
+@pytest.mark.django_db
+class MarketplaceListingDefaultStatusTests(TestCase):
+
+    def test_default_status_is_draft(self):
+        biz = _make_biz("default-status-shop")
+        listing = MarketplaceListing.objects.create(business=biz, title="New Item")
+        self.assertEqual(listing.status, ListingStatus.DRAFT)
+        self.assertFalse(listing.is_active)
+
+    def test_live_listing_is_active(self):
+        biz = _make_biz("live-status-shop")
+        listing = MarketplaceListing.objects.create(
+            business=biz, title="Active Item", status="live"
+        )
+        self.assertTrue(listing.is_active)
+        self.assertTrue(listing.is_live)
+
+    def test_queryset_filter_by_status(self):
+        biz = _make_biz("qs-filter-shop")
+        MarketplaceListing.objects.create(business=biz, title="L1", status="live")
+        MarketplaceListing.objects.create(business=biz, title="L2", status="live")
+        MarketplaceListing.objects.create(business=biz, title="D1", status="draft")
+        live_count = MarketplaceListing.objects.filter(
+            business=biz, status=ListingStatus.LIVE
+        ).count()
+        draft_count = MarketplaceListing.objects.filter(
+            business=biz, status=ListingStatus.DRAFT
+        ).count()
+        self.assertEqual(live_count, 2)
+        self.assertEqual(draft_count, 1)
+
+
+# ---------------------------------------------------------------------------
+# Landing page Marketplace nav link
+# ---------------------------------------------------------------------------
+
+@pytest.mark.django_db
+class LandingPageMarketplaceNavTests(TestCase):
+
+    def test_landing_page_has_marketplace_link(self):
+        """The public landing page should contain a Marketplace link."""
+        response = self.client.get("/", follow=True)
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode("utf-8")
+        self.assertIn("Marketplace", content)
+        self.assertIn("/marketplace/", content)
+
+
+# ---------------------------------------------------------------------------
+# PART 2: Marketplace signup routing — no 404 from marketplace
+# ---------------------------------------------------------------------------
+
+@pytest.mark.django_db
+class MarketplaceSignupRoutingTests(TestCase):
+    """
+    Guard against the `/accounts/signup/wizard/` 404 regression.
+
+    The correct signup entry point is `accounts:signup` which resolves to
+    `/accounts/signup/` (the wizard view at step=0).
+    """
+
+    def test_accounts_signup_url_resolves(self):
+        """accounts:signup named URL must reverse without NoReverseMatch."""
+        try:
+            url = reverse("accounts:signup")
+        except NoReverseMatch as e:
+            self.fail(f"accounts:signup does not resolve: {e}")
+        self.assertTrue(url.startswith("/accounts/"), f"Unexpected URL: {url}")
+
+    def test_accounts_signup_returns_non_404(self):
+        """GET /accounts/signup/ must not return 404."""
+        url = reverse("accounts:signup")
+        response = self.client.get(url, follow=False)
+        self.assertNotEqual(
+            response.status_code, 404,
+            f"accounts:signup returned 404 at {url}",
+        )
+
+    def test_wizard_step_url_resolves(self):
+        """accounts:signup_wizard_step with step=0 must also resolve."""
+        try:
+            url = reverse("accounts:signup_wizard_step", kwargs={"step": 0})
+        except NoReverseMatch as e:
+            self.fail(f"accounts:signup_wizard_step does not resolve: {e}")
+        self.assertIn("/accounts/signup/wizard/0/", url)
+
+    def test_wizard_slash_url_does_not_exist(self):
+        """
+        /accounts/signup/wizard/ (no step argument) must NOT resolve to a valid
+        named route — it was the broken link we fixed.
+        """
+        client = Client()
+        response = client.get("/accounts/signup/wizard/")
+        # Should be 404 (no such bare URL exists) — that's exactly the bug we fixed
+        self.assertEqual(
+            response.status_code, 404,
+            "/accounts/signup/wizard/ should be a 404 (bare URL never existed)",
+        )
+
+    def test_marketplace_home_contains_correct_signup_url(self):
+        """
+        The marketplace public home page must link to /accounts/signup/
+        and must NOT contain the broken /accounts/signup/wizard/ link.
+        """
+        url = reverse("marketplace:home")
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode("utf-8")
+
+        # Correct signup URL must appear somewhere in the page
+        signup_url = reverse("accounts:signup")
+        self.assertIn(
+            signup_url, content,
+            f"Marketplace page must contain {signup_url} (correct signup link)",
+        )
+
+        # Broken bare wizard URL must NOT appear
+        self.assertNotIn(
+            "/accounts/signup/wizard/\"",
+            content,
+            "Marketplace page must not contain broken /accounts/signup/wizard/ link",
+        )
+
+
+# ---------------------------------------------------------------------------
+# PART 3: Farm sale URL resolution tests (no login needed — just URL reversals)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.django_db
+class FarmSaleLandingTests(TestCase):
+    """
+    Farm sale URL names must all resolve without NoReverseMatch.
+    The actual rendering requires an authenticated session with an active farm
+    business, but URL resolution can be verified without login.
+    """
+
+    def test_farm_sales_landing_resolves(self):
+        """farm_sales named URL must resolve."""
+        try:
+            url = reverse("verticals:farm_sales")
+        except NoReverseMatch as e:
+            self.fail(f"verticals:farm_sales does not resolve: {e}")
+
+    def test_farm_sales_crops_resolves(self):
+        """farm_sales_crops named URL must resolve."""
+        try:
+            url = reverse("verticals:farm_sales_crops")
+        except NoReverseMatch as e:
+            self.fail(f"verticals:farm_sales_crops does not resolve: {e}")
+
+    def test_farm_sales_livestock_resolves(self):
+        """farm_sales_livestock named URL must resolve."""
+        try:
+            url = reverse("verticals:farm_sales_livestock")
+        except NoReverseMatch as e:
+            self.fail(f"verticals:farm_sales_livestock does not resolve: {e}")
+
+    def test_farm_sales_record_resolves(self):
+        """farm_sales_record named URL must resolve."""
+        try:
+            url = reverse("verticals:farm_sales_record")
+        except NoReverseMatch as e:
+            self.fail(f"verticals:farm_sales_record does not resolve: {e}")
+
+    def test_farm_sale_landing_url_not_404_unauthenticated(self):
+        """
+        An unauthenticated user hitting /verticals/farm/sales/ should get
+        a redirect (to login), NOT a 404 or 500.
+        """
+        url = reverse("verticals:farm_sales")
+        response = self.client.get(url, follow=False)
+        # Should be 302 redirect to login, not 404
+        self.assertNotEqual(response.status_code, 404)
+        self.assertNotEqual(response.status_code, 500)
+
+
+# ---------------------------------------------------------------------------
+# PART 4: Landing page includes farm in marketplace messaging
+# ---------------------------------------------------------------------------
+
+@pytest.mark.django_db
+class LandingPageFarmMarketplaceTests(TestCase):
+    """
+    The landing page must include farm in the marketplace section copy.
+    """
+
+    def _get_landing_content(self):
+        response = self.client.get("/", follow=True)
+        self.assertEqual(response.status_code, 200)
+        return response.content.decode("utf-8")
+
+    def test_landing_page_mentions_farm(self):
+        content = self._get_landing_content()
+        self.assertIn(
+            "farm", content.lower(),
+            "Landing page must mention 'farm' somewhere.",
+        )
+
+    def test_landing_page_marketplace_section_exists(self):
+        content = self._get_landing_content()
+        self.assertIn(
+            "marketplace", content.lower(),
+            "Landing page must contain a marketplace section.",
+        )
+
+    def test_landing_page_farm_in_marketplace_section(self):
+        """
+        The marketplace showcase section on the landing page must reference
+        farm/agriculture alongside other business types.
+        """
+        content = self._get_landing_content()
+        # The farm card has a data-testid attribute we can check for
+        self.assertIn(
+            "Farm", content,
+            "Landing page marketplace section must include Farm vertical.",
+        )
+
+    def test_landing_page_no_template_errors(self):
+        """Landing page must render without 500."""
+        response = self.client.get("/", follow=True)
+        self.assertNotEqual(response.status_code, 500)
+        self.assertEqual(response.status_code, 200)
+
+
+# ---------------------------------------------------------------------------
+# PART 5: Marketplace UI upgrades — trust band, categories strip, cards
+# ---------------------------------------------------------------------------
+
+@pytest.mark.django_db
+class MarketplaceTrustBandTests(TestCase):
+    """
+    The marketplace homepage must include the trust/stats band section.
+    """
+
+    def _get_marketplace_content(self):
+        url = reverse("marketplace:home")
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        return response.content.decode("utf-8")
+
+    def test_trust_band_renders(self):
+        """Trust band section must be present on the marketplace homepage."""
+        content = self._get_marketplace_content()
+        self.assertIn(
+            "trust-band",
+            content,
+            "Marketplace homepage must contain the trust-band section.",
+        )
+
+    def test_trust_band_has_verified_sellers(self):
+        content = self._get_marketplace_content()
+        self.assertIn("Verified", content, "Trust band must mention Verified.")
+
+    def test_trust_band_has_africa_first(self):
+        content = self._get_marketplace_content()
+        self.assertIn("Africa", content, "Trust band must mention Africa.")
+
+    def test_trust_band_has_mobile_ready(self):
+        content = self._get_marketplace_content()
+        self.assertIn("Mobile", content, "Trust band must mention Mobile.")
+
+    def test_trust_band_has_verticals_count(self):
+        content = self._get_marketplace_content()
+        self.assertIn("Vertical", content, "Trust band must mention Verticals.")
+
+
+@pytest.mark.django_db
+class MarketplaceCategoriesStripTests(TestCase):
+    """
+    The marketplace homepage must include the featured categories/verticals strip.
+    """
+
+    def _get_marketplace_content(self):
+        url = reverse("marketplace:home")
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        return response.content.decode("utf-8")
+
+    def test_categories_section_renders(self):
+        """Categories section must be present on the marketplace homepage."""
+        content = self._get_marketplace_content()
+        self.assertIn(
+            "categories-section",
+            content,
+            "Marketplace must contain the categories section.",
+        )
+
+    def test_categories_include_phones(self):
+        content = self._get_marketplace_content()
+        self.assertIn("Phones", content, "Categories must include Phones.")
+
+    def test_categories_include_farm(self):
+        content = self._get_marketplace_content()
+        self.assertIn("Farm", content, "Categories must include Farm.")
+
+    def test_categories_include_gym(self):
+        content = self._get_marketplace_content()
+        self.assertIn("Gym", content, "Categories must include Gym.")
+
+    def test_categories_include_cars(self):
+        content = self._get_marketplace_content()
+        self.assertIn("Cars", content, "Categories must include Cars.")
+
+    def test_categories_include_pharmacy(self):
+        content = self._get_marketplace_content()
+        self.assertIn("Pharmacy", content, "Categories must include Pharmacy.")
+
+    def test_categories_link_to_vertical_filters(self):
+        """Each category card must link to a vertical-filtered marketplace URL."""
+        content = self._get_marketplace_content()
+        self.assertIn("vertical=phones", content, "Must link to phones vertical filter.")
+        self.assertIn("vertical=farm", content, "Must link to farm vertical filter.")
+        self.assertIn("vertical=gym", content, "Must link to gym vertical filter.")
+        self.assertIn("vertical=car_dealer", content, "Must link to car_dealer vertical filter.")
+
+    def test_browse_by_business_type_heading(self):
+        content = self._get_marketplace_content()
+        self.assertIn(
+            "Browse by Business Type",
+            content,
+            "Must show 'Browse by Business Type' heading.",
+        )
+
+
+@pytest.mark.django_db
+class MarketplaceEmptyStateUpgradeTests(TestCase):
+    """
+    The marketplace empty state must be premium — no dashed/dotted borders,
+    must have aspirational CTAs, and must render correctly.
+    """
+
+    def _get_marketplace_content(self):
+        url = reverse("marketplace:home")
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        return response.content.decode("utf-8")
+
+    def test_empty_state_renders(self):
+        content = self._get_marketplace_content()
+        self.assertIn("empty-state", content, "Empty state must render.")
+
+    def test_empty_state_no_dashed_border(self):
+        """Empty state must NOT use dashed or dotted border style."""
+        content = self._get_marketplace_content()
+        # The empty state wrapper must not use border-style: dashed/dotted
+        self.assertNotIn(
+            "border: 2px dashed",
+            content,
+            "Empty state must not use dashed border.",
+        )
+        self.assertNotIn(
+            "border:2px dashed",
+            content,
+            "Empty state must not use dashed border.",
+        )
+
+    def test_empty_state_has_list_your_business_cta(self):
+        content = self._get_marketplace_content()
+        signup_url = reverse("accounts:signup")
+        self.assertIn(
+            signup_url, content,
+            "Empty state must contain a link to the signup/list-your-business page.",
+        )
+
+    def test_empty_state_aspirational_copy(self):
+        """Empty state must have aspirational, premium copy."""
+        content = self._get_marketplace_content()
+        # Should NOT feel like a dead end
+        self.assertNotIn(
+            "No listings yet",
+            content,
+            "Empty state must not say just 'No listings yet' — must be aspirational.",
+        )
+
+    def test_empty_state_has_features_row(self):
+        """Empty state should show platform benefits."""
+        content = self._get_marketplace_content()
+        self.assertIn("Africa-wide reach", content, "Empty state must highlight Africa-wide reach.")
+
+
+@pytest.mark.django_db
+class MarketplaceListingCardUpgradeTests(TestCase):
+    """
+    Listing cards must render with enhanced content including vertical badge.
+    """
+
+    def setUp(self):
+        self.biz = Business.objects.create(
+            name="Test Card Shop", slug="card-test-shop", business_kind="phones"
+        )
+        self.listing = MarketplaceListing.objects.create(
+            business=self.biz,
+            title="Card Test Item",
+            status="live",
+            vertical="phones",
+        )
+        self.client = Client()
+
+    def test_listing_card_renders_vertical_badge(self):
+        """Listing cards must include a vertical category badge."""
+        url = reverse("marketplace:home")
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode("utf-8")
+        self.assertIn(
+            "listing-vertical-badge",
+            content,
+            "Listing cards must render a vertical badge element.",
+        )
+
+    def test_listing_card_renders_view_cue(self):
+        """Listing cards must include a 'View' hover cue."""
+        url = reverse("marketplace:home")
+        response = self.client.get(url)
+        content = response.content.decode("utf-8")
+        self.assertIn(
+            "listing-view-cue",
+            content,
+            "Listing cards must render a view cue element.",
+        )
+
+    def test_listing_card_still_links_to_detail(self):
+        """Listing cards must still link to the listing detail page."""
+        url = reverse("marketplace:home")
+        response = self.client.get(url)
+        content = response.content.decode("utf-8")
+        self.assertIn(
+            f"/marketplace/{self.biz.slug}/{self.listing.listing_slug}/",
+            content,
+            "Listing card must link to the listing detail URL.",
+        )
+
+
+@pytest.mark.django_db
+class MarketplaceListingMediaRenderingTests(TestCase):
+    """Marketplace cards should never render broken media URLs."""
+
+    def setUp(self):
+        self.media_root = tempfile.TemporaryDirectory()
+        self.settings_override = override_settings(MEDIA_ROOT=self.media_root.name)
+        self.settings_override.enable()
+        self.biz = Business.objects.create(
+            name="Media Test Shop",
+            slug="media-test-shop",
+            business_kind="phones",
+        )
+        self.client = Client()
+
+    def tearDown(self):
+        self.settings_override.disable()
+        self.media_root.cleanup()
+
+    def test_missing_legacy_media_uses_placeholder_not_broken_img(self):
+        MarketplaceListing.objects.create(
+            business=self.biz,
+            title="Missing Legacy Image",
+            status="live",
+            vertical="phones",
+            media_file="marketplace/missing-image.jpg",
+        )
+
+        response = self.client.get(reverse("marketplace:home"))
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode("utf-8")
+
+        self.assertIn("Missing Legacy Image", content)
+        self.assertNotIn("missing-image.jpg", content)
+        self.assertIn("listing-img-placeholder", content)
+
+        listing = MarketplaceListing.objects.get(title="Missing Legacy Image")
+        self.assertEqual(listing_media(listing)["kind"], "placeholder")
+
+    def test_existing_video_media_renders_as_video_not_img(self):
+        listing = MarketplaceListing.objects.create(
+            business=self.biz,
+            title="Video Listing",
+            status="live",
+            vertical="phones",
+        )
+        listing.media_file.save("demo.mp4", ContentFile(b"video"), save=True)
+
+        response = self.client.get(reverse("marketplace:home"))
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode("utf-8")
+
+        self.assertIn("<video", content)
+        self.assertIn("demo.mp4", content)
+
+    def test_uploaded_gallery_image_renders_image_url(self):
+        listing = MarketplaceListing.objects.create(
+            business=self.biz,
+            title="Uploaded Gallery Image",
+            status="live",
+            vertical="phones",
+        )
+        image = MarketplaceListingImage.objects.create(listing=listing)
+        image.image.save("uploaded-card.jpg", ContentFile(b"image"), save=True)
+
+        response = self.client.get(reverse("marketplace:home"))
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode("utf-8")
+
+        self.assertIn("Uploaded Gallery Image", content)
+        self.assertIn("uploaded-card.jpg", content)
+        self.assertIn("<img", content)
+
+    def test_listing_with_no_image_uses_placeholder(self):
+        listing = MarketplaceListing.objects.create(
+            business=self.biz,
+            title="No Image Listing",
+            status="live",
+            vertical="phones",
+        )
+
+        media = listing_media(listing)
+
+        self.assertEqual(media["kind"], "placeholder")
+        self.assertEqual(media["url"], "")
+
+    def test_missing_gallery_image_falls_back_to_placeholder(self):
+        listing = MarketplaceListing.objects.create(
+            business=self.biz,
+            title="Missing Gallery Image",
+            status="live",
+            vertical="phones",
+        )
+        MarketplaceListingImage.objects.create(
+            listing=listing,
+            image="marketplace/missing-primary.jpg",
+        )
+
+        response = self.client.get(reverse("marketplace:home"))
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode("utf-8")
+
+        self.assertIn("Missing Gallery Image", content)
+        self.assertNotIn("missing-primary.jpg", content)
+        self.assertIn("listing-img-placeholder", content)
+
+    def test_remote_storage_url_renders_without_exists_check(self):
+        class RemoteStorage:
+            def exists(self, name):
+                raise AssertionError("remote exists() should not be required for rendering")
+
+        class RemoteField:
+            name = "marketplace/remote-card.jpg"
+            storage = RemoteStorage()
+
+            @property
+            def url(self):
+                return "https://cdn.example.test/marketplace/remote-card.jpg"
+
+        class RemoteImage:
+            image = RemoteField()
+
+        class RemoteListing:
+            title = "Remote Image Listing"
+            vertical = "phones"
+            primary_image = RemoteImage()
+            media_file = None
+
+        media = listing_media(RemoteListing())
+
+        self.assertEqual(media["kind"], "image")
+        self.assertEqual(media["url"], "https://cdn.example.test/marketplace/remote-card.jpg")
+
+    def test_listing_with_primary_image_shows_primary_image(self):
+        listing = MarketplaceListing.objects.create(
+            business=self.biz,
+            title="Primary Image Listing",
+            status="live",
+            vertical="phones",
+        )
+        listing.media_file.save("primary-card.jpg", ContentFile(b"primary"), save=True)
+
+        media = listing_media(listing)
+
+        self.assertEqual(media["kind"], "image")
+        self.assertIn("primary-card", media["url"])
+
+    def test_listing_with_no_primary_uses_gallery_image(self):
+        listing = MarketplaceListing.objects.create(
+            business=self.biz,
+            title="Gallery Fallback Listing",
+            status="live",
+            vertical="phones",
+        )
+        image = MarketplaceListingImage.objects.create(listing=listing)
+        image.image.save("gallery-fallback.jpg", ContentFile(b"gallery"), save=True)
+
+        media = listing_media(listing)
+
+        self.assertEqual(media["kind"], "image")
+        self.assertIn("gallery-fallback", media["url"])
+        self.assertEqual(media["source"], "gallery")
+
+    def test_primary_upload_wins_over_related_gallery_image(self):
+        listing = MarketplaceListing.objects.create(
+            business=self.biz,
+            title="Primary Upload Preferred",
+            status="live",
+            vertical="phones",
+        )
+        listing.media_file.save("cover-primary.jpg", ContentFile(b"primary"), save=True)
+        image = MarketplaceListingImage.objects.create(listing=listing)
+        image.image.save("extra-angle.jpg", ContentFile(b"extra"), save=True)
+
+        media = listing_media(listing)
+
+        self.assertEqual(media["kind"], "image")
+        self.assertIn("cover-primary", media["url"])
+        self.assertNotIn("extra-angle", media["url"])
+        self.assertEqual(media["source"], "primary")
+
+    def test_primary_media_url_wins_even_when_extension_is_unknown(self):
+        listing = MarketplaceListing.objects.create(
+            business=self.biz,
+            title="Extensionless Primary",
+            status="live",
+            vertical="phones",
+        )
+        listing.media_file.save("extensionless-primary", ContentFile(b"image"), save=True)
+
+        media = listing_media(listing)
+
+        self.assertEqual(media["kind"], "image")
+        self.assertEqual(media["source"], "primary")
+        self.assertIn("extensionless-primary", media["url"])
+
+        public_card = self.client.get(reverse("marketplace:home"))
+        detail = self.client.get(f"/marketplace/{self.biz.slug}/{listing.listing_slug}/")
+
+        for response in (public_card, detail):
+            self.assertEqual(response.status_code, 200)
+            content = response.content.decode("utf-8")
+            self.assertIn("extensionless-primary", content)
+            self.assertIn('<img', content)
+
+    def test_remote_primary_media_url_is_not_blocked_by_local_exists_check(self):
+        listing = MarketplaceListing.objects.create(
+            business=self.biz,
+            title="Remote Primary",
+            status="live",
+            vertical="phones",
+        )
+        listing.media_file = SimpleNamespace(
+            name="marketplace/remote-primary.jpg",
+            url="https://cdn.example.com/marketplace/remote-primary.jpg",
+        )
+
+        media = listing_media(listing)
+
+        self.assertEqual(media["kind"], "image")
+        self.assertEqual(media["source"], "primary")
+        self.assertEqual(media["url"], "https://cdn.example.com/marketplace/remote-primary.jpg")
+
+    def test_welding_marketplace_primary_upload_renders_publicly(self):
+        user = User.objects.create_user("welding_media_user", "wm@example.com", "testpass123")
+        welding_biz = Business.objects.create(
+            name="CT Edge Welding",
+            slug="ct-edge-welding",
+            business_kind="welding",
+        )
+        primary = SimpleUploadedFile(
+            "ct-edge-gate.png",
+            ContentFile(b"welding-primary").read(),
+            content_type="image/png",
+        )
+
+        listing = create_welding_marketplace_listing(
+            business=welding_biz,
+            user=user,
+            title="CT Edge Gate",
+            description="Custom blue gate.",
+            price="250000",
+            category="gate",
+            location_text="Lilongwe",
+            contact_phone="0999000000",
+            contact_email="ct@example.com",
+            status="live",
+            media_file=primary,
+        )
+
+        media = listing_media(listing)
+        self.assertEqual(media["kind"], "image")
+        self.assertEqual(media["source"], "primary")
+        self.assertIn("ct-edge-gate", media["url"])
+
+        public_card = self.client.get(reverse("marketplace:home"))
+        detail = self.client.get(f"/marketplace/{welding_biz.slug}/{listing.listing_slug}/")
+
+        for response in (public_card, detail):
+            self.assertEqual(response.status_code, 200)
+            content = response.content.decode("utf-8")
+            self.assertIn("ct-edge-gate", content)
+            self.assertIn("<img", content)
+
+    def test_welding_gallery_upload_becomes_primary_cover_and_renders_publicly(self):
+        user = User.objects.create_user("welding_gallery_user", "wg@example.com", "testpass123")
+        welding_biz = Business.objects.create(
+            name="CT Edge Gallery",
+            slug="ct-edge-gallery",
+            business_kind="welding",
+        )
+        gallery_image = SimpleUploadedFile(
+            "ct-edge-gallery-gate.png",
+            ContentFile(b"welding-gallery").read(),
+            content_type="image/png",
+        )
+
+        listing = create_welding_marketplace_listing(
+            business=welding_biz,
+            user=user,
+            title="CT Edge Gallery Gate",
+            description="Gallery-only upload should still get a public cover.",
+            price="260000",
+            category="gate",
+            location_text="Lilongwe",
+            contact_phone="0999000000",
+            contact_email="ct@example.com",
+            status="live",
+            images=[gallery_image],
+        )
+
+        listing.refresh_from_db()
+        self.assertTrue(listing.media_file.name)
+        self.assertIn("ct-edge-gallery-gate", listing.media_file.name)
+        self.assertEqual(listing.images.count(), 1)
+
+        media = listing_media(listing)
+        self.assertEqual(media["kind"], "image")
+        self.assertEqual(media["source"], "primary")
+        self.assertIn("ct-edge-gallery-gate", media["url"])
+
+        public_card = self.client.get(reverse("marketplace:home"))
+        detail = self.client.get(f"/marketplace/{welding_biz.slug}/{listing.listing_slug}/")
+
+        for response in (public_card, detail):
+            self.assertEqual(response.status_code, 200)
+            content = response.content.decode("utf-8")
+            self.assertIn("ct-edge-gallery-gate", content)
+            self.assertIn("<img", content)
+
+    def test_uploaded_primary_image_renders_on_card_detail_and_manage(self):
+        user = User.objects.create_user("media_manager", "media@example.com", "testpass123")
+        Membership.objects.create(
+            user=user,
+            business=self.biz,
+            role="manager",
+            status="ACTIVE",
+        )
+        self.client.force_login(user)
+        session = self.client.session
+        session["active_business_id"] = self.biz.id
+        session.save()
+
+        buf = BytesIO()
+        Image.new("RGB", (24, 24), "blue").save(buf, format="PNG")
+        primary = SimpleUploadedFile(
+            "uploaded-primary.png",
+            buf.getvalue(),
+            content_type="image/png",
+        )
+
+        response = self.client.post(
+            reverse("inventory:create_listing"),
+            {
+                "title": "Uploaded Primary Product",
+                "description": "Has a real uploaded cover.",
+                "status": "live",
+                "price": "123",
+                "media_file": primary,
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        listing = MarketplaceListing.objects.get(title="Uploaded Primary Product")
+        self.assertTrue(listing.media_file.name)
+        self.assertIn("uploaded-primary", listing.media_file.name)
+        self.assertIn("uploaded-primary", listing.media_file.url)
+        self.assertTrue(listing.media_file.storage.exists(listing.media_file.name))
+        self.assertIn("uploaded-primary", listing_media(listing)["url"])
+
+        public_card = self.client.get(reverse("marketplace:home"))
+        detail = self.client.get(f"/marketplace/{self.biz.slug}/{listing.listing_slug}/")
+        manage = self.client.get(reverse("inventory:manage_listings"))
+
+        for response in (public_card, detail, manage):
+            self.assertEqual(response.status_code, 200)
+            content = response.content.decode("utf-8")
+            self.assertIn("uploaded-primary", content)
+            self.assertIn("<img", content)
+
+    def test_seller_can_update_storefront_and_public_page_shows_listing(self):
+        user = User.objects.create_user("storefront_manager", "storefront@example.com", "testpass123")
+        Membership.objects.create(user=user, business=self.biz, role="manager", status="ACTIVE")
+        self.client.force_login(user)
+        session = self.client.session
+        session["active_business_id"] = self.biz.id
+        session.save()
+
+        logo = _png_upload("store-logo.png", "blue")
+        banner = _png_upload("store-banner.png", "green")
+        response = self.client.post(
+            reverse("inventory:marketplace_storefront_settings"),
+            {
+                "store_name": "Premium Storefront",
+                "description": "Trusted local seller.",
+                "phone": "0999000000",
+                "email": "store@example.com",
+                "whatsapp_number": "0999000000",
+                "address": "Lilongwe",
+                "currency": "MWK",
+                "categories": "phones, repairs",
+                "trust_badges": "Verified seller, Fast replies",
+                "facebook": "ctedge",
+                "instagram": "@ctedgeworks",
+                "website": "ctedge.example.com",
+                "logo": logo,
+                "banner_image": banner,
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        profile = MarketplaceStorefrontProfile.objects.get(business=self.biz)
+        self.assertEqual(profile.store_name, "Premium Storefront")
+        self.assertEqual(profile.description, "Trusted local seller.")
+        self.assertEqual(profile.phone, "0999000000")
+        self.assertEqual(profile.whatsapp_number, "0999000000")
+        self.assertEqual(profile.address, "Lilongwe")
+        self.assertEqual(profile.currency, "MWK")
+        self.assertEqual(profile.social_links["facebook"], "ctedge")
+        self.assertEqual(profile.social_links["instagram"], "@ctedgeworks")
+        self.assertEqual(profile.social_links["website"], "ctedge.example.com")
+        self.assertEqual(profile.owner, user)
+        self.assertTrue(profile.logo.name)
+        self.assertTrue(profile.banner_image.name)
+        self.assertTrue(profile.logo.storage.exists(profile.logo.name))
+        self.assertTrue(profile.banner_image.storage.exists(profile.banner_image.name))
+        original_logo_name = profile.logo.name
+        original_banner_name = profile.banner_image.name
+
+        update = self.client.post(
+            reverse("inventory:marketplace_storefront_settings"),
+            {
+                "store_name": "Premium Storefront Updated",
+                "description": "Updated description.",
+                "phone": "0888000000",
+                "email": "updated@example.com",
+                "whatsapp_number": "0888000000",
+                "address": "Blantyre",
+                "categories": "phones",
+                "trust_badges": "Verified seller",
+                "facebook": "ctedge",
+                "instagram": "@ctedgeworks",
+                "website": "ctedge.example.com",
+            },
+        )
+        self.assertEqual(update.status_code, 302)
+        profile.refresh_from_db()
+        self.assertEqual(profile.store_name, "Premium Storefront Updated")
+        self.assertEqual(profile.logo.name, original_logo_name)
+        self.assertEqual(profile.banner_image.name, original_banner_name)
+
+        MarketplaceListing.objects.create(
+            business=self.biz,
+            title="Storefront Live Listing",
+            status=ListingStatus.LIVE,
+            price="5000",
+        )
+        public = self.client.get(reverse("marketplace:storefront", args=[self.biz.slug]))
+        self.assertEqual(public.status_code, 200)
+        content = public.content.decode("utf-8")
+        self.assertIn("Premium Storefront Updated", content)
+        self.assertIn("Storefront Live Listing", content)
+        self.assertIn("store-logo", content)
+        self.assertIn("store-banner", content)
+        self.assertIn("MWK 5,000", content)
+        self.assertIn("https://facebook.com/ctedge", content)
+        self.assertIn("https://instagram.com/ctedgeworks", content)
+        self.assertIn("https://ctedge.example.com", content)
+        self.assertIn("https://wa.me/0888000000", content)
+        self.assertIn("Verified seller", content)
+
+        manage = self.client.get(reverse("inventory:manage_listings"))
+        self.assertEqual(manage.status_code, 200)
+        manage_html = manage.content.decode("utf-8")
+        self.assertIn("Premium Storefront Updated", manage_html)
+        self.assertIn("store-logo", manage_html)
+
+    def test_storefront_defaults_to_mwk_even_if_business_currency_is_different(self):
+        self.biz.currency = "GBP"
+        self.biz.save(update_fields=["currency"])
+        MarketplaceListing.objects.create(
+            business=self.biz,
+            title="Default MWK Listing",
+            status=ListingStatus.LIVE,
+            price="50000",
+        )
+
+        response = self.client.get(reverse("marketplace:storefront", args=[self.biz.slug]))
+
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode("utf-8")
+        self.assertIn("MWK 50,000", content)
+        self.assertNotIn(">GBP<", content)
+
+    @override_settings(
+        PAYCHANGU_PUBLIC_KEY="pub",
+        PAYCHANGU_SECRET_KEY="sec",
+        PAYCHANGU_WEBHOOK_SECRET="whsec",
+        PAYCHANGU_API_BASE="https://api.paychangu.test",
+    )
+    @patch("inventory.services.marketplace_checkout.paychangu_service.create_checkout")
+    def test_checkout_creates_pending_order_and_calculates_fees(self, mock_checkout):
+        mock_checkout.return_value = {
+            "status": "success",
+            "checkout_url": "https://checkout.paychangu.test/pay/mkt",
+            "raw_response": {"ok": True},
+        }
+        listing = MarketplaceListing.objects.create(
+            business=self.biz,
+            title="Checkout Product",
+            status=ListingStatus.LIVE,
+            price="10000",
+        )
+        response = self.client.post(
+            reverse("marketplace:checkout", args=[self.biz.slug, listing.listing_slug]),
+            {
+                "buyer_name": "Buyer One",
+                "buyer_phone": "0999000000",
+                "buyer_email": "buyer@example.com",
+                "quantity": "2",
+                "delivery_notes": "Area 25",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("checkout.paychangu.test", response["Location"])
+        order = MarketplaceOrder.objects.get(listing=listing)
+        self.assertEqual(order.payment_status, MarketplaceOrderStatus.PENDING)
+        self.assertEqual(order.total_amount, 20000)
+        self.assertEqual(order.platform_commission_amount, 1000)
+        self.assertEqual(order.seller_net_earnings, 19000)
+
+    def test_mark_order_paid_creates_checkout_lead_and_freezes_earnings(self):
+        from inventory.services.marketplace_checkout import mark_order_paid_from_paychangu
+
+        listing = MarketplaceListing.objects.create(
+            business=self.biz,
+            title="Paid Checkout Product",
+            status=ListingStatus.LIVE,
+            price="20000",
+        )
+        order = MarketplaceOrder.objects.create(
+            listing=listing,
+            seller_business=self.biz,
+            buyer_name="Paid Buyer",
+            buyer_phone="0999000000",
+            quantity=1,
+            unit_price=listing.price,
+            total_amount=listing.price,
+            paychangu_reference="mkt-paid-test",
+        )
+        mark_order_paid_from_paychangu("mkt-paid-test", payload={"status": "successful"})
+        order.refresh_from_db()
+        self.assertEqual(order.payment_status, MarketplaceOrderStatus.PAID)
+        self.assertIsNotNone(order.paid_at)
+        self.assertEqual(order.platform_commission_amount, 1000)
+        self.assertEqual(order.seller_net_earnings, 19000)
+        self.assertTrue(listing.leads.filter(source_type="marketplace_checkout", status="won").exists())
+
+    def test_seller_orders_are_scoped_to_active_business(self):
+        user = User.objects.create_user("orders_manager", "orders@example.com", "testpass123")
+        Membership.objects.create(user=user, business=self.biz, role="manager", status="ACTIVE")
+        other_biz = Business.objects.create(name="Other Order Shop", slug="other-order-shop", business_kind="phones")
+        own_listing = MarketplaceListing.objects.create(
+            business=self.biz,
+            title="Own Order Product",
+            status=ListingStatus.LIVE,
+            price="1000",
+        )
+        other_listing = MarketplaceListing.objects.create(
+            business=other_biz,
+            title="Hidden Order Product",
+            status=ListingStatus.LIVE,
+            price="2000",
+        )
+        MarketplaceOrder.objects.create(
+            listing=own_listing,
+            seller_business=self.biz,
+            buyer_name="Own Buyer",
+            buyer_phone="0999000000",
+            unit_price=own_listing.price,
+            total_amount=own_listing.price,
+            paychangu_reference="mkt-own-order",
+        )
+        MarketplaceOrder.objects.create(
+            listing=other_listing,
+            seller_business=other_biz,
+            buyer_name="Hidden Buyer",
+            buyer_phone="0999111111",
+            unit_price=other_listing.price,
+            total_amount=other_listing.price,
+            paychangu_reference="mkt-hidden-order",
+        )
+        self.client.force_login(user)
+        session = self.client.session
+        session["active_business_id"] = self.biz.id
+        session.save()
+
+        response = self.client.get(reverse("inventory:marketplace_orders"))
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode("utf-8")
+        self.assertIn("Own Order Product", content)
+        self.assertNotIn("Hidden Order Product", content)
+
+    def test_manage_listings_survives_missing_marketplace_order_table(self):
+        user = User.objects.create_user("gap_manager", "gap@example.com", "testpass123")
+        Membership.objects.create(user=user, business=self.biz, role="manager", status="ACTIVE")
+        MarketplaceListing.objects.create(
+            business=self.biz,
+            title="Visible During Migration Gap",
+            status=ListingStatus.LIVE,
+            price="1500",
+        )
+        self.client.force_login(user)
+        session = self.client.session
+        session["active_business_id"] = self.biz.id
+        session.save()
+
+        with patch("inventory.views_marketplace.MarketplaceOrder.objects.filter", side_effect=OperationalError("no such table")):
+            response = self.client.get(reverse("inventory:manage_listings"))
+
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode("utf-8")
+        self.assertIn("Visible During Migration Gap", content)
+        self.assertIn("Total Orders", content)
+
+    def test_public_storefront_survives_missing_storefront_profile_table(self):
+        MarketplaceListing.objects.create(
+            business=self.biz,
+            title="Visible Without Store Profile",
+            status=ListingStatus.LIVE,
+            price="1500",
+        )
+
+        with patch("inventory.views_marketplace.MarketplaceStorefrontProfile.objects.filter", side_effect=OperationalError("no such table")):
+            response = self.client.get(reverse("marketplace:storefront", args=[self.biz.slug]))
+
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode("utf-8")
+        self.assertIn("Visible Without Store Profile", content)
+        self.assertIn(self.biz.name, content)
+
+    def test_public_storefront_missing_logo_uses_fallback_not_broken_media(self):
+        MarketplaceStorefrontProfile.objects.create(
+            business=self.biz,
+            store_name="Fallback Store",
+            logo="marketplace/storefronts/missing-logo.png",
+            banner_image="marketplace/storefronts/missing-banner.png",
+        )
+        MarketplaceListing.objects.create(
+            business=self.biz,
+            title="Fallback Logo Listing",
+            status=ListingStatus.LIVE,
+            price="1500",
+        )
+
+        response = self.client.get(reverse("marketplace:storefront", args=[self.biz.slug]))
+
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode("utf-8")
+        self.assertIn("Fallback Store", content)
+        self.assertNotIn("missing-logo.png", content)
+        self.assertNotIn("missing-banner.png", content)
+        self.assertIn(self.biz.name[:2].upper(), content)
+
+    def test_storefront_settings_survives_missing_storefront_profile_table(self):
+        user = User.objects.create_user("store_gap_manager", "store-gap@example.com", "testpass123")
+        Membership.objects.create(user=user, business=self.biz, role="manager", status="ACTIVE")
+        self.client.force_login(user)
+        session = self.client.session
+        session["active_business_id"] = self.biz.id
+        session.save()
+
+        with patch("inventory.views_marketplace.MarketplaceStorefrontProfile.objects.get_or_create", side_effect=OperationalError("no such table")):
+            response = self.client.get(reverse("inventory:marketplace_storefront_settings"))
+
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode("utf-8")
+        self.assertIn("Storefront Settings", content)
+        self.assertIn("being prepared", content)
+
+    def test_media_diagnostics_is_staff_only_and_reports_storage(self):
+        listing = MarketplaceListing.objects.create(
+            business=self.biz,
+            title="Diagnostic Image",
+            status="live",
+            vertical="phones",
+        )
+        listing.media_file.save("diagnostic-primary.jpg", ContentFile(b"primary"), save=True)
+        user = User.objects.create_user("media_diag_user", "diag@example.com", "testpass123")
+        staff = User.objects.create_user(
+            "media_diag_staff",
+            "diag-staff@example.com",
+            "testpass123",
+            is_staff=True,
+        )
+
+        self.client.force_login(user)
+        response = self.client.get(reverse("inventory:marketplace_media_diagnostics", args=[listing.pk]))
+        self.assertEqual(response.status_code, 403)
+
+        self.client.force_login(staff)
+        response = self.client.get(reverse("inventory:marketplace_media_diagnostics", args=[listing.pk]))
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["listing_id"], listing.pk)
+        self.assertIn("diagnostic-primary", data["media_file"]["name"])
+        self.assertIn("diagnostic-primary", data["media_file"]["url"])
+        self.assertTrue(data["media_file"]["can_open"])
+
+    def test_backfill_command_sets_primary_image_from_gallery(self):
+        listing = MarketplaceListing.objects.create(
+            business=self.biz,
+            title="Backfill From Gallery",
+            status="live",
+            vertical="phones",
+        )
+        image = MarketplaceListingImage.objects.create(listing=listing)
+        image.image.save("backfill-gallery.jpg", ContentFile(b"gallery"), save=True)
+        out = StringIO()
+
+        call_command("backfill_marketplace_primary_images", stdout=out)
+
+        listing.refresh_from_db()
+        self.assertIn("backfill-gallery", listing.media_file.name)
+        self.assertIn("Listings repaired: 1", out.getvalue())
+
+    def test_audit_missing_media_reports_without_clearing_by_default(self):
+        listing = MarketplaceListing.objects.create(
+            business=self.biz,
+            title="Audit Missing Primary",
+            status="live",
+            vertical="phones",
+            media_file="marketplace/missing-audit.jpg",
+        )
+        out = StringIO()
+
+        call_command("audit_missing_media", stdout=out)
+
+        listing.refresh_from_db()
+        self.assertEqual(listing.media_file.name, "marketplace/missing-audit.jpg")
+        self.assertIn("MISSING marketplace listing primary", out.getvalue())
+        self.assertIn("Total missing:", out.getvalue())
+
+    def test_audit_missing_media_clear_invalid_blanks_listing_primary(self):
+        listing = MarketplaceListing.objects.create(
+            business=self.biz,
+            title="Audit Clear Missing Primary",
+            status="live",
+            vertical="phones",
+            media_file="marketplace/missing-clear.jpg",
+        )
+        out = StringIO()
+
+        call_command("audit_missing_media", "--clear-invalid", stdout=out)
+
+        listing.refresh_from_db()
+        self.assertFalse(listing.media_file.name)
+        self.assertIn("Missing media audit CLEARED", out.getvalue())
+
+    def test_backfill_command_does_not_overwrite_valid_primary_image(self):
+        listing = MarketplaceListing.objects.create(
+            business=self.biz,
+            title="Backfill Keeps Primary",
+            status="live",
+            vertical="phones",
+        )
+        listing.media_file.save("keep-primary.jpg", ContentFile(b"primary"), save=True)
+        image = MarketplaceListingImage.objects.create(listing=listing)
+        image.image.save("should-not-win.jpg", ContentFile(b"gallery"), save=True)
+
+        call_command("backfill_marketplace_primary_images")
+
+        listing.refresh_from_db()
+        self.assertIn("keep-primary", listing.media_file.name)
+        self.assertNotIn("should-not-win", listing.media_file.name)

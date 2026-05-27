@@ -1,0 +1,230 @@
+{% extends "inventory/base_vertical.html" %}
+{% load static %}
+
+{% block title %}Commission Settings · {{ business.name }}{% endblock %}
+
+{% block extra_head %}
+<style>
+  .commission-card{
+    background:#fff; border:1px solid #e2e8f0; border-radius:16px;
+    padding:24px; max-width:800px; margin:0 auto 24px;
+  }
+  .commission-card h2{
+    font-size:1.4rem; font-weight:800; margin:0 0 8px; color:#0f172a;
+  }
+  .commission-card .subtitle{
+    color:#64748b; font-size:.95rem; margin-bottom:24px;
+  }
+  
+  .field-group{
+    margin-bottom:24px;
+  }
+  .field-group label{
+    display:block; font-weight:700; color:#334155; margin-bottom:8px; font-size:.95rem;
+  }
+  .field-group .help-text{
+    font-size:.85rem; color:#64748b; margin-top:6px;
+  }
+  
+  .radio-cards{
+    display:grid; gap:12px; margin-top:8px;
+  }
+  .radio-card{
+    border:2px solid #e2e8f0; border-radius:12px; padding:16px;
+    cursor:pointer; transition:all .2s;
+  }
+  .radio-card:hover{
+    border-color:#3b82f6; background:#f0f9ff;
+  }
+  .radio-card input[type="radio"]{
+    margin-right:10px;
+  }
+  .radio-card.selected{
+    border-color:#3b82f6; background:#eff6ff;
+  }
+  .radio-card-title{
+    font-weight:700; color:#0f172a; font-size:1rem;
+  }
+  .radio-card-desc{
+    font-size:.9rem; color:#64748b; margin-top:4px;
+  }
+  
+  .input-field{
+    width:100%; padding:12px 14px; border:1px solid #e2e8f0; border-radius:10px;
+    font-size:1rem; font-weight:600; transition:all .2s;
+  }
+  .input-field:focus{
+    outline:none; border-color:#3b82f6; box-shadow:0 0 0 3px rgba(59,130,246,.1);
+  }
+  
+  .checkbox-field{
+    display:flex; align-items:center; gap:10px; padding:12px; background:#f8fafc;
+    border-radius:10px; margin-top:8px;
+  }
+  .checkbox-field input[type="checkbox"]{
+    width:20px; height:20px; cursor:pointer;
+  }
+  .checkbox-field label{
+    margin:0; cursor:pointer; font-weight:600;
+  }
+  
+  .btn-save{
+    background:linear-gradient(135deg, #10b981, #059669); color:#fff;
+    border:none; padding:14px 32px; font-weight:800; border-radius:12px;
+    font-size:1rem; cursor:pointer; transition:all .2s;
+    box-shadow:0 10px 25px rgba(16,185,129,.3);
+  }
+  .btn-save:hover{
+    transform:translateY(-2px); box-shadow:0 14px 30px rgba(16,185,129,.4);
+  }
+  
+  .btn-cancel{
+    background:#f1f5f9; color:#475569; border:1px solid #e2e8f0;
+    padding:14px 32px; font-weight:700; border-radius:12px; font-size:1rem;
+    cursor:pointer; transition:all .2s; text-decoration:none; display:inline-block;
+  }
+  .btn-cancel:hover{
+    background:#e2e8f0;
+  }
+  
+  .actions{
+    display:flex; gap:12px; justify-content:flex-end; margin-top:32px;
+  }
+  
+  .alert-info{
+    background:#eff6ff; border:1px solid #bfdbfe; color:#1e40af;
+    padding:14px 18px; border-radius:10px; margin-bottom:20px; font-size:.95rem;
+  }
+  .alert-info strong{
+    font-weight:800;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">⚙️ Commission Settings</h1>
+  <p class="page-subtitle">Configure how agents earn commissions on sales</p>
+</div>
+
+<form method="post" class="commission-card">
+  {% csrf_token %}
+  
+  <div class="alert-info">
+    <strong>Note:</strong> Changes to commission settings apply to <strong>future sales only</strong>. 
+    Past sales keep their original commission amounts to ensure accurate historical records.
+  </div>
+  
+  <!-- Commission Mode Selection -->
+  <div class="field-group">
+    <label>Commission Type</label>
+    <div class="radio-cards">
+      <label class="radio-card" data-mode="percentage">
+        <div>
+          <input type="radio" name="commission_mode" value="percentage" 
+                 {% if form.commission_mode.value == 'percentage' or not form.commission_mode.value %}checked{% endif %}>
+          <span class="radio-card-title">📊 Percentage of Sale</span>
+        </div>
+        <div class="radio-card-desc">Agents earn a percentage of each sale price (e.g., 12%)</div>
+      </label>
+      
+      <label class="radio-card" data-mode="fixed">
+        <div>
+          <input type="radio" name="commission_mode" value="fixed" 
+                 {% if form.commission_mode.value == 'fixed' %}checked{% endif %}>
+          <span class="radio-card-title">💰 Fixed Amount</span>
+        </div>
+        <div class="radio-card-desc">Agents earn a fixed amount per sale regardless of price</div>
+      </label>
+    </div>
+  </div>
+  
+  <!-- Percentage Input -->
+  <div class="field-group" id="percentage-field" style="display:none">
+    <label for="{{ form.base_commission_pct.id_for_label }}">Commission Percentage</label>
+    {{ form.base_commission_pct }}
+    <div class="help-text">{{ form.base_commission_pct.help_text }}</div>
+    {% if form.base_commission_pct.errors %}
+      <div class="error-text">{{ form.base_commission_pct.errors|striptags }}</div>
+    {% endif %}
+  </div>
+  
+  <!-- Fixed Amount Input -->
+  <div class="field-group" id="fixed-field" style="display:none">
+    <label for="{{ form.fixed_commission_amount.id_for_label }}">Fixed Commission Amount</label>
+    {{ form.fixed_commission_amount }}
+    <div class="help-text">{{ form.fixed_commission_amount.help_text }}</div>
+    {% if form.fixed_commission_amount.errors %}
+      <div class="error-text">{{ form.fixed_commission_amount.errors|striptags }}</div>
+    {% endif %}
+  </div>
+  
+  <!-- Bonus & Penalty Settings -->
+  <h3 style="margin-top:32px; margin-bottom:16px; font-size:1.2rem; font-weight:800;">Time-based Incentives</h3>
+  
+  <div class="checkbox-field">
+    {{ form.early_bonus_enabled }}
+    <label for="{{ form.early_bonus_enabled.id_for_label }}">Enable early arrival bonuses</label>
+  </div>
+  
+  <div class="field-group" style="margin-top:12px">
+    <label for="{{ form.early_bonus_per_30min.id_for_label }}">Bonus per 30 minutes early</label>
+    {{ form.early_bonus_per_30min }}
+    <div class="help-text">{{ form.early_bonus_per_30min.help_text }}</div>
+  </div>
+  
+  <div class="checkbox-field">
+    {{ form.lateness_penalties_enabled }}
+    <label for="{{ form.lateness_penalties_enabled.id_for_label }}">Enable lateness penalties</label>
+  </div>
+  
+  <div class="field-group" style="margin-top:12px">
+    <label for="{{ form.late_penalty_per_30min.id_for_label }}">Penalty per 30 minutes late</label>
+    {{ form.late_penalty_per_30min }}
+    <div class="help-text">{{ form.late_penalty_per_30min.help_text }}</div>
+  </div>
+  
+  <div class="actions">
+    <a href="{% url 'inventory:inventory_dashboard' %}" class="btn-cancel">Cancel</a>
+    <button type="submit" class="btn-save">💾 Save Settings</button>
+  </div>
+</form>
+
+<script>
+  // Toggle between percentage and fixed mode
+  const percentageRadio = document.querySelector('input[name="commission_mode"][value="percentage"]');
+  const fixedRadio = document.querySelector('input[name="commission_mode"][value="fixed"]');
+  const percentageField = document.getElementById('percentage-field');
+  const fixedField = document.getElementById('fixed-field');
+  const radioCards = document.querySelectorAll('.radio-card');
+  
+  function updateFields() {
+    const mode = document.querySelector('input[name="commission_mode"]:checked')?.value;
+    
+    if (mode === 'percentage') {
+      percentageField.style.display = 'block';
+      fixedField.style.display = 'none';
+    } else {
+      percentageField.style.display = 'none';
+      fixedField.style.display = 'block';
+    }
+    
+    // Update radio card styles
+    radioCards.forEach(card => {
+      const cardMode = card.getAttribute('data-mode');
+      if (cardMode === mode) {
+        card.classList.add('selected');
+      } else {
+        card.classList.remove('selected');
+      }
+    });
+  }
+  
+  percentageRadio?.addEventListener('change', updateFields);
+  fixedRadio?.addEventListener('change', updateFields);
+  
+  // Initial state
+  updateFields();
+</script>
+{% endblock %}
+

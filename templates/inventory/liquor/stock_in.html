@@ -1,0 +1,409 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Liquor Stock In{% endblock %}
+
+{% block extra_css %}
+<style>
+.stock-in-container {
+  max-width: 1000px;
+  margin: 2rem auto;
+  padding: 0 1rem;
+}
+
+.page-header {
+  margin-bottom: 2rem;
+}
+
+.page-header h1 {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #1f2937;
+  margin-bottom: 0.5rem;
+}
+
+.page-header p {
+  color: #6b7280;
+  font-size: 1.1rem;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 4rem 2rem;
+  background: white;
+  border: 2px dashed #d1d5db;
+  border-radius: 12px;
+}
+
+.empty-state-icon {
+  font-size: 4rem;
+  margin-bottom: 1rem;
+}
+
+.empty-state h2 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 0.5rem;
+}
+
+.empty-state p {
+  color: #6b7280;
+  margin-bottom: 2rem;
+}
+
+.products-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.product-card {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 1.5rem;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.product-card:hover {
+  border-color: #10b981;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.15);
+  transform: translateY(-2px);
+}
+
+.product-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  margin-bottom: 1rem;
+}
+
+.product-icon {
+  font-size: 2rem;
+}
+
+.product-stock {
+  background: #f3f4f6;
+  padding: 0.25rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.product-stock.low {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.product-stock.out {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.product-name {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 0.5rem;
+}
+
+.product-category {
+  font-size: 0.875rem;
+  color: #6b7280;
+  text-transform: capitalize;
+}
+
+.search-box {
+  margin-bottom: 2rem;
+}
+
+.search-box input {
+  border-radius: 8px;
+  border: 1px solid #d1d5db;
+  padding: 0.75rem 1rem;
+  font-size: 1rem;
+}
+
+.search-box input:focus {
+  border-color: #10b981;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+}
+
+.modal-content {
+  border-radius: 12px;
+}
+
+.modal-header {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: white;
+  border-radius: 12px 12px 0 0;
+}
+
+.modal-header .btn-close {
+  filter: brightness(0) invert(1);
+}
+
+.form-control {
+  border-radius: 8px;
+  border: 1px solid #d1d5db;
+  padding: 0.75rem;
+}
+
+.form-control:focus {
+  border-color: #10b981;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+}
+
+.alert {
+  border-radius: 8px;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="stock-in-container">
+  <!-- Header -->
+  <div class="page-header">
+    <h1>🍾 Liquor Stock In</h1>
+    <p>Add inventory to your liquor products</p>
+  </div>
+
+  <!-- Messages -->
+  {% if messages %}
+    {% for message in messages %}
+    <div class="alert alert-{{ message.tags }} alert-dismissible fade show">
+      {{ message }}
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    {% endfor %}
+  {% endif %}
+
+  {% if show_form %}
+    <!-- Stock-In Form for Selected Product -->
+    <div class="card">
+      <div class="card-header bg-success text-white">
+        <h5 class="mb-0">Add Stock: {{ product.name }}</h5>
+      </div>
+      <div class="card-body">
+        <form method="post" action="{% url 'inventory:liquor_stock_in_submit' %}" id="stock-in-form">
+          {% csrf_token %}
+          <input type="hidden" name="product_id" value="{{ product.id }}">
+          
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label for="quantity" class="form-label fw-bold">Quantity (Bottles) *</label>
+              <input type="number" class="form-control form-control-lg" name="quantity" id="quantity" min="1" required placeholder="Number of bottles" autofocus>
+              <div class="invalid-feedback">Please enter a valid quantity</div>
+            </div>
+            
+            <div class="col-md-6 mb-3">
+              <label for="cost_per_unit" class="form-label fw-bold">Cost per Bottle (MWK)</label>
+              <input type="number" class="form-control" name="cost_per_unit" id="cost_per_unit" step="0.01" min="0" placeholder="Optional">
+              <small class="form-text text-muted">Leave empty to keep current cost</small>
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label for="date_received" class="form-label">Date Received</label>
+              <input type="date" class="form-control" name="date_received" id="date_received">
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label for="notes" class="form-label">Notes</label>
+            <textarea class="form-control" name="notes" id="notes" rows="2" placeholder="Optional notes (e.g., supplier, invoice number)"></textarea>
+          </div>
+
+          <div class="d-flex justify-content-between">
+            <a href="{% url 'inventory:liquor_catalog' category=product.category %}" class="btn btn-outline-secondary">
+              ← Back to Catalog
+            </a>
+            <button type="submit" class="btn btn-success btn-lg" id="submit-btn">
+              <i class="bi bi-check-circle"></i> Add Stock
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <script>
+    // Set today's date as default
+    document.addEventListener('DOMContentLoaded', function() {
+      const today = new Date().toISOString().split('T')[0];
+      document.getElementById('date_received').value = today;
+    });
+
+    // Prevent double submission
+    document.getElementById('stock-in-form').addEventListener('submit', function(e) {
+      const btn = document.getElementById('submit-btn');
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Adding...';
+    });
+
+    // Form validation
+    document.getElementById('quantity').addEventListener('input', function() {
+      if (this.value < 1) {
+        this.classList.add('is-invalid');
+      } else {
+        this.classList.remove('is-invalid');
+      }
+    });
+    </script>
+
+  {% elif has_products %}
+    <!-- Search Box -->
+    <div class="search-box">
+      <div class="input-group">
+        <span class="input-group-text"><i class="bi bi-search"></i></span>
+        <input type="text" class="form-control" id="search-input" placeholder="Search products...">
+      </div>
+    </div>
+
+    <!-- Products Grid -->
+    <div class="products-grid" id="products-grid">
+      {% for product in products %}
+      <div class="product-card" onclick="openStockInModal({{ product.id }}, '{{ product.name|escapejs }}', {{ product.bottles_in_stock|default:0 }})" data-product-name="{{ product.name|lower }}">
+        <div class="product-card-header">
+          <div class="product-icon">
+            {% if product.category == 'beer' %}🍺
+            {% elif product.category == 'cider' %}🍎
+            {% elif product.category == 'wine' %}🍷
+            {% elif product.category == 'spirits' or product.category == 'whisky' %}🥃
+            {% else %}🍾{% endif %}
+          </div>
+          <div class="product-stock {% if product.bottles_in_stock < 10 %}low{% elif product.bottles_in_stock == 0 %}out{% endif %}">
+            {{ product.bottles_in_stock|default:0 }} in stock
+          </div>
+        </div>
+        <div class="product-name">{{ product.name }}</div>
+        <div class="product-category">{{ product.category }}</div>
+      </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <!-- Category Chooser (No product selected) -->
+    <div class="empty-state">
+      <div class="empty-state-icon">📋</div>
+      <h2>Select Category</h2>
+      <p>Choose a liquor category to view products</p>
+    </div>
+
+    <div class="products-grid">
+      {% for cat in categories %}
+      <a href="{% url 'inventory:liquor_catalog' category=cat.key %}" class="product-card text-decoration-none">
+        <div class="product-card-header">
+          <div class="product-icon">{{ cat.name|slice:":2" }}</div>
+        </div>
+        <div class="product-name">{{ cat.name }}</div>
+        <div class="product-category">{{ cat.desc }}</div>
+      </a>
+      {% endfor %}
+    </div>
+  {% endif %}
+</div>
+
+<!-- Stock In Modal -->
+<div class="modal fade" id="stockInModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Add Stock</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="post" action="{% url 'inventory:liquor_stock_in_submit' %}">
+        {% csrf_token %}
+        <div class="modal-body">
+          <input type="hidden" name="product" id="modal-product-id">
+          
+          <div class="mb-3">
+            <label class="form-label fw-bold">Product</label>
+            <div class="form-control-plaintext" id="modal-product-name"></div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label fw-bold">Current Stock</label>
+            <div class="form-control-plaintext" id="modal-current-stock"></div>
+          </div>
+
+          <div class="mb-3">
+            <label for="quantity" class="form-label fw-bold">Quantity to Add *</label>
+            <input type="number" class="form-control form-control-lg" name="quantity" id="quantity" min="1" required placeholder="Number of bottles">
+          </div>
+
+          <div class="mb-3">
+            <label for="cost_per_unit" class="form-label fw-bold">Cost per Bottle (MWK) *</label>
+            <input type="number" class="form-control" name="cost_per_unit" id="cost_per_unit" step="0.01" min="0.01" required placeholder="Cost price">
+          </div>
+
+          <div class="mb-3">
+            <label for="date_received" class="form-label">Date Received</label>
+            <input type="date" class="form-control" name="date_received" id="date_received">
+          </div>
+
+          <div class="mb-3">
+            <label for="notes" class="form-label">Notes</label>
+            <textarea class="form-control" name="notes" id="notes" rows="2" placeholder="Optional notes"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-success">
+            <i class="bi bi-check-circle"></i> Add Stock
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+// Search functionality
+const searchInput = document.getElementById('search-input');
+if (searchInput) {
+  searchInput.addEventListener('input', function() {
+    const term = this.value.toLowerCase().trim();
+    const cards = document.querySelectorAll('.product-card');
+    
+    cards.forEach(card => {
+      const name = card.getAttribute('data-product-name');
+      if (term === '' || name.includes(term)) {
+        card.style.display = '';
+      } else {
+        card.style.display = 'none';
+      }
+    });
+  });
+}
+
+// Open stock-in modal
+function openStockInModal(productId, productName, currentStock) {
+  document.getElementById('modal-product-id').value = productId;
+  document.getElementById('modal-product-name').textContent = productName;
+  document.getElementById('modal-current-stock').textContent = currentStock + ' bottles';
+  
+  // Reset form
+  document.getElementById('quantity').value = '';
+  document.getElementById('cost_per_unit').value = '';
+  document.getElementById('date_received').value = '';
+  document.getElementById('notes').value = '';
+  
+  // Set today's date as default
+  const today = new Date().toISOString().split('T')[0];
+  document.getElementById('date_received').value = today;
+  
+  // Show modal
+  const modal = new bootstrap.Modal(document.getElementById('stockInModal'));
+  modal.show();
+  
+  // Focus quantity input
+  setTimeout(() => {
+    document.getElementById('quantity').focus();
+  }, 500);
+}
+</script>
+{% endblock %}
+

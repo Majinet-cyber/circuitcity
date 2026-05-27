@@ -1,0 +1,321 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{{ page_title|default:"Contract — E-Signature Portal" }}{% endblock %}
+
+{% block extra_css %}
+<style>
+  .sign-portal {
+    max-width: 760px;
+    margin: 0 auto;
+  }
+  .contract-doc {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 2rem 2.5rem;
+    font-size: 0.92rem;
+    line-height: 1.7;
+    color: #1e293b;
+    max-height: 480px;
+    overflow-y: auto;
+    scroll-behavior: smooth;
+  }
+  .contract-doc h2 { font-size: 1rem; font-weight: 700; color: #2563eb; margin-top: 1.4rem; }
+  .contract-doc h1 { font-size: 1.3rem; font-weight: 800; color: #1e40af; text-align: center; }
+  .contract-doc p { margin-bottom: 0.6rem; }
+  .contract-doc ul { padding-left: 1.2rem; }
+  .contract-doc ul li { margin-bottom: 0.3rem; }
+
+  .sign-section {
+    background: #f8fafc;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 1.5rem;
+  }
+  .sign-section.signed {
+    background: #f0fdf4;
+    border-color: #86efac;
+  }
+  .sign-section.voided {
+    background: #fef2f2;
+    border-color: #fca5a5;
+  }
+
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .badge-signed   { background: #dcfce7; color: #166534; }
+  .badge-sent     { background: #dbeafe; color: #1e40af; }
+  .badge-viewed   { background: #fef9c3; color: #92400e; }
+  .badge-draft    { background: #f1f5f9; color: #475569; }
+  .badge-void     { background: #fee2e2; color: #991b1b; }
+
+  .sign-name-input {
+    font-size: 1.1rem;
+    font-style: italic;
+    border-bottom: 2px solid #2563eb;
+    border-top: none;
+    border-left: none;
+    border-right: none;
+    border-radius: 0;
+    padding: 8px 4px;
+    background: transparent;
+    color: #1e293b;
+  }
+  .sign-name-input:focus {
+    outline: none;
+    box-shadow: none;
+    border-bottom-color: #059669;
+  }
+  .scroll-indicator {
+    background: linear-gradient(to bottom, transparent, #f1f5f9);
+    height: 48px;
+    margin-top: -48px;
+    position: relative;
+    pointer-events: none;
+    border-radius: 0 0 12px 12px;
+  }
+  .info-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.5rem;
+    font-size: 0.82rem;
+    color: #64748b;
+  }
+  .info-row strong { color: #1e293b; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4 py-md-5 sign-portal">
+
+  <!-- Header -->
+  <div class="mb-4 text-center">
+    <div class="mb-2">
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+    </div>
+    <h1 class="h3 fw-bold mb-1">{{ contract.title }}</h1>
+    <div class="text-muted small mb-2">{{ business.name }}</div>
+    <div>
+      {% if contract.status == 'signed' %}
+        <span class="status-badge badge-signed"><i class="bi bi-check-circle-fill"></i> Signed</span>
+      {% elif contract.status == 'sent' %}
+        <span class="status-badge badge-sent"><i class="bi bi-send-fill"></i> Sent for Signature</span>
+      {% elif contract.status == 'viewed' %}
+        <span class="status-badge badge-viewed"><i class="bi bi-eye-fill"></i> Under Review</span>
+      {% elif contract.status == 'void' %}
+        <span class="status-badge badge-void"><i class="bi bi-x-circle-fill"></i> Voided</span>
+      {% else %}
+        <span class="status-badge badge-draft"><i class="bi bi-file-earmark"></i> Draft</span>
+      {% endif %}
+    </div>
+  </div>
+
+  {% if messages %}
+  {% for m in messages %}
+  <div class="alert alert-{{ m.tags|default:'info' }} rounded-3 mb-3">{{ m }}</div>
+  {% endfor %}
+  {% endif %}
+
+  <!-- Already Signed Banner -->
+  {% if already_signed %}
+  <div class="sign-section signed mb-4 text-center">
+    <div class="mb-2">
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+    </div>
+    <h5 class="fw-bold text-success mb-1">Contract Signed</h5>
+    <p class="text-muted mb-2" style="font-size:.9rem;">
+      Signed by <strong>{{ contract.signature_name }}</strong>
+      on {{ contract.signed_at|date:"d M Y, H:i" }} UTC.
+    </p>
+    {% if contract.signed_ip %}
+    <div class="text-muted" style="font-size:.75rem;">
+      IP: {{ contract.signed_ip }}
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  <!-- Contract Document -->
+  <div class="mb-3">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <h6 class="fw-bold mb-0 text-muted text-uppercase" style="font-size:.75rem;letter-spacing:.06em;">
+        <i class="bi bi-file-text me-1"></i> Contract Document
+      </h6>
+      {% if contract.file %}
+      <a href="{% url 'hq:contract_download' contract.id %}" class="btn btn-sm btn-outline-primary" style="font-size:.78rem;">
+        <i class="bi bi-download me-1"></i> Download PDF
+      </a>
+      {% endif %}
+    </div>
+    <div class="contract-doc" id="contractDoc">
+      <h1>EMAJINET MARKETPLACE<br><small style="font-size:.75em;font-weight:600;color:#64748b;">Merchant Participation Agreement</small></h1>
+
+      <h2>1. Parties</h2>
+      <p>This Merchant Participation Agreement (<strong>"Agreement"</strong>) is entered between:</p>
+      <ul>
+        <li><strong>Platform Provider:</strong> Emajinet / Circuit City Ltd., a registered technology company providing business management and marketplace services (<strong>"Emajinet"</strong>).</li>
+        <li><strong>Merchant:</strong> <strong>{{ business.name }}</strong>, operating on the Emajinet platform (<strong>"Merchant"</strong>).</li>
+      </ul>
+
+      <h2>2. Subscription &amp; Services</h2>
+      <p>The Merchant has enrolled on an Emajinet subscription plan. This plan governs the level of marketplace access, feature limits, and support tier available to the Merchant. Plan details and pricing are as outlined in the Emajinet pricing schedule at the time of agreement.</p>
+
+      <h2>3. Marketplace Terms</h2>
+      <ul>
+        <li>The Merchant may list products and services on the Emajinet Marketplace subject to these terms and the platform's listing guidelines.</li>
+        <li>All listings must be accurate, lawful, and represent goods or services the Merchant is authorised to sell. Fraudulent or misleading listings are strictly prohibited.</li>
+        <li>Emajinet reserves the right to review, reject, or remove any listing that violates platform policies or applicable laws.</li>
+        <li>The Merchant is solely responsible for fulfilling orders placed through the Marketplace and for the quality of goods/services provided.</li>
+        <li>Verified listings will receive a Verified Seller badge after satisfactory HQ review.</li>
+      </ul>
+
+      <h2>4. Payment Terms</h2>
+      <p>Subscription fees are due on the billing date agreed at sign-up. Marketplace commission applies to sales completed through the Emajinet Marketplace checkout. Commission is deducted before seller net earnings are recorded. Emajinet will not process payouts for transactions flagged as fraudulent.</p>
+
+      <h2>5. Merchant Verification</h2>
+      <p>Emajinet may require the Merchant to provide business registration documents, national identification, or other verification materials. Unverified merchants may have limited listing visibility until verification is complete.</p>
+
+      <h2>6. Suspension and Takedown</h2>
+      <p>Emajinet may immediately suspend or terminate this Agreement and remove the Merchant's listings if the Merchant:</p>
+      <ul>
+        <li>Provides false, misleading, or fraudulent information;</li>
+        <li>Violates consumer protection laws or platform policies;</li>
+        <li>Fails to fulfil orders or engages in deceptive practices;</li>
+        <li>Fails to maintain subscription payments for more than 30 days after due date;</li>
+        <li>Engages in behaviour that damages the reputation or security of the platform.</li>
+      </ul>
+      <p>The Merchant may appeal a suspension by contacting HQ support within 14 days.</p>
+
+      <h2>7. Confidentiality &amp; Data</h2>
+      <p>Both parties agree to maintain the confidentiality of non-public information shared under this Agreement. Emajinet processes Merchant data in accordance with its Privacy Policy. The Merchant must not misuse access to customer data obtained through the platform.</p>
+
+      <h2>8. General Provisions</h2>
+      <p>This Agreement is governed by the laws of the Republic of Malawi. Disputes shall be resolved by mutual negotiation; failing which, by mediation in accordance with applicable law.</p>
+
+      {% if contract.notes %}
+      <h2>Additional Notes</h2>
+      <p>{{ contract.notes }}</p>
+      {% endif %}
+    </div>
+    <div class="scroll-indicator"></div>
+  </div>
+
+  <!-- E-Signature Form -->
+  {% if not already_signed and not is_void %}
+  <div class="sign-section mb-4">
+    <h5 class="fw-bold mb-3">
+      <i class="bi bi-pen me-2 text-primary"></i>Electronic Signature
+    </h5>
+    <p class="text-muted mb-3" style="font-size:.88rem;">
+      By completing the fields below and clicking <strong>Sign Contract</strong>, you are agreeing to be legally bound by the terms of this Agreement. This constitutes your electronic signature.
+    </p>
+    <form method="post" action="{% url 'hq:contract_sign_submit' token=token %}">
+      {% csrf_token %}
+      <div class="mb-3">
+        <label for="signatureName" class="form-label fw-semibold" style="font-size:.85rem;">
+          Full Legal Name <span class="text-danger">*</span>
+        </label>
+        <input
+          type="text"
+          id="signatureName"
+          name="signature_name"
+          class="form-control sign-name-input"
+          placeholder="Type your full name here..."
+          required
+          autocomplete="name"
+        >
+        <div class="form-text" style="font-size:.75rem;">Enter your full name exactly as it appears on your national ID or business registration.</div>
+      </div>
+
+      <div class="mb-4">
+        <div class="form-check">
+          <input
+            class="form-check-input"
+            type="checkbox"
+            id="agreementCheck"
+            name="agreement"
+            required
+          >
+          <label class="form-check-label" for="agreementCheck" style="font-size:.88rem;">
+            I have read, understood, and agree to all terms and conditions in this Merchant Participation Agreement. I confirm that I am authorised to sign on behalf of <strong>{{ business.name }}</strong>.
+          </label>
+        </div>
+      </div>
+
+      <!-- Signature preview -->
+      <div id="signPreview" class="mb-4 p-3 rounded-3" style="background:#f8fafc;border:1px dashed #cbd5e1;display:none;">
+        <div class="text-muted" style="font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;font-weight:700;margin-bottom:4px;">Signature Preview</div>
+        <div id="signPreviewText" style="font-family:'Georgia',serif;font-size:1.4rem;color:#1e293b;font-style:italic;"></div>
+        <div class="text-muted mt-1" style="font-size:.72rem;">{{ business.name }} · Signed electronically via Emajinet Portal</div>
+      </div>
+
+      <div class="d-flex flex-wrap gap-2 align-items-center">
+        <button type="submit" class="btn btn-lg px-4" style="background:#059669;color:#fff;border-radius:24px;font-weight:700;" id="signBtn" disabled>
+          <i class="bi bi-pen me-2"></i>Sign Contract
+        </button>
+        <span class="text-muted" style="font-size:.78rem;">
+          <i class="bi bi-shield-lock-fill me-1 text-success"></i>
+          Your IP address and timestamp will be recorded.
+        </span>
+      </div>
+    </form>
+  </div>
+  {% elif is_void %}
+  <div class="sign-section voided mb-4 text-center">
+    <i class="bi bi-x-circle-fill text-danger mb-2" style="font-size:1.8rem;display:block;"></i>
+    <h5 class="fw-bold text-danger mb-1">This Contract Has Been Voided</h5>
+    <p class="text-muted" style="font-size:.88rem;">Please contact Emajinet HQ for a replacement contract.</p>
+  </div>
+  {% endif %}
+
+  <!-- Meta info -->
+  <div class="info-row mt-2">
+    <span><strong>Contract ID:</strong> #{{ contract.id }}</span>
+    <span><strong>Generated:</strong> {{ contract.uploaded_at|date:"d M Y" }}</span>
+    <span><strong>Business:</strong> {{ business.name }}</span>
+    {% if contract.is_signed %}
+    <span><strong>Signed by:</strong> {{ contract.signature_name }}</span>
+    <span><strong>Signed at:</strong> {{ contract.signed_at|date:"d M Y H:i" }} UTC</span>
+    {% endif %}
+  </div>
+
+</div>
+
+<script>
+(function () {
+  var nameInput = document.getElementById('signatureName');
+  var agreementCheck = document.getElementById('agreementCheck');
+  var signBtn = document.getElementById('signBtn');
+  var previewBox = document.getElementById('signPreview');
+  var previewText = document.getElementById('signPreviewText');
+
+  function updateBtn() {
+    var hasName = nameInput && nameInput.value.trim().length >= 2;
+    var hasAgreement = agreementCheck && agreementCheck.checked;
+    if (signBtn) signBtn.disabled = !(hasName && hasAgreement);
+    if (previewBox && previewText) {
+      if (hasName) {
+        previewBox.style.display = 'block';
+        previewText.textContent = nameInput.value.trim();
+      } else {
+        previewBox.style.display = 'none';
+      }
+    }
+  }
+
+  if (nameInput) nameInput.addEventListener('input', updateBtn);
+  if (agreementCheck) agreementCheck.addEventListener('change', updateBtn);
+  updateBtn();
+})();
+</script>
+{% endblock %}

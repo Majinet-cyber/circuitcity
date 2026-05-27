@@ -87,7 +87,7 @@
         </div>
         
         <div class="battery-actions">
-          <a href="{% url 'inventory:stock_list' %}?category={{ battery.key }}" class="btn-view">View Stock</a>
+          <a href="{% url 'liquor:stock_list' %}?category={{ battery.key }}" class="btn-view">View Stock</a>
           <a href="{% url 'inventory:liquor_product_new_v2' %}?category={{ battery.key }}" class="btn-add">Add Items</a>
         </div>
       </article>
@@ -122,7 +122,7 @@
     <a href="{% url 'inventory:liquor_product_new_v2' %}" class="btn btn-primary">
       <i class="bi bi-plus-circle"></i> Add Liquor Item
     </a>
-    <a href="{% url 'inventory:stock_list' %}" class="btn btn-outline-secondary">
+    <a href="{% url 'liquor:stock_list' %}" class="btn btn-outline-secondary">
       <i class="bi bi-list-ul"></i> View All Stock
     </a>
   </section>

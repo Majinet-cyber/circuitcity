@@ -1,0 +1,296 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Billing Reconciliation Dashboard{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row mb-4">
+        <div class="col-12">
+            <h1>🔍 Billing Reconciliation Dashboard</h1>
+            <p class="text-muted">Internal tool for staff to debug billing issues</p>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <form method="get" class="row g-3">
+                        <div class="col-md-3">
+                            <label for="days" class="form-label">Time Range</label>
+                            <select name="days" id="days" class="form-select">
+                                <option value="1" {% if days == 1 %}selected{% endif %}>Last 24 hours</option>
+                                <option value="7" {% if days == 7 %}selected{% endif %}>Last 7 days</option>
+                                <option value="30" {% if days == 30 %}selected{% endif %}>Last 30 days</option>
+                                <option value="90" {% if days == 90 %}selected{% endif %}>Last 90 days</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="business_id" class="form-label">Business ID (optional)</label>
+                            <input type="text" name="business_id" id="business_id" class="form-control" 
+                                   value="{{ business_id|default:'' }}" placeholder="UUID">
+                        </div>
+                        <div class="col-md-3 d-flex align-items-end">
+                            <button type="submit" class="btn btn-primary">Apply Filters</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Statistics Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title text-muted">Webhook Events</h5>
+                    <h2>{{ event_stats.total|default:0 }}</h2>
+                    <small>
+                        ✅ {{ event_stats.processed|default:0 }} processed<br>
+                        ❌ {{ event_stats.failed|default:0 }} failed<br>
+                        ⚠️ {{ event_stats.invalid_signature|default:0 }} invalid sig
+                    </small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title text-muted">Transactions</h5>
+                    <h2>{{ transaction_stats.total|default:0 }}</h2>
+                    <small>
+                        ✅ {{ transaction_stats.success|default:0 }} success<br>
+                        ⏳ {{ transaction_stats.pending|default:0 }} pending<br>
+                        ❌ {{ transaction_stats.failed|default:0 }} failed
+                    </small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title text-muted">Invoices</h5>
+                    <h2>{{ invoice_stats.total|default:0 }}</h2>
+                    <small>
+                        ✅ {{ invoice_stats.paid|default:0 }} paid<br>
+                        📄 {{ invoice_stats.issued|default:0 }} issued<br>
+                        📝 {{ invoice_stats.draft|default:0 }} draft
+                    </small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title text-muted">Subscriptions</h5>
+                    <h2>{{ subscription_stats.total|default:0 }}</h2>
+                    <small>
+                        ✅ {{ subscription_stats.active|default:0 }} active<br>
+                        🔄 {{ subscription_stats.trial|default:0 }} trial<br>
+                        ⚠️ {{ subscription_stats.past_due|default:0 }} past due
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Unmatched Transactions -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-warning">
+                    <h5 class="mb-0">⚠️ Unmatched Transactions ({{ unmatched_transactions|length }})</h5>
+                    <small>Transactions marked SUCCESS but no corresponding PAID invoice</small>
+                </div>
+                <div class="card-body">
+                    {% if unmatched_transactions %}
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>TX Ref</th>
+                                    <th>Business</th>
+                                    <th>Amount</th>
+                                    <th>Created</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for tx in unmatched_transactions %}
+                                <tr>
+                                    <td><code>{{ tx.tx_ref }}</code></td>
+                                    <td>{{ tx.business.name }}</td>
+                                    <td>{{ tx.currency }} {{ tx.amount|floatformat:2|intcomma }}</td>
+                                    <td>{{ tx.created_at|date:"M d, Y H:i" }}</td>
+                                    <td>
+                                        <a href="/admin/billing/paymenttransaction/{{ tx.id }}/change/" 
+                                           target="_blank" class="btn btn-sm btn-outline-primary">View in Admin</a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <p class="text-muted">✅ No unmatched transactions</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Unpaid Invoices -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">📄 Unpaid Invoices ({{ unpaid_invoices|length }})</h5>
+                    <small>Invoices issued but not yet paid</small>
+                </div>
+                <div class="card-body">
+                    {% if unpaid_invoices %}
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Invoice #</th>
+                                    <th>Business</th>
+                                    <th>Total</th>
+                                    <th>Status</th>
+                                    <th>Created</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for invoice in unpaid_invoices %}
+                                <tr>
+                                    <td><code>{{ invoice.number }}</code></td>
+                                    <td>{{ invoice.business.name }}</td>
+                                    <td>{{ invoice.currency }} {{ invoice.total|floatformat:2|intcomma }}</td>
+                                    <td><span class="badge bg-info">{{ invoice.get_status_display }}</span></td>
+                                    <td>{{ invoice.created_at|date:"M d, Y" }}</td>
+                                    <td>
+                                        <a href="/admin/billing/invoice/{{ invoice.id }}/change/" 
+                                           target="_blank" class="btn btn-sm btn-outline-primary">View in Admin</a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <p class="text-muted">✅ No unpaid invoices</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Webhook Events -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">📨 Recent Webhook Events (Last 20)</h5>
+                </div>
+                <div class="card-body">
+                    {% if recent_events %}
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Provider</th>
+                                    <th>Reference</th>
+                                    <th>Status</th>
+                                    <th>Signature</th>
+                                    <th>Received</th>
+                                    <th>Processed</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for event in recent_events %}
+                                <tr>
+                                    <td>{{ event.provider }}</td>
+                                    <td><code>{{ event.reference|truncatechars:30 }}</code></td>
+                                    <td>
+                                        {% if event.status == 'processed' %}
+                                            <span class="badge bg-success">{{ event.get_status_display }}</span>
+                                        {% elif event.status == 'failed' %}
+                                            <span class="badge bg-danger">{{ event.get_status_display }}</span>
+                                        {% elif event.status == 'ignored' %}
+                                            <span class="badge bg-secondary">{{ event.get_status_display }}</span>
+                                        {% else %}
+                                            <span class="badge bg-warning">{{ event.get_status_display }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if event.signature_valid %}
+                                            <span class="text-success">✓ Valid</span>
+                                        {% else %}
+                                            <span class="text-danger">✗ Invalid</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ event.received_at|date:"M d, H:i:s" }}</td>
+                                    <td>
+                                        {% if event.processed_at %}
+                                            {{ event.processed_at|date:"M d, H:i:s" }}
+                                        {% else %}
+                                            <span class="text-muted">—</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <p class="text-muted">No recent events</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Expiring Soon -->
+    {% if expiring_soon %}
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-warning">
+                    <h5 class="mb-0">⏰ Subscriptions Expiring Soon (Next 3 Days)</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Business</th>
+                                    <th>Plan</th>
+                                    <th>Status</th>
+                                    <th>Expires</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for sub in expiring_soon %}
+                                <tr>
+                                    <td>{{ sub.business.name }}</td>
+                                    <td>{{ sub.plan.name }}</td>
+                                    <td><span class="badge bg-{{ sub.status|lower }}">{{ sub.get_status_display }}</span></td>
+                                    <td>{{ sub.current_period_end|date:"M d, Y H:i" }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+</div>
+{% endblock %}
+

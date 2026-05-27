@@ -1,119 +1,600 @@
-/* Root tokens tuned for phones */
-:root{
-  --cc-bg:#0b1220;           /* dark-friendly default; your theme switcher can override */
-  --cc-panel:rgba(255,255,255,0.03);
-  --cc-border:rgba(255,255,255,0.10);
-  --cc-muted:#94a3b8;
-  --cc-text:#e5e7eb;
-  --cc-accent:#2f6df6;
-  --radius:16px;
-  --tap:14px; /* min hit slop */
+/* ============================================================
+   RESPONSIVE DESIGN SYSTEM – Circuit City / Emajinet
+   Clean separation between desktop and mobile layouts
+   ============================================================ */
 
+:root {
+  /* Colors: light, clean aesthetic */
+  --cc-bg: #f5f7fb;
+  --cc-bg-card: #ffffff;
+  --cc-ink: #111827;
+  --cc-muted: #6b7280;
+  --cc-accent: #facc15;
+  --cc-accent-hover: #fbbf24;
+  
+  /* Borders & shadows */
+  --cc-border: rgba(15,23,42,.08);
+  --cc-radius-lg: 16px;
+  --cc-radius-md: 12px;
+  --cc-shadow-soft: 0 6px 18px rgba(15,23,42,.08);
+  
   /* Layout */
-  --safe-bottom: env(safe-area-inset-bottom, 0px);
-  --tabbar-h: 64px;
-  --container-px: 14px;
-
-  /* Motion */
-  --ease: cubic-bezier(.22,.61,.36,1);
-  --dur: 200ms;
+  --cc-bottomnav-height: 64px;
+  --cc-nav-bg: #ffffff;
+  --cc-safe-bottom: env(safe-area-inset-bottom, 0px);
 }
 
-html,body{
-  background:var(--cc-bg);
-  color:var(--cc-text);
-  -webkit-tap-highlight-color: transparent;
-  font-size:16px; /* keeps mobile zoom off on inputs */
+/* =======================
+   Desktop defaults (≥992px)
+   ======================= */
+
+/* Ensure desktop has NO width constraints */
+@media (min-width: 992px) {
+  html, body {
+    max-width: none !important;
+    width: 100%;
+    margin: 0;
+  }
+  
+  /* Main content shell - full width on desktop */
+  .cc-shell {
+    max-width: none !important;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+  
+  /* Bottom nav ALWAYS hidden on desktop */
+  .cc-bottomnav,
+  .mobile-tabbar {
+    display: none !important;
+  }
+  
+  /* Body padding normal on desktop */
+  body.has-bottomnav {
+    padding-bottom: 0 !important;
+  }
 }
 
-.container-xxl,.container-xl,.container-lg,.container-md,.container,.container-fluid{
-  padding-left:var(--container-px);
-  padding-right:var(--container-px);
-}
-
-/* Thumb-safe bottom padding (for fixed tabbar) */
-body{ padding-bottom: calc(var(--tabbar-h) + var(--safe-bottom) + 8px); }
-
-/* Cards / panels */
-.panel, .card{
-  border-radius: var(--radius);
+/* Cards styling (all screens) */
+.cc-card {
+  background: var(--cc-bg-card);
+  border-radius: var(--cc-radius-lg);
+  box-shadow: var(--cc-shadow-soft);
+  padding: 14px 14px 12px;
+  margin-bottom: 12px;
+  box-sizing: border-box;
   border: 1px solid var(--cc-border);
-  background: var(--cc-panel);
-  backdrop-filter: blur(6px);
-  box-shadow: 0 6px 20px rgb(0 0 0 / .25);
 }
 
-/* KPI grid: 2 columns on phones */
-.kpi-row{
-  display:grid; gap:12px; grid-template-columns:1fr 1fr;
-}
-@media(min-width:992px){
-  .kpi-row{ grid-template-columns:repeat(4,1fr); }
+.cc-card__title {
+  font-size: 14px;
+  font-weight: 700;
+  margin: 0 0 4px;
+  color: var(--cc-ink);
 }
 
-/* Bottom Tabbar */
-.cc-tabbar{
-  position: fixed; left:0; right:0; bottom:0;
-  height: calc(var(--tabbar-h) + var(--safe-bottom));
-  padding-bottom: var(--safe-bottom);
-  background: rgba(8,12,22,0.9);
-  border-top: 1px solid var(--cc-border);
-  display:flex; justify-content:space-between; gap:4px;
-  backdrop-filter: blur(14px);
-  z-index: 1100;
+.cc-card__subtitle {
+  font-size: 12px;
+  color: var(--cc-muted);
+  margin: 0 0 8px;
+  line-height: 1.4;
 }
-.cc-tabbar .tab{
-  flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center;
-  text-decoration:none; color:var(--cc-muted);
-  font-size:.75rem; padding:6px 0; gap:4px;
-}
-.cc-tabbar .tab i{ font-size:20px; line-height:1; }
-.cc-tabbar .tab.active{ color:var(--cc-accent); }
-.cc-tabbar .tab:active{ transform: translateY(1px); }
 
-/* Buttons: larger tap targets */
-.btn, button, .form-control{
-  border-radius: 12px;
+/* ===== Metrics inside cards ===== */
+.cc-metric-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 6px;
+  flex-wrap: wrap;
 }
-.btn{ padding:12px 14px; font-weight:700; }
-.btn-sm{ padding:10px 12px; }
 
-/* Lists that feel "game-like" (spring hover on desktop, press scale on mobile) */
-.tile{
-  display:flex; align-items:center; gap:12px; padding:12px; border-radius:14px;
-  border:1px solid var(--cc-border); background:var(--cc-panel);
-  transition: transform var(--dur) var(--ease), background var(--dur) var(--ease);
+.cc-metric {
+  display: flex;
+  flex-direction: column;
+  min-width: 80px;
+  flex: 1;
 }
-.tile:active{ transform: scale(.98); }
 
-/* Responsive table → cards (auto on <= 576px) */
-.table-mobile{
-  width:100%; border-collapse: collapse;
+.cc-metric-label {
+  font-size: 11px;
+  color: var(--cc-muted);
+  margin-bottom: 2px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
 }
-@media(max-width:576px){
-  .table-mobile thead{ display:none; }
-  .table-mobile tr{
-    display:block; margin-bottom:10px; border:1px solid var(--cc-border);
-    border-radius:12px; overflow:hidden; background:var(--cc-panel);
+
+.cc-metric-value {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--cc-ink);
+  line-height: 1.2;
+}
+
+/* ===== Bottom navigation styles (universal) ===== */
+.cc-bottomnav__item {
+  flex: 1;
+  text-align: center;
+  font-size: 11px;
+  color: var(--cc-muted);
+  text-decoration: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 8px 4px;
+  min-height: 56px;
+  transition: all 0.2s ease;
+  -webkit-tap-highlight-color: transparent;
+  font-weight: 500;
+}
+
+.cc-bottomnav__item i {
+  font-size: 20px;
+  display: block;
+  margin-bottom: 2px;
+}
+
+.cc-bottomnav__item--active {
+  color: #ff6a1a;
+  font-weight: 700;
+}
+
+.cc-bottomnav__item:active {
+  transform: scale(0.95);
+  opacity: 0.7;
+}
+
+/* =======================
+   Mobile layout (tablets and phones ≤991px)
+   ======================= */
+@media (max-width: 991px) {
+  
+  body {
+    background: #f5f7fb;
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    max-width: 100vw;
+    overflow-x: hidden;
   }
-  .table-mobile td{
-    display:flex; justify-content:space-between; gap:10px;
-    padding:10px 12px; border-bottom:1px dashed var(--cc-border);
+  
+  /* Sidebar becomes an off-canvas overlay on mobile - FULL width per Dec 25 behavior */
+  /* CRITICAL: Sidebar z-index (2000) MUST be above backdrop (1990) to receive clicks */
+  .cc-sidebar {
+    position: fixed !important;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    height: 100dvh;
+    width: 260px !important;
+    transform: translateX(-100%);
+    transition: transform 0.26s cubic-bezier(0.2, 0.8, 0.2, 1);
+    z-index: 2000 !important;
+    pointer-events: auto !important;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
   }
-  .table-mobile td:last-child{ border-bottom:none; }
-  .table-mobile td::before{
+  
+  /* Ensure sidebar links are always clickable */
+  .cc-sidebar a,
+  .cc-sidebar button,
+  .cc-sidebar .navlink {
+    pointer-events: auto !important;
+  }
+  
+  /* When drawer is open */
+  body[data-drawer="open"] .cc-sidebar {
+    transform: translateX(0) !important;
+  }
+  
+  /* Backdrop for sidebar overlay - TRANSPARENT (no dim, no blur) per Dec 25 behavior */
+  .cc-backdrop {
+    position: fixed;
+    inset: 0;
+    background: transparent !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    z-index: 1990;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+  }
+  
+  .cc-backdrop.show {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  
+  /* Menu toggle button - ALWAYS visible and above everything */
+  .mobile-toggle {
+    position: fixed !important;
+    top: 12px;
+    left: 12px;
+    z-index: 2010 !important;
+    display: grid !important;
+    place-items: center;
+    border: 0;
+    border-radius: 12px;
+    width: 48px;
+    height: 48px;
+    min-width: 48px;
+    min-height: 48px;
+    background: var(--cc-accent, #2563eb);
+    color: #fff;
+    box-shadow: 0 10px 22px rgba(59, 130, 246, 0.35);
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    cursor: pointer;
+    visibility: visible !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+  }
+  
+  /* Main content fills screen on mobile */
+  .cc-main {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+  }
+  
+  /* Mobile shell - constrained width for readability, centered */
+  .cc-shell {
+    max-width: 480px;
+    margin: 0 auto;
+    padding: 16px 12px 80px; /* bottom space for nav */
+    box-sizing: border-box;
+  }
+  
+  .cc-card {
+    width: 100%;
+    box-sizing: border-box;
+  }
+  
+  /* Bottom nav visible ONLY on mobile */
+  .cc-bottomnav,
+  .mobile-tabbar {
+    display: flex !important;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 64px;
+    align-items: center;
+    justify-content: space-around;
+    background: #fff;
+    box-shadow: 0 -4px 12px rgba(15, 23, 42, 0.12);
+    z-index: 900; /* Below sidebar and toggle button */
+  }
+  
+  body.has-bottomnav {
+    padding-bottom: 72px; /* so cards don't hide behind nav */
+  }
+  
+  body.has-bottomnav main,
+  body.has-bottomnav .cc-page,
+  body.has-bottomnav .content {
+    padding-bottom: calc(var(--cc-bottomnav-height) + var(--cc-safe-bottom) + 16px);
+  }
+}
+
+/* ===== Utility: scroll column ===== */
+.cc-scroll-column {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* ===== Additional mobile utilities ===== */
+
+/* Action buttons in cards */
+.cc-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 16px;
+  border-radius: var(--cc-radius-md);
+  font-weight: 600;
+  font-size: 14px;
+  text-decoration: none;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.cc-btn--primary {
+  background: var(--cc-accent);
+  color: var(--cc-ink);
+}
+
+.cc-btn--primary:hover {
+  background: var(--cc-accent-hover);
+}
+
+.cc-btn--secondary {
+  background: #e5e7eb;
+  color: var(--cc-ink);
+}
+
+.cc-btn--secondary:hover {
+  background: #d1d5db;
+}
+
+.cc-btn:active {
+  transform: scale(0.98);
+}
+
+/* Badge helpers */
+.cc-badge {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.cc-badge--success {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.cc-badge--warning {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.cc-badge--danger {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.cc-badge--info {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+/* List items */
+.cc-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.cc-list-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--cc-border);
+}
+
+.cc-list-item:last-child {
+  border-bottom: none;
+}
+
+.cc-list-item__label {
+  font-size: 13px;
+  color: var(--cc-muted);
+  font-weight: 500;
+}
+
+.cc-list-item__value {
+  font-size: 14px;
+  color: var(--cc-ink);
+  font-weight: 600;
+}
+
+/* Empty state */
+.cc-empty {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--cc-muted);
+}
+
+.cc-empty__icon {
+  font-size: 48px;
+  margin-bottom: 12px;
+  opacity: 0.5;
+}
+
+.cc-empty__text {
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* Header inside shell */
+.cc-header {
+  margin-bottom: 16px;
+}
+
+.cc-header__title {
+  font-size: 24px;
+  font-weight: 800;
+  margin: 0 0 4px;
+  color: var(--cc-ink);
+}
+
+.cc-header__subtitle {
+  font-size: 14px;
+  color: var(--cc-muted);
+  margin: 0;
+}
+
+/* Compact spacing for very small mobile screens */
+@media (max-width: 480px) {
+  .cc-shell {
+    padding: 10px 10px calc(var(--cc-bottomnav-height) + var(--cc-safe-bottom) + 10px);
+  }
+  
+  .cc-card {
+    padding: 12px;
+    margin-bottom: 10px;
+  }
+  
+  .cc-metric-value {
+    font-size: 14px;
+  }
+}
+
+/* Mobile-specific body class */
+body.cc-mobile {
+  margin: 0;
+  padding: 0;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: var(--cc-bg);
+  color: var(--cc-ink);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  touch-action: manipulation;
+  overflow-x: hidden;
+  min-height: 100vh;
+}
+
+/* Form elements in mobile context */
+.cc-input {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid var(--cc-border);
+  border-radius: var(--cc-radius-md);
+  font-size: 16px; /* Prevents iOS zoom */
+  font-family: inherit;
+  color: var(--cc-ink);
+  background: var(--cc-bg-card);
+  box-sizing: border-box;
+}
+
+.cc-input:focus {
+  outline: none;
+  border-color: var(--cc-accent);
+  box-shadow: 0 0 0 3px rgba(250, 204, 21, 0.1);
+}
+
+/* IMEI Scanner Messages */
+.cc-imei-message {
+  margin-top: 8px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  display: none;
+}
+
+.cc-imei-message--error {
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fca5a5;
+}
+
+.cc-imei-message--success {
+  background: #dcfce7;
+  color: #166534;
+  border: 1px solid #86efac;
+}
+
+.cc-imei-message--info {
+  background: #dbeafe;
+  color: #1e40af;
+  border: 1px solid #93c5fd;
+}
+
+.cc-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--cc-ink);
+  margin-bottom: 6px;
+}
+
+/* Table responsive helpers for mobile */
+@media (max-width: 576px) {
+  .cc-table-mobile thead {
+    display: none;
+  }
+  
+  .cc-table-mobile tr {
+    display: block;
+    margin-bottom: 12px;
+    border: 1px solid var(--cc-border);
+    border-radius: var(--cc-radius-md);
+    overflow: hidden;
+    background: var(--cc-bg-card);
+    box-shadow: var(--cc-shadow-soft);
+  }
+  
+  .cc-table-mobile td {
+    display: flex;
+    justify-content: space-between;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--cc-border);
+  }
+  
+  .cc-table-mobile td:last-child {
+    border-bottom: none;
+  }
+  
+  .cc-table-mobile td::before {
     content: attr(data-label);
-    color: var(--cc-muted); font-weight:700;
+    color: var(--cc-muted);
+    font-weight: 600;
+    font-size: 12px;
   }
 }
 
-/* Form improvements for mobile */
-input, select, textarea{
-  font-size:16px !important; /* prevents iOS zoom */
-}
-.form-control, .form-select{ padding:12px 14px; }
-.form-check-input{ width:1.2rem; height:1.2rem; }
+/* ===== Responsive Dashboard Layout ===== */
 
-/* Micro animations */
-.fade-in{ animation: fadeIn .28s var(--ease) both; }
-@keyframes fadeIn{ from{ opacity:0; transform:translateY(6px); } to{ opacity:1; transform:translateY(0); } }
+/* 
+  REMOVED: mobile-only / desktop-only distinction.
+  Dashboard now shows the same content on all devices, just stacked on mobile.
+  
+  Mobile: cards stack vertically, full content visible
+  Desktop: cards use grid/flex layouts as defined in dashboard.html inline styles
+*/
+
+/* Ensure dashboard content is responsive */
+.cc-dashboard-content {
+  width: 100%;
+  max-width: none;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+/* On mobile, ensure proper spacing for bottom nav */
+@media (max-width: 767px) {
+  .cc-dashboard-content {
+    padding-bottom: calc(var(--cc-bottomnav-height, 64px) + var(--cc-safe-bottom, 0px) + 16px);
+  }
+}
+
+/* ===== Page header card - mobile only ===== */
+.cc-page-header-card,
+.cc-page-header-mobile-only {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .cc-page-header-card,
+  .cc-page-header-mobile-only {
+    display: block !important;
+  }
+}
+
+/* ===== CRITICAL: Ensure bottom nav is NEVER visible on desktop ===== */
+@media (min-width: 992px) {
+  .cc-bottomnav,
+  .mobile-tabbar,
+  nav.mobile-tabbar,
+  nav.cc-bottomnav {
+    display: none !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+  }
+}

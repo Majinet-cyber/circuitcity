@@ -1,0 +1,13 @@
+Sale Receipt - {{ business_name }}
+
+A sale was completed:
+
+- Sale ID: #{{ sale_id }}
+- Total: MK {{ total|floatformat:2 }}
+- Date: {{ date|date:"Y-m-d H:i" }}
+
+View sales: https://emajinet.africa/sales/
+
+---
+Thank you for using Emajinet!
+

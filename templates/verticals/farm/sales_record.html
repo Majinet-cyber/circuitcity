@@ -1,0 +1,240 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Record Sale - {{ business.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+.sale-record-page {
+    --farm-primary: #2563eb;
+    --farm-primary-light: #dbeafe;
+    --farm-green: #16a34a;
+    --farm-green-light: #dcfce7;
+}
+
+.sale-item-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.25rem;
+    background: var(--farm-primary-light);
+    border: 2px solid var(--farm-primary);
+    border-radius: 12px;
+    font-weight: 700;
+    font-size: 1rem;
+    color: var(--farm-primary);
+    margin-bottom: 1rem;
+}
+
+.sale-item-badge .emoji {
+    font-size: 1.5rem;
+}
+
+/* Payment Method Cards */
+.payment-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+@media (min-width: 576px) {
+    .payment-cards-grid {
+        grid-template-columns: repeat(5, 1fr);
+    }
+}
+
+.payment-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+    padding: 0.75rem 0.5rem;
+    background: var(--surface);
+    border: 2px solid var(--border);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-align: center;
+}
+
+.payment-card:hover {
+    border-color: var(--farm-green);
+    background: var(--farm-green-light);
+}
+
+.payment-card.selected {
+    border-color: var(--farm-green);
+    background: var(--farm-green-light);
+    box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.2);
+}
+
+.payment-card input[type="radio"] {
+    display: none;
+}
+
+.payment-card .icon {
+    font-size: 1.25rem;
+}
+
+.payment-card .label {
+    font-size: 0.6875rem;
+    font-weight: 600;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="sale-record-page container-fluid py-3" data-vertical="farm" data-testid="sale-record-page">
+    <div class="mb-4">
+        <a href="{% url 'verticals:farm_sales' %}" class="text-decoration-none mb-2 d-inline-block">&larr; Back to Sales</a>
+        <h1 class="h3 mb-1"><span class="me-2">💰</span>{{ hero_title }}</h1>
+    </div>
+    
+    <div class="card" style="max-width: 600px;">
+        <div class="card-body">
+            <!-- Show selected item badge -->
+            {% if selected_crop %}
+            <div class="sale-item-badge" data-testid="selected-crop-badge">
+                <span class="emoji">{{ selected_crop.emoji }}</span>
+                <span>{{ selected_crop.name }}</span>
+                {% if selected_crop.quantity_available > 0 %}
+                <small class="text-success ms-2">({{ selected_crop.quantity_available|floatformat:0 }} available)</small>
+                {% endif %}
+            </div>
+            {% elif selected_batch %}
+            <div class="sale-item-badge" data-testid="selected-batch-badge">
+                <span class="emoji">
+                    {% if selected_batch.animal_type == 'chickens' %}🐔{% elif selected_batch.animal_type == 'pigs' %}🐖{% elif selected_batch.animal_type == 'goats' %}🐐{% elif selected_batch.animal_type == 'cattle' %}🐄{% else %}🐾{% endif %}
+                </span>
+                <span>{{ selected_batch.name }}</span>
+                <small class="text-success ms-2">({{ selected_batch.count_current }} head available)</small>
+            </div>
+            {% endif %}
+            
+            <form method="post" data-testid="sale-form">
+                {% csrf_token %}
+                <input type="hidden" name="type" value="{{ sale_type }}">
+                {% if selected_crop %}<input type="hidden" name="crop_id" value="{{ selected_crop.id }}">{% endif %}
+                {% if selected_batch %}<input type="hidden" name="batch_id" value="{{ selected_batch.id }}">{% endif %}
+                
+                <div class="mb-3">
+                    <label class="form-label">Sale Date</label>
+                    <input type="date" name="date" class="form-control" value="{{ today|date:'Y-m-d' }}">
+                </div>
+                
+                <div class="row mb-3">
+                    <div class="col-6">
+                        <label class="form-label">Quantity *</label>
+                        <input type="number" name="quantity" id="quantity" class="form-control" 
+                               step="0.01" min="0.01" required placeholder="e.g., 10">
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label">Unit Price (MWK) *</label>
+                        <input type="number" name="unit_price" id="unit_price" class="form-control" 
+                               step="0.01" min="0.01" required placeholder="e.g., 5000">
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label">Total Amount (MWK)</label>
+                    <input type="text" id="total_display" class="form-control form-control-lg text-success fw-bold" 
+                           readonly placeholder="Auto-calculated">
+                    <small class="text-muted">Quantity × Unit Price</small>
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label">Unit</label>
+                    <select name="unit" class="form-select">
+                        {% for value, label in units %}
+                        <option value="{{ value }}" {% if selected_crop and selected_crop.unit == value %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <!-- Payment Method Cards -->
+                <div class="mb-3">
+                    <label class="form-label">Payment Method</label>
+                    <div class="payment-cards-grid" data-testid="payment-method-cards">
+                        <label class="payment-card selected" data-value="cash">
+                            <input type="radio" name="payment_method" value="cash" checked>
+                            <span class="icon">💵</span>
+                            <span class="label">Cash</span>
+                        </label>
+                        <label class="payment-card" data-value="mobile_money">
+                            <input type="radio" name="payment_method" value="mobile_money">
+                            <span class="icon">📱</span>
+                            <span class="label">Mobile Money</span>
+                        </label>
+                        <label class="payment-card" data-value="bank">
+                            <input type="radio" name="payment_method" value="bank">
+                            <span class="icon">🏦</span>
+                            <span class="label">Bank</span>
+                        </label>
+                        <label class="payment-card" data-value="credit">
+                            <input type="radio" name="payment_method" value="credit">
+                            <span class="icon">📝</span>
+                            <span class="label">Credit</span>
+                        </label>
+                        <label class="payment-card" data-value="barter">
+                            <input type="radio" name="payment_method" value="barter">
+                            <span class="icon">🤝</span>
+                            <span class="label">Barter</span>
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label">Buyer Name (optional)</label>
+                    <input type="text" name="buyer_name" class="form-control" placeholder="e.g., ADMARC, Local Trader">
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label">Notes (optional)</label>
+                    <textarea name="notes" class="form-control" rows="2" placeholder="Any additional notes"></textarea>
+                </div>
+                
+                <button type="submit" class="btn btn-success btn-lg w-100" data-testid="submit-sale-btn">
+                    <i class="bi bi-check-lg me-1"></i> Record Sale
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const quantityInput = document.getElementById('quantity');
+    const unitPriceInput = document.getElementById('unit_price');
+    const totalDisplay = document.getElementById('total_display');
+    
+    function calculateTotal() {
+        const qty = parseFloat(quantityInput.value) || 0;
+        const price = parseFloat(unitPriceInput.value) || 0;
+        const total = qty * price;
+        totalDisplay.value = total > 0 ? 'MWK ' + total.toLocaleString('en-MW', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '';
+    }
+    
+    quantityInput.addEventListener('input', calculateTotal);
+    unitPriceInput.addEventListener('input', calculateTotal);
+    
+    // Payment card selection
+    document.querySelectorAll('.payment-card').forEach(function(card) {
+        card.addEventListener('click', function() {
+            document.querySelectorAll('.payment-card').forEach(c => c.classList.remove('selected'));
+            this.classList.add('selected');
+            this.querySelector('input[type="radio"]').checked = true;
+        });
+    });
+    
+    // Set today's date
+    const dateInput = document.querySelector('input[name="date"]');
+    if (dateInput && !dateInput.value) {
+        dateInput.value = new Date().toISOString().split('T')[0];
+    }
+});
+</script>
+{% endblock %}

@@ -1,8 +1,8 @@
 {% extends "base.html" %}
 {% load humanize %}
 
-{% block title %}Agent · Emajinet{% endblock %}
-{% block header_title %}Agent{% endblock %}
+{% block title %}{% if BUSINESS_VERTICAL == "gym" %}Trainer{% else %}Agent{% endif %} · Emajinet{% endblock %}
+{% block header_title %}{% if BUSINESS_VERTICAL == "gym" %}Trainer{% else %}Agent{% endif %}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -46,7 +46,24 @@
     background:color-mix(in oklab,var(--cc-accent) 18%, transparent);color:var(--cc-accent)
   }
   .kpi .label{font-size:.9rem;color:var(--cc-muted);font-weight:700;letter-spacing:.01em}
-  .kpi .value{font-size:1.55rem;font-weight:800}
+  .kpi .value{
+    font-size:1.55rem;
+    font-weight:800;
+    /* Mobile overflow protection */
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    max-width:100%;
+    font-variant-numeric:tabular-nums;
+  }
+  
+  /* Mobile: Ensure KPI values never overflow */
+  @media (max-width:640px){
+    .kpi .value{
+      font-size:clamp(1.25rem,5vw,1.55rem);
+      min-width:0;
+    }
+  }
 
   /* Quick actions */
   .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
@@ -76,7 +93,7 @@
 {% block body %}
 <div class="agent-wrap">
   <div class="hero">
-    <h1>👤 Agent Dashboard</h1>
+    <h1>👤 {% if BUSINESS_VERTICAL == "gym" %}Trainer{% else %}Agent{% endif %} Dashboard</h1>
     <a class="btn primary" href="{% url 'inventory:inventory_dashboard' %}">
       <i class="bi bi-speedometer2"></i> <span class="d-none d-sm-inline">Main Dashboard</span>
     </a>
@@ -88,7 +105,7 @@
       <div class="icon"><i class="bi bi-archive"></i></div>
       <div>
         <div class="label">My In Stock</div>
-        <div class="value">{{ in_stock|default:0|intcomma }}</div>
+        <div class="value cc-amount" title="{{ in_stock|default:0|intcomma }}">{{ in_stock|default:0|intcomma }}</div>
       </div>
     </div>
 
@@ -96,7 +113,7 @@
       <div class="icon"><i class="bi bi-bag-check"></i></div>
       <div>
         <div class="label">My Sold (units)</div>
-        <div class="value">{{ sold|default:0|intcomma }}</div>
+        <div class="value cc-amount" title="{{ sold|default:0|intcomma }}">{{ sold|default:0|intcomma }}</div>
       </div>
     </div>
 
@@ -104,7 +121,7 @@
       <div class="icon"><i class="bi bi-cash-coin"></i></div>
       <div>
         <div class="label">My Sales Value</div>
-        <div class="value">MK {{ sales_value|default:0|floatformat:0|intcomma }}</div>
+        <div class="value cc-amount" title="MK {{ sales_value|default:0|floatformat:0|intcomma }}">MK {{ sales_value|default:0|floatformat:0|intcomma }}</div>
       </div>
     </div>
 
@@ -112,7 +129,7 @@
       <div class="icon"><i class="bi bi-trophy"></i></div>
       <div>
         <div class="label">My Commission (month)</div>
-        <div class="value">MK {{ commission_total|default:0|floatformat:0|intcomma }}</div>
+        <div class="value cc-amount" title="MK {{ commission_total|default:0|floatformat:0|intcomma }}">MK {{ commission_total|default:0|floatformat:0|intcomma }}</div>
       </div>
     </div>
   </div>

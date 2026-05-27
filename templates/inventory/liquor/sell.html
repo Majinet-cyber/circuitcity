@@ -5,30 +5,53 @@
 
 {% block extra_head %}
 <style>
-/* Glassmorphic cards */
-.glass-card {
-    background: rgba(255, 255, 255, 0.9);
+/* Glassmorphic cards - Liquor specific */
+.liquor-glass-card {
+    background: rgba(255, 255, 255, 0.95);
     backdrop-filter: blur(10px);
-    border-radius: 12px;
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    border-radius: 16px;
+    border: 1px solid rgba(226, 232, 240, 0.8);
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+    transition: all 0.3s ease;
+}
+
+.liquor-glass-card:hover {
+    box-shadow: 0 12px 32px rgba(15, 23, 42, 0.12);
+    transform: translateY(-2px);
 }
 
 /* Category tiles */
 .category-tile {
     cursor: pointer;
-    transition: all 0.3s ease;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     padding: 2rem 1.5rem;
     text-align: center;
-    border-radius: 12px;
-    background: linear-gradient(135deg, rgba(255, 255, 255, 0.9), rgba(240, 240, 255, 0.9));
-    border: 2px solid rgba(100, 100, 255, 0.2);
+    border-radius: 16px;
+    background: linear-gradient(135deg, #ffffff, #f8fafc);
+    border: 2px solid #e2e8f0;
+    position: relative;
+    overflow: hidden;
+}
+
+.category-tile::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(139, 92, 246, 0.1), transparent);
+    transition: left 0.5s;
+}
+
+.category-tile:hover::before {
+    left: 100%;
 }
 
 .category-tile:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
-    border-color: rgba(100, 100, 255, 0.5);
+    transform: translateY(-8px);
+    box-shadow: 0 12px 28px rgba(139, 92, 246, 0.2);
+    border-color: #8b5cf6;
 }
 
 .category-tile .icon {
@@ -48,37 +71,99 @@
     color: #718096;
 }
 
-/* Product rows */
+/* ===== PREMIUM PRODUCT CARDS (replaces product-row) ===== */
+.products-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 12px;
+}
+@media(max-width:600px){ .products-container { grid-template-columns: 1fr; } }
+
 .product-row {
     cursor: pointer;
-    transition: all 0.2s ease;
-    padding: 1rem;
-    border-radius: 8px;
-    margin-bottom: 0.5rem;
-    background: white;
-    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    background: #fff;
+    border: 2px solid #e2e8f0;
+    overflow: hidden;
+    transition: all 0.22s cubic-bezier(0.4,0,0.2,1);
+    position: relative;
+    box-shadow: 0 2px 8px rgba(15,23,42,.06);
 }
-
 .product-row:hover {
-    background: #f7fafc;
-    border-color: #cbd5e0;
-    transform: translateX(5px);
+    transform: translateY(-3px);
+    box-shadow: 0 8px 24px rgba(15,23,42,.14);
+    border-color: #a78bfa;
+}
+.product-row.selected {
+    border-color: #7c3aed;
+    box-shadow: 0 0 0 3px rgba(124,58,237,.25), 0 8px 24px rgba(124,58,237,.2);
+    transform: translateY(-3px);
+}
+.product-row.out-of-stock {
+    opacity: 0.55;
+    cursor: not-allowed;
+    filter: grayscale(0.4);
+}
+.product-row.out-of-stock:hover { transform: none; box-shadow: 0 2px 8px rgba(15,23,42,.06); border-color: #e2e8f0; }
+
+/* Category accent strip on card top */
+.product-row .pc-band {
+    height: 5px;
+    width: 100%;
+}
+.product-row[data-category="beer"] .pc-band     { background: linear-gradient(90deg,#d97706,#f59e0b); }
+.product-row[data-category="cider"] .pc-band    { background: linear-gradient(90deg,#059669,#10b981); }
+.product-row[data-category="wine"] .pc-band     { background: linear-gradient(90deg,#be185d,#db2777); }
+.product-row[data-category="spirits"] .pc-band  { background: linear-gradient(90deg,#7c3aed,#a855f7); }
+.product-row[data-category="whiskey"] .pc-band  { background: linear-gradient(90deg,#b45309,#d97706); }
+.product-row[data-category="gin"] .pc-band      { background: linear-gradient(90deg,#0369a1,#0ea5e9); }
+.product-row[data-category="vodka"] .pc-band    { background: linear-gradient(90deg,#0284c7,#38bdf8); }
+.product-row[data-category="brandy"] .pc-band   { background: linear-gradient(90deg,#c2410c,#ea580c); }
+.product-row[data-category="cocktail"] .pc-band { background: linear-gradient(90deg,#a21caf,#d946ef); }
+
+/* Selected checkmark */
+.product-row.selected::after {
+    content: '✓';
+    position: absolute;
+    top: 12px; right: 12px;
+    width: 24px; height: 24px;
+    background: #7c3aed;
+    color: #fff;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: .85rem; font-weight: 800;
+    z-index: 2;
 }
 
-.product-row.selected {
-    background: #ebf8ff;
-    border-color: #4299e1;
+.pc-body { padding: 12px 14px 14px; }
+.pc-name { font-size: .95rem; font-weight: 800; color: #0f172a; margin-bottom: 6px; line-height: 1.2; }
+.pc-stock { font-size: .78rem; font-weight: 600; margin-bottom: 8px; }
+.pc-prices { display: flex; gap: 10px; flex-wrap: wrap; }
+.pc-price-item { font-size: .8rem; }
+.pc-price-label { color: #94a3b8; font-size: .65rem; text-transform: uppercase; letter-spacing: .05em; font-weight: 700; }
+.pc-price-val { font-weight: 800; color: #0f172a; }
+.pc-badges { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 8px; }
+.pc-badge {
+    padding: 2px 8px; border-radius: 99px;
+    font-size: .66rem; font-weight: 800; text-transform: uppercase; letter-spacing: .04em;
 }
+.pc-badge-in  { background: #dcfce7; color: #15803d; }
+.pc-badge-low { background: #fef3c7; color: #92400e; }
+.pc-badge-out { background: #fee2e2; color: #991b1b; }
+.pc-badge-open{ background: #ede9fe; color: #5b21b6; }
+.pc-badge-shot{ background: #f0fdf4; color: #065f46; }
 
 /* Confirmation card */
 .confirm-card {
     position: sticky;
     top: 20px;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 50%, #ec4899 100%);
     color: white;
-    border-radius: 12px;
+    border-radius: 20px;
     padding: 2rem;
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 16px 40px rgba(139, 92, 246, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(10px);
 }
 
 .confirm-card input[type="number"],
@@ -165,7 +250,7 @@
         <!-- Main Sell Area -->
         <div class="col-lg-8">
             <!-- Step 1: Category Tiles -->
-            <div id="category-tiles-container" class="glass-card p-4 mb-4">
+            <div id="category-tiles-container" class="liquor-glass-card p-4 mb-4">
                 <h5 class="mb-4">Select Category</h5>
                 
                 {% if categories %}
@@ -190,8 +275,8 @@
                             </div>
                             <div class="title text-capitalize">{{ cat }}</div>
                             <div class="subtitle">
-                                {% if cat == "beer" %}No shots
-                                {% elif cat == "cider" %}No shots
+                                {% if cat == "beer" %}Bottles only
+                                {% elif cat == "cider" %}Bottles only
                                 {% elif cat == "wine" %}Per glass or bottle
                                 {% elif cat == "spirits" %}Shots & bottles
                                 {% elif cat == "whiskey" %}Shots & bottles
@@ -214,7 +299,7 @@
 
             <!-- Step 2: Product List (hidden by default) -->
             {% for cat, products in products_by_category.items %}
-            <div id="products-list-{{ cat }}" class="glass-card p-4 mb-4 hidden" data-category-list="{{ cat }}">
+            <div id="products-list-{{ cat }}" class="liquor-glass-card p-4 mb-4 hidden" data-category-list="{{ cat }}">
                 <div class="d-flex align-items-center justify-content-between mb-4">
                     <h5 class="mb-0 text-capitalize">{{ cat }}</h5>
                     <button class="btn btn-sm btn-outline-secondary back-btn" data-back-to-tiles>
@@ -224,33 +309,77 @@
                 
                 <div class="products-container">
                     {% for p in products %}
-                    <div class="product-row" 
+                    <div class="product-row {% if not p.is_in_stock %}out-of-stock{% endif %}" 
                          data-product-row
                          data-product-id="{{ p.id }}"
                          data-product-name="{{ p.name }}"
                          data-has-shots="{{ p.has_shots|yesno:'true,false' }}"
+                         data-has-glasses="{{ p.has_glasses|yesno:'true,false' }}"
                          data-bottle-price="{{ p.price_per_bottle }}"
                          data-shot-price="{{ p.price_per_shot|default:'0' }}"
+                         data-glass-price="{{ p.price_per_glass|default:'0' }}"
+                         data-bottle-cost="{{ p.cost_per_bottle|default:'0' }}"
+                         data-shot-cost="{{ p.cost_per_shot|default:'0' }}"
+                         data-glass-cost="{{ p.cost_per_glass|default:'0' }}"
+                         data-stock="{{ p.current_stock }}"
+                         data-in-stock="{{ p.is_in_stock|yesno:'true,false' }}"
                          data-category="{{ cat }}">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div class="flex-grow-1">
-                                <div class="fw-semibold">{{ p.name }}</div>
-                                <div class="small text-muted">
-                                    <span>Bottle: MK {{ p.price_per_bottle|floatformat:0 }}</span>
-                                    {% if p.has_shots and p.price_per_shot %}
-                                        <span class="ms-2">Shot: MK {{ p.price_per_shot|floatformat:0 }}</span>
-                                    {% endif %}
-                                </div>
-                            </div>
-                            {% if p.has_shots %}
-                            <div>
-                                <span class="badge-shots">
-                                    <i class="bi bi-stars"></i> Shots available
-                                </span>
-                            </div>
-                            {% endif %}
+                      <div class="pc-band"></div>
+                      <div class="pc-body">
+                        <div class="pc-name">{{ p.name }}</div>
+
+                        <!-- Stock line -->
+                        <div class="pc-stock">
+                          {% if p.has_shots %}
+                            <span style="color:#7c3aed"><i class="bi bi-lightning-fill"></i> {{ p.current_stock }} shot{{ p.current_stock|pluralize }}</span>
+                            {% if p.bb_display_text %}<span style="color:#94a3b8;font-size:.72rem;margin-left:4px">({{ p.bb_display_text }})</span>{% endif %}
+                          {% elif p.has_glasses %}
+                            <span style="color:#be185d"><i class="bi bi-cup-fill"></i> {{ p.current_stock }} glass{{ p.current_stock|pluralize:"es" }}</span>
+                            {% if p.bb_display_text %}<span style="color:#94a3b8;font-size:.72rem;margin-left:4px">({{ p.bb_display_text }})</span>{% endif %}
+                          {% else %}
+                            <span style="color:#475569"><i class="bi bi-box-seam"></i> {{ p.current_stock }} bottle{{ p.current_stock|pluralize }}</span>
+                          {% endif %}
                         </div>
-                    </div>
+
+                        <!-- Prices -->
+                        <div class="pc-prices">
+                          {% if p.price_per_bottle %}
+                          <div class="pc-price-item">
+                            <div class="pc-price-label">Bottle</div>
+                            <div class="pc-price-val">MK {{ p.price_per_bottle|floatformat:0 }}</div>
+                          </div>
+                          {% endif %}
+                          {% if p.has_shots and p.price_per_shot %}
+                          <div class="pc-price-item">
+                            <div class="pc-price-label">Shot</div>
+                            <div class="pc-price-val" style="color:#7c3aed">MK {{ p.price_per_shot|floatformat:0 }}</div>
+                          </div>
+                          {% endif %}
+                          {% if p.has_glasses and p.price_per_glass %}
+                          <div class="pc-price-item">
+                            <div class="pc-price-label">Glass</div>
+                            <div class="pc-price-val" style="color:#be185d">MK {{ p.price_per_glass|floatformat:0 }}</div>
+                          </div>
+                          {% endif %}
+                        </div>
+
+                        <!-- Status badges -->
+                        <div class="pc-badges">
+                          {% if not p.is_in_stock %}
+                            <span class="pc-badge pc-badge-out">✕ Out of Stock</span>
+                          {% elif p.is_low_stock %}
+                            <span class="pc-badge pc-badge-low">⚠ Low Stock</span>
+                          {% elif p.bb_has_open_bottle %}
+                            <span class="pc-badge pc-badge-open">🔓 Open Bottle</span>
+                          {% else %}
+                            <span class="pc-badge pc-badge-in">✓ In Stock</span>
+                          {% endif %}
+                          {% if p.has_shots %}<span class="pc-badge pc-badge-shot">🥃 Shots</span>{% endif %}
+                          {% if p.has_glasses %}<span class="pc-badge" style="background:#fdf4ff;color:#7c3aed">🍷 Glass</span>{% endif %}
+                        </div>
+
+                      </div>{# /.pc-body #}
+                    </div>{# /.product-row #}
                     {% endfor %}
                 </div>
             </div>
@@ -273,16 +402,23 @@
                     <input type="hidden" name="product_id" id="input-product-id">
                     <input type="hidden" name="mode" id="input-mode" value="bottle">
                     
-                    <!-- Shot/Bottle Toggle (for shot-enabled products) -->
+                    <!-- Bottle/Shot/Glass Toggle (enforced by category) -->
                     <div id="mode-toggle-container" class="mb-3 hidden">
                         <label class="form-label">Sell as:</label>
-                        <div class="btn-group w-100" role="group">
+                        <div class="btn-group w-100" role="group" id="mode-buttons">
+                            <!-- Bottle option (for beer, cider) -->
                             <input type="radio" class="btn-check" name="mode-radio" id="mode-bottle" value="bottle" checked>
-                            <label class="btn btn-outline-light" for="mode-bottle">Bottles</label>
+                            <label class="btn btn-outline-light" for="mode-bottle" id="label-bottle">Bottles</label>
                             
+                            <!-- Shot option (for spirits, whiskey) -->
                             <input type="radio" class="btn-check" name="mode-radio" id="mode-shot" value="shot">
-                            <label class="btn btn-outline-light" for="mode-shot">Shots</label>
+                            <label class="btn btn-outline-light" for="mode-shot" id="label-shot">Shots</label>
+                            
+                            <!-- Glass option (for wine) -->
+                            <input type="radio" class="btn-check" name="mode-radio" id="mode-glass" value="glass">
+                            <label class="btn btn-outline-light" for="mode-glass" id="label-glass">Glasses</label>
                         </div>
+                        <div class="form-text mt-2" id="unit-hint" style="font-size: 0.75rem; opacity: 0.8;"></div>
                     </div>
                     
                     <!-- Quantity -->
@@ -297,23 +433,145 @@
                                required>
                     </div>
                     
-                    <!-- Estimated Total -->
+                    <!-- Editable Unit Price -->
+                    <div class="mb-3">
+                        <label class="form-label small" id="price-label">Unit Price (MWK)</label>
+                        <div style="display:flex;align-items:center;gap:8px">
+                            <span style="font-size:1rem;opacity:.85">MK</span>
+                            <input type="number" 
+                                   class="form-control" 
+                                   name="unit_price" 
+                                   id="input-unit-price"
+                                   min="0"
+                                   step="1"
+                                   placeholder="Auto from product"
+                                   style="font-size:1.1rem;font-weight:600">
+                        </div>
+                        <div id="price-hint" class="form-text mt-1" style="font-size:.75rem;opacity:.8"></div>
+                    </div>
+
+                    <!-- Payment Type Cards -->
+                    <div class="mb-3">
+                        <label class="form-label">Payment Type</label>
+                        <input type="hidden" name="sale_type" id="input-sale-type" value="cash">
+                        <div id="payment-cards" style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+                            <button type="button" class="payment-type-card active" data-payment="cash"
+                                style="padding:12px 8px;border:2px solid rgba(255,255,255,.6);border-radius:12px;background:rgba(255,255,255,.25);color:#fff;font-weight:700;cursor:pointer;transition:all .2s;text-align:center">
+                                <div style="font-size:1.4rem">💵</div>
+                                <div style="font-size:.85rem;margin-top:2px">Cash</div>
+                            </button>
+                            <button type="button" class="payment-type-card" data-payment="mobile_money"
+                                style="padding:12px 8px;border:2px solid rgba(255,255,255,.3);border-radius:12px;background:rgba(255,255,255,.1);color:rgba(255,255,255,.8);font-weight:700;cursor:pointer;transition:all .2s;text-align:center">
+                                <div style="font-size:1.4rem">📱</div>
+                                <div style="font-size:.85rem;margin-top:2px">Mobile Money</div>
+                            </button>
+                            <button type="button" class="payment-type-card" data-payment="bank"
+                                style="padding:12px 8px;border:2px solid rgba(255,255,255,.3);border-radius:12px;background:rgba(255,255,255,.1);color:rgba(255,255,255,.8);font-weight:700;cursor:pointer;transition:all .2s;text-align:center">
+                                <div style="font-size:1.4rem">🏦</div>
+                                <div style="font-size:.85rem;margin-top:2px">Bank Transfer</div>
+                            </button>
+                            <button type="button" class="payment-type-card" data-payment="split"
+                                style="padding:12px 8px;border:2px solid rgba(255,255,255,.3);border-radius:12px;background:rgba(255,255,255,.1);color:rgba(255,255,255,.8);font-weight:700;cursor:pointer;transition:all .2s;text-align:center">
+                                <div style="font-size:1.4rem">✂️</div>
+                                <div style="font-size:.85rem;margin-top:2px">Split</div>
+                            </button>
+                            <button type="button" class="payment-type-card" data-payment="credit"
+                                style="padding:12px 8px;border:2px solid rgba(255,255,255,.3);border-radius:12px;background:rgba(255,255,255,.1);color:rgba(255,255,255,.8);font-weight:700;cursor:pointer;transition:all .2s;text-align:center;grid-column:1/-1">
+                                <div style="font-size:1.4rem">📋</div>
+                                <div style="font-size:.85rem;margin-top:2px">Credit Sale</div>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Split Payment inputs (only for split) -->
+                    <div id="payment-mix-container" class="mb-3 hidden">
+                        <div style="background:rgba(0,0,0,.15);border-radius:10px;padding:12px">
+                            <p class="mb-2 small" style="opacity:.9;font-weight:600">Split Payment Details</p>
+                            <div class="mb-2">
+                                <label class="form-label small">Cash (MWK)</label>
+                                <input type="number" 
+                                       class="form-control form-control-sm" 
+                                       name="cash_amount" 
+                                       id="input-cash-amount" 
+                                       min="0" step="1" value="0">
+                            </div>
+                            <div class="mb-2">
+                                <label class="form-label small">Bank Transfer (MWK)</label>
+                                <input type="number" 
+                                       class="form-control form-control-sm" 
+                                       name="bank_amount" 
+                                       id="input-bank-amount" 
+                                       min="0" step="1" value="0">
+                            </div>
+                            <div class="mb-2">
+                                <label class="form-label small">Mobile Money (MWK)</label>
+                                <input type="number" 
+                                       class="form-control form-control-sm" 
+                                       name="mobile_money_amount" 
+                                       id="input-mobile-money-amount" 
+                                       min="0" step="1" value="0">
+                            </div>
+                            <div style="background:rgba(255,255,255,.1);border-radius:8px;padding:8px 12px;font-size:.85rem">
+                                <div class="d-flex justify-content-between">
+                                    <span>Total Paid:</span>
+                                    <strong id="payment-mix-total">MK 0</strong>
+                                </div>
+                                <div class="d-flex justify-content-between mt-1">
+                                    <span>Remaining:</span>
+                                    <strong id="payment-mix-remaining">MK 0</strong>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="payment-mix-inputs" class="hidden"></div>
+                    
+                    <!-- Credit Customer Details (hidden by default) -->
+                    <div id="credit-details-container" class="mb-3 hidden">
+                        <label class="form-label">Customer Name *</label>
+                        <input type="text" 
+                               class="form-control mb-2" 
+                               name="customer_name" 
+                               id="input-customer-name" 
+                               placeholder="Full name">
+                        <label class="form-label">Phone Number (optional)</label>
+                        <input type="text" 
+                               class="form-control mb-2" 
+                               name="customer_phone" 
+                               id="input-customer-phone" 
+                               placeholder="+265...">
+                        <label class="form-label">Notes (optional)</label>
+                        <textarea class="form-control" 
+                                  name="notes" 
+                                  id="input-notes" 
+                                  rows="2" 
+                                  placeholder="Location, table number, etc."></textarea>
+                    </div>
+                    
+                    <!-- Estimated Total with Pricing Intelligence -->
                     <div class="mb-4">
                         <label class="form-label">Estimated Total</label>
                         <div style="font-size: 2rem; font-weight: 700;">
                             MK <span id="estimated-total">0</span>
                         </div>
+                        <div id="pricing-intelligence" class="mt-2" style="display: none;">
+                            <div class="alert py-2 px-3 mb-0" id="pricing-alert" style="border-radius: 8px; font-size: 0.875rem;">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <span id="pricing-text"></span>
+                                    <strong id="pricing-margin"></strong>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     
                     <!-- Action Buttons -->
-                    <button type="submit" class="btn btn-light btn-lg w-100 mb-2">
-                        <i class="bi bi-check-circle"></i> Mark as Sold
+                    <button type="submit" class="btn btn-light btn-lg w-100 mb-2" id="submit-btn">
+                        <i class="bi bi-check-circle"></i> <span id="submit-text">Mark as Sold</span>
                     </button>
                 </form>
             </div>
 
             <!-- Recent Sales -->
-            <div class="glass-card p-3 mt-4">
+            <div class="liquor-glass-card p-3 mt-4">
                 <h6 class="mb-3">Recent Sales</h6>
                 
                 {% if recent_sales %}
@@ -371,6 +629,12 @@
     const inputProductId = document.getElementById('input-product-id');
     const inputMode = document.getElementById('input-mode');
     const inputQuantity = document.getElementById('input-quantity');
+    const inputSaleType = document.getElementById('input-sale-type');
+    const inputUnitPrice = document.getElementById('input-unit-price');
+    const inputCustomerName = document.getElementById('input-customer-name');
+    const inputCashAmount = document.getElementById('input-cash-amount');
+    const inputBankAmount = document.getElementById('input-bank-amount');
+    const inputMobileMoneyAmount = document.getElementById('input-mobile-money-amount');
     
     // Display elements
     const confirmProductName = document.getElementById('confirm-product-name');
@@ -378,8 +642,62 @@
     const modeToggleContainer = document.getElementById('mode-toggle-container');
     const modeBottleRadio = document.getElementById('mode-bottle');
     const modeShotRadio = document.getElementById('mode-shot');
+    const modeGlassRadio = document.getElementById('mode-glass');
     const quantityLabel = document.getElementById('quantity-label');
     const estimatedTotal = document.getElementById('estimated-total');
+    const creditDetailsContainer = document.getElementById('credit-details-container');
+    const submitText = document.getElementById('submit-text');
+    const paymentMixContainer = document.getElementById('payment-mix-container');
+    const paymentMixInputs = document.getElementById('payment-mix-inputs');
+    const paymentMixTotal = document.getElementById('payment-mix-total');
+    const paymentMixRemaining = document.getElementById('payment-mix-remaining');
+    
+    // Payment card state
+    let selectedPayment = 'cash';
+    
+    // Payment card click handler
+    document.querySelectorAll('.payment-type-card').forEach(card => {
+        card.addEventListener('click', function() {
+            selectedPayment = this.dataset.payment;
+            
+            // Update card styles
+            document.querySelectorAll('.payment-type-card').forEach(c => {
+                c.style.border = '2px solid rgba(255,255,255,.3)';
+                c.style.background = 'rgba(255,255,255,.1)';
+                c.style.color = 'rgba(255,255,255,.8)';
+            });
+            this.style.border = '2px solid rgba(255,255,255,.9)';
+            this.style.background = 'rgba(255,255,255,.3)';
+            this.style.color = '#fff';
+            
+            // Update hidden input
+            if (selectedPayment === 'split') {
+                inputSaleType.value = 'cash';
+                paymentMixContainer.classList.remove('hidden');
+                creditDetailsContainer.classList.add('hidden');
+                submitText.textContent = 'Mark as Sold';
+            } else if (selectedPayment === 'credit') {
+                inputSaleType.value = 'credit';
+                paymentMixContainer.classList.add('hidden');
+                creditDetailsContainer.classList.remove('hidden');
+                submitText.textContent = 'Record Credit Sale';
+            } else {
+                inputSaleType.value = selectedPayment;
+                paymentMixContainer.classList.add('hidden');
+                creditDetailsContainer.classList.add('hidden');
+                submitText.textContent = 'Mark as Sold';
+                // Reset payment mix
+                if (inputCashAmount) inputCashAmount.value = '0';
+                if (inputBankAmount) inputBankAmount.value = '0';
+                if (inputMobileMoneyAmount) inputMobileMoneyAmount.value = '0';
+            }
+        });
+    });
+    
+    // Unit price input: recalculate total when changed
+    if (inputUnitPrice) {
+        inputUnitPrice.addEventListener('input', updateTotal);
+    }
     
     // State
     let currentProduct = null;
@@ -402,6 +720,16 @@
     // Step 2: Product row click
     productRows.forEach(row => {
         row.addEventListener('click', function() {
+            // Check if product is in stock
+            const inStock = this.dataset.inStock === 'true';
+            const stock = parseInt(this.dataset.stock || 0);
+            
+            if (!inStock || stock <= 0) {
+                // Show out of stock modal/alert
+                alert('❌ Out of stock! This product cannot be sold. Please scan in stock first.');
+                return;
+            }
+            
             // Remove previous selection
             productRows.forEach(r => r.classList.remove('selected'));
             this.classList.add('selected');
@@ -412,8 +740,14 @@
                 name: this.dataset.productName,
                 category: this.dataset.category,
                 hasShots: this.dataset.hasShots === 'true',
+                hasGlasses: this.dataset.hasGlasses === 'true',
                 bottlePrice: parseFloat(this.dataset.bottlePrice),
-                shotPrice: parseFloat(this.dataset.shotPrice || 0)
+                shotPrice: parseFloat(this.dataset.shotPrice || 0),
+                glassPrice: parseFloat(this.dataset.glassPrice || 0),
+                bottleCost: parseFloat(this.dataset.bottleCost || 0),
+                shotCost: parseFloat(this.dataset.shotCost || 0),
+                glassCost: parseFloat(this.dataset.glassCost || 0),
+                stock: stock
             };
             
             showConfirmCard();
@@ -427,7 +761,7 @@
     });
     
     // Mode toggle
-    if (modeBottleRadio && modeShotRadio) {
+    if (modeBottleRadio) {
         modeBottleRadio.addEventListener('change', function() {
             if (this.checked) {
                 inputMode.value = 'bottle';
@@ -435,7 +769,9 @@
                 updateTotal();
             }
         });
-        
+    }
+    
+    if (modeShotRadio) {
         modeShotRadio.addEventListener('change', function() {
             if (this.checked) {
                 inputMode.value = 'shot';
@@ -445,8 +781,87 @@
         });
     }
     
+    if (modeGlassRadio) {
+        modeGlassRadio.addEventListener('change', function() {
+            if (this.checked) {
+                inputMode.value = 'glass';
+                quantityLabel.textContent = 'Glasses';
+                updateTotal();
+            }
+        });
+    }
+    
     // Quantity change
     inputQuantity.addEventListener('input', updateTotal);
+    
+    // Sale type change
+    inputSaleType.addEventListener('change', function() {
+        if (this.value === 'credit') {
+            creditDetailsContainer.classList.remove('hidden');
+            paymentMixContainer.classList.add('hidden');
+            submitText.textContent = 'Record Credit Sale';
+        } else {
+            creditDetailsContainer.classList.add('hidden');
+            paymentMixContainer.classList.remove('hidden');
+            submitText.textContent = 'Mark as Sold';
+        }
+    });
+    
+    // Payment mix toggle
+    if (togglePaymentMixBtn) {
+        togglePaymentMixBtn.addEventListener('click', function() {
+            if (paymentMixInputs.classList.contains('hidden')) {
+                paymentMixInputs.classList.remove('hidden');
+                this.innerHTML = '<i class="bi bi-dash-circle"></i> Simple Payment';
+            } else {
+                paymentMixInputs.classList.add('hidden');
+                this.innerHTML = '<i class="bi bi-plus-circle"></i> Split Payment';
+                // Reset payment mix inputs
+                if (inputCashAmount) inputCashAmount.value = '0';
+                if (inputBankAmount) inputBankAmount.value = '0';
+                if (inputMobileMoneyAmount) inputMobileMoneyAmount.value = '0';
+                updatePaymentMix();
+            }
+        });
+    }
+    
+    // Payment mix input handlers
+    if (inputCashAmount) inputCashAmount.addEventListener('input', updatePaymentMix);
+    if (inputBankAmount) inputBankAmount.addEventListener('input', updatePaymentMix);
+    if (inputMobileMoneyAmount) inputMobileMoneyAmount.addEventListener('input', updatePaymentMix);
+    
+    // Form validation before submit
+    sellForm.addEventListener('submit', function(e) {
+        if (inputSaleType.value === 'credit') {
+            const customerName = inputCustomerName.value.trim();
+            if (!customerName) {
+                e.preventDefault();
+                alert('⚠️ Customer name is required for credit sales!');
+                inputCustomerName.focus();
+                return false;
+            }
+        } else {
+            // Validate payment mix if split payment is used
+            if (paymentMixInputs && !paymentMixInputs.classList.contains('hidden')) {
+                const cashAmt = parseFloat(inputCashAmount?.value || 0);
+                const bankAmt = parseFloat(inputBankAmount?.value || 0);
+                const mobileAmt = parseFloat(inputMobileMoneyAmount?.value || 0);
+                const totalPaid = cashAmt + bankAmt + mobileAmt;
+                const saleTotal = parseFloat(estimatedTotal?.textContent || 0);
+                
+                if (totalPaid === 0) {
+                    // If payment mix is shown but all zeros, that's ok - will default to cash
+                    return true;
+                }
+                
+                if (Math.abs(totalPaid - saleTotal) > 0.01) {
+                    e.preventDefault();
+                    alert(`❌ Payment mix total (MK ${totalPaid.toFixed(0)}) must equal sale total (MK ${saleTotal.toFixed(0)})`);
+                    return false;
+                }
+            }
+        }
+    });
     
     // Functions
     function showProductList(category) {
@@ -475,22 +890,111 @@
         confirmCategory.textContent = currentProduct.category.charAt(0).toUpperCase() + currentProduct.category.slice(1);
         inputProductId.value = currentProduct.id;
         
-        // Show/hide mode toggle
-        if (currentProduct.hasShots) {
-            modeToggleContainer.classList.remove('hidden');
-        } else {
+        // ENFORCE SERVING UNIT RULES BY CATEGORY
+        const category = currentProduct.category.toLowerCase();
+        let allowedMode = 'bottle'; // default
+        let unitHint = '';
+        
+        if (category === 'beer' || category === 'cider') {
+            // Beers and Ciders: bottles only
+            allowedMode = 'bottle';
+            unitHint = 'Beers and ciders must be sold by bottle';
             modeToggleContainer.classList.add('hidden');
-            inputMode.value = 'bottle';
-            quantityLabel.textContent = 'Bottles';
+        } else if (category === 'wine') {
+            // Wine: glasses only
+            allowedMode = 'glass';
+            unitHint = 'Wine must be sold by glass';
+            modeToggleContainer.classList.remove('hidden');
+            // Hide bottle and shot options, show only glass
+            if (modeBottleRadio) modeBottleRadio.parentElement.style.display = 'none';
+            if (modeShotRadio) modeShotRadio.parentElement.style.display = 'none';
+            if (modeGlassRadio) {
+                modeGlassRadio.parentElement.style.display = '';
+                modeGlassRadio.checked = true;
+            }
+        } else if (category === 'spirits' || category === 'whiskey') {
+            // Spirits and Whiskey: shots only
+            allowedMode = 'shot';
+            unitHint = 'Spirits and whiskey must be sold by shot';
+            modeToggleContainer.classList.remove('hidden');
+            // Hide bottle and glass options, show only shot
+            if (modeBottleRadio) modeBottleRadio.parentElement.style.display = 'none';
+            if (modeGlassRadio) modeGlassRadio.parentElement.style.display = 'none';
+            if (modeShotRadio) {
+                modeShotRadio.parentElement.style.display = '';
+                modeShotRadio.checked = true;
+            }
+        } else {
+            // Other categories: show all options if product supports them
+            const showModeToggle = currentProduct.hasShots || currentProduct.hasGlasses;
+            if (showModeToggle) {
+                modeToggleContainer.classList.remove('hidden');
+                // Show/hide specific mode buttons based on product capabilities
+                if (modeShotRadio) {
+                    modeShotRadio.parentElement.style.display = currentProduct.hasShots ? '' : 'none';
+                }
+                if (modeGlassRadio) {
+                    modeGlassRadio.parentElement.style.display = currentProduct.hasGlasses ? '' : 'none';
+                }
+                if (modeBottleRadio) modeBottleRadio.parentElement.style.display = '';
+            } else {
+                modeToggleContainer.classList.add('hidden');
+            }
         }
         
-        // Reset form
+        // Set unit hint
+        const unitHintEl = document.getElementById('unit-hint');
+        if (unitHintEl) {
+            unitHintEl.textContent = unitHint;
+        }
+        
+        // Reset form and set max quantity based on stock
         inputQuantity.value = 1;
-        if (modeBottleRadio) modeBottleRadio.checked = true;
-        inputMode.value = 'bottle';
-        quantityLabel.textContent = 'Bottles';
+        inputQuantity.max = currentProduct.stock;
+        inputMode.value = allowedMode;
+        
+        // Update quantity label based on mode
+        const unitLabel = allowedMode === 'shot' ? 'Shots' : (allowedMode === 'glass' ? 'Glasses' : 'Bottles');
+        quantityLabel.textContent = `${unitLabel} (max: ${currentProduct.stock})`;
+        
+        // Set editable unit price from product canonical price
+        let canonicalPrice = allowedMode === 'shot' ? currentProduct.shotPrice :
+                             (allowedMode === 'glass' ? currentProduct.glassPrice : currentProduct.bottlePrice);
+        if (inputUnitPrice) {
+            inputUnitPrice.value = canonicalPrice > 0 ? Math.round(canonicalPrice) : '';
+            const priceHint = document.getElementById('price-hint');
+            if (priceHint) {
+                priceHint.textContent = canonicalPrice > 0
+                    ? `Default: MK ${canonicalPrice.toLocaleString()} — override if needed`
+                    : 'No price set — enter price above';
+            }
+        }
+        
+        // Reset payment card to Cash
+        selectedPayment = 'cash';
+        document.querySelectorAll('.payment-type-card').forEach(c => {
+            c.style.border = '2px solid rgba(255,255,255,.3)';
+            c.style.background = 'rgba(255,255,255,.1)';
+            c.style.color = 'rgba(255,255,255,.8)';
+        });
+        const cashCard = document.querySelector('[data-payment="cash"]');
+        if (cashCard) {
+            cashCard.style.border = '2px solid rgba(255,255,255,.9)';
+            cashCard.style.background = 'rgba(255,255,255,.3)';
+            cashCard.style.color = '#fff';
+        }
+        inputSaleType.value = 'cash';
+        
+        // Reset payment mix
+        if (inputCashAmount) inputCashAmount.value = '0';
+        if (inputBankAmount) inputBankAmount.value = '0';
+        if (inputMobileMoneyAmount) inputMobileMoneyAmount.value = '0';
+        if (paymentMixContainer) paymentMixContainer.classList.add('hidden');
+        if (creditDetailsContainer) creditDetailsContainer.classList.add('hidden');
+        submitText.textContent = 'Mark as Sold';
         
         updateTotal();
+        updatePaymentMix();
         confirmCard.classList.remove('hidden');
     }
     
@@ -504,16 +1008,132 @@
         
         const quantity = parseInt(inputQuantity.value) || 1;
         const mode = inputMode.value;
-        const price = mode === 'shot' ? currentProduct.shotPrice : currentProduct.bottlePrice;
-        const total = quantity * price;
         
-        estimatedTotal.textContent = total.toFixed(0);
+        // Validate quantity against stock
+        const stockUnit = currentProduct.hasShots ? 'shots' : currentProduct.hasGlasses ? 'glasses' : 'bottles';
+        if (mode === 'bottle' && !currentProduct.hasShots && !currentProduct.hasGlasses && quantity > currentProduct.stock) {
+            inputQuantity.value = currentProduct.stock;
+            alert(`⚠️ Only ${currentProduct.stock} ${stockUnit} available in stock!`);
+        }
+        
+        // Get canonical price and cost based on mode
+        let canonicalPrice, cost;
+        if (mode === 'shot') {
+            canonicalPrice = currentProduct.shotPrice;
+            cost = currentProduct.shotCost;
+        } else if (mode === 'glass') {
+            canonicalPrice = currentProduct.glassPrice;
+            cost = currentProduct.glassCost;
+        } else {
+            canonicalPrice = currentProduct.bottlePrice;
+            cost = currentProduct.bottleCost;
+        }
+        
+        // Use editable price if provided, otherwise canonical price
+        let price = canonicalPrice;
+        if (inputUnitPrice && inputUnitPrice.value.trim() !== '') {
+            const overridePrice = parseFloat(inputUnitPrice.value);
+            if (!isNaN(overridePrice) && overridePrice > 0) {
+                price = overridePrice;
+            }
+        }
+        
+        const total = quantity * price;
+        const totalCost = quantity * cost;
+        estimatedTotal.textContent = Math.round(total).toLocaleString();
+        
+        // Update pricing intelligence
+        updatePricingIntelligence(price, cost, total, totalCost);
+        
+        // Update payment mix when total changes
+        updatePaymentMix();
     }
     
-    // Form submit (just ensure form submits normally)
-    sellForm.addEventListener('submit', function(e) {
-        // Let form submit naturally to POST endpoint
-    });
+    function updatePricingIntelligence(unitPrice, unitCost, total, totalCost) {
+        const pricingIntelligence = document.getElementById('pricing-intelligence');
+        const pricingAlert = document.getElementById('pricing-alert');
+        const pricingText = document.getElementById('pricing-text');
+        const pricingMargin = document.getElementById('pricing-margin');
+        
+        if (!pricingIntelligence || !unitCost || unitCost === 0) {
+            // Hide if no cost data
+            if (pricingIntelligence) pricingIntelligence.style.display = 'none';
+            return;
+        }
+        
+        const profit = total - totalCost;
+        const marginPercent = ((profit / total) * 100).toFixed(1);
+        
+        // Show pricing intelligence
+        pricingIntelligence.style.display = 'block';
+        
+        // Determine status and styling
+        if (unitPrice < unitCost) {
+            // Selling below cost - RED ALERT
+            pricingAlert.style.background = 'rgba(239, 68, 68, 0.1)';
+            pricingAlert.style.borderLeft = '3px solid #ef4444';
+            pricingAlert.style.color = '#991b1b';
+            pricingText.innerHTML = '<i class="bi bi-exclamation-triangle-fill me-1"></i> <strong>Below Cost!</strong> Loss per unit: MK ' + Math.abs(unitPrice - unitCost).toFixed(0);
+            pricingMargin.textContent = '-' + Math.abs(marginPercent) + '%';
+            pricingMargin.style.color = '#dc2626';
+        } else if (unitPrice === unitCost) {
+            // Break-even - YELLOW WARNING
+            pricingAlert.style.background = 'rgba(245, 158, 11, 0.1)';
+            pricingAlert.style.borderLeft = '3px solid #f59e0b';
+            pricingAlert.style.color = '#92400e';
+            pricingText.innerHTML = '<i class="bi bi-dash-circle me-1"></i> <strong>Break-even</strong> No profit on this sale';
+            pricingMargin.textContent = '0%';
+            pricingMargin.style.color = '#d97706';
+        } else {
+            // Above cost - GREEN SUCCESS
+            pricingAlert.style.background = 'rgba(34, 197, 94, 0.1)';
+            pricingAlert.style.borderLeft = '3px solid #22c55e';
+            pricingAlert.style.color = '#14532d';
+            pricingText.innerHTML = '<i class="bi bi-check-circle-fill me-1"></i> <strong>Profitable</strong> Profit: MK ' + profit.toFixed(0);
+            pricingMargin.textContent = '+' + marginPercent + '%';
+            pricingMargin.style.color = '#16a34a';
+        }
+    }
+    
+    function updatePaymentMix() {
+        if (!paymentMixTotal || !paymentMixRemaining) return;
+        
+        const cashAmt = parseFloat(inputCashAmount?.value || 0);
+        const bankAmt = parseFloat(inputBankAmount?.value || 0);
+        const mobileAmt = parseFloat(inputMobileMoneyAmount?.value || 0);
+        
+        const totalPaid = cashAmt + bankAmt + mobileAmt;
+        const saleTotal = parseFloat(estimatedTotal?.textContent || 0);
+        const remaining = saleTotal - totalPaid;
+        
+        paymentMixTotal.textContent = 'MK ' + totalPaid.toFixed(0);
+        paymentMixRemaining.textContent = 'MK ' + remaining.toFixed(0);
+        
+        // Change color based on remaining
+        if (remaining === 0 && totalPaid > 0) {
+            paymentMixRemaining.style.color = '#10b981';
+        } else if (remaining < 0) {
+            paymentMixRemaining.style.color = '#ef4444';
+        } else {
+            paymentMixRemaining.style.color = '#f59e0b';
+        }
+    }
+    
+    // Form submit (just ensure form submits naturally to POST endpoint)
+    sellForm.addEventListener('submit', function(e) {});
+})();
+
+// ── Premium Sound: play on successful sale (detected from Django messages) ──
+(function() {
+    {% for message in messages %}
+        {% if 'sold' in message.message|lower or 'sale' in message.message|lower %}
+        document.addEventListener('DOMContentLoaded', function() {
+            setTimeout(function() {
+                if (window.CCSounds) window.CCSounds.playSaleCompleteSound();
+            }, 150);
+        });
+        {% endif %}
+    {% endfor %}
 })();
 </script>
 {% endblock %}

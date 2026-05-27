@@ -1,7 +1,11 @@
 from __future__ import annotations
 
+from decimal import Decimal
 from django.contrib.auth.decorators import login_required
+from django.db.models import Sum, Count
+from django.shortcuts import render
 
+from tenants.models import Business
 from tenants.utils import require_business
 
 from inventory.authz import require_business_kind
@@ -9,6 +13,7 @@ from inventory.business_kinds import BusinessKind
 
 # Use the comprehensive pharmacy dashboard from views_pharmacy
 from inventory.views_pharmacy import pharmacy_dashboard
+from inventory.models_pharmacy import PharmacyBatch
 
 
 @login_required
@@ -18,3 +23,791 @@ def dashboard(request):
     """Pharmacy dashboard - delegates to views_pharmacy.pharmacy_dashboard"""
     return pharmacy_dashboard(request)
 
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.PHARMACY)
+def hub(request):
+    """
+    Pharmacy & Cosmetics Hub - Navigation center for the pharmacy vertical.
+    Shows tiles/cards for accessing key features: dashboard, stock-in, sell, batches, etc.
+    Enhanced with first-glance badge counts on each category card.
+    """
+    from django.utils import timezone
+    from datetime import timedelta
+    
+    business: Business = request.business
+    today = timezone.now().date()
+
+    # Get basic counts for display
+    batches = PharmacyBatch.objects.filter(business=business, is_archived=False).select_related("merch_product")
+
+    total_batches = batches.count()
+    total_stock_value = sum(b.stock_value_selling for b in batches)
+
+    # Products count
+    from inventory.models import MerchProduct
+
+    products_count = MerchProduct.objects.filter(business=business, kind="pharmacy", is_active=True).count()
+    
+    # ===== BADGE COUNTS FOR CARDS =====
+    # Near Expiry: batches expiring in next 30 days
+    near_expiry_count = batches.filter(
+        expiry_date__gte=today,
+        expiry_date__lte=today + timedelta(days=30)
+    ).count()
+    
+    # Expired Batches: batches that have already expired
+    expired_count = batches.filter(expiry_date__lt=today).count()
+    
+    # Low Stock: batches at or below reorder threshold (but not out of stock)
+    from django.db.models import F
+    low_stock_count = batches.filter(quantity__gt=0, quantity__lte=F("reorder_level")).count()
+    
+    # Active batches count (for "View Batches" card)
+    active_batches_count = total_batches
+    
+    # Sales History: last 30 days transaction count
+    thirty_days_ago = today - timedelta(days=30)
+    from inventory.models_pharmacy import PharmacySale
+    recent_sales_count = PharmacySale.objects.filter(
+        business=business,
+        sold_at__date__gte=thirty_days_ago,
+        sold_at__date__lte=today,
+        is_deleted=False,
+        is_reversed=False,
+    ).count()
+
+    ctx = {
+        "total_batches": total_batches,
+        "total_stock_value": total_stock_value,
+        "products_count": products_count,
+        # Badge counts for cards
+        "near_expiry_count": near_expiry_count,
+        "expired_count": expired_count,
+        "low_stock_count": low_stock_count,
+        "active_batches_count": active_batches_count,
+        "recent_sales_count": recent_sales_count,
+    }
+
+    return render(request, "verticals/pharmacy/hub.html", ctx)
+
+
+# ==============================================================================
+# SALES HISTORY, EXPORT, AND TREND API
+# ==============================================================================
+
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.PHARMACY)
+def sales_history(request):
+    """
+    Sales History page for pharmacy with filters, pagination, and export.
+    Shows all pharmacy sales with date range filtering and search.
+    """
+    from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+    from django.db.models import Q
+    from inventory.models_pharmacy import PharmacySale
+
+    business: Business = request.business
+
+    # Build base queryset
+    sales_qs = PharmacySale.objects.filter(business=business).select_related("batch", "batch__merch_product", "sold_by")
+
+    # Parse filter parameters
+    start_date = request.GET.get("start", "")
+    end_date = request.GET.get("end", "")
+    search_query = request.GET.get("q", "")
+    sale_id = request.GET.get("sale_id", "")
+
+    # Apply date filters
+    if start_date:
+        try:
+            from datetime import datetime
+
+            start_dt = datetime.strptime(start_date, "%Y-%m-%d").date()
+            sales_qs = sales_qs.filter(sold_at__date__gte=start_dt)
+        except ValueError:
+            pass
+
+    if end_date:
+        try:
+            from datetime import datetime
+
+            end_dt = datetime.strptime(end_date, "%Y-%m-%d").date()
+            sales_qs = sales_qs.filter(sold_at__date__lte=end_dt)
+        except ValueError:
+            pass
+
+    # Apply search filter (product name, batch number, customer name, cashier)
+    if search_query:
+        sales_qs = sales_qs.filter(
+            Q(batch__merch_product__name__icontains=search_query)
+            | Q(batch__batch_number__icontains=search_query)
+            | Q(customer_name__icontains=search_query)
+            | Q(customer_phone__icontains=search_query)
+            | Q(prescription_number__icontains=search_query)
+            | Q(sold_by__username__icontains=search_query)
+        )
+
+    # Highlight specific sale if sale_id provided
+    highlighted_sale_id = None
+    if sale_id:
+        try:
+            highlighted_sale_id = int(sale_id)
+            if not sales_qs.filter(id=highlighted_sale_id).exists():
+                highlighted_sale_id = None
+        except ValueError:
+            pass
+
+    # Order by most recent first
+    sales_qs = sales_qs.order_by("-sold_at")
+
+    # Pagination
+    page = request.GET.get("page", 1)
+    paginator = Paginator(sales_qs, 50)  # 50 sales per page
+
+    try:
+        sales_page = paginator.page(page)
+    except PageNotAnInteger:
+        sales_page = paginator.page(1)
+    except EmptyPage:
+        sales_page = paginator.page(paginator.num_pages)
+
+    # Summary stats for filtered results
+    summary = sales_qs.aggregate(
+        total_revenue=Sum("total_amount"),
+        total_cost=Sum("unit_cost") * Sum("quantity"),  # Approximate
+        total_sales=Count("id"),
+        total_items=Sum("quantity"),
+    )
+
+    # Determine manager status for template permission gates
+    is_manager = request.user.is_staff or request.user.is_superuser
+    if not is_manager:
+        try:
+            from tenants.models import Membership as _Membership
+            is_manager = _Membership.objects.filter(
+                business=business,
+                user=request.user,
+                role__in=["manager", "owner", "MANAGER", "OWNER"],
+                status__in=["active", "ACTIVE"],
+            ).exists()
+        except Exception:
+            pass
+
+    ctx = {
+        "business": business,
+        "sales": sales_page,
+        "start_date": start_date,
+        "end_date": end_date,
+        "search_query": search_query,
+        "highlighted_sale_id": highlighted_sale_id,
+        "summary": summary,
+        "page_title": "Sales History",
+        "IS_MANAGER": is_manager,
+    }
+
+    return render(request, "verticals/pharmacy/sales_history.html", ctx)
+
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.PHARMACY)
+def sales_export_csv(request):
+    """
+    Export filtered pharmacy sales to CSV.
+    Respects all the same filters as sales_history view.
+    """
+    import csv
+    from django.http import HttpResponse
+    from django.db.models import Q
+    from inventory.models_pharmacy import PharmacySale
+    from django.utils import timezone
+
+    business: Business = request.business
+
+    # Build queryset with same filters as sales_history
+    sales_qs = PharmacySale.objects.filter(business=business).select_related("batch", "batch__merch_product", "sold_by")
+
+    # Apply filters
+    start_date = request.GET.get("start", "")
+    end_date = request.GET.get("end", "")
+    search_query = request.GET.get("q", "")
+
+    if start_date:
+        try:
+            from datetime import datetime
+
+            start_dt = datetime.strptime(start_date, "%Y-%m-%d").date()
+            sales_qs = sales_qs.filter(sold_at__date__gte=start_dt)
+        except ValueError:
+            pass
+
+    if end_date:
+        try:
+            from datetime import datetime
+
+            end_dt = datetime.strptime(end_date, "%Y-%m-%d").date()
+            sales_qs = sales_qs.filter(sold_at__date__lte=end_dt)
+        except ValueError:
+            pass
+
+    if search_query:
+        sales_qs = sales_qs.filter(
+            Q(batch__merch_product__name__icontains=search_query)
+            | Q(batch__batch_number__icontains=search_query)
+            | Q(customer_name__icontains=search_query)
+            | Q(sold_by__username__icontains=search_query)
+        )
+
+    sales_qs = sales_qs.order_by("-sold_at")
+
+    # Create CSV response
+    response = HttpResponse(content_type="text/csv")
+    response[
+        "Content-Disposition"
+    ] = f'attachment; filename="pharmacy_sales_{timezone.now().strftime("%Y%m%d_%H%M")}.csv"'
+
+    writer = csv.writer(response)
+
+    # Write header
+    writer.writerow(
+        [
+            "Timestamp",
+            "Date",
+            "Time",
+            "Sale ID",
+            "Item",
+            "Batch Number",
+            "Expiry Date",
+            "Qty",
+            "Unit Price",
+            "Total",
+            "Payment Method",
+            "Customer Name",
+            "Customer Phone",
+            "Prescription",
+            "Cashier",
+        ]
+    )
+
+    # Write data rows
+    for sale in sales_qs:
+        batch = sale.batch
+        product = batch.merch_product if batch else None
+        local_timestamp = timezone.localtime(sale.sold_at)
+
+        writer.writerow(
+            [
+                local_timestamp.strftime("%Y-%m-%d %H:%M:%S"),
+                local_timestamp.strftime("%Y-%m-%d"),
+                local_timestamp.strftime("%H:%M:%S"),
+                sale.id,
+                product.name if product else "",
+                batch.batch_number if batch else "",
+                batch.expiry_date.strftime("%Y-%m-%d") if batch and batch.expiry_date else "",
+                sale.quantity,
+                f"{sale.unit_price:.2f}",
+                f"{sale.total_amount:.2f}",
+                sale.get_payment_method_display()
+                if hasattr(sale, "get_payment_method_display")
+                else sale.payment_method,
+                sale.customer_name or "",
+                sale.customer_phone or "",
+                sale.prescription_number or "",
+                sale.sold_by.username if sale.sold_by else "System",
+            ]
+        )
+
+    return response
+
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.PHARMACY)
+def fast_sell(request):
+    """
+    Fast Sell page for pharmacy - barcode scanner + instant sell.
+    Uses front camera for barcode scanning with BarcodeDetector API fallback.
+    Includes barcode datalist prefill for auto-complete.
+    """
+    from django.http import JsonResponse
+    from inventory.utils_scope import get_visible_actor
+    from django.db.models import Q
+
+    business: Business = request.business
+
+    # Get role flags for template
+    is_manager, is_agent, actor_user = get_visible_actor(request)
+    
+    # Get all products with barcodes for datalist prefill (like Clothing)
+    products_with_barcodes = []
+    
+    # Get batches with barcodes (batch-level barcodes)
+    batches_with_barcodes = (
+        PharmacyBatch.objects.filter(
+            business=business,
+            is_archived=False,
+            quantity__gt=0
+        )
+        .exclude(Q(barcode="") | Q(barcode__isnull=True))
+        .select_related("merch_product")
+        .order_by("merch_product__name", "expiry_date")[:100]  # Limit to 100 for performance
+    )
+    
+    for batch in batches_with_barcodes:
+        products_with_barcodes.append({
+            "barcode": batch.barcode,
+            "name": f"{batch.merch_product.name} (Batch: {batch.batch_number or 'N/A'})",
+        })
+
+    ctx = {
+        "business": business,
+        "page_title": "Fast Sell",
+        "vertical": "pharmacy",
+        "vertical_name": "Pharmacy",
+        "IS_MANAGER": is_manager,
+        "IS_AGENT": is_agent,
+        "products_with_barcodes": products_with_barcodes,  # NEW: For datalist prefill
+        "body_class": "pharmacy-fast-sell",  # NEW: Scoped body class to override any modal CSS
+    }
+
+    return render(request, "verticals/pharmacy/fast_sell.html", ctx)
+
+
+# Fast Sell API endpoints
+@login_required
+@require_business
+@require_business_kind(BusinessKind.PHARMACY)
+def fast_sell_lookup_api(request):
+    """API: Look up product/batch by barcode"""
+    from django.http import JsonResponse
+    from inventory.services.fast_sell import lookup_product_by_barcode
+
+    business: Business = request.business
+    barcode = request.GET.get("barcode", "").strip()
+
+    if not barcode:
+        return JsonResponse({"ok": False, "error": "Barcode required"}, status=400)
+
+    result = lookup_product_by_barcode(business=business, vertical="pharmacy", barcode=barcode)
+
+    return JsonResponse(result)
+
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.PHARMACY)
+def pharmacy_product_by_barcode(request):
+    """
+    API: Look up pharmacy product/batch by barcode for Fast Sell.
+    Similar to Clothing's barcode lookup - returns product details for auto-selection.
+    
+    GET /pharmacy/api/product-by-barcode/?barcode=XXXX
+    
+    Returns:
+        - ok: bool
+        - product: dict with id, name, barcode, sale_price, stock_qty
+        - error: str (if not found)
+    """
+    from django.http import JsonResponse
+    
+    business: Business = request.business
+    barcode = (request.GET.get("barcode") or "").strip()
+    
+    if not barcode:
+        return JsonResponse({"ok": False, "error": "missing_barcode"}, status=400)
+    
+    try:
+        # Try batch barcode first (most specific)
+        batch = (
+            PharmacyBatch.objects.filter(
+                business=business,
+                is_archived=False,
+                barcode=barcode,
+                quantity__gt=0
+            )
+            .select_related("merch_product")
+            .order_by("expiry_date")
+            .first()
+        )
+        
+        # Fall back to product barcode if batch not found
+        if not batch:
+            batch = (
+                PharmacyBatch.objects.filter(
+                    business=business,
+                    is_archived=False,
+                    merch_product__barcode=barcode,
+                    quantity__gt=0
+                )
+                .select_related("merch_product")
+                .order_by("expiry_date")
+                .first()
+            )
+        
+        if not batch:
+            return JsonResponse({"ok": False, "error": "not_found"}, status=404)
+        
+        product = batch.merch_product
+        
+        return JsonResponse({
+            "ok": True,
+            "product": {
+                "id": product.id,
+                "name": product.name,
+                "barcode": barcode,
+                "sale_price": str(batch.selling_price),
+                "stock_qty": batch.quantity,
+                "batch_id": batch.id,
+                "batch_number": batch.batch_number or "",
+                "expiry_date": batch.expiry_date.isoformat() if batch.expiry_date else None,
+            }
+        })
+        
+    except Exception as e:
+        return JsonResponse({"ok": False, "error": str(e)}, status=500)
+
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.PHARMACY)
+def fast_sell_create_api(request):
+    """API: Create a fast sale"""
+    from django.http import JsonResponse
+    from inventory.services.fast_sell import create_fast_sell
+    import json
+
+    if request.method != "POST":
+        return JsonResponse({"ok": False, "error": "POST required"}, status=405)
+
+    business: Business = request.business
+
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({"ok": False, "error": "Invalid JSON"}, status=400)
+
+    barcode = data.get("barcode", "").strip()
+    quantity = int(data.get("quantity", 1))
+    payment_method = data.get("payment_method", "cash")
+    selling_price_str = data.get("selling_price")
+
+    selling_price = None
+    if selling_price_str:
+        try:
+            from decimal import Decimal
+
+            selling_price = Decimal(str(selling_price_str))
+        except:
+            return JsonResponse({"ok": False, "error": "Invalid price"}, status=400)
+
+    result = create_fast_sell(
+        business=business,
+        vertical="pharmacy",
+        user=request.user,
+        barcode=barcode,
+        quantity=quantity,
+        payment_method=payment_method,
+        selling_price=selling_price,
+    )
+
+    return JsonResponse(result)
+
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.PHARMACY)
+def fast_sell_kpis_api(request):
+    """API: Get Fast Sell KPIs"""
+    from django.http import JsonResponse
+    from inventory.services.fast_sell import get_fast_sell_kpis
+
+    business: Business = request.business
+    date_range = request.GET.get("range", "today")
+
+    result = get_fast_sell_kpis(
+        business=business,
+        vertical="pharmacy",
+        date_range=date_range,
+    )
+
+    return JsonResponse(result)
+
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.PHARMACY)
+def sales_trend_json(request):
+    """
+    JSON endpoint for pharmacy sales trend data (PREMIUM FILTERS).
+    Returns both REVENUE and UNITS suitable for Chart.js with toggle.
+    Supports: today, 7d, 30d, this_month, last_month, this_year, custom + product filtering.
+    Automatically aggregates by day/week/month based on date range.
+    """
+    from django.http import JsonResponse
+    from datetime import timedelta, datetime
+    from dateutil.relativedelta import relativedelta
+    from django.db.models import Sum
+    from django.db.models.functions import TruncDate, TruncWeek, TruncMonth, Coalesce
+    from inventory.models_pharmacy import PharmacySale
+    from inventory.models import MerchProduct
+
+    business: Business = request.business
+
+    # Parse date range from request
+    range_param = request.GET.get("range", "30d")
+    from django.utils import timezone as django_tz
+
+    today = django_tz.localtime(django_tz.now()).date()  # Use local timezone date to avoid UTC cutoff
+
+    if range_param == "today":
+        start_date = end_date = today
+    elif range_param == "7d":
+        start_date = today - timedelta(days=6)
+        end_date = today
+    elif range_param == "30d":
+        start_date = today - timedelta(days=29)
+        end_date = today
+    elif range_param == "this_month":
+        start_date = today.replace(day=1)
+        end_date = today
+    elif range_param == "last_month":
+        first_of_this_month = today.replace(day=1)
+        first_of_last_month = first_of_this_month - relativedelta(months=1)
+        last_day_of_last_month = first_of_this_month - timedelta(days=1)
+        start_date = first_of_last_month
+        end_date = last_day_of_last_month
+    elif range_param == "this_year":
+        start_date = today.replace(month=1, day=1)
+        end_date = today
+    elif range_param == "custom":
+        start_str = request.GET.get("start", "")
+        end_str = request.GET.get("end", "")
+        try:
+            start_date = datetime.strptime(start_str, "%Y-%m-%d").date()
+            end_date = datetime.strptime(end_str, "%Y-%m-%d").date()
+        except (ValueError, TypeError):
+            # Fallback to 30d
+            start_date = today - timedelta(days=29)
+            end_date = today
+            range_param = "30d"
+    elif range_param == "mtd":
+        # Legacy support
+        start_date = today.replace(day=1)
+        end_date = today
+        range_param = "this_month"
+    else:
+        # Default to 30d
+        start_date = today - timedelta(days=29)
+        end_date = today
+        range_param = "30d"
+
+    # Calculate date range span
+    date_span_days = (end_date - start_date).days + 1
+
+    # Determine aggregation level (daily, weekly, or monthly buckets)
+    if date_span_days <= 60:
+        trunc_func = TruncDate
+        date_format = "%b %d"
+        bucket_type = "daily"
+    elif date_span_days <= 365:
+        trunc_func = TruncWeek
+        date_format = "W%U"
+        bucket_type = "weekly"
+    else:
+        trunc_func = TruncMonth
+        date_format = "%b %Y"
+        bucket_type = "monthly"
+
+    # Build sales queryset (exclude deleted/reversed sales)
+    sales_qs = PharmacySale.objects.filter(
+        business=business,
+        sold_at__date__gte=start_date,
+        sold_at__date__lte=end_date,
+        is_deleted=False,
+        is_reversed=False,
+    )
+
+    # Apply product filter if specified (premium feature)
+    product_id = request.GET.get("product_id", "")
+    if product_id:
+        try:
+            product_id = int(product_id)
+            # Verify product exists
+            if MerchProduct.objects.filter(id=product_id, business=business, kind="pharmacy").exists():
+                sales_qs = sales_qs.filter(batch__merch_product__id=product_id)
+        except (ValueError, TypeError):
+            pass
+
+    # Aggregate by date bucket
+    from django.db import models
+    
+    aggregated_sales = (
+        sales_qs.annotate(date_bucket=trunc_func("sold_at"))
+        .values("date_bucket")
+        .annotate(
+            revenue=Coalesce(Sum("total_amount"), Decimal("0.00"), output_field=models.DecimalField(max_digits=14, decimal_places=2)),
+            units=Coalesce(Sum("quantity"), 0, output_field=models.IntegerField())
+        )
+        .order_by("date_bucket")
+    )
+
+    # Build lookup dictionary
+    sales_by_bucket = {}
+    for item in aggregated_sales:
+        date_bucket = item["date_bucket"]
+        if date_bucket:
+            # For TruncDate, date_bucket is a date object
+            # For TruncWeek/TruncMonth, it's a datetime object
+            if hasattr(date_bucket, 'date'):
+                key = date_bucket.date().isoformat()
+            else:
+                key = date_bucket.isoformat()
+            sales_by_bucket[key] = {
+                "revenue": float(item["revenue"]),
+                "units": int(item["units"])
+            }
+
+    # Generate complete date series (fill missing buckets with zeros)
+    labels = []
+    revenue_values = []
+    units_sold_values = []
+
+    if bucket_type == "daily":
+        current_date = start_date
+        while current_date <= end_date:
+            date_key = current_date.isoformat()
+            data = sales_by_bucket.get(date_key, {"revenue": 0.0, "units": 0})
+            
+            labels.append(current_date.strftime(date_format))
+            revenue_values.append(data["revenue"])
+            units_sold_values.append(data["units"])
+            
+            current_date += timedelta(days=1)
+    elif bucket_type == "weekly":
+        # Weekly aggregation: group by week start (Monday)
+        current_date = start_date
+        while current_date <= end_date:
+            # Find Monday of this week
+            week_start = current_date - timedelta(days=current_date.weekday())
+            date_key = week_start.isoformat()
+            data = sales_by_bucket.get(date_key, {"revenue": 0.0, "units": 0})
+            
+            labels.append(f"Week {current_date.strftime('%U')}")
+            revenue_values.append(data["revenue"])
+            units_sold_values.append(data["units"])
+            
+            current_date += timedelta(days=7)
+    else:  # monthly
+        current_date = start_date.replace(day=1)
+        while current_date <= end_date:
+            date_key = current_date.isoformat()
+            data = sales_by_bucket.get(date_key, {"revenue": 0.0, "units": 0})
+            
+            labels.append(current_date.strftime(date_format))
+            revenue_values.append(data["revenue"])
+            units_sold_values.append(data["units"])
+            
+            current_date = (current_date + relativedelta(months=1)).replace(day=1)
+
+    # Check if there's actual data
+    has_data = any(r > 0 for r in revenue_values) or any(u > 0 for u in units_sold_values)
+
+    # Return with explicit units_sold key (count is legacy alias)
+    return JsonResponse(
+        {
+            "labels": labels,
+            "revenue": revenue_values,
+            "units": units_sold_values,
+            "units_sold": units_sold_values,  # Alias for clarity
+            "count": units_sold_values,  # Legacy alias for backward compatibility
+            "has_data": has_data,
+            "bucket_type": bucket_type,
+            "period": range_param,
+            "start_date": start_date.isoformat(),
+            "end_date": end_date.isoformat(),
+            "date_span_days": date_span_days,
+            "timestamp": django_tz.now().isoformat(),
+        }
+    )
+
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.PHARMACY)
+def rollback_sale(request, sale_id):
+    """
+    Rollback/cancel a pharmacy sale and restore batch inventory.
+    Manager-only feature for correcting mistakes.
+    """
+    from django.http import JsonResponse
+    from django.contrib import messages
+    from django.shortcuts import redirect
+    from django.db import transaction
+    from inventory.models_pharmacy import PharmacySale
+    from inventory.utils_scope import get_visible_actor
+
+    business: Business = request.business
+
+    # Check if user is manager
+    is_manager, is_agent, actor_user = get_visible_actor(request)
+    if not is_manager:
+        if request.method == "POST":
+            return JsonResponse({"ok": False, "error": "Only managers can rollback sales"}, status=403)
+        messages.error(request, "Only managers can rollback sales")
+        return redirect("verticals:pharmacy_sales_history")
+
+    # Get the sale
+    try:
+        sale = PharmacySale.objects.get(id=sale_id, business=business)
+    except PharmacySale.DoesNotExist:
+        if request.method == "POST":
+            return JsonResponse({"ok": False, "error": "Sale not found"}, status=404)
+        messages.error(request, "Sale not found")
+        return redirect("verticals:pharmacy_sales_history")
+
+    # Check if already deleted
+    if sale.is_deleted:
+        if request.method == "POST":
+            return JsonResponse({"ok": False, "error": "Sale already cancelled"}, status=400)
+        messages.error(request, "Sale already cancelled")
+        return redirect("verticals:pharmacy_sales_history")
+
+    if request.method == "POST":
+        with transaction.atomic():
+            # Restore batch inventory
+            batch = sale.batch
+            batch.quantity += sale.quantity
+            if batch.is_archived:
+                batch.is_archived = False
+            batch.save(update_fields=["quantity", "is_archived", "updated_at"])
+
+            # Sync MerchProduct.quantity_in_stock
+            from django.db.models import Sum as _Sum
+            from inventory.models import MerchProduct as _MP
+            from inventory.models_pharmacy import PharmacyBatch as _PB
+            new_total = (
+                _PB.objects.filter(
+                    business=batch.business,
+                    merch_product=batch.merch_product,
+                    is_archived=False,
+                ).aggregate(t=_Sum("quantity"))["t"] or 0
+            )
+            _MP.objects.filter(pk=batch.merch_product_id).update(quantity_in_stock=new_total)
+
+            # Mark sale as deleted
+            sale.is_deleted = True
+            sale.deleted_at = timezone.now()
+            sale.deleted_by = request.user
+            sale.save(update_fields=["is_deleted", "deleted_at", "deleted_by"])
+
+        return JsonResponse(
+            {"ok": True, "message": f"Sale #{sale_id} rolled back successfully. Batch inventory restored."}
+        )
+
+    # GET request: show confirmation
+    messages.error(request, "Invalid request method")
+    return redirect("verticals:pharmacy_sales_history")

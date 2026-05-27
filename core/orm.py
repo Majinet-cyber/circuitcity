@@ -167,5 +167,3 @@ def save_update_fields(
         except Exception:
             # swallowâ€”the caller should handle/log if needed
             pass
-
-

@@ -1,0 +1,22 @@
+{{ business.name }} — Daily Summary
+{{ report_date|date:"l, N j, Y" }}
+================================================================================
+
+SALES OVERVIEW
+--------------
+Total Sales Today :  {{ total_sales }}
+Total Revenue     :  {{ currency }} {{ total_revenue|floatformat:0 }}
+Total Profit      :  {{ currency }} {{ total_profit|floatformat:0 }}
+Total COGS        :  {{ currency }} {{ total_cogs|floatformat:0 }}
+
+HIGHLIGHTS
+----------
+{% if top_product %}Top Product       :  {{ top_product }}
+{% endif %}{% if top_category %}Top Category      :  {{ top_category }}
+{% endif %}{% if biggest_sale_amount %}Biggest Sale      :  {{ currency }} {{ biggest_sale_amount|floatformat:0 }}{% if biggest_sale_ref %} ({{ biggest_sale_ref }}){% endif %}
+{% endif %}
+{% if low_stock_alerts > 0 %}⚠️  LOW STOCK ALERT: {{ low_stock_alerts }} item{{ low_stock_alerts|pluralize }} out of stock.
+{% endif %}
+--------------------------------------------------------------------------------
+This summary was generated automatically for {{ business.name }}.
+To disable, ask your manager to turn off Daily Summary in Settings.

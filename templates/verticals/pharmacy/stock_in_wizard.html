@@ -1,0 +1,729 @@
+{% extends "base.html" %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}Add Product · Emajinet{% endblock %}
+
+{% block extra_css %}
+<style>
+  /* Wizard Container */
+  .wizard-container{max-width:900px;margin:32px auto;padding:20px}
+  .wizard-header{background:linear-gradient(135deg,#10b981,#3b82f6);padding:32px;border-radius:24px;color:#fff;text-align:center;margin-bottom:32px}
+  .wizard-header h1{margin:0;font-size:clamp(24px,4vw,36px);font-weight:800}
+  .wizard-header p{margin:12px 0 0;opacity:.95;font-size:1.1rem}
+  
+  /* Progress Stepper */
+  .progress-stepper{display:flex;justify-content:center;align-items:center;gap:12px;margin-bottom:32px;padding:0 16px}
+  .progress-step{flex:1;max-width:80px;text-align:center}
+  .progress-step-circle{width:40px;height:40px;border-radius:50%;background:#e2e8f0;display:flex;align-items:center;justify-content:center;margin:0 auto 6px;font-weight:700;color:#64748b;transition:all .3s}
+  .progress-step.active .progress-step-circle{background:linear-gradient(135deg,#10b981,#059669);color:#fff;box-shadow:0 4px 12px rgba(16,185,129,.4)}
+  .progress-step.completed .progress-step-circle{background:#10b981;color:#fff}
+  .progress-step.completed:hover .progress-step-circle{background:#059669;transform:scale(1.1)}
+  .progress-step-label{font-size:.75rem;color:#64748b;font-weight:600}
+  .progress-step.active .progress-step-label{color:#10b981}
+  .progress-step.completed{transition:all 0.2s}
+  .progress-step.completed:hover{transform:translateY(-2px)}
+  .progress-divider{flex:0 0 40px;height:2px;background:#e2e8f0;margin-bottom:24px}
+  
+  /* Card Grid */
+  .wizard-panel{background:#fff;border-radius:24px;padding:32px;box-shadow:0 10px 40px rgba(15,23,42,.08);margin-bottom:24px}
+  .wizard-section-title{font-size:1.4rem;font-weight:800;color:#0f172a;margin:0 0 20px;display:flex;align-items:center;gap:10px}
+  .wizard-section-title .icon{font-size:1.6rem}
+  
+  .card-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:16px;margin-bottom:24px}
+  .option-card{background:#fff;border:3px solid #e2e8f0;border-radius:16px;padding:20px 16px;cursor:pointer;transition:all .2s;text-align:center;display:flex;flex-direction:column;align-items:center;gap:8px;position:relative;min-height:120px}
+  .option-card:hover{border-color:#cbd5e1;transform:translateY(-3px);box-shadow:0 8px 24px rgba(15,23,42,.12)}
+  .option-card.selected{border-color:#10b981;background:linear-gradient(135deg,#f0fdf4,#dcfce7);box-shadow:0 6px 20px rgba(16,185,129,.2)}
+  .option-card .card-icon{font-size:2.8rem;margin-bottom:4px;flex-shrink:0}
+  .option-card .card-label{font-size:.95rem;font-weight:700;color:#0f172a;line-height:1.3;word-wrap:break-word;overflow-wrap:break-word;hyphens:auto;max-width:100%;display:-webkit-box;-webkit-line-clamp:3;line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;text-overflow:ellipsis}
+  .option-card.selected::after{content:"✓";position:absolute;top:8px;right:8px;background:#10b981;color:#fff;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.9rem;font-weight:800}
+  
+  /* Premium category cards (text-only, subtle colors, with counts) */
+  .premium-category-card{backdrop-filter:blur(8px);border:2px solid rgba(148,163,184,0.3)}
+  .premium-category-card:hover{transform:translateY(-4px);box-shadow:0 12px 32px rgba(15,23,42,0.15)}
+  .premium-category-card.selected{border-color:#10b981 !important;background:linear-gradient(135deg,#f0fdf4,#dcfce7) !important}
+  .product-count-badge{display:inline-block;padding:4px 10px;border-radius:8px;background:rgba(15,23,42,0.08);color:#475569;font-size:0.8rem;font-weight:600;margin-top:4px}
+  
+  /* Premium mode cards (Step 0) */
+  .mode-card{background:linear-gradient(135deg,rgba(255,255,255,0.9),rgba(248,250,252,0.95));backdrop-filter:blur(10px);border:2px solid rgba(148,163,184,0.2);box-shadow:0 4px 16px rgba(15,23,42,0.08)}
+  .mode-card:hover{border-color:rgba(148,163,184,0.4);transform:translateY(-4px);box-shadow:0 12px 32px rgba(15,23,42,0.15)}
+  .mode-card.selected{background:linear-gradient(135deg,#f0fdf4,#dcfce7);border-color:#10b981;box-shadow:0 8px 28px rgba(16,185,129,0.25)}
+  
+  /* Back to start button */
+  .btn-back-to-start:hover{background:#e2e8f0 !important;transform:translateY(-1px)}
+  
+  /* Form Fields */
+  .form-group{margin-bottom:20px}
+  .form-group label{display:block;font-weight:700;color:#0f172a;margin-bottom:8px;font-size:.95rem}
+  .form-group label .required{color:#dc2626}
+  .form-group input,.form-group select,.form-group textarea{width:100%;padding:12px 16px;border:2px solid #e2e8f0;border-radius:12px;font-size:1rem;transition:border-color .2s}
+  .form-group input:focus,.form-group select:focus,.form-group textarea:focus{outline:none;border-color:#10b981}
+  .form-group small{display:block;margin-top:6px;color:#64748b;font-size:.85rem}
+  
+  .form-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px}
+  
+  /* Action Buttons */
+  .wizard-actions{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:32px;padding-top:24px;border-top:2px solid #f1f5f9}
+  .btn-wizard{padding:14px 28px;border-radius:999px;font-weight:700;font-size:1rem;cursor:pointer;transition:all .2s;border:none;display:inline-flex;align-items:center;gap:8px}
+  .btn-back{background:#f1f5f9;color:#475569}
+  .btn-back:hover{background:#e2e8f0}
+  .btn-next{background:linear-gradient(135deg,#10b981,#059669);color:#fff;box-shadow:0 4px 12px rgba(16,185,129,.3)}
+  .btn-next:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(16,185,129,.4)}
+  .btn-next:disabled{opacity:.5;cursor:not-allowed}
+  
+  /* Success Celebration */
+  .success-celebration{background:linear-gradient(135deg,#dcfce7,#d1fae5);border:3px solid #10b981;border-radius:24px;padding:40px;text-align:center;margin-bottom:32px;animation:slideDown .6s ease}
+  .success-celebration .icon{font-size:5rem;margin-bottom:16px}
+  .success-celebration h2{color:#065f46;margin:0 0 12px;font-size:2rem;font-weight:800}
+  .success-celebration p{color:#047857;margin:0 0 24px;font-size:1.15rem}
+  .success-actions{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+  .success-actions a{border-radius:999px;padding:14px 28px;font-weight:700;text-decoration:none;transition:transform .2s}
+  .success-actions .primary{background:#10b981;color:#fff}
+  .success-actions .secondary{background:#fff;color:#10b981;border:2px solid #10b981}
+  .success-actions a:hover{transform:translateY(-2px)}
+  
+  @keyframes slideDown{from{opacity:0;transform:translateY(-20px)}to{opacity:1;transform:translateY(0)}}
+  @keyframes slideInDown{from{opacity:0;transform:translate(-50%,-30px)}to{opacity:1;transform:translate(-50%,0)}}
+  @keyframes slideOutUp{from{opacity:1;transform:translate(-50%,0)}to{opacity:0;transform:translate(-50%,-30px)}}
+  
+  /* Button-as-card fixes */
+  button.option-card{border:none;font-family:inherit;text-align:center;width:100%}
+  button.option-card:focus{outline:2px solid #10b981;outline-offset:2px}
+  button.option-card:active{transform:scale(0.98)}
+  
+  /* Mobile Responsive */
+  @media (max-width:768px){
+    .card-grid{grid-template-columns:repeat(2,1fr);gap:12px}
+    .wizard-panel{padding:24px 20px}
+    .wizard-actions{flex-direction:column}
+    .wizard-actions .btn-wizard{width:100%}
+    .progress-step-label{font-size:.65rem}
+  }
+  
+  /* FIX: Mobile overflow for "Choose product type" cards (360px) */
+  @media (max-width:480px){
+    .wizard-container{max-width:100%;padding:12px;overflow-x:hidden}
+    .wizard-panel{overflow-x:hidden;box-sizing:border-box}
+    .card-grid{grid-template-columns:1fr !important;gap:12px;max-width:100% !important}
+    .option-card{min-width:0;box-sizing:border-box;width:100%}
+    .option-card .card-label{word-break:break-word;overflow-wrap:break-word;white-space:normal}
+    .mode-card{min-height:140px !important}
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="wizard-container">
+  {% if success_data %}
+  <div class="success-celebration">
+    <div class="icon">🎉</div>
+    <h2>Stock Added Successfully!</h2>
+    <p>You added <strong>{{ success_data.quantity }}</strong> units of <strong>{{ success_data.product_name }}</strong></p>
+    <div class="success-actions">
+      <a href="{% url 'pharmacy:stock_in' %}" class="primary">Add Another Product</a>
+      <a href="{% url 'pharmacy:dashboard' %}" class="secondary">View Dashboard</a>
+    </div>
+  </div>
+  {% endif %}
+
+  <header class="wizard-header">
+    <h1>Add Product</h1>
+    <p>Choose Cosmetics or Pharmacy, then add stock in a few clicks</p>
+  </header>
+
+  <!-- Back to Start Button (always visible) -->
+  {% if step > 0 %}
+  <div style="text-align: center; margin-bottom: 16px;">
+    <button type="button" onclick="backToStart()" class="btn-back-to-start" style="background: #f1f5f9; color: #475569; border: none; padding: 10px 20px; border-radius: 999px; font-weight: 600; cursor: pointer; transition: all 0.2s;">
+      ← Back to Start
+    </button>
+  </div>
+  {% endif %}
+
+  <!-- Progress Stepper (Clickable for completed steps) -->
+  <div class="progress-stepper">
+    <div class="progress-step {% if step == 0 %}active{% elif step > 0 %}completed{% endif %}" 
+         {% if step > 0 %}onclick="jumpToStep(0)" style="cursor:pointer;"{% endif %}>
+      <div class="progress-step-circle">1</div>
+      <div class="progress-step-label">Start</div>
+    </div>
+    <div class="progress-divider"></div>
+    <div class="progress-step {% if step == 1 %}active{% elif step > 1 %}completed{% endif %}" 
+         {% if step > 1 %}onclick="jumpToStep(1)" style="cursor:pointer;"{% endif %}>
+      <div class="progress-step-circle">2</div>
+      <div class="progress-step-label">Product</div>
+    </div>
+    <div class="progress-divider"></div>
+    <div class="progress-step {% if step >= 2 and step <= 3 %}active{% elif step > 3 %}completed{% endif %}"
+         {% if step > 3 %}onclick="jumpToStep(2)" style="cursor:pointer;"{% endif %}>
+      <div class="progress-step-circle">3</div>
+      <div class="progress-step-label">Select</div>
+    </div>
+    <div class="progress-divider"></div>
+    <div class="progress-step {% if step == 4 %}active{% elif step > 4 %}completed{% endif %}">
+      <div class="progress-step-circle">4</div>
+      <div class="progress-step-label">Save</div>
+    </div>
+  </div>
+
+  <form method="post" id="wizardForm">
+    {% csrf_token %}
+    <input type="hidden" name="wizard_step" value="{{ step }}">
+    <input type="hidden" name="selected_mode" id="selected_mode" value="{{ wizard_mode }}">
+    <input type="hidden" name="selected_category" id="selected_category" value="{{ selected_category }}">
+    <input type="hidden" name="selected_subcategory" id="selected_subcategory" value="{{ selected_subcategory }}">
+    <input type="hidden" name="selected_item" id="selected_item" value="{{ selected_item }}">
+
+    <!-- STEP 0: Select Mode (Pharmacy or Cosmetics) -->
+    {% if step == 0 %}
+    <div class="wizard-panel">
+      <h2 class="wizard-section-title">Choose Product Type</h2>
+      <div class="card-grid" style="max-width: 600px; margin: 0 auto;">
+        {% for mode in mode_options %}
+        <button type="button" class="option-card mode-card cc-mode-card" data-mode="{{ mode.key }}" style="min-height:160px; padding: 32px 24px;">
+          <div class="card-label" style="font-size:1.4rem; font-weight: 800;">{{ mode.label }}</div>
+          <small style="color:#64748b; font-size:0.9rem; margin-top: 8px;">{{ mode.description }}</small>
+        </button>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="wizard-actions">
+      <a href="{% url 'pharmacy:dashboard' %}" class="btn-wizard btn-back">← Cancel</a>
+      <button type="submit" class="btn-wizard btn-next" id="btnNext" disabled>Next →</button>
+    </div>
+    {% endif %}
+
+    <!-- STEP 1: Select Top Category -->
+    {% if step == 1 %}
+    <div class="wizard-panel">
+      <h2 class="wizard-section-title">Select Category</h2>
+      <div class="card-grid">
+        {% for cat in top_categories %}
+        <button type="button" class="option-card premium-category-card cc-category-card" data-category="{{ cat.key }}" data-label="{{ cat.label }}" style="background:linear-gradient(135deg,{{ cat.color|default:'#f1f5f9' }}15,{{ cat.color|default:'#f1f5f9' }}05);border-left:4px solid {{ cat.color|default:'#94a3b8' }}">
+          <div class="card-label">{{ cat.label }}</div>
+          {% if cat.product_count is not None %}
+          <small class="product-count-badge">{{ cat.product_count }} product{{ cat.product_count|pluralize }}</small>
+          {% endif %}
+        </button>
+        {% endfor %}
+      </div>
+      
+      <div style="text-align:center;margin-top:16px;">
+        <p class="text-muted small" id="ccStep1Hint" style="margin:0;font-size:0.9rem;">
+          <i class="bi bi-info-circle"></i> Select a category to continue
+        </p>
+      </div>
+    </div>
+
+    <div class="wizard-actions">
+      <button type="submit" name="action" value="back" class="btn-wizard btn-back">← Back</button>
+      <button type="submit" class="btn-wizard btn-next" id="ccStep1Next" disabled>Next →</button>
+    </div>
+    {% endif %}
+
+    <!-- STEP 2: Select Subcategory/Item -->
+    {% if step == 2 %}
+    <div class="wizard-panel" id="cc-step-2">
+      <h2 class="wizard-section-title">Select Product</h2>
+      <p style="color:#64748b;margin:0 0 20px;"><strong>Category:</strong> {{ selected_category_label }}</p>
+      
+      {% if subcategories %}
+      <!-- Show subcategories for Medicines or Cosmetics -->
+      <div class="card-grid">
+        {% for subcat in subcategories %}
+        <button type="button" class="option-card cc-subcategory-card" data-subcategory="{{ subcat.key }}">
+          <div class="card-label">{{ subcat.label }}</div>
+        </button>
+        {% endfor %}
+      </div>
+      {% elif items %}
+      <!-- Direct items for top-level categories (First Aid, Chronic, etc.) OR Cosmetics products -->
+      <div class="card-grid">
+        {% for item in items %}
+        <button type="button" class="option-card cc-item-card" data-item="{{ item.name }}">
+          {% if item.icon %}<span class="card-icon">{{ item.icon }}</span>{% endif %}
+          <div class="card-label">{{ item.name }}</div>
+        </button>
+        {% endfor %}
+      </div>
+      {% else %}
+      <!-- Fallback: No items available -->
+      <div style="background:linear-gradient(135deg,#fef3c7,#fde68a);border-left:4px solid #f59e0b;padding:20px;border-radius:12px;margin-bottom:20px;text-align:center;">
+        <p style="color:#92400e;font-weight:600;margin:0 0 12px;">No products found for this category.</p>
+        <p style="color:#92400e;margin:0;">You can add a custom product by clicking below.</p>
+      </div>
+      <div class="card-grid" style="max-width:300px;margin:0 auto;">
+        <button type="button" class="option-card cc-item-card" data-item="+ Add Custom Product">
+          <span class="card-icon">📝</span>
+          <div class="card-label">+ Add Custom Product</div>
+        </button>
+      </div>
+      {% endif %}
+    </div>
+
+    <div class="wizard-actions">
+      <button type="submit" name="action" value="back" class="btn-wizard btn-back">← Back</button>
+      <button type="submit" class="btn-wizard btn-next" id="btnNext" disabled>Next →</button>
+    </div>
+    {% endif %}
+
+    <!-- STEP 3: Select Specific Item (for subcategories) -->
+    {% if step == 3 and show_item_selection %}
+    <div class="wizard-panel">
+      <h2 class="wizard-section-title">Select Specific Item</h2>
+      <p style="color:#64748b;margin:0 0 20px;">
+        <strong>Category:</strong> {{ selected_category_label }} → {{ selected_subcategory_label }}
+      </p>
+      
+      {% if no_products_message %}
+      <div style="background:linear-gradient(135deg,#fef3c7,#fde68a);border-left:4px solid #f59e0b;padding:16px;border-radius:12px;margin-bottom:20px;color:#92400e;font-weight:600;">
+        <i class="bi bi-info-circle"></i> {{ no_products_message }}
+      </div>
+      {% endif %}
+      
+      {% if items %}
+      <div class="card-grid">
+        {% for item in items %}
+        <button type="button" class="option-card cc-item-card" data-item="{{ item.name }}">
+          {% if item.icon %}<span class="card-icon">{{ item.icon }}</span>{% endif %}
+          <div class="card-label">{{ item.name }}</div>
+        </button>
+        {% endfor %}
+      </div>
+      {% else %}
+      <!-- Fallback if no items -->
+      <div style="background:linear-gradient(135deg,#fef3c7,#fde68a);border-left:4px solid #f59e0b;padding:20px;border-radius:12px;margin-bottom:20px;text-align:center;">
+        <p style="color:#92400e;font-weight:600;margin:0 0 12px;">No products found.</p>
+        <p style="color:#92400e;margin:0;">Add a custom product below.</p>
+      </div>
+      <div class="card-grid" style="max-width:300px;margin:0 auto;">
+        <button type="button" class="option-card cc-item-card" data-item="+ Add Custom Product">
+          <span class="card-icon">📝</span>
+          <div class="card-label">+ Add Custom Product</div>
+        </button>
+      </div>
+      {% endif %}
+    </div>
+
+    <div class="wizard-actions">
+      <button type="submit" name="action" value="back" class="btn-wizard btn-back">← Back</button>
+      <button type="submit" class="btn-wizard btn-next" id="btnNext" disabled>Next →</button>
+    </div>
+    {% endif %}
+
+    <!-- STEP 3/4: Product Details -->
+    {% if step == 3 and not show_item_selection or step == 4 %}
+    <div class="wizard-panel">
+      <h2 class="wizard-section-title">Quantity & Pricing</h2>
+      
+      <div class="form-group">
+        <label>Product Name <span class="required">*</span></label>
+        <input type="text" name="product_name" id="product_name" 
+               value="{{ selected_item|default:'' }}" required 
+               placeholder="e.g., Paracetamol 500mg">
+        <small>This will be the display name in your system</small>
+      </div>
+
+      <div class="form-group">
+        <label>Quantity <span class="required">*</span></label>
+        <input type="number" name="quantity" required min="1" placeholder="0">
+        <small>Number of units to add</small>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Cost Price (per unit) <span class="required">*</span></label>
+          <input type="number" name="cost_price" required step="0.01" min="0" placeholder="0.00">
+          <small>Your purchase price</small>
+        </div>
+        <div class="form-group">
+          <label>Selling Price (per unit) <span class="required">*</span></label>
+          <input type="number" name="selling_price" required step="0.01" min="0" placeholder="0.00">
+          <small>Customer price</small>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Batch Number <span style="color:#64748b;">(optional)</span></label>
+          <input type="text" name="batch_number" placeholder="e.g., BT-2025-001">
+          <small>Leave blank to auto-generate</small>
+        </div>
+        <div class="form-group">
+          <label>Expiry Date {% if wizard_mode != 'cosmetics' %}<span class="required">*</span>{% else %}<span style="color:#64748b;">(optional)</span>{% endif %}</label>
+          <input type="date" name="expiry_date" {% if wizard_mode != 'cosmetics' and selected_category != 'cosmetics' %}required{% endif %}>
+          {% if wizard_mode == 'cosmetics' or selected_category == 'cosmetics' %}
+          <small>Optional for cosmetics</small>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label style="display:block;margin-bottom:8px;font-weight:700;">Has Barcode?</label>
+        <div style="display:flex;gap:16px;margin-bottom:8px;">
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+            <input type="radio" name="has_barcode" value="no" checked style="cursor:pointer;">
+            <span>No</span>
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+            <input type="radio" name="has_barcode" value="yes" style="cursor:pointer;">
+            <span>Yes</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="form-group" id="barcode-field" style="display:none;">
+        <label>Barcode <span class="required">*</span></label>
+        <input type="text" name="barcode" id="barcode-input" placeholder="Scan or type barcode" maxlength="100">
+        <button type="button" id="scan-barcode-btn" class="btn-scan-barcode" style="margin-top:8px;padding:10px 20px;background:linear-gradient(135deg,#8b5cf6,#6366f1);color:#fff;border:none;border-radius:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:8px;transition:all 0.2s;">
+          <i class="bi bi-upc-scan"></i>
+          <span>Scan Barcode</span>
+        </button>
+      </div>
+
+      <div class="form-group">
+        <label>Supplier (optional)</label>
+        <input type="text" name="supplier" placeholder="Supplier name">
+      </div>
+    </div>
+
+    <div class="wizard-actions">
+      <button type="submit" name="action" value="back" class="btn-wizard btn-back">← Back</button>
+      <button type="submit" name="action" value="save" class="btn-wizard btn-next">💾 Add to Stock</button>
+    </div>
+    {% endif %}
+  </form>
+</div>
+
+<script>
+console.log('✅ Pharmacy stock-in wizard loaded');
+
+document.addEventListener('DOMContentLoaded', function() {
+  console.log('✅ DOM ready, initializing wizard');
+  
+  // ========== VISUAL FEEDBACK HELPER ==========
+  function showFeedback(message, type = 'success') {
+    const existing = document.getElementById('cc-wizard-toast');
+    if (existing) existing.remove();
+    
+    const toast = document.createElement('div');
+    toast.id = 'cc-wizard-toast';
+    toast.style.cssText = `
+      position: fixed;
+      top: 80px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: ${type === 'success' ? 'linear-gradient(135deg, #10b981, #059669)' : 'linear-gradient(135deg, #ef4444, #dc2626)'};
+      color: #fff;
+      padding: 16px 32px;
+      border-radius: 999px;
+      font-weight: 700;
+      font-size: 1rem;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+      z-index: 10000;
+      animation: slideInDown 0.3s ease;
+    `;
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    
+    setTimeout(() => {
+      toast.style.animation = 'slideOutUp 0.3s ease';
+      setTimeout(() => toast.remove(), 300);
+    }, 2000);
+  }
+  
+  // ========== BULLETPROOF EVENT DELEGATION ==========
+  document.addEventListener('click', function(e) {
+    // Mode card (Step 0)
+    const modeCard = e.target.closest('.cc-mode-card');
+    if (modeCard) {
+      e.preventDefault();
+      const mode = modeCard.dataset.mode;
+      console.log('🎯 Mode clicked:', mode);
+      
+      document.querySelectorAll('.cc-mode-card').forEach(el => el.classList.remove('selected'));
+      modeCard.classList.add('selected');
+      
+      const modeInput = document.getElementById('selected_mode');
+      if (modeInput) {
+        modeInput.value = mode;
+        console.log('✅ Mode input set:', mode);
+      }
+      
+      const btnNext = document.getElementById('btnNext');
+      if (btnNext) btnNext.disabled = false;
+      
+      showFeedback('Mode selected: ' + (modeCard.querySelector('.card-label')?.textContent || mode));
+      return;
+    }
+    
+    // Category card (Step 1) - THE CRITICAL FIX
+    const categoryCard = e.target.closest('.cc-category-card');
+    if (categoryCard) {
+      e.preventDefault();
+      const category = categoryCard.dataset.category;
+      const categoryLabel = categoryCard.dataset.label || categoryCard.querySelector('.card-label')?.textContent || category;
+      console.log('🎯 Category clicked:', category);
+      
+      document.querySelectorAll('.cc-category-card').forEach(el => el.classList.remove('selected'));
+      categoryCard.classList.add('selected');
+      
+      const categoryInput = document.getElementById('selected_category');
+      if (categoryInput) {
+        categoryInput.value = category;
+        categoryInput.dispatchEvent(new Event('change', { bubbles: true }));
+        console.log('✅ Category input set:', category);
+      } else {
+        console.warn('⚠️ Category input not found, but continuing anyway');
+      }
+      
+      // Enable Next button (Step 1 specific)
+      const btnNext = document.getElementById('ccStep1Next');
+      if (btnNext) {
+        btnNext.disabled = false;
+        console.log('✅ Next button enabled');
+      }
+      
+      // Update hint text
+      const hint = document.getElementById('ccStep1Hint');
+      if (hint) {
+        hint.innerHTML = '<i class="bi bi-check-circle-fill" style="color:#10b981;"></i> Selected: <strong>' + categoryLabel + '</strong>. Click Next to continue.';
+      }
+      
+      showFeedback('Category selected: ' + categoryLabel);
+      return;
+    }
+    
+    // Subcategory card (Step 2)
+    const subcategoryCard = e.target.closest('.cc-subcategory-card');
+    if (subcategoryCard) {
+      e.preventDefault();
+      const subcategory = subcategoryCard.dataset.subcategory;
+      console.log('🎯 Subcategory clicked:', subcategory);
+      
+      document.querySelectorAll('.cc-subcategory-card').forEach(el => el.classList.remove('selected'));
+      subcategoryCard.classList.add('selected');
+      
+      const subcategoryInput = document.getElementById('selected_subcategory');
+      if (subcategoryInput) {
+        subcategoryInput.value = subcategory;
+        console.log('✅ Subcategory input set:', subcategory);
+      }
+      
+      const btnNext = document.getElementById('btnNext');
+      if (btnNext) btnNext.disabled = false;
+      
+      showFeedback('Subcategory selected: ' + (subcategoryCard.querySelector('.card-label')?.textContent || subcategory));
+      return;
+    }
+    
+    // Item card (Step 2/3)
+    const itemCard = e.target.closest('.cc-item-card');
+    if (itemCard) {
+      e.preventDefault();
+      const item = itemCard.dataset.item;
+      console.log('🎯 Item clicked:', item);
+      
+      document.querySelectorAll('.cc-item-card').forEach(el => el.classList.remove('selected'));
+      itemCard.classList.add('selected');
+      
+      const itemInput = document.getElementById('selected_item');
+      if (itemInput) {
+        itemInput.value = item;
+        console.log('✅ Item input set:', item);
+      }
+      
+      // Auto-fill product name if available
+      const productNameInput = document.getElementById('product_name');
+      if (productNameInput && item) {
+        if (item.toLowerCase().includes('other') || 
+            item.toLowerCase().includes('custom') || 
+            item.toLowerCase().includes('create new') ||
+            item.toLowerCase().includes('add custom') ||
+            item.toLowerCase() === 'other') {
+          productNameInput.value = '';
+          productNameInput.placeholder = 'Enter custom product name';
+          productNameInput.focus();
+        } else {
+          productNameInput.value = item;
+        }
+      }
+      
+      const btnNext = document.getElementById('btnNext');
+      if (btnNext) btnNext.disabled = false;
+      
+      showFeedback('Product selected: ' + item);
+      return;
+    }
+  });
+  
+  // ========== STEP 1 NEXT BUTTON (Category Selection) ==========
+  const ccStep1Next = document.getElementById('ccStep1Next');
+  if (ccStep1Next) {
+    ccStep1Next.addEventListener('click', function(e) {
+      e.preventDefault();
+      
+      const categoryInput = document.getElementById('selected_category');
+      const selectedCategory = categoryInput ? categoryInput.value : null;
+      
+      if (!selectedCategory) {
+        showFeedback('Please select a category first', 'error');
+        console.warn('⚠️ Next clicked but no category selected');
+        return;
+      }
+      
+      console.log('🚀 Next button clicked, advancing to Step 2...');
+      console.log('📦 Selected category:', selectedCategory);
+      
+      // Submit form to advance to Step 2
+      const form = document.getElementById('wizardForm');
+      if (form) {
+        form.submit();
+        console.log('✅ Form submitted');
+      } else {
+        console.error('❌ Form not found!');
+        // Fallback: scroll to step 2 anchor if it exists
+        const step2 = document.getElementById('cc-step-2');
+        if (step2) {
+          step2.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          console.log('⚠️ Fallback: scrolled to step 2 anchor');
+        }
+      }
+    });
+    console.log('✅ Step 1 Next button handler registered');
+  }
+  
+  // ========== BACK TO START ==========
+  window.backToStart = function() {
+    console.log('🔄 Back to start');
+    const form = document.getElementById('wizardForm');
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = 'jump_to_step';
+    input.value = 0;
+    form.appendChild(input);
+    
+    const actionInput = document.createElement('input');
+    actionInput.type = 'hidden';
+    actionInput.name = 'action';
+    actionInput.value = 'jump';
+    form.appendChild(actionInput);
+    
+    form.submit();
+  };
+
+  // ========== JUMP TO STEP ==========
+  window.jumpToStep = function(targetStep) {
+    console.log('🔄 Jump to step:', targetStep);
+    const form = document.getElementById('wizardForm');
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = 'jump_to_step';
+    input.value = targetStep;
+    form.appendChild(input);
+    
+    const actionInput = document.createElement('input');
+    actionInput.type = 'hidden';
+    actionInput.name = 'action';
+    actionInput.value = 'jump';
+    form.appendChild(actionInput);
+    
+    form.submit();
+  };
+
+  // ========== BARCODE TOGGLE ==========
+  function toggleBarcodeField() {
+    const hasBarcodeYes = document.querySelector('input[name="has_barcode"][value="yes"]');
+    const barcodeField = document.getElementById('barcode-field');
+    const barcodeInput = document.getElementById('barcode-input');
+    
+    if (hasBarcodeYes && hasBarcodeYes.checked) {
+      if (barcodeField) barcodeField.style.display = 'block';
+      if (barcodeInput) barcodeInput.required = true;
+    } else {
+      if (barcodeField) barcodeField.style.display = 'none';
+      if (barcodeInput) {
+        barcodeInput.required = false;
+        barcodeInput.value = '';
+      }
+    }
+  }
+
+  const barcodeRadios = document.querySelectorAll('input[name="has_barcode"]');
+  barcodeRadios.forEach(radio => {
+    radio.addEventListener('change', toggleBarcodeField);
+  });
+  toggleBarcodeField();
+
+  // ========== PRE-SELECT IF VALUES EXIST ==========
+  const selectedMode = document.getElementById('selected_mode')?.value;
+  if (selectedMode) {
+    const card = document.querySelector(`[data-mode="${selectedMode}"]`);
+    if (card) {
+      card.classList.add('selected');
+      console.log('✅ Pre-selected mode:', selectedMode);
+    }
+  }
+
+  const selectedCategory = document.getElementById('selected_category')?.value;
+  if (selectedCategory) {
+    const card = document.querySelector(`[data-category="${selectedCategory}"]`);
+    if (card) {
+      card.classList.add('selected');
+      console.log('✅ Pre-selected category:', selectedCategory);
+    }
+  }
+
+  const selectedSubcategory = document.getElementById('selected_subcategory')?.value;
+  if (selectedSubcategory) {
+    const card = document.querySelector(`[data-subcategory="${selectedSubcategory}"]`);
+    if (card) {
+      card.classList.add('selected');
+      console.log('✅ Pre-selected subcategory:', selectedSubcategory);
+    }
+  }
+
+  const selectedItem = document.getElementById('selected_item')?.value;
+  if (selectedItem) {
+    const card = document.querySelector(`[data-item="${selectedItem}"]`);
+    if (card) {
+      card.classList.add('selected');
+      console.log('✅ Pre-selected item:', selectedItem);
+    }
+  }
+
+  // ========== BARCODE SCANNER INTEGRATION ==========
+  let barcodeScanner = null;
+  const scanBtn = document.getElementById('scan-barcode-btn');
+  const barcodeInput = document.getElementById('barcode-input');
+  
+  if (scanBtn && barcodeInput) {
+    scanBtn.addEventListener('click', function() {
+      if (!barcodeScanner) {
+        barcodeScanner = new RearCameraBarcodeScanner({
+          onScan: function(barcode) {
+            barcodeInput.value = barcode;
+            console.log('📷 Barcode scanned:', barcode);
+          },
+          onError: function(error) {
+            console.error('❌ Scanner error:', error);
+          }
+        });
+      }
+      barcodeScanner.open();
+    });
+  }
+  
+  console.log('✅ Wizard initialization complete');
+});
+</script>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/barcode-scanner-rear-camera.js' %}"></script>
+<link rel="stylesheet" href="{% static 'css/barcode-scanner-rear-camera.css' %}">
+{% endblock %}
+

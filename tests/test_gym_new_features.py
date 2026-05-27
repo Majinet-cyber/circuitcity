@@ -499,3 +499,128 @@ class TestDashboardIntegration:
         assert response.context['unpaid_checkins'] == 0
         assert response.context['conversion_percentage'] == 100.0
 
+
+@pytest.mark.django_db
+class TestGymCheckinSuccess:
+    """Test gym-aware check-in success page"""
+    
+    def test_checkin_success_page_renders(self, client, business, manager, gym_settings):
+        """Test that check-in success page renders with gym-aware context"""
+        # Create an active member
+        member = GymMember.objects.create(
+            business=business,
+            name="John Doe",
+            phone="0991234567"
+        )
+        member.set_paid(
+            payment_date=date.today(),
+            membership_fee=gym_settings.default_membership_price,
+            trainer_fee=Decimal("0.00"),
+            paid_by=manager
+        )
+        
+        # Log in
+        client.force_login(manager)
+        session = client.session
+        session['active_business_id'] = business.id
+        session.save()
+        
+        # Perform check-in
+        response = client.post(f'/gym/member/{member.id}/checkin/')
+        
+        # Should render success page (200) not redirect (302)
+        assert response.status_code == 200
+        
+        # Verify gym-aware context
+        assert 'member_name' in response.context
+        assert response.context['member_name'] == "John Doe"
+        
+        assert 'checked_in_at' in response.context
+        assert response.context['checked_in_at'] is not None
+        
+        assert 'streak_days' in response.context
+        assert 'monthly_checkins' in response.context
+        assert 'membership_status' in response.context
+        
+        # Member should now have 1 check-in
+        member.refresh_from_db()
+        assert member.monthly_checkins == 1
+        
+        # Verify no sales-like wording in response
+        content = response.content.decode('utf-8')
+        assert 'sale' not in content.lower() or 'Check in another' in content
+        assert 'transaction' not in content.lower()
+        assert 'Check-in Recorded' in content or 'Check-in recorded' in content
+        
+        # Verify gym-aware elements present
+        assert 'Streak' in content
+        assert 'This Month' in content or 'This month' in content
+        assert 'consistency wins' in content.lower() or 'great work' in content.lower()
+    
+    def test_checkin_already_checked_in(self, client, business, manager, gym_settings):
+        """Test that re-checking in same member shows appropriate message"""
+        # Create member and check in once
+        member = GymMember.objects.create(
+            business=business,
+            name="Jane Smith",
+            phone="0991234568"
+        )
+        member.set_paid(
+            payment_date=date.today(),
+            membership_fee=gym_settings.default_membership_price,
+            trainer_fee=Decimal("0.00"),
+            paid_by=manager
+        )
+        
+        GymCheckIn.objects.create(
+            business=business,
+            member=member,
+            checked_in_by=manager
+        )
+        
+        # Log in
+        client.force_login(manager)
+        session = client.session
+        session['active_business_id'] = business.id
+        session.save()
+        
+        # Try to check in again
+        response = client.post(f'/gym/member/{member.id}/checkin/')
+        
+        assert response.status_code == 200
+        assert 'already_checked_in' in response.context
+        assert response.context['already_checked_in'] is True
+        
+        # Verify appropriate message
+        content = response.content.decode('utf-8')
+        assert 'Already Checked In' in content or 'already checked in' in content.lower()
+    
+    def test_checkin_success_page_has_actions(self, client, business, manager, gym_settings):
+        """Test that success page has appropriate gym actions"""
+        member = GymMember.objects.create(
+            business=business,
+            name="Test Member",
+            phone="0991234569"
+        )
+        member.set_paid(
+            payment_date=date.today(),
+            membership_fee=gym_settings.default_membership_price,
+            trainer_fee=Decimal("0.00"),
+            paid_by=manager
+        )
+        
+        client.force_login(manager)
+        session = client.session
+        session['active_business_id'] = business.id
+        session.save()
+        
+        response = client.post(f'/gym/member/{member.id}/checkin/')
+        
+        assert response.status_code == 200
+        content = response.content.decode('utf-8')
+        
+        # Verify gym-aware actions present
+        assert 'Check in another' in content or 'check in another' in content.lower()
+        assert 'Scan QR' in content or 'scan qr' in content.lower()
+        assert 'members' in content.lower()
+        assert 'dashboard' in content.lower()

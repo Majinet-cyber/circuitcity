@@ -12,7 +12,7 @@
         <button class="btn btn-success">
           <span class="chip">✓</span> View Dashboard
         </button>
-        <a href="{% url 'contracts:list' %}" class="btn btn-primary">Per Contract Summary</a>
+        <a href="{% url 'hq:contracts_list' %}" class="btn btn-primary">Per Contract Summary</a>
         <button class="btn btn-outline">Export CSV</button>
       </div>
     </div>
@@ -72,4 +72,8 @@
   {% endif %}
 
 </div>
+
+{# Include mobile bottom nav (hidden on desktop) #}
+{% include 'partials/bottomnav.html' with active_tab='wallet' %}
+
 {% endblock %}

@@ -27,7 +27,7 @@
           <td>{{ p.period_start|date:"Y-m-d" }} → {{ p.period_end|date:"Y-m-d" }}</td>
           <td class="text-end">MK {{ p.gross|floatformat:0 }}</td>
           <td class="text-end">MK {{ p.net|floatformat:0 }}</td>
-          <td>{{ p.status }}</td>
+          <td>{{ p.display_status }}</td>
           <td>{{ p.email_to }}</td>
         </tr>
         {% empty %}

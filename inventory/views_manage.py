@@ -5,6 +5,7 @@ from django.views.decorators.http import require_http_methods
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.db.models import Count, Sum
+from django.http import Http404
 from django.utils import timezone
 
 from tenants.utils import require_role, get_active_business
@@ -14,9 +15,27 @@ from accounts.models import User  # adjust if your User path differs
 from .models_inventory import InventoryItem  # if you have it split; else from .models import InventoryItem
 from .models_sales import Sale  # adjust to your project
 
+
+def _get_scoped_location(request, pk: int) -> Location:
+    """
+    Get a Location scoped to the current business.
+    
+    SECURITY: Always filter by business to prevent IDOR.
+    Returns 404 if location doesn't exist or belongs to different business.
+    """
+    _, biz_id = get_active_business(request)
+    if not biz_id:
+        raise Http404("Location not found")
+    try:
+        return Location.objects.get(pk=pk, business_id=biz_id)
+    except Location.DoesNotExist:
+        raise Http404("Location not found")
+
+
 def _is_manager(user):
     # reuse your role checks; fallback:
     return getattr(user, "is_staff", False) or user.groups.filter(name__iexact="manager").exists()
+
 
 @login_required
 def manage_time_logs(request):
@@ -37,23 +56,26 @@ def manage_time_logs(request):
 
     return render(request, "inventory/manage_time_logs.html", {"logs": enriched})
 
+
 @login_required
-@require_http_methods(["GET","POST"])
+@require_http_methods(["GET", "POST"])
 def location_geofence(request, pk: int):
     if not _is_manager(request.user):
         messages.error(request, "Managers only.")
         return redirect("/")
 
-    loc = get_object_or_404(Location, pk=pk)
+    # SECURITY: Scope location to business to prevent IDOR
+    loc = _get_scoped_location(request, pk)
     if request.method == "POST":
         loc.latitude = request.POST.get("latitude") or None
         loc.longitude = request.POST.get("longitude") or None
         loc.geofence_radius_m = int(request.POST.get("radius") or 150)
-        loc.save(update_fields=["latitude","longitude","geofence_radius_m"])
+        loc.save(update_fields=["latitude", "longitude", "geofence_radius_m"])
         messages.success(request, "Location GPS saved.")
         return redirect("inventory:location_geofence", pk=loc.pk)
 
     return render(request, "inventory/location_geofence.html", {"loc": loc})
+
 
 @login_required
 def toggle_geofence_launch(request, pk: int):
@@ -61,11 +83,13 @@ def toggle_geofence_launch(request, pk: int):
         messages.error(request, "Managers only.")
         return redirect("/")
 
-    loc = get_object_or_404(Location, pk=pk)
+    # SECURITY: Scope location to business to prevent IDOR
+    loc = _get_scoped_location(request, pk)
     loc.geofence_enabled = not loc.geofence_enabled
     loc.save(update_fields=["geofence_enabled"])
     messages.success(request, f"Geofence {'LAUNCHED' if loc.geofence_enabled else 'paused'} for {loc.name}.")
     return redirect("inventory:location_geofence", pk=pk)
+
 
 @login_required
 def manager_agents(request):
@@ -78,8 +102,9 @@ def manager_agents(request):
     recent = timezone.now() - timedelta(days=7)
     user_ids = set(TimeLog.objects.filter(business_id=biz_id, ts__gte=recent).values_list("user_id", flat=True))
     # fallback to all business members if needed
-    agents = User.objects.filter(id__in=user_ids).order_by("first_name","last_name")
+    agents = User.objects.filter(id__in=user_ids).order_by("first_name", "last_name")
     return render(request, "inventory/manager_agents.html", {"agents": agents})
+
 
 @login_required
 def manager_agent_detail(request, user_id: int):
@@ -88,6 +113,17 @@ def manager_agent_detail(request, user_id: int):
         return redirect("/")
 
     _, biz_id = get_active_business(request)
+    if not biz_id:
+        raise Http404("Agent not found")
+    
+    # SECURITY: Verify agent belongs to this business via Membership BEFORE proceeding
+    try:
+        from tenants.models import Membership
+        if not Membership.objects.filter(user_id=user_id, business_id=biz_id, status="ACTIVE").exists():
+            raise Http404("Agent not found")
+    except ImportError:
+        pass  # If Membership model unavailable, continue with other scoping
+    
     agent = get_object_or_404(User, pk=user_id)
     logs = TimeLog.objects.filter(business_id=biz_id, user=agent).select_related("location").order_by("-ts")[:200]
 
@@ -105,13 +141,15 @@ def manager_agent_detail(request, user_id: int):
         net += int(oc.net_adjustment)
         enriched.append((tl, oc))
 
-    return render(request, "inventory/manager_agent_detail.html", {
-        "agent": agent,
-        "stock_count": stock_count,
-        "total_sales": total_sales,
-        "total_earnings": total_earnings,
-        "logs": enriched,
-        "attendance_net": net,
-    })
-
-
+    return render(
+        request,
+        "inventory/manager_agent_detail.html",
+        {
+            "agent": agent,
+            "stock_count": stock_count,
+            "total_sales": total_sales,
+            "total_earnings": total_earnings,
+            "logs": enriched,
+            "attendance_net": net,
+        },
+    )

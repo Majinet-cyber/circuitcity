@@ -4,24 +4,23 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('insights', '0001_initial'),
+        ("insights", "0001_initial"),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='CurrencySetting',
+            name="CurrencySetting",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('base_currency', models.CharField(default='MWK', max_length=8)),
-                ('display_currency', models.CharField(default='MWK', max_length=8)),
-                ('rates', models.JSONField(blank=True, default=dict)),
-                ('updated_at', models.DateTimeField(auto_now=True)),
+                ("id", models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name="ID")),
+                ("base_currency", models.CharField(default="MWK", max_length=8)),
+                ("display_currency", models.CharField(default="MWK", max_length=8)),
+                ("rates", models.JSONField(blank=True, default=dict)),
+                ("updated_at", models.DateTimeField(auto_now=True)),
             ],
             options={
-                'verbose_name': 'Currency Setting',
-                'verbose_name_plural': 'Currency Setting',
+                "verbose_name": "Currency Setting",
+                "verbose_name_plural": "Currency Setting",
             },
         ),
     ]

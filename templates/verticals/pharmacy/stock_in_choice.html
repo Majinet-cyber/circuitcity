@@ -1,0 +1,234 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Stock In · Pharmacy & Cosmetics{% endblock %}
+
+{% block content %}
+
+<style>
+  /* Mobile-First Stock In Choice Page */
+  .stock-in-choice-container {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 20px;
+  }
+  
+  /* Header */
+  .choice-header {
+    text-align: center;
+    margin-bottom: 48px;
+  }
+  
+  .choice-header h1 {
+    font-size: clamp(2rem, 5vw, 2.8rem);
+    font-weight: 800;
+    color: #0f172a;
+    margin: 0 0 12px 0;
+  }
+  
+  .choice-header p {
+    font-size: 1.1rem;
+    color: #64748b;
+    margin: 0;
+  }
+  
+  /* Choice Cards Grid */
+  .choice-cards {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 24px;
+    margin-bottom: 40px;
+  }
+  
+  @media (min-width: 768px) {
+    .choice-cards {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+  
+  .choice-card {
+    background: linear-gradient(135deg, #fff 0%, #f8fafc 100%);
+    border: 3px solid #e2e8f0;
+    border-radius: 24px;
+    padding: 48px 32px;
+    text-align: center;
+    text-decoration: none;
+    transition: all 0.3s ease;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    min-height: 300px;
+    box-shadow: 0 12px 32px rgba(15, 23, 42, 0.08);
+    cursor: pointer;
+  }
+  
+  .choice-card:hover {
+    transform: translateY(-8px);
+    box-shadow: 0 20px 56px rgba(15, 23, 42, 0.15);
+  }
+  
+  .choice-card.pharmacy {
+    border-color: #10b981;
+    background: linear-gradient(135deg, #dcfce7 0%, #d1fae5 100%);
+  }
+  
+  .choice-card.pharmacy:hover {
+    border-color: #059669;
+    background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+  }
+  
+  .choice-card.cosmetics {
+    border-color: #ec4899;
+    background: linear-gradient(135deg, #fce7f3 0%, #fbcfe8 100%);
+  }
+  
+  .choice-card.cosmetics:hover {
+    border-color: #db2777;
+    background: linear-gradient(135deg, #fbcfe8 0%, #f9a8d4 100%);
+  }
+  
+  .choice-icon {
+    font-size: 5rem;
+    margin-bottom: 8px;
+  }
+  
+  .choice-title {
+    font-size: 2rem;
+    font-weight: 800;
+    color: #0f172a;
+    margin: 0;
+  }
+  
+  .choice-description {
+    font-size: 1.05rem;
+    color: #64748b;
+    margin: 0;
+    font-weight: 600;
+    line-height: 1.5;
+  }
+  
+  .choice-badge {
+    display: inline-block;
+    padding: 6px 16px;
+    background: rgba(255, 255, 255, 0.8);
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: #475569;
+    margin-top: 8px;
+  }
+  
+  /* Custom Option */
+  .custom-option {
+    text-align: center;
+    margin-top: 24px;
+    padding: 32px;
+    background: #f8fafc;
+    border-radius: 20px;
+    border: 2px dashed #cbd5e1;
+  }
+  
+  .custom-option h3 {
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: #0f172a;
+    margin: 0 0 12px 0;
+  }
+  
+  .custom-option p {
+    font-size: 0.95rem;
+    color: #64748b;
+    margin: 0 0 20px 0;
+  }
+  
+  .custom-btn {
+    display: inline-block;
+    padding: 14px 32px;
+    background: #3b82f6;
+    color: #fff;
+    border-radius: 12px;
+    text-decoration: none;
+    font-weight: 700;
+    font-size: 1rem;
+    transition: all 0.2s;
+  }
+  
+  .custom-btn:hover {
+    background: #2563eb;
+    color: #fff;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(59, 130, 246, 0.3);
+  }
+  
+  /* Mobile Responsive */
+  @media (max-width: 640px) {
+    .stock-in-choice-container {
+      padding: 16px;
+    }
+    
+    .choice-header {
+      margin-bottom: 32px;
+    }
+    
+    .choice-card {
+      padding: 36px 24px;
+      min-height: 260px;
+    }
+    
+    .choice-icon {
+      font-size: 4rem;
+    }
+    
+    .choice-title {
+      font-size: 1.6rem;
+    }
+    
+    .custom-option {
+      padding: 24px;
+    }
+  }
+</style>
+
+<div class="stock-in-choice-container">
+  <!-- Header -->
+  <div class="choice-header">
+    <h1>📦 Stock In</h1>
+    <p>What type of products are you receiving?</p>
+  </div>
+  
+  <!-- Choice Cards -->
+  <div class="choice-cards">
+    <!-- Pharmacy Card -->
+    <a href="{% url 'pharmacy:stock_in_catalog' category='pharmacy' %}" class="choice-card pharmacy" data-testid="stock-in-pharmacy-card">
+      <div class="choice-icon">💊</div>
+      <h2 class="choice-title">Pharmacy</h2>
+      <p class="choice-description">
+        Medicines, supplements, and healthcare products
+      </p>
+      <span class="choice-badge">Batch tracking • Expiry dates</span>
+    </a>
+    
+    <!-- Cosmetics Card -->
+    <a href="{% url 'pharmacy:stock_in_catalog' category='cosmetics' %}" class="choice-card cosmetics" data-testid="stock-in-cosmetics-card">
+      <div class="choice-icon">💄</div>
+      <h2 class="choice-title">Cosmetics</h2>
+      <p class="choice-description">
+        Beauty, skincare, haircare, and personal care items
+      </p>
+      <span class="choice-badge">Quick stock-in • Instant save</span>
+    </a>
+  </div>
+  
+  <!-- Custom/Other Option -->
+  <div class="custom-option">
+    <h3>🔍 Can't find your product?</h3>
+    <p>Use the custom form to add products not in our catalog</p>
+    <a href="{% url 'pharmacy:stock_in' %}" class="custom-btn" data-testid="stock-in-custom-btn">
+      Custom Product
+    </a>
+  </div>
+</div>
+
+{% endblock %}
+

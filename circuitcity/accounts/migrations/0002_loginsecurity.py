@@ -6,25 +6,35 @@ import django.db.models.deletion
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
-        ('accounts', '0001_initial'),
+        ("accounts", "0001_initial"),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='LoginSecurity',
+            name="LoginSecurity",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('stage', models.PositiveSmallIntegerField(default=0)),
-                ('fail_count', models.PositiveSmallIntegerField(default=0)),
-                ('locked_until', models.DateTimeField(blank=True, null=True)),
-                ('hard_blocked', models.BooleanField(default=False)),
-                ('user', models.OneToOneField(on_delete=django.db.models.deletion.CASCADE, related_name='login_sec', to=settings.AUTH_USER_MODEL)),
+                ("id", models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name="ID")),
+                ("stage", models.PositiveSmallIntegerField(default=0)),
+                ("fail_count", models.PositiveSmallIntegerField(default=0)),
+                ("locked_until", models.DateTimeField(blank=True, null=True)),
+                ("hard_blocked", models.BooleanField(default=False)),
+                (
+                    "user",
+                    models.OneToOneField(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="login_sec",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
             ],
             options={
-                'indexes': [models.Index(fields=['user'], name='accounts_lo_user_id_e9bc33_idx'), models.Index(fields=['locked_until'], name='accounts_lo_locked__da8084_idx'), models.Index(fields=['hard_blocked'], name='accounts_lo_hard_bl_8b63ec_idx')],
+                "indexes": [
+                    models.Index(fields=["user"], name="accounts_lo_user_id_e9bc33_idx"),
+                    models.Index(fields=["locked_until"], name="accounts_lo_locked__da8084_idx"),
+                    models.Index(fields=["hard_blocked"], name="accounts_lo_hard_bl_8b63ec_idx"),
+                ],
             },
         ),
     ]

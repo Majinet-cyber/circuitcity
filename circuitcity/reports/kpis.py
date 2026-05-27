@@ -54,5 +54,3 @@ def compute_sales_kpis(qs, dt_field: str = "sold_at", amount_field: str = "price
     today = now.date()
 
     # --- Today vs Yesterday (using [sta]()
-
-

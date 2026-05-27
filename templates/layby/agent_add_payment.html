@@ -45,9 +45,7 @@
 
     <div class="meter" title="Progress toward full payment">
       {% with total=order.total_price|default_if_none:0 paid=order.amount_paid|default_if_none:0 %}
-      {% with pct=total|divisibleby:0 %}
-      <div class="bar" id="progress-bar" style="width:{% if total > 0 %}{{ (paid|floatformat:2|floatformat:"0")|default_if_none:"0" }}{% endif %}%"></div>
-      {% endwith %}
+      <div class="bar" id="progress-bar" style="width:{% if total > 0 %}{{ paid|floatformat:0 }}{% endif %}%"></div>
       {% endwith %}
     </div>
 

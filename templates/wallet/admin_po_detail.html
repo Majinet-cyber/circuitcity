@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Purchase Order - Emajinet{% endblock %}
+{% block header_title %}<i class="bi bi-box-seam me-2"></i>Purchase Order PO-{{ po.id|stringformat:"05d" }}{% endblock %}
+
+{% block body %}
+<div class="container-xxl px-0">
+  <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+    <div class="small text-muted">{{ po.supplier_name|default:"Supplier not specified" }} - {{ po.created_at|date:"Y-m-d" }}</div>
+    <div class="d-flex gap-2">
+      <a class="btn btn-outline-secondary" href="{% url 'wallet:admin_pos' %}">History</a>
+      <a class="btn btn-primary" href="{% url 'wallet:admin_po_pdf' po.id %}"><i class="bi bi-file-pdf me-1"></i>Download PDF</a>
+    </div>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-lg-4">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-body">
+          <h5 class="mb-3">Add Item</h5>
+          <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="add_item">
+            {% for field in form %}
+            <div class="mb-3">
+              <label class="form-label">{{ field.label }}</label>
+              {{ field }}
+              {% if field.errors %}<div class="text-danger small">{{ field.errors|striptags }}</div>{% endif %}
+            </div>
+            {% endfor %}
+            <div id="productPreview" class="small text-muted border rounded p-2 mb-3 d-none"></div>
+            <button class="btn btn-primary w-100" type="submit"><i class="bi bi-plus-circle me-1"></i>Add item</button>
+          </form>
+          <hr>
+          <form method="post" class="d-flex gap-2">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="set_status">
+            <select class="form-select" name="status">
+              {% for val,label in status_choices %}<option value="{{ val }}" {% if po.status == val %}selected{% endif %}>{{ label }}</option>{% endfor %}
+            </select>
+            <button class="btn btn-outline-secondary" type="submit">Update</button>
+          </form>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-8">
+      <div class="card border-0 shadow-sm">
+        <div class="table-responsive">
+          <table class="table align-middle mb-0">
+            <thead class="text-muted small"><tr><th>Item</th><th class="text-end">Qty</th><th class="text-end">Unit Cost</th><th class="text-end">Line Total</th><th></th></tr></thead>
+            <tbody>
+              {% for item in items %}
+              <tr>
+                <td>{{ item.product }}</td>
+                <td class="text-end">{{ item.quantity }}</td>
+                <td class="text-end">{{ po.currency }} {{ item.unit_price|floatformat:2|intcomma }}</td>
+                <td class="text-end fw-semibold">{{ po.currency }} {{ item.line_total|floatformat:2|intcomma }}</td>
+                <td class="text-end">
+                  <form method="post" class="d-inline">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="delete_item">
+                    <input type="hidden" name="item_id" value="{{ item.id }}">
+                    <button class="btn btn-sm btn-outline-danger" type="submit"><i class="bi bi-trash"></i></button>
+                  </form>
+                </td>
+              </tr>
+              {% empty %}
+              <tr><td colspan="5" class="text-center text-muted py-4">Add products before downloading the supplier PDF.</td></tr>
+              {% endfor %}
+            </tbody>
+            <tfoot>
+              <tr><th colspan="3" class="text-end">Subtotal</th><th class="text-end">{{ po.currency }} {{ po.subtotal|floatformat:2|intcomma }}</th><th></th></tr>
+              <tr><th colspan="3" class="text-end">Tax</th><th class="text-end">{{ po.currency }} {{ po.tax|floatformat:2|intcomma }}</th><th></th></tr>
+              <tr><th colspan="3" class="text-end">Total</th><th class="text-end">{{ po.currency }} {{ po.total|floatformat:2|intcomma }}</th><th></th></tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<script id="productCatalogData" type="application/json">{{ product_catalog_json|safe }}</script>
+<script>
+(() => {
+  const select = document.getElementById('id_product');
+  const unit = document.getElementById('id_unit_price');
+  const preview = document.getElementById('productPreview');
+  if (!select || !unit || !preview) return;
+  let catalog = [];
+  try { catalog = JSON.parse(document.getElementById('productCatalogData')?.textContent || '[]'); } catch (_) { catalog = []; }
+  const byId = new Map(catalog.map(p => [String(p.id), p]));
+  function syncProductDetails() {
+    const product = byId.get(String(select.value));
+    if (!product) {
+      preview.classList.add('d-none');
+      return;
+    }
+    if (!unit.value || Number(unit.value) === 0) {
+      unit.value = product.cost_price || '0.00';
+    }
+    preview.textContent = `${product.code || 'No code'} - ${product.model || 'Product'} - Cost ${product.cost_price || '0.00'} - Sale ${product.sale_price || '0.00'}`;
+    preview.classList.remove('d-none');
+  }
+  select.addEventListener('change', syncProductDetails);
+  syncProductDetails();
+})();
+</script>
+{% endblock %}

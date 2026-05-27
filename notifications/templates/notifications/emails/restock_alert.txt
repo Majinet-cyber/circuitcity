@@ -1,0 +1,13 @@
+RESTOCK ALERT — {{ business_name }}
+======================================
+
+{{ alert_label|upper }}: {{ product_name }}
+
+Current Stock : {{ current_stock }} units
+Reorder Level : {{ threshold }} units
+Suggested Order: {{ suggested_reorder }} units
+
+{% if current_stock == 0 %}{{ product_name }} is completely out of stock. Place a reorder of at least {{ suggested_reorder }} units immediately.{% else %}{{ product_name }} is running low. Consider reordering at least {{ suggested_reorder }} units.{% endif %}
+
+---
+Emajinet · {{ business_name }} · Automated restock alert

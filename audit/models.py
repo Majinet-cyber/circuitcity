@@ -1,12 +1,13 @@
 ﻿# audit/models.py
 from django.db import models
 
+
 class AuditLog(models.Model):
     business = models.ForeignKey("tenants.Business", on_delete=models.CASCADE, db_index=True)
     user = models.ForeignKey("auth.User", null=True, blank=True, on_delete=models.SET_NULL)
-    entity = models.CharField(max_length=64)       # e.g. "InventoryItem"
-    entity_id = models.CharField(max_length=64)    # pk/identifier
-    action = models.CharField(max_length=64)       # e.g. INVENTORY_CREATE
+    entity = models.CharField(max_length=64)  # e.g. "InventoryItem"
+    entity_id = models.CharField(max_length=64)  # pk/identifier
+    action = models.CharField(max_length=64)  # e.g. INVENTORY_CREATE
     message = models.TextField(blank=True)
     ip = models.GenericIPAddressField(null=True, blank=True)
     ua = models.TextField(blank=True)
@@ -17,3 +18,7 @@ class AuditLog(models.Model):
         ordering = ["-created_at"]
 
 
+# PHASE 4: Price correction audit models
+from .models_price_audit import PriceAdjustment, UnsoldPriceEdit
+
+__all__ = ["AuditLog", "PriceAdjustment", "UnsoldPriceEdit"]

@@ -11,16 +11,16 @@ from django.urls import reverse
 from django.utils import timezone
 
 from tenants.models import Business  # type: ignore
-from .models import BusinessSubscription, SubscriptionPlan
 
+from .models import BusinessSubscription, SubscriptionPlan
 
 # Paths we never block (prefix match). Keep short, stable prefixes only.
 SAFE_PREFIXES: tuple[str, ...] = (
-    "/admin/",                 # let superusers fix billing if needed
-    "/healthz",                # health probes
+    "/admin/",  # let superusers fix billing if needed
+    "/healthz",  # health probes
     "/robots.txt",
     "/favicon.ico",
-    "/static/",                # assets
+    "/static/",  # assets
     settings.STATIC_URL or "/static/",
     settings.MEDIA_URL or "/media/",
     # Auth + account management
@@ -31,13 +31,14 @@ SAFE_PREFIXES: tuple[str, ...] = (
     "/tenants/choose/",
     "/tenants/create/",
     # Billing flows
-    "/billing/subscribe/",
-    "/billing/checkout/",
-    "/billing/success/",
-    "/billing/webhook/",
-    "/billing/invoices/",      # allow users to view/pay invoices
-    # Notifications list is OK even if read-only
-    "/notifications/",
+    "/billing/",  # all billing pages allowed
+    # Public/landing pages
+    "/",  # root/landing page
+    "/about/",
+    "/pricing/",
+    "/contact/",
+    "/support/",
+    "/landing/",
 )
 
 
@@ -69,16 +70,66 @@ class SubscriptionGateMiddleware:
         self._grace_days = int(getattr(settings, "BILLING_GRACE_DAYS", 30))
 
     # --------------- helpers ----------------
+    def _subscription_allows_access(self, sub: BusinessSubscription) -> bool:
+        """
+        Comprehensive subscription access check following SaaS best practices.
+
+        Allow full access if:
+        - status in (trialing, active)
+        - OR status == past_due AND now <= grace_until (within grace period)
+        - OR cancel_at_period_end == True AND now < current_period_end (canceling but still in period)
+
+        Deny (lock out) if:
+        - status == suspended
+        - OR status == canceled (after period end)
+        - OR status == past_due AND now > grace_until (grace expired)
+        """
+        now = timezone.now()
+        status = sub.status
+
+        # Explicitly blocked statuses
+        if status in [BusinessSubscription.Status.SUSPENDED, BusinessSubscription.Status.CANCELED]:
+            # Exception: if canceled but cancel_at_period_end and still before period end, allow
+            if status == BusinessSubscription.Status.CANCELED:
+                if sub.cancel_at_period_end and sub.current_period_end and now < sub.current_period_end:
+                    return True
+            return False
+
+        # Allow active and trialing subscriptions
+        if status in [
+            BusinessSubscription.Status.ACTIVE,
+            BusinessSubscription.Status.TRIALING,
+            BusinessSubscription.Status.TRIAL,
+        ]:
+            # If cancel_at_period_end is set, still allow until period end
+            if sub.cancel_at_period_end and sub.current_period_end:
+                return now < sub.current_period_end
+            return True
+
+        # Past due with grace period
+        if status == BusinessSubscription.Status.PAST_DUE:
+            if sub.grace_until:
+                return now <= sub.grace_until
+            # Fallback to old grace logic if grace_until not set
+            return sub.in_grace()
+
+        # Grace status (legacy)
+        if status == BusinessSubscription.Status.GRACE:
+            return sub.in_grace()
+
+        # Expired - deny access
+        if status == BusinessSubscription.Status.EXPIRED:
+            return False
+
+        # Default: allow (safe fallback)
+        return True
+
     def _bootstrap_subscription(self, biz: Business) -> BusinessSubscription:
         """
         Create a trial subscription for a new Business.
         Picks the cheapest active plan (or creates a basic one).
         """
-        plan = (
-            SubscriptionPlan.objects.filter(is_active=True)
-            .order_by("amount", "sort_order")
-            .first()
-        )
+        plan = SubscriptionPlan.objects.filter(is_active=True).order_by("amount", "sort_order").first()
         if not plan:
             plan = SubscriptionPlan.objects.create(
                 code="starter",
@@ -98,6 +149,10 @@ class SubscriptionGateMiddleware:
     # --------------- main ----------------
     def __call__(self, request: HttpRequest) -> HttpResponse:
         path = request.path or "/"
+
+        # CRITICAL: Bypass HQ paths entirely to prevent redirect loops
+        if path.startswith("/hq/"):
+            return self.get_response(request)
 
         # Always let safe URLs through
         if _is_safe(path, SAFE_PREFIXES):
@@ -123,14 +178,9 @@ class SubscriptionGateMiddleware:
         if not self._enforce:
             return self.get_response(request)
 
-        # Live enforcement
-        # Allow while subscription considers itself active (ACTIVE/TRIAL/GRACE)
-        if sub.is_active_now():
-            return self.get_response(request)
-
-        # If not active but still within our computed grace window, allow
-        # (BusinessSubscription.in_grace already computes based on next_billing_date/trial_end)
-        if sub.in_grace():
+        # Live enforcement - Updated for SaaS best practices
+        # Check if subscription allows access based on comprehensive rules
+        if self._subscription_allows_access(sub):
             return self.get_response(request)
 
         # Past grace â†’ expired
@@ -141,6 +191,34 @@ class SubscriptionGateMiddleware:
                 sub.status = BusinessSubscription.Status.EXPIRED
                 sub.save(update_fields=["status", "updated_at"])
 
+        # For AJAX/API/HTMX requests, return JSON error instead of redirect
+        if request.headers.get("X-Requested-With") == "XMLHttpRequest" or request.headers.get("HX-Request"):
+            from django.http import JsonResponse
+
+            return JsonResponse(
+                {
+                    "ok": False,
+                    "locked": True,
+                    "error": "Trial expired - subscription required",
+                    "redirect_url": "/billing/trial-expired/",
+                },
+                status=402,
+            )
+
+        # For API paths, return JSON
+        if path.startswith("/api/") or path.startswith("/app/api/"):
+            from django.http import JsonResponse
+
+            return JsonResponse(
+                {
+                    "ok": False,
+                    "locked": True,
+                    "error": "Trial expired - subscription required",
+                    "redirect_url": "/billing/trial-expired/",
+                },
+                status=402,
+            )
+
         # Redirect to trial expired page for better UX
         try:
             expired_url = reverse("billing:trial_expired")
@@ -148,5 +226,3 @@ class SubscriptionGateMiddleware:
             expired_url = "/billing/trial-expired/"
         reason = "expired" if sub.is_expired() else "inactive"
         return redirect(f"{expired_url}?reason={reason}")
-
-

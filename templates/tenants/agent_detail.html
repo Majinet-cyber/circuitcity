@@ -1,12 +1,12 @@
 {% extends "base.html" %}
 {% load humanize %}
 
-{% block title %}{{ agent.get_full_name|default:agent.username }} · Agent Detail{% endblock %}
+{% block title %}{{ agent.get_full_name|default:agent.username }} · {% if BUSINESS_VERTICAL == "gym" %}Trainer{% else %}Agent{% endif %} Detail{% endblock %}
 
 {% block body %}
 <div class="cc-wrap">
   <div class="cc-header">
-    <h2>{{ agent.get_full_name|default:agent.username }} <span class="cc-muted">· Agent Details</span></h2>
+    <h2>{{ agent.get_full_name|default:agent.username }} <span class="cc-muted">· {% if BUSINESS_VERTICAL == "gym" %}Trainer{% else %}Agent{% endif %} Details</span></h2>
     <p class="cc-muted">{{ membership.location.name|default:"No location assigned" }}</p>
   </div>
 

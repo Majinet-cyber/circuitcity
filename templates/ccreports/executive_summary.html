@@ -1,0 +1,237 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Executive Summary — {{ business.name|default:"Business" }}{% endblock %}
+
+{% block content %}
+<style>
+  .exec-page { max-width: 1100px; margin: 0 auto; padding: 0 1rem 4rem; }
+  .exec-header { background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 60%, #047857 100%); border-radius: 22px; padding: 2.5rem; margin-bottom: 1.75rem; color: #fff; display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; flex-wrap: wrap; }
+  .exec-header h1 { font-size: clamp(1.4rem, 3vw, 2rem); font-weight: 900; margin: 0; }
+  .exec-header .meta { font-size: .85rem; opacity: .75; margin-top: .35rem; }
+  .exec-actions { display: flex; gap: .6rem; flex-wrap: wrap; }
+
+  .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+  .kpi-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 1.25rem 1.5rem; box-shadow: 0 2px 14px rgba(0,0,0,.06); }
+  .kpi-card .kl { font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; color: #64748b; font-weight: 800; }
+  .kpi-card .kv { font-size: 1.6rem; font-weight: 900; color: #0f172a; margin-top: .2rem; }
+  .kpi-card .kv.green { color: #059669; }
+  .kpi-card .kv.red { color: #dc2626; }
+  .kpi-card .kv.amber { color: #d97706; }
+  .kpi-card .kg { font-size: .78rem; color: #64748b; margin-top: .2rem; }
+
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; margin-bottom: 1.5rem; }
+  @media (max-width: 768px) { .grid-2 { grid-template-columns: 1fr; } }
+
+  .section-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 18px; overflow: hidden; box-shadow: 0 2px 14px rgba(0,0,0,.05); }
+  .section-head { background: #ecfdf5; border-bottom: 1px solid #bbf7d0; padding: 1rem 1.5rem; }
+  .section-head h3 { font-size: .95rem; font-weight: 800; color: #047857; margin: 0; }
+  .section-body { padding: 1.25rem 1.5rem; }
+
+  /* BHS gauge inline */
+  .bhs-wrap { display: flex; align-items: center; gap: 1.5rem; }
+  .bhs-gauge { position: relative; flex-shrink: 0; }
+  .bhs-gauge svg { display: block; }
+  .bhs-gauge .bhs-inner { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .bhs-gauge .bhs-num { font-size: 1.6rem; font-weight: 900; color: #0f172a; line-height: 1; }
+  .bhs-gauge .bhs-denom { font-size: .7rem; color: #64748b; }
+  .bhs-info h4 { font-weight: 800; color: #0f172a; margin: 0 0 .25rem; }
+  .bhs-badge { display: inline-flex; padding: .2rem .7rem; border-radius: 999px; font-size: .8rem; font-weight: 800; margin-bottom: .5rem; }
+  .badge-green  { background: #dcfce7; color: #166534; }
+  .badge-amber  { background: #fef3c7; color: #92400e; }
+  .badge-orange { background: #fed7aa; color: #9a3412; }
+  .badge-red    { background: #fee2e2; color: #991b1b; }
+  .badge-gray   { background: #f1f5f9; color: #64748b; }
+
+  .comp-bar { display: flex; align-items: center; gap: .75rem; margin-bottom: .5rem; font-size: .82rem; }
+  .comp-bar .c-name { width: 140px; flex-shrink: 0; color: #475569; }
+  .comp-bar .c-bar-bg { flex: 1; background: #f1f5f9; border-radius: 999px; height: 7px; }
+  .comp-bar .c-bar-fg { height: 100%; border-radius: 999px; background: linear-gradient(90deg, #059669, #10b981); }
+  .comp-bar .c-score { width: 36px; text-align: right; font-weight: 800; color: #0f172a; }
+
+  .pl-row { display: flex; justify-content: space-between; padding: .6rem 0; border-bottom: 1px solid #f1f5f9; font-size: .9rem; }
+  .pl-row:last-child { border-bottom: none; }
+  .pl-row.total { font-weight: 900; color: #059669; }
+
+  .product-item { display: flex; justify-content: space-between; align-items: center; padding: .5rem 0; border-bottom: 1px solid #f1f5f9; font-size: .88rem; }
+  .product-item:last-child { border-bottom: none; }
+
+  @media print {
+    .exec-actions { display: none; }
+    .exec-page { max-width: 100%; }
+    body { font-size: 12px; }
+  }
+</style>
+
+<div class="exec-page">
+  <!-- Header -->
+  <div class="exec-header">
+    <div>
+      <h1>Executive Summary</h1>
+      <div class="meta">{{ business.name|default:"Business" }} &nbsp;·&nbsp; Generated {{ report_date|date:"d F Y" }}</div>
+      <div class="meta" style="margin-top:.2rem;">Month-to-date: {{ start_date|date:"d M" }} — {{ end_date|date:"d M Y" }}</div>
+    </div>
+    <div class="exec-actions">
+      <a href="{% url 'reports:executive_summary_pdf' %}" class="btn btn-light rounded-pill btn-sm">
+        <i class="bi bi-download me-1"></i>PDF
+      </a>
+      <button class="btn btn-outline-light rounded-pill btn-sm" onclick="window.print()">
+        <i class="bi bi-printer me-1"></i>Print
+      </button>
+      <a href="{% url 'reports:home' %}" class="btn btn-outline-light rounded-pill btn-sm">← Reports</a>
+    </div>
+  </div>
+
+  <!-- KPIs -->
+  <div class="kpi-grid">
+    <div class="kpi-card">
+      <div class="kl">Revenue (MTD)</div>
+      <div class="kv">MWK {{ pl.revenue|floatformat:0 }}</div>
+      <div class="kg">{{ pl.sales_count }} transactions</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kl">Gross Profit (MTD)</div>
+      <div class="kv {% if pl.gross_profit >= 0 %}green{% else %}red{% endif %}">MWK {{ pl.gross_profit|floatformat:0 }}</div>
+      <div class="kg">Margin: {{ gross_margin }}%</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kl">Net Profit (MTD)</div>
+      <div class="kv {% if pl.net_profit >= 0 %}green{% else %}red{% endif %}">MWK {{ pl.net_profit|floatformat:0 }}</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kl">Credit Exposure</div>
+      <div class="kv amber">{{ credit_count }} active</div>
+      <div class="kg">layby orders</div>
+    </div>
+    {% if health_score %}
+    <div class="kpi-card">
+      <div class="kl">Business Health Score</div>
+      <div class="kv {% if health_score.score >= 75 %}green{% elif health_score.score >= 50 %}amber{% else %}red{% endif %}">
+        {{ health_score.score|default:"N/A" }}/100
+      </div>
+      <div class="kg">{{ health_score.label|default:"" }}</div>
+    </div>
+    {% endif %}
+    <div class="kpi-card">
+      <div class="kl">Avg Transaction</div>
+      <div class="kv">MWK {{ pl.avg_transaction|floatformat:0 }}</div>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <!-- P&L Summary -->
+    <div class="section-card">
+      <div class="section-head"><h3>📊 P&L Summary</h3></div>
+      <div class="section-body">
+        <div class="pl-row"><div>Revenue</div><div class="fw-bold" style="color:#0891b2">MWK {{ pl.revenue|floatformat:0 }}</div></div>
+        <div class="pl-row"><div>(-) COGS</div><div class="text-muted">({{ pl.cogs|floatformat:0 }})</div></div>
+        <div class="pl-row total"><div>Gross Profit</div><div>MWK {{ pl.gross_profit|floatformat:0 }}</div></div>
+        <div class="pl-row"><div>(-) Expenses</div><div class="text-muted">({{ pl.expenses|floatformat:0 }})</div></div>
+        <div class="pl-row total" style="margin-top:.25rem;border-top:2px solid #bbf7d0;padding-top:.75rem;">
+          <div>Net Profit</div>
+          <div class="{% if pl.net_profit >= 0 %}text-success{% else %}text-danger{% endif %}">MWK {{ pl.net_profit|floatformat:0 }}</div>
+        </div>
+        <div style="margin-top:1rem;text-align:center;">
+          <a href="{% url 'reports:pl_report' %}" class="btn btn-outline-success btn-sm rounded-pill">View Full P&L →</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Business Health Score -->
+    <div class="section-card">
+      <div class="section-head"><h3>🏥 Business Health Score</h3></div>
+      <div class="section-body">
+        {% if health_score and health_score.score is not None %}
+        <div class="bhs-wrap mb-3">
+          <div class="bhs-gauge">
+            <svg width="90" height="90" viewBox="0 0 90 90">
+              <circle cx="45" cy="45" r="36" fill="none" stroke="#f1f5f9" stroke-width="9"/>
+              <circle id="execBhsArc" cx="45" cy="45" r="36" fill="none"
+                stroke="{% if health_score.status_color == 'green' %}#059669{% elif health_score.status_color == 'amber' %}#f59e0b{% elif health_score.status_color == 'orange' %}#ea580c{% else %}#ef4444{% endif %}"
+                stroke-width="9" stroke-linecap="round"
+                stroke-dasharray="0 226" transform="rotate(-90 45 45)"
+                data-score="{{ health_score.score|default:0 }}"/>
+            </svg>
+            <div class="bhs-inner">
+              <span class="bhs-num">{{ health_score.score }}</span>
+              <span class="bhs-denom">/100</span>
+            </div>
+          </div>
+          <div class="bhs-info">
+            <span class="bhs-badge badge-{{ health_score.status_color }}">{{ health_score.label }}</span>
+            <h4>{{ health_score.label }}</h4>
+            {% if health_score.recommendations %}
+            <div style="font-size:.82rem;color:#64748b;">{{ health_score.recommendations.0 }}</div>
+            {% endif %}
+          </div>
+        </div>
+        {% if health_score.components %}
+        {% for key, comp in health_score.components.items %}
+        {% if comp.score is not None %}
+        <div class="comp-bar">
+          <div class="c-name">
+            {% if key == "profit_trend" %}Profit Trend
+            {% elif key == "cash_flow" %}Cash Flow
+            {% elif key == "stock_risk" %}Stock Risk
+            {% elif key == "sales_consistency" %}Sales
+            {% elif key == "expense_control" %}Expenses
+            {% else %}{{ key|title }}{% endif %}
+          </div>
+          <div class="c-bar-bg"><div class="c-bar-fg" style="width:{{ comp.score }}%;"></div></div>
+          <div class="c-score">{{ comp.score }}</div>
+        </div>
+        {% endif %}
+        {% endfor %}
+        {% endif %}
+        <div style="margin-top:1rem;text-align:center;">
+          <a href="{% url 'dashboard:business_health' %}" class="btn btn-outline-success btn-sm rounded-pill">Full Health Report →</a>
+        </div>
+        {% else %}
+        <div class="text-muted text-center py-3">
+          <p>Run more transactions to generate your Business Health Score.</p>
+          <a href="{% url 'dashboard:business_health' %}" class="btn btn-outline-success btn-sm rounded-pill">Check Health Score</a>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Top Products -->
+  {% if pl.top_products %}
+  <div class="section-card mb-4">
+    <div class="section-head"><h3>🏆 Top Products (MTD)</h3></div>
+    <div class="section-body">
+      {% for p in pl.top_products|slice:":5" %}
+      <div class="product-item">
+        <div>
+          <div class="fw-bold" style="font-size:.9rem;">{{ p.item__product__name|default:"Product" }}</div>
+        </div>
+        <div class="text-end">
+          <div class="fw-bold text-success">MWK {{ p.total|floatformat:0 }}</div>
+          <div class="text-muted small">{{ p.units }} units</div>
+        </div>
+      </div>
+      {% endfor %}
+      {% if pl.top_products|length > 5 %}
+      <div class="text-center mt-2">
+        <a href="{% url 'reports:pl_report' %}" class="text-muted small">+ {{ pl.top_products|length|add:"-5" }} more in full P&L →</a>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="text-muted text-center" style="font-size:.78rem;">
+    Confidential · {{ business.name|default:"Emajinet" }} Executive Report · {{ report_date|date:"d M Y" }}
+  </div>
+</div>
+
+<script>
+(function(){
+  var arc = document.getElementById('execBhsArc');
+  if (!arc) return;
+  var score = parseInt(arc.getAttribute('data-score') || '0', 10);
+  arc.setAttribute('stroke-dasharray', Math.round(score * 226 / 100) + ' 226');
+})();
+</script>
+{% endblock %}

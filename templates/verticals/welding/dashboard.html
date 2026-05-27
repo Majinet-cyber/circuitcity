@@ -1,0 +1,1103 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% load static %}
+
+{% block title %}Welding Dashboard{% if business %} - {{ business.name }}{% endif %}{% endblock %}
+
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+/* ===== Welding Dashboard Light Workshop Theme ===== */
+
+.welding-page {
+  background: linear-gradient(135deg, #eff6ff 0%, #f8fafc 36%, #ffffff 100%);
+  min-height: 100vh;
+  color: var(--ink, #0f172a);
+  overflow-x: hidden;
+}
+
+.welding-container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 1.5rem;
+}
+
+.vertical-hero {
+  background: linear-gradient(135deg, #1d4ed8 0%, #2563eb 52%, #0ea5e9 100%);
+  padding: 28px;
+  border-radius: 24px;
+  color: #fff;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 20px 60px rgba(249, 115, 22, 0.2);
+  position: relative;
+  overflow: hidden;
+  margin-bottom: 1.5rem;
+}
+
+.vertical-hero::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  right: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.1) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.vertical-hero .eyebrow {
+  opacity: 0.9;
+  text-transform: uppercase;
+  font-size: 0.8rem;
+  letter-spacing: 0.15em;
+  margin: 0;
+  font-weight: 600;
+}
+
+.vertical-hero h1 {
+  margin: 6px 0;
+  font-size: clamp(26px, 4vw, 36px);
+  font-weight: 800;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.vertical-hero p {
+  margin: 0;
+  opacity: 0.95;
+  font-size: 1rem;
+}
+
+.hero-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  z-index: 1;
+  position: relative;
+}
+
+.hero-actions a {
+  border-radius: 30px;
+  padding: 12px 20px;
+  font-weight: 700;
+  text-decoration: none;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.hero-actions .primary {
+  background: #fff;
+  color: #0f172a;
+}
+
+.hero-actions .primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+  background: #f8fafc;
+}
+
+.hero-actions .ghost {
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  color: #fff;
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+}
+
+.hero-actions .ghost:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(255, 255, 255, 0.2);
+}
+
+/* Alert Box */
+.alert-box {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem 1.5rem;
+  background: rgba(234, 179, 8, 0.1);
+  border: 1px solid rgba(234, 179, 8, 0.3);
+  border-radius: 16px;
+  margin-bottom: 1.5rem;
+  color: var(--ink, #0f172a);
+}
+
+.alert-icon {
+  font-size: 1.5rem;
+  color: #eab308;
+}
+
+.alert-text {
+  flex: 1;
+  font-weight: 600;
+}
+
+.alert-link {
+  color: #b45309;
+  text-decoration: none;
+  font-weight: 700;
+}
+
+.alert-link:hover {
+  text-decoration: underline;
+}
+
+/* KPI Grid - Premium Cards */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.kpi-card {
+  background: #fff;
+  border-radius: 20px;
+  padding: 24px;
+  box-shadow: 0 4px 20px rgba(15, 23, 42, 0.08);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(226, 232, 240, 0.5);
+}
+
+.kpi-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, transparent, rgba(37, 99, 235, 0.45), transparent);
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.kpi-card:hover::before {
+  opacity: 1;
+}
+
+.kpi-card:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 12px 40px rgba(15, 23, 42, 0.12);
+  border-color: rgba(249, 115, 22, 0.22);
+}
+
+.kpi-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: #64748b;
+  margin-bottom: 0.5rem;
+  letter-spacing: 0.05em;
+}
+
+.kpi-value {
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.kpi-value.success { color: #16a34a; }
+.kpi-value.primary { color: #2563eb; }
+.kpi-value.info { color: #2563eb; }
+.kpi-value.warning { color: #eab308; }
+
+/* Charts Row */
+.charts-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.chart-card {
+  background: #fff;
+  border-radius: 20px;
+  border: 1px solid rgba(226, 232, 240, 0.5);
+  box-shadow: 0 4px 20px rgba(15, 23, 42, 0.08);
+  overflow: hidden;
+}
+
+.chart-card-header {
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid #e2e8f0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.chart-card-header h3 {
+  font-size: 1rem;
+  font-weight: 700;
+  margin: 0;
+  color: #0f172a;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.chart-card-body {
+  padding: 1rem;
+  height: 280px;
+  position: relative;
+}
+
+/* Section Cards */
+.section-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.section-card {
+  background: #fff;
+  border: 1px solid rgba(226, 232, 240, 0.5);
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(15, 23, 42, 0.08);
+}
+
+.section-header {
+  padding: 1rem 1.5rem;
+  background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+  border-bottom: 1px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.section-title {
+  font-weight: 700;
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #0f172a;
+}
+
+.section-link {
+  font-size: 0.85rem;
+  color: #2563eb;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.section-link:hover {
+  text-decoration: underline;
+}
+
+.section-body {
+  padding: 0;
+}
+
+/* Table Styles */
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.data-table th {
+  padding: 0.75rem 1rem;
+  text-align: left;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.data-table td {
+  padding: 0.875rem 1rem;
+  border-bottom: 1px solid #e2e8f0;
+  color: #0f172a;
+}
+
+.data-table tr:last-child td {
+  border-bottom: none;
+}
+
+.data-table tr:hover {
+  background: #f8fafc;
+  cursor: pointer;
+}
+
+.status-badge {
+  display: inline-flex;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: 6px;
+}
+
+.status-badge.accepted, .status-badge.delivered {
+  background: rgba(22, 163, 74, 0.1);
+  color: #16a34a;
+}
+
+.status-badge.sent, .status-badge.in_progress {
+  background: rgba(37, 99, 235, 0.1);
+  color: #2563eb;
+}
+
+.status-badge.ready {
+  background: rgba(234, 179, 8, 0.1);
+  color: #b45309;
+}
+
+.status-badge.draft, .status-badge.pending {
+  background: rgba(100, 116, 139, 0.1);
+  color: #64748b;
+}
+
+.status-badge.rejected, .status-badge.cancelled {
+  background: rgba(220, 38, 38, 0.1);
+  color: #dc2626;
+}
+
+/* Empty State */
+.empty-state {
+  text-align: center;
+  padding: 2rem;
+  color: #64748b;
+}
+
+.empty-icon {
+  font-size: 2.5rem;
+  margin-bottom: 0.5rem;
+}
+
+/* Insights Grid */
+.insights-section {
+  background: #fff;
+  border: 1px solid rgba(226, 232, 240, 0.5);
+  border-radius: 20px;
+  box-shadow: 0 4px 20px rgba(15, 23, 42, 0.08);
+  margin-bottom: 1.5rem;
+  overflow: hidden;
+}
+
+.insights-header {
+  padding: 1rem 1.5rem;
+  background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.insights-header h3 {
+  margin: 0;
+  font-weight: 700;
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.insights-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+  padding: 1.5rem;
+}
+
+.insight-card {
+  background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 1rem;
+}
+
+.insight-label {
+  font-size: 0.85rem;
+  color: #64748b;
+  margin-bottom: 0.25rem;
+}
+
+.insight-value {
+  font-weight: 700;
+  font-size: 1.25rem;
+  color: #0f172a;
+}
+
+/* Ready Banner */
+.ready-banner {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.25rem 1.5rem;
+  background: linear-gradient(135deg, rgba(22, 163, 74, 0.1), rgba(22, 163, 74, 0.05));
+  border: 1px solid rgba(22, 163, 74, 0.2);
+  border-radius: 16px;
+  margin-bottom: 1.5rem;
+}
+
+.ready-icon {
+  font-size: 2rem;
+  color: #16a34a;
+}
+
+.ready-text {
+  flex: 1;
+}
+
+.ready-title {
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: #16a34a;
+}
+
+.ready-link {
+  color: #16a34a;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.ready-link:hover {
+  text-decoration: underline;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .welding-container {
+    padding: 1rem;
+    padding-bottom: calc(5.5rem + env(safe-area-inset-bottom));
+  }
+  
+  .vertical-hero {
+    flex-direction: column;
+    text-align: center;
+  }
+  
+  .hero-actions {
+    width: 100%;
+    justify-content: center;
+  }
+  
+  .hero-actions a {
+    flex: 1;
+    text-align: center;
+    min-width: 120px;
+  }
+  
+  .section-grid,
+  .charts-row {
+    grid-template-columns: 1fr;
+  }
+  
+  .kpi-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 430px) {
+  .welding-container {
+    padding-left: 0.875rem;
+    padding-right: 0.875rem;
+  }
+
+  .kpi-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .vertical-hero,
+  .section-card,
+  .chart-card {
+    border-radius: 16px;
+  }
+
+  .hero-actions a {
+    width: 100%;
+  }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="welding-page" data-testid="welding-dashboard">
+  <div class="welding-container">
+    <!-- Welding Hero Card -->
+    <header class="vertical-hero" data-testid="welding-hero-card">
+      <div>
+        <p class="eyebrow">{% if business %}{{ business.name }}{% else %}Welding Workshop{% endif %}</p>
+        <h1>🔧 Welding Workshop</h1>
+        <p>Create quotes, track jobs, generate invoices</p>
+      </div>
+      <div class="hero-actions">
+        <a class="primary" href="{{ url_create_quote }}" data-testid="welding-create-quote">
+          <i class="bi bi-plus-circle"></i> New Quote
+        </a>
+        <a class="ghost" href="{% url 'verticals:welding_notebook_list' %}">
+          <i class="bi bi-journal-text"></i> Notebook
+        </a>
+        <a class="ghost" href="{% url 'verticals:welding_marketplace_publish' %}">
+          <i class="bi bi-shop"></i> Post to Marketplace
+        </a>
+        <a class="ghost" href="{% url 'verticals:welding_branding_settings' %}">
+          <i class="bi bi-patch-check"></i> Branding
+        </a>
+        <a class="ghost" href="{% url 'verticals:welding_sales' %}">Sales</a>
+      </div>
+    </header>
+    
+    <!-- Low Stock Alert -->
+    {% if low_stock_count > 0 %}
+    <div class="alert-box">
+      <div class="alert-icon">⚠️</div>
+      <div class="alert-text">{{ low_stock_count }} materials running low!</div>
+      <a href="{% url 'verticals:welding_materials_list' %}?low_stock=1" class="alert-link">View →</a>
+    </div>
+    {% endif %}
+    
+    <!-- Date Range Filter Bar -->
+    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+      <div class="filter-label" style="color: #64748b; font-weight: 600; font-size: 0.9rem;">
+        <i class="bi bi-calendar3"></i>
+        <span>Showing: <strong data-testid="welding-date-range-label">{{ range_label|default:"Month to Date" }}</strong></span>
+      </div>
+      
+      <!-- Filter Button (Bootstrap Dropdown) -->
+      <div class="dropdown">
+        <button class="btn btn-outline-primary btn-sm dropdown-toggle" type="button" id="dashboardFilterBtn" data-bs-toggle="dropdown" aria-expanded="false" data-testid="welding-filter-button">
+          <i class="bi bi-funnel"></i> Filter
+        </button>
+        <div class="dropdown-menu dropdown-menu-end p-3" style="min-width: 320px;" aria-labelledby="dashboardFilterBtn">
+          <h6 class="dropdown-header px-0">Date Range</h6>
+          
+          <!-- Quick Filters -->
+          <div class="d-grid gap-2 mb-3">
+            <a href="?range=mtd" class="btn btn-sm {% if active_range == 'mtd' or not active_range %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+              📅 Month to Date
+            </a>
+            <a href="?range=7d" class="btn btn-sm {% if active_range == '7d' %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+              📊 Last 7 Days
+            </a>
+            <a href="?range=30d" class="btn btn-sm {% if active_range == '30d' %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+              📈 Last 30 Days
+            </a>
+          </div>
+          
+          <div class="dropdown-divider"></div>
+          
+          <!-- Custom Date Range -->
+          <form method="get" action="" id="customDateRangeForm">
+            <h6 class="mb-2" style="font-size: 0.85rem; color: #64748b;">Custom Range</h6>
+            <div class="mb-2">
+              <label for="start_date" class="form-label" style="font-size: 0.8rem; margin-bottom: 0.25rem;">Start Date</label>
+              <input type="date" class="form-control form-control-sm" id="start_date" name="start" value="{{ start_date_param|default:'' }}">
+            </div>
+            <div class="mb-3">
+              <label for="end_date" class="form-label" style="font-size: 0.8rem; margin-bottom: 0.25rem;">End Date</label>
+              <input type="date" class="form-control form-control-sm" id="end_date" name="end" value="{{ end_date_param|default:'' }}">
+            </div>
+            <button type="submit" class="btn btn-primary btn-sm w-100">Apply Custom Range</button>
+          </form>
+          
+          <div class="dropdown-divider"></div>
+          
+          <!-- Reset -->
+          <a href="?" class="btn btn-sm btn-outline-secondary w-100">
+            <i class="bi bi-arrow-clockwise"></i> Reset to Default
+          </a>
+        </div>
+      </div>
+    </div>
+    
+    <div class="kpi-grid" data-testid="welding-dashboard-kpis">
+      <div class="kpi-card">
+        <div class="kpi-label">💰 Revenue ({{ range_label|default:"MTD" }})</div>
+        <div class="kpi-value success">MWK {{ revenue_this_month|floatformat:0|intcomma }}</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">💸 Costs ({{ range_label|default:"MTD" }})</div>
+        <div class="kpi-value danger">MWK {{ costs_this_month|floatformat:0|intcomma }}</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">📊 Profit ({{ range_label|default:"MTD" }})</div>
+        <div class="kpi-value {% if profit_this_month >= 0 %}success{% else %}danger{% endif %}">MWK {{ profit_this_month|floatformat:0|intcomma }}</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">📋 Quotes ({{ range_label|default:"MTD" }})</div>
+        <div class="kpi-value primary">{{ quotes_this_month }}</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">🔨 Active Jobs</div>
+        <div class="kpi-value info">{{ jobs_active }}</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">📄 Outstanding</div>
+        <div class="kpi-value warning">MWK {{ total_outstanding|floatformat:0|intcomma }}</div>
+      </div>
+      {% if delayed_jobs > 0 %}
+      <div class="kpi-card" style="border-left:4px solid #dc2626">
+        <div class="kpi-label" style="color:#dc2626">⏰ Delayed Jobs (>14 days)</div>
+        <div class="kpi-value" style="color:#dc2626">{{ delayed_jobs }}</div>
+      </div>
+      {% endif %}
+    </div>
+    
+    <!-- ===== JOB PIPELINE KANBAN ===== -->
+    <div class="section-card" style="margin-bottom:1.5rem;" data-testid="welding-job-pipeline">
+      <div class="section-header">
+        <div class="section-title">🏭 Job Pipeline</div>
+        <a href="{% url 'verticals:welding_jobs_list' %}" class="section-link">View All</a>
+      </div>
+      <div class="section-body" style="padding:1.25rem;">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;" data-testid="job-pipeline-stages">
+          {% with q_count=quotes_pending jobs_pending=jobs_active %}
+          <!-- Quotation Stage -->
+          <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:14px;text-align:center;position:relative;">
+            <div style="position:absolute;top:-1px;left:0;right:0;height:3px;background:#6366f1;border-radius:12px 12px 0 0;"></div>
+            <div style="font-size:1.5rem;margin-bottom:6px;">📝</div>
+            <div style="font-size:1.5rem;font-weight:800;color:#0f172a;">{{ quotes_pending }}</div>
+            <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#64748b;">Quotation</div>
+          </div>
+          <!-- Approved -->
+          <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:14px;text-align:center;position:relative;">
+            <div style="position:absolute;top:-1px;left:0;right:0;height:3px;background:#10b981;border-radius:12px 12px 0 0;"></div>
+            <div style="font-size:1.5rem;margin-bottom:6px;">✅</div>
+            <div style="font-size:1.5rem;font-weight:800;color:#0f172a;">{{ jobs_active }}</div>
+            <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#64748b;">In Progress</div>
+          </div>
+          <!-- Fabrication -->
+          <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:14px;text-align:center;position:relative;">
+            <div style="position:absolute;top:-1px;left:0;right:0;height:3px;background:#2563eb;border-radius:12px 12px 0 0;"></div>
+            <div style="font-size:1.5rem;margin-bottom:6px;">🔧</div>
+            <div style="font-size:1.5rem;font-weight:800;color:#0f172a;">{% if jobs_active > 0 %}{{ jobs_active|add:"-1" }}{% else %}0{% endif %}</div>
+            <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#64748b;">Fabrication</div>
+          </div>
+          <!-- Finishing -->
+          <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:12px;padding:14px;text-align:center;position:relative;">
+            <div style="position:absolute;top:-1px;left:0;right:0;height:3px;background:#eab308;border-radius:12px 12px 0 0;"></div>
+            <div style="font-size:1.5rem;margin-bottom:6px;">🎨</div>
+            <div style="font-size:1.5rem;font-weight:800;color:#0f172a;">{{ jobs_ready }}</div>
+            <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#64748b;">Ready</div>
+          </div>
+          <!-- Delivered -->
+          <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:14px;text-align:center;position:relative;">
+            <div style="position:absolute;top:-1px;left:0;right:0;height:3px;background:#16a34a;border-radius:12px 12px 0 0;"></div>
+            <div style="font-size:1.5rem;margin-bottom:6px;">🚚</div>
+            <div style="font-size:1.5rem;font-weight:800;color:#16a34a;">{{ jobs_completed_in_range }}</div>
+            <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#64748b;">Delivered</div>
+          </div>
+          <!-- Paid -->
+          <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:14px;text-align:center;position:relative;">
+            <div style="position:absolute;top:-1px;left:0;right:0;height:3px;background:#059669;border-radius:12px 12px 0 0;"></div>
+            <div style="font-size:1.5rem;margin-bottom:6px;">💰</div>
+            <div style="font-size:1.5rem;font-weight:800;color:#059669;">MWK {{ revenue_this_month|floatformat:0|intcomma }}</div>
+            <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#64748b;">Paid ({{ range_label|default:"MTD" }})</div>
+          </div>
+          {% endwith %}
+        </div>
+        {% if delayed_jobs > 0 %}
+        <div style="margin-top:12px;background:#fef2f2;border:1px solid #fecaca;border-radius:10px;padding:10px 14px;display:flex;align-items:center;gap:10px;font-size:.85rem;">
+          <span style="font-size:1.25rem;">⏰</span>
+          <span style="color:#dc2626;font-weight:600;">{{ delayed_jobs }} job{{ delayed_jobs|pluralize }} overdue (>14 days)</span>
+          <a href="{% url 'verticals:welding_jobs_list' %}?status=active" style="margin-left:auto;color:#dc2626;font-weight:700;text-decoration:none;">Review →</a>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- ===== GAMIFICATION PANEL ===== -->
+    <div data-testid="welding-gamification" style="background:#fff;border:1px solid #e2e8f0;box-shadow:0 14px 36px rgba(15,23,42,.08);border-radius:20px;padding:1.5rem;margin-bottom:1.5rem;color:#0f172a;position:relative;overflow:hidden;">
+      <div style="position:absolute;top:-40%;right:-10%;width:300px;height:300px;background:radial-gradient(circle,rgba(249,115,22,.12) 0%,transparent 70%);pointer-events:none;"></div>
+      <div style="position:relative;z-index:1;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;flex-wrap:wrap;gap:10px;">
+          <div>
+            <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#64748b;margin-bottom:4px;">Workshop Productivity</div>
+            <h3 style="margin:0;font-size:1.25rem;font-weight:800;color:#0f172a;" data-testid="workshop-productivity-title">🏆 Workshop Score</h3>
+          </div>
+          <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:8px 16px;text-align:center;">
+            <div style="font-size:1.75rem;font-weight:900;color:#2563eb;">
+              {% with total=jobs_completed_in_range|add:quotes_this_month %}
+                {% if total > 30 %}🥇 Level 5{% elif total > 20 %}🥈 Level 4{% elif total > 10 %}🥉 Level 3{% elif total > 5 %}⭐ Level 2{% else %}🔰 Level 1{% endif %}
+              {% endwith %}
+            </div>
+            <div style="font-size:.7rem;color:#64748b;margin-top:2px;">Workshop Level</div>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:1.25rem;" data-testid="gamification-widgets">
+          <!-- Jobs Completed -->
+          <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:12px;">
+            <div style="font-size:.7rem;color:#64748b;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;">Jobs Completed</div>
+            <div style="font-size:1.5rem;font-weight:800;color:#34d399;">{{ jobs_completed_in_range }}</div>
+            <div style="font-size:.72rem;color:#64748b;">{{ range_label|default:"This period" }}</div>
+          </div>
+          <!-- Profit -->
+          <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:12px;">
+            <div style="font-size:.7rem;color:#64748b;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;">Profit Earned</div>
+            <div style="font-size:1.2rem;font-weight:800;color:{% if profit_this_month >= 0 %}#34d399{% else %}#f87171{% endif %};">MWK {{ profit_this_month|floatformat:0|intcomma }}</div>
+            <div style="font-size:.72rem;color:#64748b;">{{ range_label|default:"This period" }}</div>
+          </div>
+          <!-- Material Efficiency -->
+          <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:12px;">
+            <div style="font-size:.7rem;color:#64748b;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;">Material Alerts</div>
+            <div style="font-size:1.5rem;font-weight:800;color:{% if low_stock_count > 0 %}#fbbf24{% else %}#34d399{% endif %};">{{ low_stock_count }}</div>
+            <div style="font-size:.72rem;color:#64748b;">Low stock items</div>
+          </div>
+          <!-- On-Time Badge -->
+          <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:12px;">
+            <div style="font-size:.7rem;color:#64748b;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;">On-Time Delivery</div>
+            <div style="font-size:1.5rem;font-weight:800;color:{% if delayed_jobs == 0 %}#34d399{% else %}#f87171{% endif %};">
+              {% if delayed_jobs == 0 %}🎯 Perfect{% else %}{{ delayed_jobs }} Late{% endif %}
+            </div>
+            <div style="font-size:.72rem;color:#64748b;">Active job delays</div>
+          </div>
+        </div>
+
+        <!-- Revenue Target Progress -->
+        <div data-testid="revenue-target-progress">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;font-size:.8rem;">
+            <span style="color:#475569;font-weight:600;">Revenue Target Progress</span>
+            <span style="color:#2563eb;font-weight:700;">
+              MWK {{ revenue_this_month|floatformat:0|intcomma }} / MWK 500,000
+            </span>
+          </div>
+          <div style="height:8px;background:#dbeafe;border-radius:999px;overflow:hidden;">
+            <div style="height:100%;border-radius:999px;background:linear-gradient(90deg,#2563eb,#0ea5e9);
+                        width:{% widthratio revenue_this_month 500000 100 %}%;max-width:100%;transition:width .5s ease;">
+            </div>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:.68rem;color:#64748b;margin-top:4px;">
+            <span>0</span>
+            <span>Target: MWK 500,000</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Charts Row -->
+    <div class="charts-row" data-testid="welding-charts">
+      <!-- Revenue Trend Chart -->
+      <div class="chart-card">
+        <div class="chart-card-header">
+          <h3><i class="bi bi-graph-up me-2"></i>Revenue Trend (Last 30 Days)</h3>
+        </div>
+        <div class="chart-card-body">
+          <canvas id="revenueTrendChart" data-testid="welding-revenue-chart"></canvas>
+        </div>
+      </div>
+      
+      <!-- Quotes Trend Chart -->
+      <div class="chart-card">
+        <div class="chart-card-header">
+          <h3><i class="bi bi-file-text me-2"></i>Quotes & Jobs Trend</h3>
+        </div>
+        <div class="chart-card-body">
+          <canvas id="quotesJobsChart" data-testid="welding-quotes-chart"></canvas>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Recent Activity -->
+    <div class="section-grid">
+      <!-- Recent Quotes -->
+      <div class="section-card">
+        <div class="section-header">
+          <div class="section-title">📝 Recent Quotes</div>
+          <a href="{% url 'verticals:welding_quotes_list' %}" class="section-link">View All</a>
+        </div>
+        <div class="section-body">
+          {% if recent_quotes %}
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Quote #</th>
+                <th>Customer</th>
+                <th>Total</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for quote in recent_quotes %}
+              <tr onclick="window.location='{% url 'verticals:welding_quote_detail' quote.id %}';">
+                <td>{{ quote.quote_number }}</td>
+                <td>{{ quote.customer_name|truncatechars:15 }}</td>
+                <td>MWK {{ quote.total|floatformat:0|intcomma }}</td>
+                <td><span class="status-badge {{ quote.status }}">{{ quote.get_status_display }}</span></td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          {% else %}
+          <div class="empty-state">
+            <div class="empty-icon">📝</div>
+            <p>No quotes yet.</p>
+            <a href="{{ url_create_quote }}" class="section-link">Create First Quote</a>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+      
+      <!-- Recent Jobs -->
+      <div class="section-card">
+        <div class="section-header">
+          <div class="section-title">🔨 Recent Jobs</div>
+          <a href="{% url 'verticals:welding_jobs_list' %}" class="section-link">View All</a>
+        </div>
+        <div class="section-body">
+          {% if recent_jobs %}
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Job #</th>
+                <th>Customer</th>
+                <th>Price</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for job in recent_jobs %}
+              <tr onclick="window.location='{% url 'verticals:welding_job_detail' job.id %}';">
+                <td>{{ job.job_number }}</td>
+                <td>{{ job.customer_name|truncatechars:15 }}</td>
+                <td>MWK {{ job.quoted_price|floatformat:0|intcomma }}</td>
+                <td><span class="status-badge {{ job.status }}">{{ job.get_status_display }}</span></td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          {% else %}
+          <div class="empty-state">
+            <div class="empty-icon">🔨</div>
+            <p>No jobs yet.</p>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    
+    <!-- Insights Section -->
+    <div class="insights-section" data-testid="welding-insights">
+      <div class="insights-header">
+        <h3>💡 Insights</h3>
+      </div>
+      <div class="insights-grid">
+        <div class="insight-card">
+          <div class="insight-label">Jobs Created</div>
+          <div class="insight-value">{{ jobs_created_in_range }}</div>
+        </div>
+        <div class="insight-card">
+          <div class="insight-label">Jobs Completed</div>
+          <div class="insight-value">{{ jobs_completed_in_range }}</div>
+        </div>
+        <div class="insight-card">
+          <div class="insight-label">Average Job Value</div>
+          <div class="insight-value">MWK {{ avg_job_value|floatformat:0|intcomma }}</div>
+        </div>
+        <div class="insight-card">
+          <div class="insight-label">Outstanding Jobs</div>
+          <div class="insight-value">{{ outstanding_jobs }}</div>
+        </div>
+        <div class="insight-card">
+          <div class="insight-label">Top Job Type</div>
+          <div class="insight-value" style="font-size: 1rem;">{{ top_job_category }}</div>
+        </div>
+        <div class="insight-card">
+          <div class="insight-label">Pending Quotes</div>
+          <div class="insight-value">{{ quotes_pending }}</div>
+        </div>
+        <div class="insight-card">
+          <div class="insight-label">Jobs Ready for Pickup</div>
+          <div class="insight-value">{{ jobs_ready }}</div>
+        </div>
+        <div class="insight-card">
+          <div class="insight-label">Low Stock Materials</div>
+          <div class="insight-value">{{ low_stock_count }}</div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Top Clients -->
+    {% if top_clients %}
+    <div class="section-card" style="margin-bottom:1.5rem">
+      <div class="section-header">
+        <div class="section-title">👥 Top Clients</div>
+        <a href="{% url 'verticals:welding_client_management' %}" class="section-link">View All</a>
+      </div>
+      <div class="section-body" style="padding:1rem 1.5rem">
+        {% for client in top_clients %}
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid #e2e8f0">
+          <div>
+            <div style="font-weight:700;color:#0f172a">{{ client.customer_name }}</div>
+            {% if client.customer_phone %}
+            <div style="font-size:.8rem;color:#64748b">{{ client.customer_phone }}</div>
+            {% endif %}
+          </div>
+          <div style="text-align:right">
+            <div style="font-weight:700;color:#16a34a">MWK {{ client.total_value|floatformat:0|intcomma }}</div>
+            <div style="font-size:.78rem;color:#64748b">{{ client.quote_count }} quote{{ client.quote_count|pluralize }}</div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Ready for Pickup Banner -->
+    {% if jobs_ready > 0 %}
+    <div class="ready-banner">
+      <div class="ready-icon">✅</div>
+      <div class="ready-text">
+        <div class="ready-title">{{ jobs_ready }} job{{ jobs_ready|pluralize }} ready for pickup</div>
+        <a href="{% url 'verticals:welding_jobs_list' %}?status=ready" class="ready-link">View ready jobs →</a>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  // Revenue Trend Chart
+  const revenueTrendData = {{ revenue_trend_json|safe|default:'[]' }};
+  const quotesJobsData = {{ quotes_jobs_trend_json|safe|default:'[]' }};
+  
+  // Revenue Trend Chart
+  const revenueCtx = document.getElementById('revenueTrendChart');
+  if (revenueCtx && revenueTrendData.length > 0) {
+    new Chart(revenueCtx, {
+      type: 'line',
+      data: {
+        labels: revenueTrendData.map(d => d.date),
+        datasets: [{
+          label: 'Revenue (MWK)',
+          data: revenueTrendData.map(d => d.revenue),
+          borderColor: '#16a34a',
+          backgroundColor: 'rgba(22, 163, 74, 0.1)',
+          fill: true,
+          tension: 0.4,
+          pointRadius: 4,
+          pointHoverRadius: 6,
+          pointBackgroundColor: '#16a34a',
+          borderWidth: 2.5,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: 'rgba(15, 23, 42, 0.9)',
+            padding: 12,
+            callbacks: {
+              label: function(context) {
+                return 'MWK ' + context.parsed.y.toLocaleString();
+              }
+            }
+          }
+        },
+        scales: {
+          x: {
+            grid: { display: false },
+            ticks: { font: { size: 11 }, maxRotation: 45 }
+          },
+          y: {
+            beginAtZero: true,
+            grid: { color: 'rgba(226, 232, 240, 0.5)' },
+            ticks: {
+              font: { size: 11 },
+              callback: function(value) {
+                if (value >= 1000000) return 'MWK ' + (value / 1000000).toFixed(1) + 'M';
+                if (value >= 1000) return 'MWK ' + (value / 1000).toFixed(0) + 'K';
+                return 'MWK ' + value.toLocaleString();
+              },
+              // Calculate nice step size based on max value
+              stepSize: (function() {
+                const data = revenueTrendData.map(d => d.revenue);
+                const maxValue = Math.max(...data, 0);
+                
+                if (maxValue === 0) return 50000;  // Default when no data
+                if (maxValue <= 50000) return 10000;
+                if (maxValue <= 200000) return 50000;
+                if (maxValue <= 1000000) return 100000;
+                return 500000;
+              })()
+            }
+          }
+        }
+      }
+    });
+  } else if (revenueCtx) {
+    // Empty state
+    revenueCtx.parentElement.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#64748b;text-align:center;"><div><div style="font-size:2rem;margin-bottom:0.5rem;">📊</div><p>No revenue data yet</p></div></div>';
+  }
+  
+  // Quotes & Jobs Trend Chart
+  const quotesCtx = document.getElementById('quotesJobsChart');
+  if (quotesCtx && quotesJobsData.length > 0) {
+    new Chart(quotesCtx, {
+      type: 'bar',
+      data: {
+        labels: quotesJobsData.map(d => d.date),
+        datasets: [
+          {
+            label: 'Quotes',
+            data: quotesJobsData.map(d => d.quotes),
+            backgroundColor: 'rgba(37, 99, 235, 0.8)',
+            borderColor: '#2563eb',
+            borderWidth: 1,
+            borderRadius: 4,
+          },
+          {
+            label: 'Jobs',
+            data: quotesJobsData.map(d => d.jobs),
+            backgroundColor: 'rgba(37, 99, 235, 0.8)',
+            borderColor: '#2563eb',
+            borderWidth: 1,
+            borderRadius: 4,
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            display: true,
+            position: 'top',
+            labels: {
+              usePointStyle: true,
+              padding: 15,
+              font: { size: 12, weight: '600' }
+            }
+          },
+          tooltip: {
+            backgroundColor: 'rgba(15, 23, 42, 0.9)',
+            padding: 12
+          }
+        },
+        scales: {
+          x: {
+            grid: { display: false },
+            ticks: { font: { size: 11 }, maxRotation: 45 }
+          },
+          y: {
+            grid: { color: 'rgba(226, 232, 240, 0.5)' },
+            ticks: {
+              stepSize: 1,
+              font: { size: 11 }
+            }
+          }
+        }
+      }
+    });
+  } else if (quotesCtx) {
+    // Empty state
+    quotesCtx.parentElement.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#64748b;text-align:center;"><div><div style="font-size:2rem;margin-bottom:0.5rem;">📈</div><p>No quotes/jobs data yet</p></div></div>';
+  }
+});
+</script>
+{% endblock %}

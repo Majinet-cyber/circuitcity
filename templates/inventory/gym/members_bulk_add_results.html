@@ -1,0 +1,178 @@
+{% extends "inventory/base.html" %}
+{% load static %}
+
+{% block title %}Bulk Add Results - {{ business.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .result-section {
+        margin-bottom: 20px;
+    }
+    .result-table {
+        font-size: 14px;
+    }
+    .result-table td, .result-table th {
+        padding: 8px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-md-10 offset-md-1">
+            <div class="card">
+                <div class="card-header bg-success text-white">
+                    <h4 class="mb-0">
+                        <i class="bi bi-check-circle"></i> Bulk Add Results
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <!-- Summary -->
+                    <div class="alert alert-success">
+                        <h5><i class="bi bi-bar-chart-fill"></i> Summary:</h5>
+                        <ul class="mb-0">
+                            <li><strong>Created:</strong> {{ results.created|length }} member(s)</li>
+                            <li><strong>Skipped (duplicates):</strong> {{ results.skipped_duplicates|length }}</li>
+                            <li><strong>Errors:</strong> {{ results.errors|length }}</li>
+                        </ul>
+                    </div>
+
+                    <!-- Created Members -->
+                    {% if results.created %}
+                    <div class="result-section">
+                        <h5 class="text-success">
+                            <i class="bi bi-check-circle-fill"></i> Successfully Created ({{ results.created|length }})
+                        </h5>
+                        <div class="table-responsive">
+                            <table class="table table-striped table-hover result-table">
+                                <thead class="table-success">
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Phone</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for member in results.created %}
+                                    <tr>
+                                        <td>{{ member.name }}</td>
+                                        <td>{{ member.phone|default:"—" }}</td>
+                                        <td>
+                                            <a href="{% url 'gym:member_detail' member.id %}" class="btn btn-sm btn-primary">
+                                                <i class="bi bi-eye"></i> View
+                                            </a>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- Skipped Duplicates -->
+                    {% if results.skipped_duplicates %}
+                    <div class="result-section">
+                        <h5 class="text-warning">
+                            <i class="bi bi-exclamation-triangle-fill"></i> Skipped Duplicates ({{ results.skipped_duplicates|length }})
+                        </h5>
+                        <div class="table-responsive">
+                            <table class="table table-striped table-hover result-table">
+                                <thead class="table-warning">
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Reason</th>
+                                        <th>Existing Member</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for item in results.skipped_duplicates %}
+                                    <tr>
+                                        <td>{{ item.name }}</td>
+                                        <td>
+                                            {% if item.reason == "duplicate_name" %}
+                                            Duplicate name (already exists)
+                                            {% elif item.reason == "duplicate_in_batch" %}
+                                            Duplicate in batch (appears multiple times)
+                                            {% else %}
+                                            {{ item.reason }}
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if item.existing_member_id %}
+                                            <a href="{% url 'gym:member_detail' item.existing_member_id %}" class="btn btn-sm btn-info">
+                                                <i class="bi bi-eye"></i> View Existing
+                                            </a>
+                                            {% else %}
+                                            —
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- Errors -->
+                    {% if results.errors %}
+                    <div class="result-section">
+                        <h5 class="text-danger">
+                            <i class="bi bi-x-circle-fill"></i> Errors ({{ results.errors|length }})
+                        </h5>
+                        <div class="table-responsive">
+                            <table class="table table-striped table-hover result-table">
+                                <thead class="table-danger">
+                                    <tr>
+                                        <th>Row</th>
+                                        <th>Name</th>
+                                        <th>Error</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for item in results.errors %}
+                                    <tr>
+                                        <td>{{ item.row_index|add:1 }}</td>
+                                        <td>{{ item.name }}</td>
+                                        <td class="text-danger">{{ item.error }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- Actions -->
+                    <div class="d-flex justify-content-between mt-4">
+                        <a href="{% url 'gym:members_bulk_add' %}" class="btn btn-secondary">
+                            <i class="bi bi-arrow-left"></i> Add More Members
+                        </a>
+                        <a href="{% url 'gym:members_list' %}" class="btn btn-primary">
+                            <i class="bi bi-people-fill"></i> View Members List
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

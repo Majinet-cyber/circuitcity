@@ -1,0 +1,1116 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Add Clothing Product · Step 1{% endblock %}
+
+{% block extra_css %}
+<style>
+  :root {
+    --cc-primary: #0ea5e9;
+    --cc-primary-dark: #0284c7;
+    --cc-success: #10b981;
+    --cc-danger: #ef4444;
+    --cc-warning: #f59e0b;
+    --cc-bg: #f8fafc;
+    --cc-card: #ffffff;
+    --cc-border: #e2e8f0;
+    --cc-text: #1e293b;
+    --cc-text-muted: #64748b;
+  }
+
+  .stockin-container {
+    max-width: 780px;
+    margin: 0 auto;
+    padding: 24px 16px;
+  }
+
+  .stockin-header {
+    text-align: center;
+    margin-bottom: 24px;
+  }
+
+  .stockin-header h1 {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--cc-text);
+    margin: 0 0 8px;
+  }
+
+  .stockin-header p {
+    color: var(--cc-text-muted);
+    margin: 0;
+  }
+
+  .stockin-card {
+    background: var(--cc-card);
+    border-radius: 16px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    padding: 24px;
+    margin-bottom: 20px;
+  }
+
+  .picker-section {
+    margin-bottom: 28px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--cc-border);
+  }
+
+  .picker-section:last-of-type {
+    border-bottom: none;
+  }
+
+  .picker-label {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-weight: 600;
+    color: var(--cc-text);
+    margin-bottom: 12px;
+    font-size: 0.95rem;
+  }
+
+  .picker-label .required {
+    color: var(--cc-danger);
+  }
+
+  .ready-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: var(--cc-success);
+    color: white;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+
+  /* Category Cards Grid */
+  .category-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+    gap: 10px;
+  }
+
+  .category-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 16px 8px;
+    border: 2px solid var(--cc-border);
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: center;
+    background: white;
+  }
+
+  .category-card:hover {
+    border-color: var(--cc-primary);
+    background: rgba(14, 165, 233, 0.05);
+    transform: translateY(-2px);
+  }
+
+  .category-card.selected {
+    border-color: var(--cc-primary);
+    background: linear-gradient(135deg, rgba(14, 165, 233, 0.15), rgba(14, 165, 233, 0.08));
+    box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.25), 0 4px 12px rgba(14, 165, 233, 0.2);
+  }
+
+  .category-icon {
+    font-size: 2rem;
+    margin-bottom: 6px;
+  }
+
+  .category-name {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--cc-text);
+  }
+
+  /* Brand/Size/Color Chips */
+  .chips-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .chip {
+    padding: 10px 16px;
+    border: 2px solid var(--cc-border);
+    border-radius: 24px;
+    cursor: pointer;
+    transition: all 0.18s;
+    font-size: 0.9rem;
+    font-weight: 500;
+    background: white;
+    color: var(--cc-text);
+  }
+
+  .chip:hover {
+    border-color: var(--cc-primary);
+    background: rgba(14, 165, 233, 0.05);
+    transform: scale(1.05);
+  }
+
+  .chip.selected {
+    border-color: var(--cc-primary);
+    background: var(--cc-primary);
+    color: white;
+    box-shadow: 0 2px 8px rgba(14, 165, 233, 0.3);
+  }
+
+  .chip.other-chip {
+    border-style: dashed;
+  }
+
+  /* Type Cards (dynamic by category) */
+  .type-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: 10px;
+  }
+
+  .type-card {
+    padding: 14px 10px;
+    border: 2px solid var(--cc-border);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: center;
+    font-size: 0.85rem;
+    font-weight: 600;
+    background: white;
+    color: var(--cc-text);
+  }
+
+  .type-card:hover {
+    border-color: var(--cc-primary);
+    background: rgba(14, 165, 233, 0.05);
+    transform: translateY(-2px);
+  }
+
+  .type-card.selected {
+    border-color: var(--cc-primary);
+    background: linear-gradient(135deg, rgba(14, 165, 233, 0.15), rgba(14, 165, 233, 0.08));
+    box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.25);
+  }
+
+  /* Stock Mode Cards */
+  .stock-mode-options {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  .stock-mode-option {
+    position: relative;
+  }
+
+  .stock-mode-option input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .stock-mode-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 18px 14px;
+    border: 2px solid var(--cc-border);
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: center;
+    background: white;
+  }
+
+  .stock-mode-card:hover {
+    border-color: var(--cc-primary);
+    background: rgba(14, 165, 233, 0.05);
+    transform: translateY(-2px);
+  }
+
+  .stock-mode-option input:checked + .stock-mode-card {
+    border-color: var(--cc-primary);
+    background: linear-gradient(135deg, rgba(14, 165, 233, 0.15), rgba(14, 165, 233, 0.08));
+    box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.25), 0 4px 12px rgba(14, 165, 233, 0.2);
+  }
+
+  .stock-mode-icon {
+    font-size: 2.2rem;
+    margin-bottom: 8px;
+  }
+
+  .stock-mode-title {
+    font-weight: 600;
+    color: var(--cc-text);
+    margin-bottom: 4px;
+    font-size: 0.95rem;
+  }
+
+  .stock-mode-desc {
+    font-size: 0.75rem;
+    color: var(--cc-text-muted);
+    line-height: 1.3;
+  }
+
+  /* Product Name Input */
+  .name-input-wrapper {
+    position: relative;
+  }
+
+  .form-control {
+    width: 100%;
+    padding: 12px 14px;
+    border: 2px solid var(--cc-border);
+    border-radius: 10px;
+    font-size: 1rem;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .form-control:focus {
+    outline: none;
+    border-color: var(--cc-primary);
+    box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.15);
+  }
+
+  .form-control.is-invalid {
+    border-color: var(--cc-danger);
+  }
+
+  .form-control-help {
+    font-size: 0.8rem;
+    color: var(--cc-text-muted);
+    margin-top: 4px;
+  }
+
+  .regenerate-link {
+    font-size: 0.8rem;
+    color: var(--cc-primary);
+    cursor: pointer;
+    text-decoration: underline;
+    margin-top: 4px;
+    display: inline-block;
+  }
+
+  .regenerate-link:hover {
+    color: var(--cc-primary-dark);
+  }
+
+  .error-message {
+    color: var(--cc-danger);
+    font-size: 0.85rem;
+    margin-top: 4px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  /* Price inputs side by side */
+  .price-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+
+  .form-group {
+    margin-bottom: 0;
+  }
+
+  .form-group label {
+    display: block;
+    font-weight: 600;
+    color: var(--cc-text);
+    margin-bottom: 6px;
+    font-size: 0.9rem;
+  }
+
+  .form-group label .required {
+    color: var(--cc-danger);
+  }
+
+  @media (max-width: 480px) {
+    .price-row {
+      grid-template-columns: 1fr;
+      gap: 20px;
+    }
+    .category-grid {
+      grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+    }
+  }
+
+  /* Buttons */
+  .btn-submit {
+    width: 100%;
+    padding: 16px 24px;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #fff;
+    background: linear-gradient(135deg, var(--cc-primary), var(--cc-primary-dark));
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s, opacity 0.2s;
+    margin-top: 28px;
+  }
+
+  .btn-submit:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(14, 165, 233, 0.3);
+  }
+
+  .btn-submit:active:not(:disabled) {
+    transform: translateY(0);
+  }
+
+  .btn-submit:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .btn-cancel {
+    display: block;
+    text-align: center;
+    padding: 12px;
+    color: var(--cc-text-muted);
+    text-decoration: none;
+    font-weight: 500;
+    margin-top: 12px;
+  }
+
+  .btn-cancel:hover {
+    color: var(--cc-text);
+  }
+
+  /* Summary alert */
+  .validation-summary {
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    border-radius: 10px;
+    padding: 12px 16px;
+    margin-bottom: 20px;
+    color: var(--cc-danger);
+    font-size: 0.9rem;
+  }
+
+  /* Progress indicator */
+  .step-indicator {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 20px;
+  }
+
+  .step-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--cc-border);
+  }
+
+  .step-dot.active {
+    background: var(--cc-primary);
+    box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.2);
+  }
+
+  .step-dot.complete {
+    background: var(--cc-success);
+  }
+
+  .step-label {
+    font-size: 0.85rem;
+    color: var(--cc-text-muted);
+    font-weight: 500;
+  }
+
+  /* Custom input for "Other" options */
+  .other-input {
+    display: none;
+    margin-top: 10px;
+  }
+
+  .other-input.show {
+    display: block;
+  }
+
+  .other-input input {
+    width: 100%;
+    padding: 10px 12px;
+    border: 2px solid var(--cc-primary);
+    border-radius: 8px;
+    font-size: 0.9rem;
+  }
+
+  /* Hidden inputs */
+  .hidden-inputs {
+    display: none;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="stockin-container">
+  <!-- Step Indicator -->
+  <div class="step-indicator">
+    <span class="step-label">Basics 1/2</span>
+    <div class="step-dot active" title="Step 1: Product Setup"></div>
+    <div class="step-dot" title="Step 2: Barcodes (if unique stock)"></div>
+  </div>
+
+  <!-- Header -->
+  <div class="stockin-header">
+    <h1>👕 Add Clothing Product</h1>
+    <p>Click to pick — minimal typing required!</p>
+  </div>
+
+  <!-- Validation Summary (only shown if errors exist after submit) -->
+  {% if errors %}
+  <div class="validation-summary">
+    ❌ Please fix the errors below and try again.
+  </div>
+  {% endif %}
+
+  <form method="POST" class="stockin-card" id="clothingForm">
+    {% csrf_token %}
+
+    <!-- ========== CATEGORY PICKER ========== -->
+    <div class="picker-section">
+      <div class="picker-label">
+        <span>1️⃣ Category</span>
+      </div>
+      <div class="category-grid" id="categoryPicker">
+        <div class="category-card" data-value="shoes">
+          <div class="category-icon">👟</div>
+          <div class="category-name">Shoes</div>
+        </div>
+        <div class="category-card" data-value="dresses">
+          <div class="category-icon">👗</div>
+          <div class="category-name">Dresses</div>
+        </div>
+        <div class="category-card" data-value="shirts">
+          <div class="category-icon">👔</div>
+          <div class="category-name">Shirts</div>
+        </div>
+        <div class="category-card" data-value="tshirts">
+          <div class="category-icon">👕</div>
+          <div class="category-name">T-Shirts</div>
+        </div>
+        <div class="category-card" data-value="jeans">
+          <div class="category-icon">👖</div>
+          <div class="category-name">Jeans</div>
+        </div>
+        <div class="category-card" data-value="trousers">
+          <div class="category-icon">👖</div>
+          <div class="category-name">Trousers</div>
+        </div>
+        <div class="category-card" data-value="jackets">
+          <div class="category-icon">🧥</div>
+          <div class="category-name">Jackets</div>
+        </div>
+        <div class="category-card" data-value="skirts">
+          <div class="category-icon">👗</div>
+          <div class="category-name">Skirts</div>
+        </div>
+        <div class="category-card" data-value="suits">
+          <div class="category-icon">🤵</div>
+          <div class="category-name">Suits</div>
+        </div>
+        <div class="category-card" data-value="sweaters">
+          <div class="category-icon">🧶</div>
+          <div class="category-name">Sweaters</div>
+        </div>
+        <div class="category-card" data-value="accessories">
+          <div class="category-icon">👜</div>
+          <div class="category-name">Bags</div>
+        </div>
+        <div class="category-card" data-value="other">
+          <div class="category-icon">📦</div>
+          <div class="category-name">Other</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========== BRAND PICKER ========== -->
+    <div class="picker-section">
+      <div class="picker-label">
+        <span>2️⃣ Brand</span>
+      </div>
+      <div class="chips-grid" id="brandPicker">
+        <div class="chip" data-value="Nike">Nike</div>
+        <div class="chip" data-value="Adidas">Adidas</div>
+        <div class="chip" data-value="Puma">Puma</div>
+        <div class="chip" data-value="Converse">Converse</div>
+        <div class="chip" data-value="Vans">Vans</div>
+        <div class="chip" data-value="New Balance">New Balance</div>
+        <div class="chip" data-value="Reebok">Reebok</div>
+        <div class="chip" data-value="Under Armour">Under Armour</div>
+        <div class="chip" data-value="Jordan">Jordan</div>
+        <div class="chip" data-value="Skechers">Skechers</div>
+        <div class="chip" data-value="Timberland">Timberland</div>
+        <div class="chip" data-value="Clarks">Clarks</div>
+        <div class="chip" data-value="Zara">Zara</div>
+        <div class="chip" data-value="H&M">H&M</div>
+        <div class="chip" data-value="Levi's">Levi's</div>
+        <div class="chip" data-value="Diesel">Diesel</div>
+        <div class="chip" data-value="Gucci">Gucci</div>
+        <div class="chip" data-value="Louis Vuitton">Louis Vuitton</div>
+        <div class="chip other-chip" data-value="Other">Other Brand</div>
+      </div>
+      <div class="other-input" id="brandOtherInput">
+        <input type="text" placeholder="Type brand name..." id="brandCustom">
+      </div>
+    </div>
+
+    <!-- ========== TYPE/SUBTYPE PICKER ========== -->
+    <div class="picker-section" id="typeSection" style="display: none;">
+      <div class="picker-label">
+        <span>3️⃣ Type</span>
+      </div>
+      <div class="type-grid" id="typePicker"></div>
+    </div>
+
+    <!-- ========== SIZE PICKER ========== -->
+    <div class="picker-section">
+      <div class="picker-label">
+        <span>4️⃣ Size</span>
+      </div>
+      <div class="chips-grid" id="sizePicker">
+        <!-- Will be populated dynamically based on category -->
+      </div>
+      <div class="other-input" id="sizeOtherInput">
+        <input type="text" placeholder="Type size..." id="sizeCustom">
+      </div>
+    </div>
+
+    <!-- ========== COLOR PICKER ========== -->
+    <div class="picker-section">
+      <div class="picker-label">
+        <span>5️⃣ Color</span>
+      </div>
+      <div class="chips-grid" id="colorPicker">
+        <div class="chip" data-value="Black">Black</div>
+        <div class="chip" data-value="White">White</div>
+        <div class="chip" data-value="Navy">Navy</div>
+        <div class="chip" data-value="Blue">Blue</div>
+        <div class="chip" data-value="Red">Red</div>
+        <div class="chip" data-value="Green">Green</div>
+        <div class="chip" data-value="Brown">Brown</div>
+        <div class="chip" data-value="Grey">Grey</div>
+        <div class="chip" data-value="Beige">Beige</div>
+        <div class="chip" data-value="Pink">Pink</div>
+        <div class="chip" data-value="Yellow">Yellow</div>
+        <div class="chip other-chip" data-value="Other">Other Color</div>
+      </div>
+      <div class="other-input" id="colorOtherInput">
+        <input type="text" placeholder="Type color..." id="colorCustom">
+      </div>
+    </div>
+
+    <!-- ========== PRODUCT NAME ========== -->
+    <div class="picker-section">
+      <div class="picker-label">
+        <span>6️⃣ Product Name <span class="required">*</span></span>
+        <span id="readyBadge" style="display: none;" class="ready-badge">✓ Ready</span>
+      </div>
+      <div class="name-input-wrapper">
+        <input 
+          type="text" 
+          id="name" 
+          name="name" 
+          class="form-control {% if errors.name %}is-invalid{% endif %}"
+          value="{{ form_data.name|default:'' }}"
+          placeholder="Will be auto-generated from your picks..."
+          required
+          autocomplete="off"
+        >
+        {% if errors.name %}
+        <div class="error-message">❌ {{ errors.name }}</div>
+        {% endif %}
+        <div class="form-control-help">Auto-generated. Edit if needed or <span class="regenerate-link" id="regenerateName">regenerate</span></div>
+      </div>
+    </div>
+
+    <!-- ========== STOCK MODE ========== -->
+    <div class="picker-section">
+      <div class="picker-label">
+        <span>7️⃣ Stock Mode <span class="required">*</span></span>
+      </div>
+      <div class="stock-mode-options">
+        <label class="stock-mode-option">
+          <input type="radio" name="stock_mode" value="common" id="stockCommon"
+            {% if form_data.stock_mode == 'common' or not form_data.stock_mode %}checked{% endif %}>
+          <div class="stock-mode-card">
+            <div class="stock-mode-icon">📦</div>
+            <div class="stock-mode-title">Common Stock</div>
+            <div class="stock-mode-desc">Quantity-based, no individual barcodes</div>
+          </div>
+        </label>
+        <label class="stock-mode-option">
+          <input type="radio" name="stock_mode" value="unique" id="stockUnique"
+            {% if form_data.stock_mode == 'unique' %}checked{% endif %}>
+          <div class="stock-mode-card">
+            <div class="stock-mode-icon">📱</div>
+            <div class="stock-mode-title">Unique Stock</div>
+            <div class="stock-mode-desc">Each unit has a barcode</div>
+          </div>
+        </label>
+      </div>
+    </div>
+
+    <!-- ========== QUANTITY & PRICING ========== -->
+    <div class="picker-section">
+      <div class="picker-label">
+        <span>8️⃣ Quantity & Pricing</span>
+      </div>
+      
+      <div style="margin-bottom: 16px;">
+        <label for="quantity" style="display: block; font-weight: 600; font-size: 0.9rem; margin-bottom: 6px;">
+          Quantity <span class="required">*</span>
+        </label>
+        <input 
+          type="number" 
+          id="quantity" 
+          name="quantity" 
+          class="form-control {% if errors.quantity %}is-invalid{% endif %}"
+          value="{{ form_data.quantity|default:'1' }}"
+          min="1"
+          step="1"
+          required
+        >
+        {% if errors.quantity %}
+        <div class="error-message">❌ {{ errors.quantity }}</div>
+        {% endif %}
+      </div>
+
+      <div class="price-row">
+        <div class="form-group">
+          <label for="selling_price">Selling Price (MWK) <span class="required">*</span></label>
+          <input 
+            type="number" 
+            id="selling_price" 
+            name="selling_price" 
+            class="form-control {% if errors.selling_price %}is-invalid{% endif %}"
+            value="{{ form_data.selling_price|default:'' }}"
+            min="0.01"
+            step="0.01"
+            placeholder="e.g., 15000"
+            required
+          >
+          {% if errors.selling_price %}
+          <div class="error-message">❌ {{ errors.selling_price }}</div>
+          {% endif %}
+        </div>
+
+        <div class="form-group">
+          <label for="cost_price">Cost Price (MWK)</label>
+          <input 
+            type="number" 
+            id="cost_price" 
+            name="cost_price" 
+            class="form-control {% if errors.cost_price %}is-invalid{% endif %}"
+            value="{{ form_data.cost_price|default:'' }}"
+            min="0"
+            step="0.01"
+            placeholder="Optional"
+          >
+          {% if errors.cost_price %}
+          <div class="error-message">❌ {{ errors.cost_price }}</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- ========== HIDDEN INPUTS (for backend) ========== -->
+    <div class="hidden-inputs">
+      <input type="hidden" id="hiddenCategory" name="category" value="{{ form_data.category|default:'other' }}">
+      <input type="hidden" id="hiddenBrand" name="brand" value="{{ form_data.brand|default:'' }}">
+      <input type="hidden" id="hiddenSize" name="size" value="{{ form_data.size|default:'' }}">
+      <input type="hidden" id="hiddenColor" name="color" value="{{ form_data.color|default:'' }}">
+    </div>
+
+    {% if errors.location %}
+    <div class="validation-summary">
+      ❌ {{ errors.location }} <a href="/tenants/manage/locations/">Create Location</a>
+    </div>
+    {% endif %}
+
+    <!-- Submit -->
+    <button type="submit" class="btn-submit" id="submitBtn">
+      Save & Continue →
+    </button>
+    <div style="text-align: center; margin-top: 12px; font-size: 0.85rem; color: var(--cc-text-muted);" id="submitHint">
+      Pick a category and stock mode to continue
+    </div>
+  </form>
+
+  <a href="{% url 'verticals:clothing_dashboard' %}" class="btn-cancel">
+    ← Cancel and return to dashboard
+  </a>
+</div>
+
+<script>
+(function() {
+  'use strict';
+
+  // ========== STATE ==========
+  const state = {
+    category: '{{ form_data.category|default:"" }}' || null,
+    brand: '{{ form_data.brand|default:"" }}' || null,
+    type: null,
+    size: '{{ form_data.size|default:"" }}' || null,
+    color: '{{ form_data.color|default:"" }}' || null,
+    stockMode: '{{ form_data.stock_mode|default:"common" }}' || 'common',
+    userEditedName: false
+  };
+
+  // ========== TYPE DEFINITIONS (by category) ==========
+  const typesByCategory = {
+    shoes: ['Sneakers', 'Formal', 'Boots', 'Sandals', 'Slides', 'Loafers', 'Heels', 'Flats'],
+    dresses: ['Evening', 'Casual', 'Office', 'Traditional', 'Maxi', 'Mini'],
+    shirts: ['Formal Shirt', 'Polo', 'Button-up', 'Oxford'],
+    tshirts: ['Crew Neck', 'V-Neck', 'Henley', 'Tank Top'],
+    jeans: ['Slim Fit', 'Straight', 'Bootcut', 'Skinny', 'Wide Leg'],
+    trousers: ['Chinos', 'Dress Pants', 'Cargo', 'Joggers'],
+    jackets: ['Bomber', 'Denim', 'Leather', 'Parka', 'Blazer'],
+    skirts: ['A-Line', 'Pencil', 'Maxi', 'Mini', 'Pleated'],
+    suits: ['Two-Piece', 'Three-Piece', 'Tuxedo'],
+    sweaters: ['Pullover', 'Cardigan', 'Hoodie', 'Turtleneck'],
+    accessories: ['Handbag', 'Backpack', 'Wallet', 'Belt', 'Scarf', 'Hat'],
+    other: []
+  };
+
+  // ========== SIZE DEFINITIONS (by category) ==========
+  const sizesByCategory = {
+    shoes: ['36', '37', '38', '39', '40', '41', '42', '43', '44', '45', '46', 'Other'],
+    default: ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL', 'Other']
+  };
+
+  // ========== DOM ELEMENTS ==========
+  const els = {
+    categoryPicker: document.getElementById('categoryPicker'),
+    brandPicker: document.getElementById('brandPicker'),
+    brandOtherInput: document.getElementById('brandOtherInput'),
+    brandCustom: document.getElementById('brandCustom'),
+    typeSection: document.getElementById('typeSection'),
+    typePicker: document.getElementById('typePicker'),
+    sizePicker: document.getElementById('sizePicker'),
+    sizeOtherInput: document.getElementById('sizeOtherInput'),
+    sizeCustom: document.getElementById('sizeCustom'),
+    colorPicker: document.getElementById('colorPicker'),
+    colorOtherInput: document.getElementById('colorOtherInput'),
+    colorCustom: document.getElementById('colorCustom'),
+    nameInput: document.getElementById('name'),
+    regenerateName: document.getElementById('regenerateName'),
+    readyBadge: document.getElementById('readyBadge'),
+    submitBtn: document.getElementById('submitBtn'),
+    submitHint: document.getElementById('submitHint'),
+    hiddenCategory: document.getElementById('hiddenCategory'),
+    hiddenBrand: document.getElementById('hiddenBrand'),
+    hiddenSize: document.getElementById('hiddenSize'),
+    hiddenColor: document.getElementById('hiddenColor'),
+    stockCommon: document.getElementById('stockCommon'),
+    stockUnique: document.getElementById('stockUnique')
+  };
+
+  // ========== CATEGORY PICKER ==========
+  els.categoryPicker.querySelectorAll('.category-card').forEach(card => {
+    card.addEventListener('click', () => {
+      // Deselect all
+      els.categoryPicker.querySelectorAll('.category-card').forEach(c => c.classList.remove('selected'));
+      // Select this
+      card.classList.add('selected');
+      state.category = card.dataset.value;
+      els.hiddenCategory.value = state.category;
+      
+      // Reset type when category changes
+      state.type = null;
+      
+      // Update type picker
+      updateTypePicker();
+      // Update size picker
+      updateSizePicker();
+      // Update name
+      updateProductName();
+      // Check readiness
+      checkReadiness();
+    });
+  });
+
+  // ========== BRAND PICKER ==========
+  els.brandPicker.querySelectorAll('.chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      if (chip.dataset.value === 'Other') {
+        // Toggle other input
+        els.brandOtherInput.classList.toggle('show');
+        if (els.brandOtherInput.classList.contains('show')) {
+          els.brandCustom.focus();
+        } else {
+          els.brandCustom.value = '';
+          state.brand = null;
+          els.hiddenBrand.value = '';
+          updateProductName();
+        }
+        // Deselect all chips
+        els.brandPicker.querySelectorAll('.chip').forEach(c => c.classList.remove('selected'));
+        chip.classList.add('selected');
+      } else {
+        // Deselect all
+        els.brandPicker.querySelectorAll('.chip').forEach(c => c.classList.remove('selected'));
+        // Select this
+        chip.classList.add('selected');
+        state.brand = chip.dataset.value;
+        els.hiddenBrand.value = state.brand;
+        // Hide other input
+        els.brandOtherInput.classList.remove('show');
+        els.brandCustom.value = '';
+        updateProductName();
+      }
+      checkReadiness();
+    });
+  });
+
+  // Custom brand input
+  els.brandCustom.addEventListener('input', () => {
+    state.brand = els.brandCustom.value.trim();
+    els.hiddenBrand.value = state.brand;
+    updateProductName();
+    checkReadiness();
+  });
+
+  // ========== TYPE PICKER ==========
+  function updateTypePicker() {
+    const types = typesByCategory[state.category] || [];
+    
+    if (types.length === 0) {
+      els.typeSection.style.display = 'none';
+      return;
+    }
+
+    els.typeSection.style.display = 'block';
+    els.typePicker.innerHTML = '';
+    
+    types.forEach(type => {
+      const card = document.createElement('div');
+      card.className = 'type-card';
+      card.textContent = type;
+      card.dataset.value = type;
+      card.addEventListener('click', () => {
+        // Deselect all
+        els.typePicker.querySelectorAll('.type-card').forEach(c => c.classList.remove('selected'));
+        // Select this
+        card.classList.add('selected');
+        state.type = type;
+        updateProductName();
+        checkReadiness();
+      });
+      els.typePicker.appendChild(card);
+    });
+  }
+
+  // ========== SIZE PICKER ==========
+  function updateSizePicker() {
+    const sizes = state.category === 'shoes' ? sizesByCategory.shoes : sizesByCategory.default;
+    
+    els.sizePicker.innerHTML = '';
+    
+    sizes.forEach(size => {
+      const chip = document.createElement('div');
+      chip.className = 'chip';
+      if (size === 'Other') {
+        chip.classList.add('other-chip');
+      }
+      chip.textContent = size;
+      chip.dataset.value = size;
+      chip.addEventListener('click', () => {
+        if (size === 'Other') {
+          // Toggle other input
+          els.sizeOtherInput.classList.toggle('show');
+          if (els.sizeOtherInput.classList.contains('show')) {
+            els.sizeCustom.focus();
+          } else {
+            els.sizeCustom.value = '';
+            state.size = null;
+            els.hiddenSize.value = '';
+            updateProductName();
+          }
+          // Deselect all chips
+          els.sizePicker.querySelectorAll('.chip').forEach(c => c.classList.remove('selected'));
+          chip.classList.add('selected');
+        } else {
+          // Deselect all
+          els.sizePicker.querySelectorAll('.chip').forEach(c => c.classList.remove('selected'));
+          // Select this
+          chip.classList.add('selected');
+          state.size = size;
+          els.hiddenSize.value = state.size;
+          // Hide other input
+          els.sizeOtherInput.classList.remove('show');
+          els.sizeCustom.value = '';
+          updateProductName();
+        }
+        checkReadiness();
+      });
+      els.sizePicker.appendChild(chip);
+    });
+  }
+
+  // Custom size input
+  els.sizeCustom.addEventListener('input', () => {
+    state.size = els.sizeCustom.value.trim();
+    els.hiddenSize.value = state.size;
+    updateProductName();
+    checkReadiness();
+  });
+
+  // ========== COLOR PICKER ==========
+  els.colorPicker.querySelectorAll('.chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      if (chip.dataset.value === 'Other') {
+        // Toggle other input
+        els.colorOtherInput.classList.toggle('show');
+        if (els.colorOtherInput.classList.contains('show')) {
+          els.colorCustom.focus();
+        } else {
+          els.colorCustom.value = '';
+          state.color = null;
+          els.hiddenColor.value = '';
+          updateProductName();
+        }
+        // Deselect all chips
+        els.colorPicker.querySelectorAll('.chip').forEach(c => c.classList.remove('selected'));
+        chip.classList.add('selected');
+      } else {
+        // Deselect all
+        els.colorPicker.querySelectorAll('.chip').forEach(c => c.classList.remove('selected'));
+        // Select this
+        chip.classList.add('selected');
+        state.color = chip.dataset.value;
+        els.hiddenColor.value = state.color;
+        // Hide other input
+        els.colorOtherInput.classList.remove('show');
+        els.colorCustom.value = '';
+        updateProductName();
+      }
+      checkReadiness();
+    });
+  });
+
+  // Custom color input
+  els.colorCustom.addEventListener('input', () => {
+    state.color = els.colorCustom.value.trim();
+    els.hiddenColor.value = state.color;
+    updateProductName();
+    checkReadiness();
+  });
+
+  // ========== PRODUCT NAME AUTO-GENERATION ==========
+  function updateProductName() {
+    // Only auto-update if user hasn't manually edited
+    if (state.userEditedName) return;
+
+    const parts = [];
+    
+    if (state.brand) parts.push(state.brand);
+    if (state.type) parts.push(state.type);
+    if (state.size) parts.push(`Size ${state.size}`);
+    if (state.color) parts.push(state.color);
+
+    const name = parts.join(' - ');
+    els.nameInput.value = name;
+  }
+
+  // Track manual edits to name
+  els.nameInput.addEventListener('input', () => {
+    state.userEditedName = true;
+    checkReadiness();
+  });
+
+  // Regenerate name button
+  els.regenerateName.addEventListener('click', () => {
+    state.userEditedName = false;
+    updateProductName();
+  });
+
+  // ========== STOCK MODE ==========
+  [els.stockCommon, els.stockUnique].forEach(radio => {
+    radio.addEventListener('change', () => {
+      state.stockMode = radio.value;
+      checkReadiness();
+    });
+  });
+
+  // ========== CHECK READINESS & UPDATE UI ==========
+  function checkReadiness() {
+    const hasName = els.nameInput.value.trim().length > 0;
+    const hasStockMode = state.stockMode !== null;
+    
+    const isReady = hasName && hasStockMode;
+    
+    // Update submit button
+    els.submitBtn.disabled = !isReady;
+    
+    // Update hint
+    if (isReady) {
+      els.submitHint.textContent = '✅ Ready to continue!';
+      els.submitHint.style.color = 'var(--cc-success)';
+      els.readyBadge.style.display = 'inline-flex';
+    } else {
+      els.submitHint.textContent = 'Pick a category and stock mode to continue';
+      els.submitHint.style.color = 'var(--cc-text-muted)';
+      els.readyBadge.style.display = 'none';
+    }
+  }
+
+  // ========== INITIALIZATION ==========
+  function init() {
+    // Pre-select category if form was submitted with errors
+    if (state.category) {
+      const categoryCard = els.categoryPicker.querySelector(`[data-value="${state.category}"]`);
+      if (categoryCard) {
+        categoryCard.classList.add('selected');
+        updateTypePicker();
+      }
+    }
+
+    // Pre-select brand if exists
+    if (state.brand) {
+      const brandChip = els.brandPicker.querySelector(`[data-value="${state.brand}"]`);
+      if (brandChip) {
+        brandChip.classList.add('selected');
+      }
+    }
+
+    // Pre-select size if exists
+    if (state.size) {
+      // Size picker needs to be initialized first
+      updateSizePicker();
+      setTimeout(() => {
+        const sizeChip = els.sizePicker.querySelector(`[data-value="${state.size}"]`);
+        if (sizeChip) {
+          sizeChip.classList.add('selected');
+        }
+      }, 50);
+    } else {
+      updateSizePicker();
+    }
+
+    // Pre-select color if exists
+    if (state.color) {
+      const colorChip = els.colorPicker.querySelector(`[data-value="${state.color}"]`);
+      if (colorChip) {
+        colorChip.classList.add('selected');
+      }
+    }
+
+    // Check initial readiness
+    checkReadiness();
+  }
+
+  init();
+})();
+</script>
+{% endblock %}
+

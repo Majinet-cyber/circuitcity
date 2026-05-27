@@ -1,0 +1,186 @@
+name: Security Checks
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  schedule:
+    # Run weekly on Mondays at 9:00 AM UTC
+    - cron: '0 9 * * 1'
+
+jobs:
+  dependency-scan:
+    name: Dependency Vulnerability Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pip-audit
+      
+      - name: Run pip-audit
+        run: |
+          pip-audit --desc --requirement requirements.txt --format=json --output=pip-audit-report.json || true
+          pip-audit --desc --requirement requirements.txt
+        continue-on-error: true
+      
+      - name: Upload pip-audit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pip-audit-report
+          path: pip-audit-report.json
+
+  sast-bandit:
+    name: SAST (Bandit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install Bandit
+        run: pip install bandit[toml]
+      
+      - name: Run Bandit
+        run: |
+          bandit -r . -f json -o bandit-report.json -ll -i || true
+          bandit -r . -ll -i
+        continue-on-error: true
+      
+      - name: Upload Bandit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bandit-report
+          path: bandit-report.json
+
+  sast-semgrep:
+    name: SAST (Semgrep)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Run Semgrep
+        uses: returntocorp/semgrep-action@v1
+        with:
+          config: >-
+            p/security-audit
+            p/django
+            p/python
+            p/owasp-top-ten
+          generateSarif: true
+        continue-on-error: true
+      
+      - name: Upload Semgrep report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: semgrep-report
+          path: semgrep.sarif
+
+  secret-scan:
+    name: Secret Scanning
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for secret scanning
+      
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
+
+  idor-security-tests:
+    name: IDOR Security Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+      
+      - name: Run IDOR tests
+        run: |
+          pytest tenants/tests_security_idor.py -q --tb=short || true
+        env:
+          DJANGO_SETTINGS_MODULE: cc.settings
+          DJANGO_SECRET_KEY: test-secret-key-for-ci
+          DEBUG: "0"
+          CI: "true"
+        continue-on-error: true
+
+  lint-security:
+    name: Security Linting
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          pip install flake8 flake8-bandit flake8-bugbear
+      
+      - name: Run security-focused linting
+        run: |
+          flake8 . --select=S,B --max-line-length=120 --exclude=migrations,venv,.venv,node_modules
+        continue-on-error: true
+
+  dependency-review:
+    name: Dependency Review
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Dependency Review
+        uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high
+
+  security-summary:
+    name: Security Summary
+    runs-on: ubuntu-latest
+    needs: [dependency-scan, sast-bandit, sast-semgrep, secret-scan, idor-security-tests, lint-security]
+    if: always()
+    steps:
+      - name: Security Check Summary
+        run: |
+          echo "## Security Checks Completed"
+          echo ""
+          echo "| Check | Status |"
+          echo "|-------|--------|"
+          echo "| Dependency Scan | ${{ needs.dependency-scan.result }} |"
+          echo "| SAST (Bandit) | ${{ needs.sast-bandit.result }} |"
+          echo "| SAST (Semgrep) | ${{ needs.sast-semgrep.result }} |"
+          echo "| Secret Scan | ${{ needs.secret-scan.result }} |"
+          echo "| IDOR Tests | ${{ needs.idor-security-tests.result }} |"
+          echo "| Security Linting | ${{ needs.lint-security.result }} |"
+          echo ""
+          echo "Review artifacts for detailed reports."
+

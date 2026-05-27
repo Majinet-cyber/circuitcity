@@ -1,0 +1,190 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Cuts & Products · {{ business.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+.bt-wrap { max-width: 1100px; margin: 0 auto; padding: 16px 14px; }
+
+.filter-bar {
+  background: #fff; border: 1px solid #e2e8f0; border-radius: 12px;
+  padding: 12px 14px; margin-bottom: 18px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  box-shadow: 0 1px 3px rgba(15,23,42,.04);
+}
+.filter-bar input, .filter-bar select {
+  padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 8px;
+  font-size: .88rem; color: #0f172a; background: #fafafa; font-family: inherit;
+}
+.filter-bar input:focus, .filter-bar select:focus { outline: none; border-color: #10b981; }
+.filter-bar .search-input { flex: 1; min-width: 160px; }
+.filter-btn {
+  padding: 8px 16px; background: #10b981; border: none; color: #fff;
+  border-radius: 8px; font-size: .85rem; font-weight: 700; cursor: pointer;
+}
+
+/* Summary bar */
+.summary-bar { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px,1fr)); gap: 10px; margin-bottom: 18px; }
+.sb-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 11px; padding: 11px 13px; box-shadow: 0 1px 3px rgba(15,23,42,.04); }
+.sb-label { font-size: .67rem; text-transform: uppercase; letter-spacing: .06em; color: #64748b; font-weight: 700; margin-bottom: 3px; }
+.sb-val { font-size: 1.2rem; font-weight: 900; color: #0f172a; }
+
+/* Product cards grid */
+.prod-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px,1fr)); gap: 12px; }
+.prod-card {
+  background: #fff; border: 1px solid #e2e8f0; border-radius: 14px;
+  padding: 16px; box-shadow: 0 1px 4px rgba(15,23,42,.05);
+  transition: box-shadow .15s ease;
+}
+.prod-card:hover { box-shadow: 0 4px 14px rgba(15,23,42,.1); }
+.prod-card.low-stock { border-left: 3px solid #f59e0b; }
+.prod-card.out-stock  { border-left: 3px solid #ef4444; }
+.prod-card.ok-stock   { border-left: 3px solid #22c55e; }
+
+.prod-name { font-size: .92rem; font-weight: 800; color: #0f172a; margin-bottom: 4px; }
+.prod-badges { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 10px; }
+.badge { padding: 2px 8px; border-radius: 99px; font-size: .68rem; font-weight: 700; }
+.badge-cat { background: #f0fdf4; color: #166534; }
+.badge-unit { background: #eff6ff; color: #1d4ed8; }
+.badge-low { background: #fef3c7; color: #92400e; }
+.badge-out { background: #fee2e2; color: #991b1b; }
+.badge-ok { background: #dcfce7; color: #166534; }
+
+.prod-metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+.pm-item { }
+.pm-label { font-size: .67rem; color: #94a3b8; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 2px; }
+.pm-val { font-size: .88rem; font-weight: 800; color: #0f172a; }
+.pm-val.green { color: #059669; }
+.pm-val.amber { color: #d97706; }
+.pm-val.red { color: #dc2626; }
+
+.prod-actions { display: flex; gap: 6px; }
+.prod-edit-btn {
+  flex: 1; padding: 7px 0; background: #f8fafc; border: 1px solid #e2e8f0;
+  color: #374151; border-radius: 8px; font-size: .8rem; font-weight: 700;
+  text-decoration: none; text-align: center;
+}
+.prod-edit-btn:hover { background: #f0fdf4; border-color: #86efac; color: #15803d; }
+
+@media (max-width: 600px) {
+  .prod-grid { grid-template-columns: 1fr; }
+  .summary-bar { grid-template-columns: 1fr 1fr; }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="bt-wrap">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;flex-wrap:wrap;gap:10px;">
+    <div>
+      <h1 style="font-size:1.2rem;font-weight:900;margin:0 0 4px;color:#0f172a;">Cuts &amp; Products</h1>
+      <p style="color:#64748b;font-size:.82rem;margin:0;">{{ business.name }} &middot; Manage butchery cuts, stock, and pricing</p>
+    </div>
+    <a href="{% url 'butchery:product_add' %}" style="padding:9px 20px;background:#10b981;color:#fff;border-radius:10px;font-size:.88rem;font-weight:700;text-decoration:none;display:inline-flex;align-items:center;gap:7px;">
+      <i class="bi bi-plus-lg"></i> Add Cut / Product
+    </a>
+  </div>
+
+  <!-- Summary -->
+  <div class="summary-bar">
+    <div class="sb-card">
+      <div class="sb-label">Total Products</div>
+      <div class="sb-val">{{ products|length }}</div>
+    </div>
+    <div class="sb-card">
+      <div class="sb-label">Stock Value</div>
+      <div class="sb-val">MWK {{ total_stock_value|floatformat:0|intcomma }}</div>
+    </div>
+    <div class="sb-card">
+      <div class="sb-label">Low Stock</div>
+      <div class="sb-val" style="color:#d97706;">
+        {% with cnt=products|length %}{% for p in products %}{% if p.is_low_stock %}{{ forloop.counter0|add:1 }}{% endif %}{% endfor %}{% endwith %}
+        —
+      </div>
+    </div>
+  </div>
+
+  <!-- Filter Bar -->
+  <form method="get" class="filter-bar">
+    <input type="text" name="q" class="search-input" placeholder="Search cuts..." value="{{ search }}">
+    <select name="cat">
+      <option value="">All Categories</option>
+      {% for val, lbl in categories %}<option value="{{ val }}" {% if val == cat_filter %}selected{% endif %}>{{ lbl }}</option>{% endfor %}
+    </select>
+    <select name="meat">
+      <option value="">All Meat Types</option>
+      {% for val, lbl in meat_types %}<option value="{{ val }}" {% if val == meat_filter %}selected{% endif %}>{{ lbl }}</option>{% endfor %}
+    </select>
+    <label style="font-size:.8rem;display:flex;align-items:center;gap:5px;color:#374151;">
+      <input type="checkbox" name="inactive" value="1" {% if show_inactive %}checked{% endif %}> Show inactive
+    </label>
+    <button type="submit" class="filter-btn"><i class="bi bi-funnel"></i> Filter</button>
+    {% if search or cat_filter or meat_filter %}
+    <a href="{% url 'butchery:products' %}" style="font-size:.82rem;color:#64748b;text-decoration:none;font-weight:600;">Clear</a>
+    {% endif %}
+  </form>
+
+  {% if products %}
+  <div class="prod-grid">
+    {% for p in products %}
+    <div class="prod-card {% if p.is_out_of_stock %}out-stock{% elif p.is_low_stock %}low-stock{% else %}ok-stock{% endif %}">
+      <div class="prod-name">{{ p.name }}</div>
+      <div class="prod-badges">
+        <span class="badge badge-cat">{{ p.get_category_display }}</span>
+        <span class="badge badge-unit">{{ p.get_unit_display }}</span>
+        {% if p.is_out_of_stock %}
+        <span class="badge badge-out">Out of Stock</span>
+        {% elif p.is_low_stock %}
+        <span class="badge badge-low">Low Stock</span>
+        {% else %}
+        <span class="badge badge-ok">In Stock</span>
+        {% endif %}
+        {% if not p.is_active %}
+        <span class="badge" style="background:#f1f5f9;color:#64748b;">Inactive</span>
+        {% endif %}
+      </div>
+      <div class="prod-metrics">
+        <div class="pm-item">
+          <div class="pm-label">Stock</div>
+          <div class="pm-val {% if p.is_out_of_stock %}red{% elif p.is_low_stock %}amber{% else %}green{% endif %}">{{ p.stock_quantity|floatformat:3 }} {{ p.get_unit_display }}</div>
+        </div>
+        <div class="pm-item">
+          <div class="pm-label">Selling Price</div>
+          <div class="pm-val">{% if p.selling_price > 0 %}MWK {{ p.selling_price|floatformat:0|intcomma }}{% else %}<span style="color:#dc2626;">Not set</span>{% endif %}</div>
+        </div>
+        <div class="pm-item">
+          <div class="pm-label">Cost Price</div>
+          <div class="pm-val" style="color:#475569;">{% if p.cost_price > 0 %}MWK {{ p.cost_price|floatformat:0|intcomma }}{% else %}<span style="color:#94a3b8;">—</span>{% endif %}</div>
+        </div>
+        <div class="pm-item">
+          <div class="pm-label">Margin</div>
+          <div class="pm-val {% if p.margin_pct > 20 %}green{% elif p.margin_pct > 5 %}amber{% else %}red{% endif %}">{{ p.margin_pct|floatformat:1 }}%</div>
+        </div>
+      </div>
+      <div style="font-size:.72rem;color:#94a3b8;margin-bottom:10px;">
+        Reorder at: {{ p.reorder_level|floatformat:2 }} {{ p.get_unit_display }}
+        &nbsp;&middot;&nbsp; Stock value: MWK {{ p.stock_value|floatformat:0|intcomma }}
+      </div>
+      <div class="prod-actions">
+        <a href="{% url 'butchery:product_edit' p.pk %}" class="prod-edit-btn">
+          <i class="bi bi-pencil"></i> Edit
+        </a>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div style="text-align:center;padding:56px 20px;background:#fff;border:1px solid #e2e8f0;border-radius:14px;">
+    <i class="bi bi-box-seam" style="font-size:2.8rem;color:#d1d5db;display:block;margin-bottom:14px;"></i>
+    <h3 style="font-size:1rem;font-weight:800;color:#64748b;margin:0 0 8px;">No Products Found</h3>
+    <p style="color:#94a3b8;font-size:.85rem;max-width:360px;margin:0 auto 20px;">
+      {% if search or cat_filter %}Try different filters, or add your first butchery cut.{% else %}Add cuts like Pork Braai, Chicken, Sausage, Beef Steak, Drinks, etc.{% endif %}
+    </p>
+    <a href="{% url 'butchery:product_add' %}" style="display:inline-flex;align-items:center;gap:7px;padding:10px 22px;background:#10b981;color:#fff;border-radius:10px;font-size:.9rem;font-weight:700;text-decoration:none;">
+      <i class="bi bi-plus-lg"></i> Add First Cut
+    </a>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}

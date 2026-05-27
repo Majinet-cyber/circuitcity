@@ -18,7 +18,7 @@
       <input type="date" class="form-control" name="date_to">
     </div>
     <div class="col-sm-2">
-      <label class="form-label">Agent</label>
+      <label class="form-label">{% if BUSINESS_VERTICAL == "gym" %}Trainer{% else %}Agent{% endif %}</label>
       <input type="number" class="form-control" name="agent" placeholder="ID">
     </div>
     <div class="col-sm-2">

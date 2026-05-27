@@ -7,15 +7,26 @@
 {% block extra_css %}
 <style>
   :root {
-    --dash-bg: #0b1220;
+    --dash-bg: #f8fafc;
     --dash-text: #0f172a;
     --dash-muted: #64748b;
     --dash-panel: #ffffff;
     --dash-panel-2: #f8fafc;
     --dash-border: #e2e8f0;
-    --dash-accent: #2563eb;
+    --dash-accent: #ff6a1a;
     --dash-success: #16a34a;
     --dash-shadow: 0 4px 14px rgba(2, 6, 23, .08);
+  }
+
+  /* Prevent horizontal scroll and text overflow */
+  body {
+    overflow-x: hidden;
+    max-width: 100vw;
+  }
+
+  * {
+    word-wrap: break-word;
+    overflow-wrap: break-word;
   }
 
   .dash-container {
@@ -23,6 +34,8 @@
     margin: 0 auto;
     padding: 1.5rem;
     color: var(--dash-text);
+    overflow-x: hidden;
+    word-wrap: break-word;
   }
 
   /* Hero Section */
@@ -34,11 +47,17 @@
     font-size: 2rem;
     font-weight: 800;
     margin-bottom: .5rem;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    max-width: 100%;
   }
 
   .hero-greeting p {
     color: var(--dash-muted);
     font-size: 1.1rem;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    max-width: 100%;
   }
 
   /* Stats Cards */
@@ -66,7 +85,7 @@
     left: 0;
     right: 0;
     height: 3px;
-    background: linear-gradient(90deg, var(--dash-accent), #06b6d4);
+    background: linear-gradient(90deg, #ff7a2e, #f25c05);
   }
 
   .stat-label {
@@ -76,12 +95,16 @@
     display: flex;
     align-items: center;
     gap: .5rem;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
   }
 
   .stat-value {
     font-size: 2rem;
     font-weight: 800;
     color: var(--dash-text);
+    word-wrap: break-word;
+    overflow-wrap: break-word;
   }
 
   .stat-change {
@@ -428,6 +451,199 @@
     </div>
   </div>
 
+  {# ========== DAILY BOOKS BALANCE CARD (managers only) ========== #}
+  {% if IS_MANAGER and books_balance %}
+    {% include "dashboard/partials/books_balance_card.html" %}
+  {% endif %}
+
+  {# ========== BUSINESS HEALTH SCORE CARD (managers only) ========== #}
+  {% if IS_MANAGER and health_score %}
+  <div class="chart-card" style="margin-bottom:2rem;border:1.5px solid
+    {% if health_score.status_color == 'green' %}rgba(5,150,105,0.25){% elif health_score.status_color == 'amber' %}rgba(245,158,11,0.25){% elif health_score.status_color == 'orange' %}rgba(234,88,12,0.25){% else %}rgba(239,68,68,0.25){% endif %};
+    background:linear-gradient(135deg,
+    {% if health_score.status_color == 'green' %}rgba(5,150,105,0.05),rgba(16,185,129,0.03){% elif health_score.status_color == 'amber' %}rgba(245,158,11,0.06),rgba(251,191,36,0.03){% else %}rgba(239,68,68,0.06),rgba(248,113,113,0.03){% endif %}
+    );">
+    <div class="chart-header">
+      <div>
+        <div class="chart-title" style="font-size:1.1rem;display:flex;align-items:center;gap:0.5rem;">
+          <i class="bi bi-heart-pulse-fill" style="color:{% if health_score.status_color == 'green' %}#059669{% elif health_score.status_color == 'amber' %}#d97706{% elif health_score.status_color == 'orange' %}#ea580c{% else %}#dc2626{% endif %};"></i>
+          Business Health Score
+          {% if health_score.is_onboarding %}
+          <span class="badge bg-secondary" style="font-size:.65rem;">Getting Started</span>
+          {% endif %}
+        </div>
+        <div class="chart-subtitle" style="font-size:.8rem;">30-day rolling assessment</div>
+      </div>
+      <a href="{% url 'dashboard:business_health' %}" class="btn btn-sm btn-outline-secondary" style="font-size:.8rem;">
+        See full breakdown &rarr;
+      </a>
+    </div>
+
+    {% if health_score.is_onboarding %}
+    <p style="font-size:.9rem;color:#64748b;margin:0.5rem 0 0;">
+      Record sales and add inventory to unlock your Business Health Score.
+    </p>
+    {% else %}
+    <div style="display:flex;align-items:center;gap:2rem;flex-wrap:wrap;margin-top:.75rem;">
+      <!-- Circular score -->
+      <div style="position:relative;width:90px;height:90px;flex-shrink:0;">
+        <svg width="90" height="90" viewBox="0 0 90 90" style="position:absolute;top:0;left:0;transform:rotate(-90deg);">
+          <circle cx="45" cy="45" r="38" fill="none" stroke="#e2e8f0" stroke-width="8"/>
+          <circle id="dashHealthArc" cx="45" cy="45" r="38" fill="none"
+            stroke="{% if health_score.status_color == 'green' %}#059669{% elif health_score.status_color == 'amber' %}#f59e0b{% elif health_score.status_color == 'orange' %}#ea580c{% else %}#ef4444{% endif %}"
+            stroke-width="8"
+            stroke-dasharray="0 239"
+            stroke-linecap="round"
+            data-score="{{ health_score.score|default:0 }}"/>
+        </svg>
+        <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;">
+          <div style="font-size:1.4rem;font-weight:800;color:#0f172a;line-height:1;">{{ health_score.score }}</div>
+          <div style="font-size:.6rem;color:#64748b;font-weight:600;">/100</div>
+        </div>
+      </div>
+      <!-- Label + components mini-bar -->
+      <div style="flex:1;min-width:180px;">
+        <div style="font-size:1.05rem;font-weight:700;margin-bottom:.25rem;color:{% if health_score.status_color == 'green' %}#059669{% elif health_score.status_color == 'amber' %}#d97706{% elif health_score.status_color == 'orange' %}#ea580c{% else %}#dc2626{% endif %};">
+          {{ health_score.label }}
+        </div>
+        {% with c=health_score.components %}
+        <div style="display:grid;gap:.35rem;">
+          {# Mini component bars #}
+          {% with comp=c.profit_trend %}
+          <div style="display:flex;align-items:center;gap:.5rem;font-size:.75rem;">
+            <span style="width:70px;color:#475569;flex-shrink:0;">Profit</span>
+            <div style="flex:1;height:5px;background:#e2e8f0;border-radius:99px;overflow:hidden;">
+              <div style="height:100%;width:{{ comp.score|default:0 }}%;background:{% if comp.score and comp.score >= 70 %}#059669{% elif comp.score and comp.score >= 50 %}#f59e0b{% elif comp.score %}#ef4444{% else %}#cbd5e1{% endif %};border-radius:99px;"></div>
+            </div>
+            <span style="width:28px;text-align:right;color:#64748b;">{% if comp.score %}{{ comp.score }}{% else %}–{% endif %}</span>
+          </div>
+          {% endwith %}
+          {% with comp=c.cash_flow %}
+          <div style="display:flex;align-items:center;gap:.5rem;font-size:.75rem;">
+            <span style="width:70px;color:#475569;flex-shrink:0;">Cash Flow</span>
+            <div style="flex:1;height:5px;background:#e2e8f0;border-radius:99px;overflow:hidden;">
+              <div style="height:100%;width:{{ comp.score|default:0 }}%;background:{% if comp.score and comp.score >= 70 %}#059669{% elif comp.score and comp.score >= 50 %}#f59e0b{% elif comp.score %}#ef4444{% else %}#cbd5e1{% endif %};border-radius:99px;"></div>
+            </div>
+            <span style="width:28px;text-align:right;color:#64748b;">{% if comp.score %}{{ comp.score }}{% else %}–{% endif %}</span>
+          </div>
+          {% endwith %}
+          {% with comp=c.stock_risk %}
+          <div style="display:flex;align-items:center;gap:.5rem;font-size:.75rem;">
+            <span style="width:70px;color:#475569;flex-shrink:0;">Stock Risk</span>
+            <div style="flex:1;height:5px;background:#e2e8f0;border-radius:99px;overflow:hidden;">
+              <div style="height:100%;width:{{ comp.score|default:0 }}%;background:{% if comp.score and comp.score >= 70 %}#059669{% elif comp.score and comp.score >= 50 %}#f59e0b{% elif comp.score %}#ef4444{% else %}#cbd5e1{% endif %};border-radius:99px;"></div>
+            </div>
+            <span style="width:28px;text-align:right;color:#64748b;">{% if comp.score %}{{ comp.score }}{% else %}–{% endif %}</span>
+          </div>
+          {% endwith %}
+        </div>
+        {% endwith %}
+      </div>
+      <!-- Top recommendation -->
+      {% if health_score.recommendations %}
+      <div style="flex:1;min-width:200px;padding:.75rem 1rem;background:rgba(255,255,255,0.7);border-radius:10px;border:1px solid #e2e8f0;">
+        <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#64748b;margin-bottom:.3rem;">Top Action</div>
+        <p style="font-size:.82rem;color:#1e293b;margin:0;line-height:1.5;">{{ health_score.recommendations.0 }}</p>
+      </div>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+  <script>
+  (function() {
+    var arc = document.getElementById('dashHealthArc');
+    if (!arc) return;
+    var score = parseInt(arc.getAttribute('data-score') || '0', 10);
+    arc.setAttribute('stroke-dasharray', Math.round(score * 239 / 100) + ' 239');
+  })();
+  </script>
+
+  {# ========== NEW: Dynamic Network Activity Stats (PREMIUM FEATURE) ========== #}
+  {% if active_businesses_today or active_agents_today or new_agents_this_week %}
+  <div class="chart-card" style="margin-bottom: 2rem; background: linear-gradient(135deg, rgba(168, 85, 247, 0.08), rgba(236, 72, 153, 0.05)); border: 2px solid rgba(168, 85, 247, 0.2); position: relative; overflow: hidden;">
+    {# Animated background particles #}
+    <div style="position: absolute; top: -50%; right: -50%; width: 200%; height: 200%; background: radial-gradient(circle, rgba(168, 85, 247, 0.1) 1px, transparent 1px); background-size: 50px 50px; opacity: 0.3; animation: float 20s linear infinite;"></div>
+    
+    <div class="chart-header" style="position: relative; z-index: 1;">
+      <div>
+        <div class="chart-title" style="font-size: 1.25rem; margin-bottom: 0.25rem; display: flex; align-items: center; gap: 8px;">
+          <span style="animation: pulse-glow 2s ease-in-out infinite;">🌐</span> Live Network Activity
+        </div>
+        <div style="font-size: 0.875rem; color: var(--dash-muted);">
+          Real-time statistics across all businesses on the platform
+        </div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 8px; padding: 6px 12px; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 20px;">
+        <span style="width: 8px; height: 8px; background: #10b981; border-radius: 50%; animation: pulse-dot 1.5s ease-in-out infinite;"></span>
+        <span style="font-size: 0.75rem; font-weight: 600; color: #065f46;">LIVE</span>
+      </div>
+    </div>
+
+    <div class="stats-grid" style="margin-top: 1.5rem; position: relative; z-index: 1;">
+      {# Active Businesses Today #}
+      <div style="background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(147, 51, 234, 0.05)); border: 2px solid rgba(59, 130, 246, 0.3); border-radius: 16px; padding: 1.5rem; position: relative; overflow: hidden;">
+        <div style="position: absolute; top: 0; right: 0; font-size: 4rem; opacity: 0.1; transform: rotate(15deg);">🏪</div>
+        <div style="font-size: 0.8rem; color: #1e40af; margin-bottom: 0.5rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Active Businesses</div>
+        <div style="font-size: 2.5rem; font-weight: 900; color: #1e40af; animation: count-up 1.5s ease-out;" data-animate-value="{{ active_businesses_today|default:0 }}" data-format="number">
+          {{ active_businesses_today|default:0 }}
+        </div>
+        <div style="font-size: 0.75rem; color: #1e40af; margin-top: 0.5rem; opacity: 0.8;">
+          <i class="bi bi-arrow-up-circle-fill"></i> Businesses with sales today
+        </div>
+      </div>
+
+      {# Active Agents Today #}
+      <div style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(5, 150, 105, 0.05)); border: 2px solid rgba(16, 185, 129, 0.3); border-radius: 16px; padding: 1.5rem; position: relative; overflow: hidden;">
+        <div style="position: absolute; top: 0; right: 0; font-size: 4rem; opacity: 0.1; transform: rotate(15deg);">👥</div>
+        <div style="font-size: 0.8rem; color: #065f46; margin-bottom: 0.5rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Active Agents</div>
+        <div style="font-size: 2.5rem; font-weight: 900; color: #065f46; animation: count-up 1.5s ease-out;" data-animate-value="{{ active_agents_today|default:0 }}" data-format="number">
+          {{ active_agents_today|default:0 }}
+        </div>
+        <div style="font-size: 0.75rem; color: #065f46; margin-top: 0.5rem; opacity: 0.8;">
+          <i class="bi bi-lightning-charge-fill"></i> Agents making sales today
+        </div>
+      </div>
+
+      {# New Agents This Week #}
+      <div style="background: linear-gradient(135deg, rgba(236, 72, 153, 0.1), rgba(219, 39, 119, 0.05)); border: 2px solid rgba(236, 72, 153, 0.3); border-radius: 16px; padding: 1.5rem; position: relative; overflow: hidden;">
+        <div style="position: absolute; top: 0; right: 0; font-size: 4rem; opacity: 0.1; transform: rotate(15deg);">✨</div>
+        <div style="font-size: 0.8rem; color: #831843; margin-bottom: 0.5rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">New This Week</div>
+        <div style="font-size: 2.5rem; font-weight: 900; color: #831843; animation: count-up 1.5s ease-out;" data-animate-value="{{ new_agents_this_week|default:0 }}" data-format="number">
+          {{ new_agents_this_week|default:0 }}
+        </div>
+        <div style="font-size: 0.75rem; color: #831843; margin-top: 0.5rem; opacity: 0.8;">
+          <i class="bi bi-person-plus-fill"></i> New agents joined (last 7 days)
+        </div>
+      </div>
+    </div>
+
+    {# Floating particles animation #}
+    <style>
+      @keyframes float {
+        0% { transform: translate(0, 0); }
+        50% { transform: translate(-20px, -20px); }
+        100% { transform: translate(0, 0); }
+      }
+      
+      @keyframes pulse-glow {
+        0%, 100% { opacity: 1; transform: scale(1); }
+        50% { opacity: 0.7; transform: scale(1.1); }
+      }
+      
+      @keyframes pulse-dot {
+        0%, 100% { opacity: 1; transform: scale(1); }
+        50% { opacity: 0.5; transform: scale(0.8); }
+      }
+      
+      @keyframes count-up {
+        0% { opacity: 0; transform: translateY(20px); }
+        100% { opacity: 1; transform: translateY(0); }
+      }
+    </style>
+  </div>
+  {% endif %}
+
   {# ========== Costs & Commissions Panel (Manager Only) ========== #}
   {% if costs_commissions_panel %}
   <div class="chart-card" style="margin-bottom: 2rem; background: linear-gradient(135deg, rgba(37, 99, 235, 0.05), rgba(59, 130, 246, 0.02)); border: 2px solid rgba(37, 99, 235, 0.2);">
@@ -456,7 +672,7 @@
         <div style="font-size: 1.5rem; font-weight: 800; color: #991b1b;">
           MK {{ costs_commissions_panel.commissions_this_period|floatformat:0|intcomma }}
         </div>
-        <div style="font-size: 0.75rem; color: #7f1d1d; margin-top: 0.25rem;">Agents earned</div>
+        <div style="font-size: 0.75rem; color: #7f1d1d; margin-top: 0.25rem;">{% if BUSINESS_VERTICAL == "gym" %}Trainers{% else %}Agents{% endif %} earned</div>
       </div>
 
       <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 12px; padding: 1rem;">
@@ -491,68 +707,9 @@
   </div>
   {% endif %}
 
-  {# Payment Mix Panel (Manager Only) #}
-  {% if PAYMENT_MIX and IS_MANAGER %}
-  <div class="chart-card" style="margin-bottom: 2rem;">
-    <div class="chart-header">
-      <div>
-        <div class="chart-title" style="font-size: 1.25rem; margin-bottom: 0.25rem;">💳 Payment Mix (Last 30 Days)</div>
-        <div style="font-size: 0.875rem; color: var(--dash-muted);">
-          Breakdown of sales by payment method
-        </div>
-      </div>
-    </div>
-
-    <div class="stats-grid" style="margin-top: 1rem;">
-      <div style="background: linear-gradient(135deg, #dcfce7, #f0fdf4); border: 2px solid #86efac; border-radius: 14px; padding: 1.25rem; text-align: center;">
-        <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">💵</div>
-        <div style="font-size: 0.875rem; color: #166534; margin-bottom: 0.5rem; font-weight: 600;">Cash</div>
-        <div style="font-size: 1.5rem; font-weight: 800; color: #166534;">
-          MK {{ PAYMENT_MIX.CASH|floatformat:0|intcomma }}
-        </div>
-        {% if PAYMENT_MIX.total > 0 %}
-        <div style="font-size: 0.8rem; color: #14532d; margin-top: 0.5rem;">
-          {% widthratio PAYMENT_MIX.CASH PAYMENT_MIX.total 100 %}%
-        </div>
-        {% endif %}
-      </div>
-
-      <div style="background: linear-gradient(135deg, #dbeafe, #eff6ff); border: 2px solid #93c5fd; border-radius: 14px; padding: 1.25rem; text-align: center;">
-        <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">🏦</div>
-        <div style="font-size: 0.875rem; color: #1e40af; margin-bottom: 0.5rem; font-weight: 600;">Bank</div>
-        <div style="font-size: 1.5rem; font-weight: 800; color: #1e40af;">
-          MK {{ PAYMENT_MIX.BANK|floatformat:0|intcomma }}
-        </div>
-        {% if PAYMENT_MIX.total > 0 %}
-        <div style="font-size: 0.8rem; color: #1e3a8a; margin-top: 0.5rem;">
-          {% widthratio PAYMENT_MIX.BANK PAYMENT_MIX.total 100 %}%
-        </div>
-        {% endif %}
-      </div>
-
-      <div style="background: linear-gradient(135deg, #fef3c7, #fefce8); border: 2px solid #fbbf24; border-radius: 14px; padding: 1.25rem; text-align: center;">
-        <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">📱</div>
-        <div style="font-size: 0.875rem; color: #92400e; margin-bottom: 0.5rem; font-weight: 600;">Mobile Money</div>
-        <div style="font-size: 1.5rem; font-weight: 800; color: #92400e;">
-          MK {{ PAYMENT_MIX.MOBILE_MONEY|floatformat:0|intcomma }}
-        </div>
-        {% if PAYMENT_MIX.total > 0 %}
-        <div style="font-size: 0.8rem; color: #78350f; margin-top: 0.5rem;">
-          {% widthratio PAYMENT_MIX.MOBILE_MONEY PAYMENT_MIX.total 100 %}%
-        </div>
-        {% endif %}
-      </div>
-
-      <div style="background: linear-gradient(135deg, #e0e7ff, #eef2ff); border: 2px solid #a5b4fc; border-radius: 14px; padding: 1.25rem; text-align: center;">
-        <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">💰</div>
-        <div style="font-size: 0.875rem; color: #4338ca; margin-bottom: 0.5rem; font-weight: 600;">Total Sales</div>
-        <div style="font-size: 1.5rem; font-weight: 800; color: #4338ca;">
-          MK {{ PAYMENT_MIX.total|floatformat:0|intcomma }}
-        </div>
-        <div style="font-size: 0.75rem; color: #3730a3; margin-top: 0.5rem;">All payment methods</div>
-      </div>
-    </div>
-  </div>
+  {# Payment Mix Panel (Manager Only) - Use standardized partial #}
+  {% if payment_mix and IS_MANAGER %}
+  {% include "partials/dashboard_payment_mix.html" %}
   {% endif %}
 
   {# Charts #}
@@ -621,7 +778,7 @@
     </div>
 
     <div class="perf-card">
-      <div class="perf-title"><i class="bi bi-trophy me-2"></i>Agent Leaderboard</div>
+      <div class="perf-title"><i class="bi bi-trophy me-2"></i>{% if BUSINESS_VERTICAL == "gym" %}Trainer{% else %}Agent{% endif %} Leaderboard</div>
       <div id="agentLeaderboard">
         {% if agent_leaderboard %}
           <ol class="list-group list-group-numbered" style="list-style:none;padding:0">
@@ -650,9 +807,9 @@
   </div>
 
   {% else %}
-  {# ========== Agent Dashboard ========== #}
+  {# ========== {% if BUSINESS_VERTICAL == "gym" %}Trainer{% else %}Agent{% endif %} Dashboard ========== #}
 
-  {# ========== Date Filter Controls (Agent View) ========== #}
+  {# ========== Date Filter Controls ({% if BUSINESS_VERTICAL == "gym" %}Trainer{% else %}Agent{% endif %} View) ========== #}
   <div style="background: var(--dash-panel); border: 1px solid var(--dash-border); border-radius: 14px; padding: 1.25rem; margin-bottom: 1.5rem; box-shadow: var(--dash-shadow);">
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px">
       <h3 style="margin:0; font-size:1rem; color:var(--dash-muted); text-transform:uppercase; letter-spacing:0.08em; font-weight:700">
@@ -782,8 +939,8 @@
       <a href="{% url 'inventory:scan_in' %}" class="btn btn-primary">
         <i class="bi bi-upc-scan"></i> Scan IN
       </a>
-      <a href="{% url 'inventory:phone_sale_wizard' %}" class="btn btn-success">
-        <i class="bi bi-bag-check"></i> Scan & Sell
+      <a href="{% url 'inventory:scan_sell_landing' %}" class="btn btn-primary">
+        <i class="bi bi-bag-check"></i> Scan &amp; Sell
       </a>
       <a href="{% url 'inventory:stock_list' %}" class="btn btn-outline-primary">
         <i class="bi bi-box-seam"></i> View Stock
@@ -794,33 +951,11 @@
     </div>
   </div>
   {% endif %}
-
-  {# Quick Links #}
-  <div class="chart-card">
-    <div class="chart-title" style="margin-bottom:1rem">Quick Links</div>
-    <div class="d-flex flex-wrap gap-2">
-      <a href="{% url 'inventory:stock_list' %}" class="btn btn-sm btn-outline-primary">
-        <i class="bi bi-list"></i> Stock List
-      </a>
-      <a href="{% url 'inventory:inventory_dashboard' %}" class="btn btn-sm btn-outline-primary">
-        <i class="bi bi-columns-gap"></i> Inventory Dashboard
-      </a>
-      {% if IS_MANAGER %}
-      {% if HAS_REPORTS_NAMESPACE %}
-      <a href="{% url 'reports:home' %}" class="btn btn-sm btn-outline-primary">
-        <i class="bi bi-graph-up"></i> Reports
-      </a>
-      {% endif %}
-      <a href="{% url 'tenants:manager_review_agents' %}" class="btn btn-sm btn-outline-primary">
-        <i class="bi bi-people"></i> Manage Agents
-      </a>
-      <a href="{% url 'billing:plans' %}" class="btn btn-sm btn-outline-warning">
-        <i class="bi bi-rocket-takeoff"></i> Upgrade Plan
-      </a>
-      {% endif %}
-    </div>
-  </div>
 </div>
+
+{# Include mobile bottom nav (hidden on desktop) #}
+{% include 'partials/bottomnav.html' with active_tab='home' %}
+
 {% endblock %}
 
 {% block extra_js %}

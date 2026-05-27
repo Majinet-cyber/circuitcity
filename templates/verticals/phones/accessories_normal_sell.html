@@ -1,0 +1,416 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Sell Accessories · Emajinet{% endblock %}
+
+{% block content %}
+
+<style>
+  .sell-container{max-width:1200px;margin:20px auto;padding:20px}
+  .sell-hero{background:linear-gradient(120deg,#6366f1,#4f46e5);padding:30px;border-radius:20px;color:#fff;text-align:center;margin-bottom:30px;box-shadow:0 20px 50px rgba(99,102,241,0.3)}
+  .sell-hero h1{margin:0;font-size:2rem;font-weight:900}
+  .sell-hero p{margin:10px 0 0;opacity:.9}
+  
+  .wizard-panel{background:linear-gradient(135deg,#ffffff,#f8fafc);border:2px solid #e2e8f0;border-radius:20px;padding:32px;margin-bottom:24px;box-shadow:0 10px 30px rgba(15,23,42,0.1)}
+  .wizard-panel h2{margin:0 0 20px;font-size:1.3rem;font-weight:900;color:#0f172a;display:flex;align-items:center;gap:10px}
+  .wizard-panel h2 i{color:#6366f1}
+  
+  .category-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;margin-bottom:20px}
+  .category-card{background:#fff;border:2px solid #e2e8f0;border-radius:12px;padding:16px;text-align:center;cursor:pointer;transition:all 0.2s}
+  .category-card:hover{border-color:#6366f1;background:#f5f3ff;transform:translateY(-2px);box-shadow:0 4px 12px rgba(99,102,241,0.2)}
+  .category-card.selected{border-color:#6366f1;background:#ede9fe}
+  .category-card i{font-size:2rem;color:#6366f1;margin-bottom:8px}
+  .category-card span{display:block;font-size:0.9rem;font-weight:600;color:#0f172a}
+  
+  .product-list{max-height:400px;overflow-y:auto;margin-bottom:20px}
+  .product-item{background:#fff;border:2px solid #e2e8f0;border-radius:12px;padding:16px;margin-bottom:12px;cursor:pointer;transition:all 0.2s}
+  .product-item:hover{border-color:#6366f1;background:#f5f3ff}
+  .product-item.selected{border-color:#6366f1;background:#ede9fe}
+  .product-item h4{margin:0 0 8px;font-size:1rem;font-weight:700;color:#0f172a}
+  .product-item .info{display:flex;justify-content:space-between;font-size:0.85rem;color:#64748b}
+  .product-item .stock{color:#10b981;font-weight:600}
+  .product-item .stock.low{color:#f59e0b}
+  .product-item .stock.out{color:#dc2626}
+  
+  .sell-form{background:#fff;border-radius:16px;padding:24px;margin-top:20px}
+  .form-group{margin-bottom:20px}
+  .form-group label{display:block;font-weight:700;margin-bottom:8px;color:#0f172a}
+  .form-group input,
+ .form-group select{width:100%;padding:12px;border:2px solid #e2e8f0;border-radius:8px;font-size:1rem}
+  .form-group input:focus,
+  .form-group select:focus{outline:none;border-color:#6366f1;box-shadow:0 0 0 3px rgba(99,102,241,0.1)}
+  
+  .btn-sell{padding:14px 28px;border-radius:999px;font-weight:700;font-size:1rem;border:none;cursor:pointer;transition:all 0.2s;display:inline-flex;align-items:center;gap:8px}
+  .btn-sell.primary{background:#6366f1;color:#fff}
+  .btn-sell.primary:hover{background:#4f46e5;transform:translateY(-2px);box-shadow:0 8px 20px rgba(99,102,241,0.3)}
+  .btn-sell.secondary{background:#e2e8f0;color:#0f172a}
+  .btn-sell.secondary:hover{background:#cbd5e1}
+  .btn-sell:disabled{opacity:0.5;cursor:not-allowed}
+  
+  .toast{position:fixed;top:20px;right:20px;background:#6366f1;color:#fff;padding:20px 24px;border-radius:12px;box-shadow:0 10px 30px rgba(99,102,241,0.3);display:none;z-index:1000;min-width:300px}
+  .toast.show{display:block;animation:slideIn 0.3s}
+  .toast.error{background:#dc2626}
+  .toast.success{background:#10b981}
+  
+  @keyframes slideIn{from{transform:translateX(100%)}to{transform:translateX(0)}}
+  
+  @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+  .spinner{animation:spin 1s linear infinite}
+  
+  .hidden{display:none!important}
+  
+  @media (max-width:768px){
+    .sell-container{padding:12px}
+    .wizard-panel{padding:20px}
+    .category-grid{grid-template-columns:repeat(auto-fill,minmax(100px,1fr))}
+  }
+</style>
+
+<div class="sell-container">
+  <div class="sell-hero">
+    <h1><i class="bi bi-cart-check-fill"></i> Sell Accessories</h1>
+    <p>Select product, set quantity and price</p>
+  </div>
+
+  <!-- Step 1: Category Selection -->
+  <div class="wizard-panel" id="step1">
+    <h2><i class="bi bi-grid-3x3-gap"></i> Step 1: Choose Category</h2>
+    <div class="category-grid" id="categoryGrid">
+      {% for cat in categories %}
+      <div class="category-card" data-category="{{ cat.value }}" onclick="selectCategory('{{ cat.value }}')">
+        <i class="{{ cat.icon }}"></i>
+        <span>{{ cat.label }}</span>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Step 2: Product Selection -->
+  <div class="wizard-panel hidden" id="step2">
+    <h2><i class="bi bi-box-seam"></i> Step 2: Choose Product</h2>
+    <button class="btn-sell secondary" onclick="backToCategories()" style="margin-bottom:16px">
+      <i class="bi bi-arrow-left"></i> Back
+    </button>
+    <div class="product-list" id="productList"></div>
+  </div>
+
+  <!-- Step 3: Sale Details -->
+  <div class="wizard-panel hidden" id="step3">
+    <h2><i class="bi bi-calculator"></i> Step 3: Sale Details</h2>
+    <button class="btn-sell secondary" onclick="backToProducts()" style="margin-bottom:16px">
+      <i class="bi bi-arrow-left"></i> Back
+    </button>
+    
+    <!-- Message Area for Errors/Success -->
+    <div id="messageArea" style="display:none;padding:16px;border-radius:12px;margin-bottom:20px;font-weight:600">
+      <div id="messageText"></div>
+    </div>
+    
+    <div class="sell-form">
+      <div id="selectedProductInfo" style="background:#f8fafc;border-radius:12px;padding:16px;margin-bottom:20px">
+        <h3 id="productName" style="margin:0 0 8px;font-size:1.2rem;font-weight:700;color:#0f172a"></h3>
+        <p style="margin:0;color:#64748b">Stock: <span id="productStock" style="font-weight:600"></span></p>
+      </div>
+      
+      <div class="form-group">
+        <label for="quantity">Quantity</label>
+        <input type="number" id="quantity" min="1" value="1" required>
+      </div>
+      
+      <div class="form-group">
+        <label for="sellingPrice">Selling Price (MK)</label>
+        <input type="number" id="sellingPrice" step="0.01" min="0" required>
+      </div>
+      
+      <div class="form-group">
+        <label for="paymentMethod">Payment Method</label>
+        <select id="paymentMethod">
+          <option value="CASH">Cash</option>
+          <option value="BANK">Bank Transfer</option>
+          <option value="MOBILE_MONEY">Mobile Money</option>
+        </select>
+      </div>
+      
+      <div style="background:#ede9fe;border-radius:12px;padding:16px;margin-bottom:20px">
+        <h4 style="margin:0 0 8px;color:#6366f1">Total</h4>
+        <p id="totalAmount" style="font-size:2rem;font-weight:900;color:#0f172a;margin:0">MK 0.00</p>
+      </div>
+      
+      <button id="completeSaleBtn" class="btn-sell primary" onclick="completeSale()" style="width:100%">
+        <i class="bi bi-check-circle" id="saleIcon"></i> 
+        <span id="saleButtonText">Complete Sale</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast Notification -->
+<div class="toast" id="toast">
+  <strong id="toastTitle"></strong>
+  <p id="toastMessage" style="margin:6px 0 0;font-size:0.9rem;opacity:0.9"></p>
+</div>
+
+<script>
+const products = {{ products|safe }};
+let selectedCategory = null;
+let selectedProduct = null;
+
+function selectCategory(category) {
+  selectedCategory = category;
+  
+  // Update UI
+  document.querySelectorAll('.category-card').forEach(card => {
+    card.classList.remove('selected');
+  });
+  document.querySelector(`[data-category="${category}"]`).classList.add('selected');
+  
+  // Filter products by category
+  const categoryProducts = products.filter(p => p.category === category);
+  
+  if (categoryProducts.length === 0) {
+    showToast('No Products', 'No products found in this category', 'error');
+    return;
+  }
+  
+  // Render product list
+  const productList = document.getElementById('productList');
+  productList.innerHTML = categoryProducts.map(p => `
+    <div class="product-item" data-product-id="${p.id}" onclick="selectProduct(${p.id})">
+      <h4>${p.name}</h4>
+      <div class="info">
+        <span class="stock ${p.stock_qty < 5 ? (p.stock_qty === 0 ? 'out' : 'low') : ''}">
+          Stock: ${p.stock_qty} units
+        </span>
+        <span>MK ${parseFloat(p.default_selling_price).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+      </div>
+    </div>
+  `).join('');
+  
+  // Show step 2
+  document.getElementById('step1').classList.add('hidden');
+  document.getElementById('step2').classList.remove('hidden');
+}
+
+function selectProduct(productId) {
+  selectedProduct = products.find(p => p.id === productId);
+  
+  if (!selectedProduct) {
+    showToast('Error', 'Product not found', 'error');
+    return;
+  }
+  
+  if (selectedProduct.stock_qty === 0) {
+    showToast('Out of Stock', 'This product is out of stock', 'error');
+    return;
+  }
+  
+  // Update UI
+  document.querySelectorAll('.product-item').forEach(item => {
+    item.classList.remove('selected');
+  });
+  document.querySelector(`[data-product-id="${productId}"]`).classList.add('selected');
+  
+  // Populate step 3
+  document.getElementById('productName').textContent = selectedProduct.name;
+  document.getElementById('productStock').textContent = `${selectedProduct.stock_qty} units`;
+  document.getElementById('quantity').max = selectedProduct.stock_qty;
+  document.getElementById('quantity').value = 1;
+  document.getElementById('sellingPrice').value = parseFloat(selectedProduct.default_selling_price).toFixed(2);
+  
+  // Calculate total
+  updateTotal();
+  
+  // Show step 3
+  document.getElementById('step2').classList.add('hidden');
+  document.getElementById('step3').classList.remove('hidden');
+}
+
+function backToCategories() {
+  document.getElementById('step2').classList.add('hidden');
+  document.getElementById('step1').classList.remove('hidden');
+}
+
+function backToProducts() {
+  document.getElementById('step3').classList.add('hidden');
+  document.getElementById('step2').classList.remove('hidden');
+}
+
+function updateTotal() {
+  const quantity = parseInt(document.getElementById('quantity').value) || 0;
+  const price = parseFloat(document.getElementById('sellingPrice').value) || 0;
+  const total = quantity * price;
+  document.getElementById('totalAmount').textContent = `MK ${total.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+}
+
+// Update total when quantity or price changes
+document.addEventListener('DOMContentLoaded', () => {
+  const qtyInput = document.getElementById('quantity');
+  const priceInput = document.getElementById('sellingPrice');
+  
+  if (qtyInput) qtyInput.addEventListener('input', updateTotal);
+  if (priceInput) priceInput.addEventListener('input', updateTotal);
+});
+
+async function completeSale() {
+  console.log('completeSale() called');
+  
+  if (!selectedProduct) {
+    showMessage('No product selected', 'error');
+    showToast('Error', 'No product selected', 'error');
+    return;
+  }
+  
+  const quantity = parseInt(document.getElementById('quantity').value);
+  const sellingPrice = parseFloat(document.getElementById('sellingPrice').value);
+  const paymentMethod = document.getElementById('paymentMethod').value;
+  
+  console.log('Sale data:', { product: selectedProduct.name, quantity, sellingPrice, paymentMethod });
+  
+  // Validate inputs
+  if (!quantity || quantity < 1) {
+    showMessage('Invalid quantity', 'error');
+    showToast('Error', 'Invalid quantity', 'error');
+    return;
+  }
+  
+  if (!sellingPrice || sellingPrice <= 0) {
+    showMessage('Invalid selling price', 'error');
+    showToast('Error', 'Invalid selling price', 'error');
+    return;
+  }
+  
+  if (quantity > selectedProduct.stock_qty) {
+    const msg = `Insufficient stock: only ${selectedProduct.stock_qty} available`;
+    showMessage(msg, 'error');
+    showToast('Error', msg, 'error');
+    return;
+  }
+  
+  // Show processing state
+  const btn = document.getElementById('completeSaleBtn');
+  const btnText = document.getElementById('saleButtonText');
+  const btnIcon = document.getElementById('saleIcon');
+  
+  btn.disabled = true;
+  btnIcon.className = 'bi bi-hourglass-split spinner';
+  btnText.textContent = 'Processing...';
+  
+  console.log('Submitting sale to API...');
+  
+  const formData = new FormData();
+  formData.append('product_id', selectedProduct.id);
+  formData.append('quantity', quantity);
+  formData.append('selling_price', sellingPrice);
+  formData.append('payment_method', paymentMethod);
+  
+  try {
+    const response = await fetch('{% url "verticals:phones_accessories_sell_api" %}', {
+      method: 'POST',
+      headers: {
+        'X-CSRFToken': '{{ csrf_token }}'
+      },
+      body: formData
+    });
+    
+    console.log('Response status:', response.status);
+    
+    // Check if response is ok
+    if (!response.ok) {
+      throw new Error(`Server returned ${response.status}: ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    console.log('Response data:', data);
+    
+    if (data.success) {
+      const successMsg = data.message || 'Sale completed successfully!';
+      showMessage(successMsg, 'success');
+      showToast('Success!', successMsg, 'success');
+      
+      // Update stock in memory
+      if (data.product && data.product.stock_remaining !== undefined) {
+        selectedProduct.stock_qty = data.product.stock_remaining;
+      }
+      
+      // Redirect to dashboard after 2 seconds
+      setTimeout(() => {
+        window.location.href = '{% url "verticals:phones_accessories_dashboard" %}';
+      }, 2000);
+    } else {
+      const errorMsg = data.error || 'Failed to complete sale';
+      console.error('Sale failed:', errorMsg);
+      showMessage(errorMsg, 'error');
+      showToast('Error', errorMsg, 'error');
+      
+      // Re-enable button
+      btn.disabled = false;
+      btnIcon.className = 'bi bi-check-circle';
+      btnText.textContent = 'Complete Sale';
+    }
+  } catch (error) {
+    console.error('Exception during sale:', error);
+    const errorMsg = 'Failed to complete sale: ' + error.message;
+    showMessage(errorMsg, 'error');
+    showToast('Error', errorMsg, 'error');
+    
+    // Re-enable button
+    btn.disabled = false;
+    btnIcon.className = 'bi bi-check-circle';
+    btnText.textContent = 'Complete Sale';
+  }
+}
+
+function showMessage(message, type) {
+  const messageArea = document.getElementById('messageArea');
+  const messageText = document.getElementById('messageText');
+  
+  messageText.textContent = message;
+  messageArea.style.display = 'block';
+  
+  if (type === 'error') {
+    messageArea.style.backgroundColor = '#fee2e2';
+    messageArea.style.color = '#dc2626';
+    messageArea.style.border = '2px solid #dc2626';
+  } else if (type === 'success') {
+    messageArea.style.backgroundColor = '#d1fae5';
+    messageArea.style.color = '#059669';
+    messageArea.style.border = '2px solid #059669';
+  } else {
+    messageArea.style.backgroundColor = '#dbeafe';
+    messageArea.style.color = '#1d4ed8';
+    messageArea.style.border = '2px solid #1d4ed8';
+  }
+  
+  // Auto-hide success messages after 5 seconds
+  if (type === 'success') {
+    setTimeout(() => {
+      messageArea.style.display = 'none';
+    }, 5000);
+  }
+}
+
+function showToast(title, message, type) {
+  const toast = document.getElementById('toast');
+  const toastTitle = document.getElementById('toastTitle');
+  const toastMessage = document.getElementById('toastMessage');
+  
+  toastTitle.textContent = title;
+  toastMessage.textContent = message;
+  
+  toast.className = 'toast';
+  if (type === 'error') {
+    toast.classList.add('error');
+  } else if (type === 'success') {
+    toast.classList.add('success');
+  }
+  
+  toast.classList.add('show');
+  
+  setTimeout(() => {
+    toast.classList.remove('show');
+  }, 4000);
+}
+</script>
+
+{% endblock %}
+

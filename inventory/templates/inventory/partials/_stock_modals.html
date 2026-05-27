@@ -1,0 +1,197 @@
+{% comment %}
+Shared modals and JavaScript for stock control actions (Transfer, Edit IMEI)
+Should be included once at the bottom of templates that use _stock_row_actions.html
+Context required:
+- manager_agents: queryset of agent memberships for transfer dropdown
+{% endcomment %}
+
+{# Transfer Modal - Bootstrap 5 #}
+<div class="modal fade" id="transferModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form method="post" id="transferForm">
+        {% csrf_token %}
+        <div class="modal-header">
+          <h5 class="modal-title">Transfer Stock</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <p class="mb-2">Transfer stock <strong id="transferImei"></strong> to:</p>
+          <select name="agent_id" class="form-select" style="width:100%; padding:8px; margin:12px 0;">
+            <option value="unassign">Unassign (return to store)</option>
+            {% for location_name, memberships in transfer_agents_by_location %}
+              <optgroup label="{{ location_name }}">
+                {% for membership in memberships %}
+                  <option value="{{ membership.user.id }}">
+                    {{ membership.user.get_full_name|default:membership.user.username }}
+                    {% if membership.role == 'MANAGER' %} (Manager){% endif %}
+                  </option>
+                {% endfor %}
+              </optgroup>
+            {% empty %}
+              <option disabled>No agents available — add team members first</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Transfer</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+{# Edit IMEI Modal - Bootstrap 5 #}
+<div class="modal fade" id="editImeiModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form method="post" id="editImeiForm">
+        {% csrf_token %}
+        <div class="modal-header">
+          <h5 class="modal-title">Edit IMEI</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <p class="mb-2">Current IMEI: <strong id="currentImei"></strong></p>
+          <label class="form-label" style="display:block; margin:12px 0;">
+            New IMEI (15 digits):
+            <input type="text" name="imei" pattern="\d{15}" maxlength="15" required 
+                   class="form-control" style="width:100%; padding:8px; margin-top:4px;">
+          </label>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Update IMEI</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+{# Edit Price Modal - Bootstrap 5 #}
+<div class="modal fade" id="editPriceModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form method="post" id="editPriceForm">
+        {% csrf_token %}
+        <input type="hidden" name="next" id="editPriceNext" value="">
+        <div class="modal-header">
+          <h5 class="modal-title" id="editPriceTitle">Edit Price</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <p class="mb-2" id="editPriceDescription">Current price: <strong id="currentPrice"></strong></p>
+          <label class="form-label" style="display:block; margin:12px 0;">
+            <span id="editPriceLabel">New price:</span>
+            <input type="number" name="price" step="0.01" min="0" required 
+                   class="form-control" style="width:100%; padding:8px; margin-top:4px;"
+                   placeholder="0.00" id="editPriceInput">
+          </label>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Update Price</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<style>
+/* Ensure Actions buttons and dropdown items have proper cursor */
+.stock-actions .btn,
+.stock-actions .dropdown-item,
+.dropdown .btn,
+.dropdown-item {
+  cursor: pointer;
+}
+
+/* Prevent dropdowns getting clipped inside responsive tables */
+.table-responsive {
+  overflow-y: visible;
+}
+</style>
+
+<script>
+// ===== Bootstrap Modal Helpers =====
+function showTransferModal(itemId, imei) {
+  const modal = new bootstrap.Modal(document.getElementById('transferModal'));
+  const form = document.getElementById('transferForm');
+  document.getElementById('transferImei').textContent = imei || '#' + itemId;
+  form.action = '/inventory/stock/' + itemId + '/transfer/';
+  modal.show();
+}
+
+function showEditImeiModal(itemId, imei) {
+  const modal = new bootstrap.Modal(document.getElementById('editImeiModal'));
+  const form = document.getElementById('editImeiForm');
+  document.getElementById('currentImei').textContent = imei || '(none)';
+  form.action = '/inventory/stock/' + itemId + '/edit-imei/';
+  modal.show();
+}
+
+function showEditPriceModal(itemId, currentPrice, isSold, imei) {
+  const modal = new bootstrap.Modal(document.getElementById('editPriceModal'));
+  const form = document.getElementById('editPriceForm');
+  const title = document.getElementById('editPriceTitle');
+  const description = document.getElementById('editPriceDescription');
+  const label = document.getElementById('editPriceLabel');
+  const input = document.getElementById('editPriceInput');
+  const nextInput = document.getElementById('editPriceNext');
+  
+  // Set form action
+  form.action = '/inventory/stock/' + itemId + '/edit-price/';
+  
+  // Set next URL to return to current page with filters
+  nextInput.value = window.location.pathname + window.location.search;
+  
+  // Update title and labels based on sold status
+  if (isSold) {
+    title.textContent = 'Edit Selling Price';
+    label.textContent = 'New selling price:';
+    description.innerHTML = 'Item <strong>' + (imei || '#' + itemId) + '</strong> (SOLD)<br>Current selling price: <strong>' + (currentPrice || '—') + '</strong>';
+  } else {
+    title.textContent = 'Edit Order Price';
+    label.textContent = 'New order price (cost):';
+    description.innerHTML = 'Item <strong>' + (imei || '#' + itemId) + '</strong> (IN STOCK)<br>Current order price: <strong>' + (currentPrice || '—') + '</strong>';
+  }
+  
+  // Prefill current price (remove commas if present)
+  if (currentPrice) {
+    const priceValue = currentPrice.toString().replace(/,/g, '');
+    input.value = priceValue;
+    // Select the input for easy replacement
+    setTimeout(() => input.select(), 100);
+  } else {
+    input.value = '';
+  }
+  
+  modal.show();
+}
+
+// ===== GLOBAL MODAL CLEANUP (Fixes blur/lock issue) =====
+(function () {
+  function cleanupBootstrapBackdrops() {
+    // Only cleanup if there is no modal currently shown
+    if (document.querySelectorAll(".modal.show").length === 0) {
+      document.querySelectorAll(".modal-backdrop").forEach(b => b.remove());
+      document.body.classList.remove("modal-open");
+      document.body.style.removeProperty("overflow");
+      document.body.style.removeProperty("padding-right");
+    }
+  }
+
+  // Cleanup on load (fixes already-stuck pages)
+  document.addEventListener("DOMContentLoaded", cleanupBootstrapBackdrops);
+
+  // Cleanup whenever any modal finishes hiding
+  document.addEventListener("hidden.bs.modal", cleanupBootstrapBackdrops);
+
+  // Extra safety: if something cancels show/hide mid-way
+  window.addEventListener("keydown", function (e) {
+    if (e.key === "Escape") setTimeout(cleanupBootstrapBackdrops, 0);
+  });
+})();
+</script>
+

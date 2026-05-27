@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+
+{% block title %}Business Credit Score - {{ business.name }}{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <div class="p-4 rounded-4 border border-success-subtle bg-white shadow-sm">
+    <nav aria-label="breadcrumb" class="mb-3">
+      <ol class="breadcrumb mb-0">
+        <li class="breadcrumb-item"><a href="{% url 'dashboard:home' %}">Dashboard</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'dashboard:credit_scores' %}">Business Credit Score</a></li>
+        <li class="breadcrumb-item active">Legacy link</li>
+      </ol>
+    </nav>
+    <h1 class="h4 fw-bold text-dark mb-2">Business Credit Score</h1>
+    <p class="text-muted mb-3">
+      Credit scoring is now business-level. It evaluates the active business's creditworthiness
+      for financing, supplier terms, lenders, banks, investors, and partners.
+    </p>
+    <a class="btn btn-primary rounded-pill" href="{% url 'dashboard:credit_scores' %}">
+      View business credit profile
+    </a>
+  </div>
+</div>
+{% endblock %}

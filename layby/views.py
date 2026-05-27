@@ -23,7 +23,7 @@ from django.http import (
     Http404,
 )
 from django.middleware.csrf import get_token
-from django.shortcuts import get_object_or_404, redirect
+from django.shortcuts import get_object_or_404, redirect, render
 from django.template import TemplateDoesNotExist
 from django.template.loader import get_template
 from django.urls import NoReverseMatch, reverse
@@ -40,8 +40,57 @@ try:
 except Exception:  # pragma: no cover
     qrcode = None
 
+# Tenant scoping helpers
+try:
+    from tenants.utils import get_active_business
+    from tenants.models import Membership
+except ImportError:  # pragma: no cover
+    def get_active_business(_request):  # type: ignore
+        return None
+    Membership = None  # type: ignore
+
+
+def _scope_layby_order(request: HttpRequest, order_id: int) -> LaybyOrder:
+    """
+    Get a LaybyOrder scoped to the current business.
+    
+    SECURITY: LaybyOrder doesn't have a direct business FK, so we scope via
+    the created_by user's membership to prevent IDOR vulnerabilities.
+    
+    Uses PRE-FETCH scoping (not post-fetch checks) to prevent timing-based
+    information leaks about object existence.
+    
+    Returns the order if accessible, raises Http404 otherwise.
+    """
+    business = get_active_business(request)
+    
+    # ✅ SECURITY: Build scoped queryset BEFORE fetching to prevent IDOR info leaks
+    qs = LaybyOrder.objects.filter(pk=order_id)
+    
+    if business and Membership is not None:
+        # Scope via created_by membership in current business
+        business_user_ids = Membership.objects.filter(
+            business=business,
+            status="ACTIVE"
+        ).values_list("user_id", flat=True)
+        qs = qs.filter(created_by_id__in=list(business_user_ids))
+    elif not business:
+        # No business context - only allow access to user's own orders
+        qs = qs.filter(created_by_id=request.user.id)
+    else:
+        # No Membership model but have business - fallback to own orders only
+        qs = qs.filter(created_by_id=request.user.id)
+    
+    # Fetch from scoped queryset - returns None if doesn't exist OR doesn't match scope
+    order = qs.first()
+    if not order:
+        raise Http404("Order not found")
+    
+    return order
+
 
 # ---------------- helpers ----------------
+
 
 def _agent_field_name() -> str | None:
     names = {f.name for f in LaybyOrder._meta.get_fields()}
@@ -96,12 +145,7 @@ def _serialize_order(o: LaybyOrder) -> dict[str, Any]:
     balance = max(total - amount_paid, Decimal("0.00"))
 
     # Product
-    product = (
-        getattr(o, "product_name", None)
-        or getattr(o, "item_name", None)
-        or getattr(o, "product", None)
-        or ""
-    )
+    product = getattr(o, "product_name", None) or getattr(o, "item_name", None) or getattr(o, "product", None) or ""
     sku = getattr(o, "product_sku", None) or getattr(o, "sku", None) or ""
     ref = getattr(o, "ref", None) or getattr(o, "reference", "") or ""
 
@@ -150,6 +194,7 @@ def _render_or_inline(
 
 
 # ---------- extra helpers for customer portal (history + messages) -----------
+
 
 def _dt_as_str(obj) -> str:
     """
@@ -228,6 +273,7 @@ def _collect_sms(order_obj):
 
 
 # ---------------- Agent views ----------------
+
 
 @login_required
 def agent_dashboard(request: HttpRequest) -> HttpResponse:
@@ -383,6 +429,7 @@ def agent_new(request: HttpRequest) -> HttpResponse:
 
 # ---------------- Admin dashboard (customers + alerts + colors) ----------------
 
+
 def _color_for(name: str) -> str:
     palette = ["#ffeb3b", "#03a9f4", "#8bc34a", "#e91e63", "#ff9800", "#9c27b0", "#00bcd4", "#cddc39"]
     if not name:
@@ -403,13 +450,20 @@ def admin_dashboard(request: HttpRequest) -> HttpResponse:
     paid_this_week = Decimal("0.00")
     try:
         from .models import LaybyPayment  # type: ignore
+
         week_ago = timezone.now() - timedelta(days=7)
         if hasattr(LaybyPayment, "created_at"):
-            paid_this_week = _money(LaybyPayment.objects.filter(created_at__gte=week_ago).aggregate(s=Sum("amount"))["s"])
+            paid_this_week = _money(
+                LaybyPayment.objects.filter(created_at__gte=week_ago).aggregate(s=Sum("amount"))["s"]
+            )
         elif hasattr(LaybyPayment, "timestamp"):
-            paid_this_week = _money(LaybyPayment.objects.filter(timestamp__gte=week_ago).aggregate(s=Sum("amount"))["s"])
+            paid_this_week = _money(
+                LaybyPayment.objects.filter(timestamp__gte=week_ago).aggregate(s=Sum("amount"))["s"]
+            )
         elif hasattr(LaybyPayment, "date"):
-            paid_this_week = _money(LaybyPayment.objects.filter(date__gte=week_ago.date()).aggregate(s=Sum("amount"))["s"])
+            paid_this_week = _money(
+                LaybyPayment.objects.filter(date__gte=week_ago.date()).aggregate(s=Sum("amount"))["s"]
+            )
         else:
             paid_this_week = _money(LaybyPayment.objects.aggregate(s=Sum("amount"))["s"])
     except Exception:
@@ -493,6 +547,7 @@ def admin_dashboard(request: HttpRequest) -> HttpResponse:
 
 
 # ---------------- Admin: customer detail ----------------
+
 
 @staff_member_required
 def admin_customer(request: HttpRequest) -> HttpResponse:
@@ -593,6 +648,7 @@ def admin_customer(request: HttpRequest) -> HttpResponse:
 
 # ---------------- Customer OTP flow ----------------
 
+
 def customer_login(request: HttpRequest) -> HttpResponse:
     return _render_or_inline(
         request,
@@ -682,9 +738,11 @@ def customer_portal(request: HttpRequest) -> HttpResponse:
 
 # ---------------- Pay Now (QR + deep link) ----------------
 
+
 @login_required
 def pay_now(request: HttpRequest, order_id: int) -> HttpResponse:
-    order = get_object_or_404(LaybyOrder, pk=order_id)
+    # SECURITY: Scope to business via created_by membership
+    order = _scope_layby_order(request, order_id)
     ser = _serialize_order(order)
     deeplink = f"circuitpay://pay?ref=LAYBY-{order.pk}&amount={ser['balance']}&label={escape(ser['product'])}"
     return _render_or_inline(
@@ -697,7 +755,8 @@ def pay_now(request: HttpRequest, order_id: int) -> HttpResponse:
 
 @login_required
 def qr_png(request: HttpRequest, order_id: int) -> HttpResponse:
-    order = get_object_or_404(LaybyOrder, pk=order_id)
+    # SECURITY: Scope to business via created_by membership
+    order = _scope_layby_order(request, order_id)
     ser = _serialize_order(order)
     payload = f"REF=LAYBY-{order.pk};AMOUNT={ser['balance']};DESC={ser['product']}"
     if not qrcode:  # pragma: no cover
@@ -727,7 +786,8 @@ class LaybyPaymentForm(forms.ModelForm):
 
 @login_required
 def agent_add_payment(request: HttpRequest, order_id: int) -> HttpResponse:
-    order = get_object_or_404(LaybyOrder, pk=order_id)
+    # SECURITY: Scope to business via created_by membership
+    order = _scope_layby_order(request, order_id)
 
     if request.method == "POST":
         form = LaybyPaymentForm(request.POST)
@@ -750,3 +810,380 @@ def agent_add_payment(request: HttpRequest, order_id: int) -> HttpResponse:
     )
 
 
+# ---------------- Manager views (primary sidebar entry point) ----------------
+
+
+@login_required
+def manager_dashboard(request: HttpRequest) -> HttpResponse:
+    """
+    Manager-facing Layby dashboard - main entry point from sidebar.
+    Shows all layby orders for the business with payment status and progress.
+    """
+    from inventory.helpers import get_active_business, business_vertical
+
+    # Get business context
+    try:
+        business = get_active_business(request)
+    except Exception:
+        business = None
+
+    # Filter laybys by business if we can determine it
+    qs = LaybyOrder.objects.all()
+    field = _agent_field_name()
+
+    # If there's a business field on LaybyOrder, filter by it
+    try:
+        if hasattr(LaybyOrder, "business") and business:
+            qs = qs.filter(business=business)
+        elif hasattr(LaybyOrder, "location") and hasattr(request.user, "location"):
+            if request.user.location:
+                qs = qs.filter(location=request.user.location)
+    except Exception:
+        pass
+
+    qs = qs.order_by("-id")[:500]
+
+    # Serialize with computed fields
+    orders = []
+    for o in qs:
+        ser = _serialize_order(o)
+        # Calculate percentage paid
+        try:
+            total = ser.get("total") or Decimal("0.00")
+            paid = ser.get("amount_paid") or Decimal("0.00")
+            if total > 0:
+                pct = (paid / total) * 100
+            else:
+                pct = 0
+            ser["percentage_paid"] = min(pct, 100)
+        except Exception:
+            ser["percentage_paid"] = 0
+        orders.append(ser)
+
+    # Aggregates
+    total_balance = sum((o.get("balance", Decimal("0.00")) for o in orders), Decimal("0"))
+    count_active = sum(1 for o in orders if (o.get("status") or "").lower() == "active")
+    total_value = sum((o.get("total", Decimal("0.00")) for o in orders), Decimal("0"))
+    total_paid = sum((o.get("amount_paid", Decimal("0.00")) for o in orders), Decimal("0"))
+
+    return render(
+        request,
+        "layby/manager_dashboard.html",
+        {
+            "orders": orders,
+            "total_balance": total_balance,
+            "count_active": count_active,
+            "total_value": total_value,
+            "total_paid": total_paid,
+            "header_title": "Layby",
+            "active_nav": "layby",
+        },
+    )
+
+
+@login_required
+def manager_detail(request: HttpRequest, pk: int) -> HttpResponse:
+    """
+    Manager view for a single layby order with payment history.
+    
+    SECURITY: Scoped to business via created_by membership.
+    """
+    order = _scope_layby_order(request, pk)
+    ser = _serialize_order(order)
+
+    # Calculate percentage
+    try:
+        total = ser.get("total") or Decimal("0.00")
+        paid = ser.get("amount_paid") or Decimal("0.00")
+        if total > 0:
+            pct = (paid / total) * 100
+        else:
+            pct = 0
+        ser["percentage_paid"] = min(pct, 100)
+    except Exception:
+        ser["percentage_paid"] = 0
+
+    # Get payment history
+    payments = _collect_payments(order)
+
+    # Handle payment submission
+    if request.method == "POST" and "add_payment" in request.POST:
+        form = LaybyPaymentForm(request.POST)
+        if form.is_valid():
+            pay = form.save(commit=False)
+            pay.order = order
+            if hasattr(pay, "received_by") and request.user.is_authenticated:
+                pay.received_by = request.user
+            pay.save()
+            messages.success(request, "Payment recorded successfully.")
+            return redirect("layby:detail", pk=order.pk)
+    else:
+        form = LaybyPaymentForm()
+
+    return render(
+        request,
+        "layby/manager_detail.html",
+        {
+            "order": order,
+            "ser": ser,
+            "payments": payments,
+            "form": form,
+            "header_title": "Layby Detail",
+            "active_nav": "layby",
+        },
+    )
+
+
+@login_required
+def manager_new_sale(request: HttpRequest) -> HttpResponse:
+    """
+    Manager view to create a new layby sale.
+    """
+    if request.method == "POST":
+        form = LaybyOrderForm(request.POST, request.FILES)
+        if form.is_valid():
+            order = form.save(user=request.user, commit=True)
+            messages.success(request, f"Layby {escape(getattr(order, 'ref', '') or order.pk)} created successfully.")
+            return redirect("layby:detail", pk=order.pk)
+    else:
+        form = LaybyOrderForm()
+
+    return render(
+        request,
+        "layby/manager_new.html",
+        {
+            "form": form,
+            "header_title": "New Layby Sale",
+            "active_nav": "layby",
+        },
+    )
+
+
+@login_required
+def layby_agreement_pdf(request: HttpRequest, pk: int) -> HttpResponse:
+    """
+    Generate a professional layby agreement PDF using reportlab.
+    Downloads as: layby-agreement-<ref>.pdf
+    """
+    from decimal import Decimal as D
+    from io import BytesIO
+
+    try:
+        from reportlab.lib import colors
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib.units import cm
+        from reportlab.platypus import (
+            SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
+        )
+    except ImportError:
+        return HttpResponse("PDF library not available. Contact support.", status=503)
+
+    order = _scope_layby_order(request, pk)
+    payments = _collect_payments(order)
+
+    # Build document
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        rightMargin=2 * cm,
+        leftMargin=2 * cm,
+        topMargin=2 * cm,
+        bottomMargin=2 * cm,
+    )
+
+    styles = getSampleStyleSheet()
+    orange = colors.HexColor("#ff6a1a")
+    dark = colors.HexColor("#0f172a")
+    muted = colors.HexColor("#64748b")
+    green = colors.HexColor("#059669")
+
+    title_style = ParagraphStyle(
+        "Title", parent=styles["Heading1"],
+        fontSize=22, textColor=orange, spaceAfter=4, leading=26,
+    )
+    subtitle_style = ParagraphStyle(
+        "Subtitle", parent=styles["Normal"],
+        fontSize=10, textColor=muted, spaceAfter=12,
+    )
+    section_style = ParagraphStyle(
+        "Section", parent=styles["Heading2"],
+        fontSize=11, textColor=dark, spaceBefore=14, spaceAfter=6,
+        borderPad=4,
+    )
+    body_style = ParagraphStyle(
+        "Body", parent=styles["Normal"],
+        fontSize=10, textColor=dark, leading=14,
+    )
+    small_style = ParagraphStyle(
+        "Small", parent=styles["Normal"],
+        fontSize=8, textColor=muted, leading=11,
+    )
+
+    try:
+        business = get_active_business(request)
+        biz_name = getattr(business, "name", "Business") if business else "Business"
+    except Exception:
+        biz_name = "Business"
+
+    ref = getattr(order, "ref", str(order.pk))
+    total = getattr(order, "total_price", D("0.00")) or D("0.00")
+    deposit = getattr(order, "deposit_amount", D("0.00")) or D("0.00")
+    balance = getattr(order, "balance", D("0.00"))
+    term_months = getattr(order, "term_months", 3)
+    created_at = getattr(order, "created_at", timezone.now())
+    created_date = created_at.strftime("%d %B %Y") if created_at else "—"
+    due_date_approx = (created_at + timedelta(days=term_months * 30)).strftime("%d %B %Y") if created_at else "—"
+
+    elements = []
+
+    # Header
+    elements.append(Paragraph(f"LAYBY AGREEMENT", title_style))
+    elements.append(Paragraph(f"{biz_name} · Ref: {ref} · Date: {created_date}", subtitle_style))
+    elements.append(HRFlowable(width="100%", thickness=2, color=orange, spaceAfter=12))
+
+    # Customer Details
+    elements.append(Paragraph("CUSTOMER DETAILS", section_style))
+    customer_data = [
+        ["Full Name", getattr(order, "customer_name", "—") or "—"],
+        ["Phone", getattr(order, "customer_phone", "—") or "—"],
+        ["ID Number", getattr(order, "id_number", "—") or "—"],
+    ]
+    if getattr(order, "kin1_name", ""):
+        customer_data.append(["Next of Kin", f"{order.kin1_name} — {order.kin1_phone or '—'}"])
+    ct = Table(customer_data, colWidths=[4 * cm, None])
+    ct.setStyle(TableStyle([
+        ("FONTSIZE", (0, 0), (-1, -1), 9),
+        ("TEXTCOLOR", (0, 0), (0, -1), muted),
+        ("TEXTCOLOR", (1, 0), (1, -1), dark),
+        ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
+        ("ROWBACKGROUNDS", (0, 0), (-1, -1), [colors.white, colors.HexColor("#f8fafc")]),
+        ("TOPPADDING", (0, 0), (-1, -1), 5),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+        ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#e2e8f0")),
+    ]))
+    elements.append(ct)
+
+    # Product Details
+    elements.append(Paragraph("PRODUCT / ITEM", section_style))
+    product_data = [
+        ["Item", getattr(order, "item_name", "—") or "—"],
+        ["SKU / Reference", getattr(order, "sku", "—") or "—"],
+    ]
+    pt = Table(product_data, colWidths=[4 * cm, None])
+    pt.setStyle(TableStyle([
+        ("FONTSIZE", (0, 0), (-1, -1), 9),
+        ("TEXTCOLOR", (0, 0), (0, -1), muted),
+        ("TEXTCOLOR", (1, 0), (1, -1), dark),
+        ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
+        ("ROWBACKGROUNDS", (0, 0), (-1, -1), [colors.white, colors.HexColor("#f8fafc")]),
+        ("TOPPADDING", (0, 0), (-1, -1), 5),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+        ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#e2e8f0")),
+    ]))
+    elements.append(pt)
+
+    # Payment Summary
+    elements.append(Paragraph("PAYMENT SUMMARY", section_style))
+    summary_data = [
+        ["TOTAL PRICE", f"MWK {total:,.2f}"],
+        ["INITIAL DEPOSIT", f"MWK {deposit:,.2f}"],
+        ["BALANCE DUE", f"MWK {balance:,.2f}"],
+        ["TERM", f"{term_months} month{'s' if term_months != 1 else ''}"],
+        ["DUE DATE (approx.)", due_date_approx],
+        ["STATUS", (getattr(order, "status", "active") or "active").upper()],
+    ]
+    st = Table(summary_data, colWidths=[5 * cm, None])
+    st.setStyle(TableStyle([
+        ("FONTSIZE", (0, 0), (-1, -1), 10),
+        ("TEXTCOLOR", (0, 0), (0, -1), muted),
+        ("TEXTCOLOR", (1, 0), (1, -1), dark),
+        ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
+        ("FONTNAME", (1, 0), (1, -1), "Helvetica-Bold"),
+        ("ROWBACKGROUNDS", (0, 0), (-1, -1), [colors.white, colors.HexColor("#f8fafc")]),
+        ("TOPPADDING", (0, 0), (-1, -1), 6),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+        ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#e2e8f0")),
+        # Highlight balance row
+        ("BACKGROUND", (0, 2), (1, 2), colors.HexColor("#fef3c7")),
+        ("TEXTCOLOR", (1, 2), (1, 2), colors.HexColor("#92400e")),
+    ]))
+    elements.append(st)
+
+    # Payment History
+    if payments:
+        elements.append(Paragraph("PAYMENT HISTORY", section_style))
+        ph_data = [["Date", "Amount", "Method", "Received By"]]
+        for p in payments:
+            date_str = ""
+            if hasattr(p, "received_at") and p.received_at:
+                date_str = p.received_at.strftime("%d %b %Y")
+            elif isinstance(p, dict):
+                date_str = str(p.get("received_at", "")[:10] if p.get("received_at") else "—")
+            ph_data.append([
+                date_str or "—",
+                f"MWK {(p.amount if hasattr(p, 'amount') else p.get('amount', 0)):,.2f}",
+                (p.method if hasattr(p, "method") else p.get("method", "cash")) or "cash",
+                str(getattr(p, "received_by", None) or p.get("received_by", "—") or "—"),
+            ])
+        pht = Table(ph_data, colWidths=[3.5 * cm, 3.5 * cm, 3 * cm, None])
+        pht.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), orange),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("FONTSIZE", (0, 0), (-1, -1), 9),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f0fdf4")]),
+            ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#e2e8f0")),
+            ("TOPPADDING", (0, 0), (-1, -1), 5),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+        ]))
+        elements.append(pht)
+
+    # Terms & Conditions
+    elements.append(Spacer(1, 0.5 * cm))
+    elements.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#e2e8f0"), spaceAfter=10))
+    elements.append(Paragraph("TERMS AND CONDITIONS", section_style))
+    terms = [
+        "1. The customer agrees to pay the balance in full by the due date specified above.",
+        "2. A minimum deposit as specified must be paid before the item is reserved.",
+        "3. Items are reserved pending full payment. Stock may be released if payments are not made on time.",
+        "4. Deposits are non-refundable in case of cancellation by the customer.",
+        "5. The business reserves the right to cancel the agreement if payment terms are not met.",
+        "6. All prices are in Malawian Kwacha (MWK) unless otherwise stated.",
+    ]
+    for term in terms:
+        elements.append(Paragraph(term, small_style))
+
+    # Signature block
+    elements.append(Spacer(1, 1 * cm))
+    sig_data = [
+        ["Customer Signature:", "___________________________", "Date:", "_______________"],
+        ["Agent Signature:", "___________________________", "Date:", "_______________"],
+    ]
+    sig_t = Table(sig_data, colWidths=[3.5 * cm, 6 * cm, 1.5 * cm, 3.5 * cm])
+    sig_t.setStyle(TableStyle([
+        ("FONTSIZE", (0, 0), (-1, -1), 9),
+        ("TEXTCOLOR", (0, 0), (0, -1), muted),
+        ("TEXTCOLOR", (2, 0), (2, -1), muted),
+        ("TOPPADDING", (0, 0), (-1, -1), 8),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+        ("LINEABOVE", (1, 0), (1, -1), 0.5, muted),
+        ("LINEABOVE", (3, 0), (3, -1), 0.5, muted),
+    ]))
+    elements.append(sig_t)
+
+    # Footer
+    elements.append(Spacer(1, 0.5 * cm))
+    elements.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#e2e8f0")))
+    elements.append(Paragraph(
+        f"Generated by Emajinet · {biz_name} · Ref: {ref} · {created_date}",
+        small_style,
+    ))
+
+    doc.build(elements)
+    buffer.seek(0)
+    filename = f"layby-agreement-{ref}.pdf"
+    response = HttpResponse(buffer, content_type="application/pdf")
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+    return response

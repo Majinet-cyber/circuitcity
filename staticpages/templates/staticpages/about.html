@@ -4,7 +4,31 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>About Emajinet</title>
+  <title>About Us - Emajinet | Business Management for African Merchants</title>
+  <meta name="description" content="Learn about Emajinet, a business management platform built in Malawi for African merchants. We help businesses digitize operations, manage inventory, and grow sustainably.">
+  
+  <!-- Open Graph / Social Media -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://www.emajinet.africa{{ request.path }}">
+  <meta property="og:title" content="About Us - Emajinet | Business Management for African Merchants">
+  <meta property="og:description" content="Learn about Emajinet, a business management platform built in Malawi for African merchants.">
+  <meta property="og:site_name" content="Emajinet">
+  <meta property="og:image" content="https://www.emajinet.africa{% static 'img/majn.png' %}">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Emajinet Logo">
+  
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:url" content="https://www.emajinet.africa{{ request.path }}">
+  <meta name="twitter:title" content="About Us - Emajinet">
+  <meta name="twitter:description" content="Learn about Emajinet, a business management platform built in Malawi for African merchants.">
+  <meta name="twitter:image" content="https://www.emajinet.africa{% static 'img/majn.png' %}">
+  <meta name="twitter:image:alt" content="Emajinet Logo">
+  
+  <!-- SEO: Canonical URL -->
+  <link rel="canonical" href="https://www.emajinet.africa{{ request.path }}">
+  
   <link rel="icon" href="{% static 'favicon.ico' %}">
   <style>
     :root {
@@ -187,25 +211,140 @@
     <section class="about-hero">
       <h1>About Emajinet</h1>
       <p>
-        We are pioneers determined to simplify business for everyday merchants.
+        Emajinet is a business management platform built specifically for African merchants. 
+        We help small and medium businesses digitize their operations, replacing manual ledgers 
+        with a modern, mobile-first system that works even when internet is unreliable.
       </p>
+      
+      <div style="margin: 2rem 0; padding: 1.5rem; background: rgba(79, 70, 229, 0.05); border-radius: 16px; border-left: 4px solid var(--primary);">
+        <p style="font-weight: 600; color: var(--text-primary); margin-bottom: 1rem;">What Emajinet helps merchants do:</p>
+        <ul style="list-style: none; padding: 0; margin: 0;">
+          <li style="padding: 0.5rem 0; color: var(--text-secondary);">✓ Manage inventory and track stock levels in real-time</li>
+          <li style="padding: 0.5rem 0; color: var(--text-secondary);">✓ Process sales, generate reports, and analyze performance</li>
+          <li style="padding: 0.5rem 0; color: var(--text-secondary);">✓ Coordinate team members and agents across locations</li>
+        </ul>
+      </div>
+      
       <p>
-        We are motivated by the common men and women who give their all to survive,
-        support their families, and build society through business.
+        Built in Malawi for African realities, Emajinet is designed to work offline, load fast on 
+        mobile devices, and require minimal training. We understand the challenges of running a 
+        business in Africa—unreliable internet, limited budgets, and the need for simplicity. 
+        That's why we built a platform that adapts to your environment, not the other way around.
       </p>
-      <p>
-        May they never lose.
+      
+      <!-- Support Block -->
+      <div style="margin: 2.5rem 0; padding: 2rem; background: linear-gradient(135deg, rgba(16, 185, 129, 0.06) 0%, rgba(79, 70, 229, 0.04) 100%); border-radius: 16px; border-left: 4px solid var(--secondary);">
+        <h3 style="font-size: 1.25rem; font-weight: 700; color: var(--text-primary); margin-bottom: 1.5rem;">📞 Support</h3>
+        
+        <div style="display: grid; gap: 1rem;">
+          <div style="display: flex; align-items: flex-start; gap: 0.75rem;">
+            <span style="font-size: 1.25rem;">⚡</span>
+            <div>
+              <strong style="color: var(--text-primary);">Quick Onboarding</strong>
+              <p style="color: var(--text-secondary); margin: 0.25rem 0 0 0; font-size: 0.95rem;">Get started in under 30 minutes. We help you set up your business and import your data.</p>
+            </div>
+          </div>
+          <div style="display: flex; align-items: flex-start; gap: 0.75rem;">
+            <span style="font-size: 1.25rem;">💬</span>
+            <div>
+              <strong style="color: var(--text-primary);">WhatsApp Support</strong>
+              <p style="color: var(--text-secondary); margin: 0.25rem 0 0 0; font-size: 0.95rem;">Real humans on WhatsApp. Get help when you need it, in a language you understand.</p>
+            </div>
+          </div>
+          <div style="display: flex; align-items: flex-start; gap: 0.75rem;">
+            <span style="font-size: 1.25rem;">📚</span>
+            <div>
+              <strong style="color: var(--text-primary);">Simple Training</strong>
+              <p style="color: var(--text-secondary); margin: 0.25rem 0 0 0; font-size: 0.95rem;">Built so simple that most users need no training. When you do, we're here to help.</p>
+            </div>
+          </div>
+          <div style="padding-top: 1rem; border-top: 1px solid rgba(16, 185, 129, 0.2);">
+            <p style="margin: 0; color: var(--text-secondary);">
+              <strong>Email:</strong> <a href="mailto:{{ SUPPORT_EMAIL|default:'support@emajinet.africa' }}" style="color: var(--primary); text-decoration: none;">{{ SUPPORT_EMAIL|default:'support@emajinet.africa' }}</a>
+            </p>
+            <p style="margin: 0.5rem 0 0 0; color: var(--text-secondary);">
+              <strong>WhatsApp:</strong> <a href="https://wa.me/{{ SUPPORT_WHATSAPP_NUMBER|default:'+265991234567'|cut:' '|cut:'+' }}" target="_blank" rel="noopener" style="color: var(--primary); text-decoration: none;">{{ SUPPORT_WHATSAPP_NUMBER|default:'+265 991 234 567' }}</a>
+            </p>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Why Businesses Trust Emajinet Block -->
+      <div style="margin: 2.5rem 0; padding: 2rem; background: linear-gradient(135deg, rgba(79, 70, 229, 0.04) 0%, rgba(16, 185, 129, 0.04) 100%); border-radius: 16px; border-left: 4px solid var(--primary);">
+        <h3 style="font-size: 1.25rem; font-weight: 700; color: var(--text-primary); margin-bottom: 1.5rem;">🔒 Why Businesses Trust Emajinet</h3>
+        
+        <div style="display: grid; gap: 1rem;">
+          <div style="display: flex; align-items: flex-start; gap: 0.75rem;">
+            <span style="font-size: 1.25rem;">👥</span>
+            <div>
+              <strong style="color: var(--text-primary);">Permissions & Roles</strong>
+              <p style="color: var(--text-secondary); margin: 0.25rem 0 0 0; font-size: 0.95rem;">Control who sees what. Owners see everything, staff see only what they need.</p>
+            </div>
+          </div>
+          <div style="display: flex; align-items: flex-start; gap: 0.75rem;">
+            <span style="font-size: 1.25rem;">📋</span>
+            <div>
+              <strong style="color: var(--text-primary);">Audit History</strong>
+              <p style="color: var(--text-secondary); margin: 0.25rem 0 0 0; font-size: 0.95rem;">Every change is logged. Know who did what and when—catch issues before they become problems.</p>
+            </div>
+          </div>
+          <div style="display: flex; align-items: flex-start; gap: 0.75rem;">
+            <span style="font-size: 1.25rem;">📊</span>
+            <div>
+              <strong style="color: var(--text-primary);">Reports & Exports</strong>
+              <p style="color: var(--text-secondary); margin: 0.25rem 0 0 0; font-size: 0.95rem;">Download your data anytime. Clean records you can share with partners or banks.</p>
+            </div>
+          </div>
+          <div style="display: flex; align-items: flex-start; gap: 0.75rem;">
+            <span style="font-size: 1.25rem;">✅</span>
+            <div>
+              <strong style="color: var(--text-primary);">Clean Records</strong>
+              <p style="color: var(--text-secondary); margin: 0.25rem 0 0 0; font-size: 0.95rem;">No more messy ledgers. Digital records that are accurate, searchable, and always backed up.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Built for African Businesses Block -->
+      <div style="margin: 2.5rem 0; padding: 2rem; background: rgba(249, 250, 251, 0.8); border-radius: 16px; border: 1px solid rgba(79, 70, 229, 0.1);">
+        <h3 style="font-size: 1.25rem; font-weight: 700; color: var(--text-primary); margin-bottom: 1.5rem;">🌍 Built for African Businesses</h3>
+        
+        <div style="display: grid; gap: 1.25rem;">
+          <div>
+            <h4 style="font-size: 1rem; font-weight: 600; color: var(--text-primary); margin-bottom: 0.5rem;">🎯 Who It's For</h4>
+            <p style="color: var(--text-secondary); margin: 0;">Shops, farms, gyms, liquor stores, cement depots, and more—any business that needs to track stock, sales, and team performance.</p>
+          </div>
+          
+          <div>
+            <h4 style="font-size: 1rem; font-weight: 600; color: var(--text-primary); margin-bottom: 0.5rem;">💼 What It Does</h4>
+            <p style="color: var(--text-secondary); margin: 0;">Track operations, manage your team, and get smart recommendations—all from your phone.</p>
+          </div>
+          
+          <div>
+            <h4 style="font-size: 1rem; font-weight: 600; color: var(--text-primary); margin-bottom: 0.5rem;">🇲🇼 Where We Focus</h4>
+            <p style="color: var(--text-secondary); margin: 0;">Proudly built in Malawi, designed for African realities—unreliable internet, mobile-first users, and practical business needs.</p>
+          </div>
+        </div>
+      </div>
+      
+      <p style="font-style: italic; color: var(--primary); margin-top: 2rem;">
+        We are pioneers determined to simplify business for everyday merchants. We are motivated 
+        by the common men and women who give their all to survive, support their families, and 
+        build society through business. May they never lose.
       </p>
     </section>
   </div>
 
   <!-- Footer -->
   <footer class="footer">
-    <p class="footer-text">&copy; 2025 Emajinet. All rights reserved.</p>
+    <p class="footer-text">&copy; {% now "Y" %} Emajinet. All rights reserved.</p>
     <div style="margin-top: 1rem; display: flex; gap: 2rem; justify-content: center; flex-wrap: wrap;">
+      <a href="{% url 'staticpages:pricing' %}" style="color: rgba(255,255,255,0.7); text-decoration: none; font-size: 0.9rem;">Pricing</a>
       <a href="{% url 'staticpages:about' %}" style="color: rgba(255,255,255,0.7); text-decoration: none; font-size: 0.9rem;">About</a>
-      <a href="{% url 'staticpages:privacy' %}" style="color: rgba(255,255,255,0.7); text-decoration: none; font-size: 0.9rem;">Privacy Policy</a>
-      <a href="{% url 'staticpages:terms' %}" style="color: rgba(255,255,255,0.7); text-decoration: none; font-size: 0.9rem;">Terms of Service</a>
+      <a href="{% url 'staticpages:contact' %}" style="color: rgba(255,255,255,0.7); text-decoration: none; font-size: 0.9rem;">Contact</a>
+      <a href="{% url 'staticpages:terms' %}" style="color: rgba(255,255,255,0.7); text-decoration: none; font-size: 0.9rem;">Terms</a>
+      <a href="{% url 'staticpages:privacy' %}" style="color: rgba(255,255,255,0.7); text-decoration: none; font-size: 0.9rem;">Privacy</a>
+      <a href="{% url 'staticpages:terms' %}#refund-policy" style="color: rgba(255,255,255,0.7); text-decoration: none; font-size: 0.9rem;">Refund Policy</a>
     </div>
   </footer>
 </body>

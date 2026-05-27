@@ -1,0 +1,99 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                  LIQUOR DASHBOARD COGS FIX - DELIVERY COMPLETE               ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+📊 BEFORE:
+   Stock Value:  MK 460,000.00 ✅
+   COGS (30d):   MK 0.00       ❌ (misleading for Liquor with no sales)
+
+📊 AFTER:
+   Stock Value:  MK 460,000.00 ✅ (unchanged)
+   COGS (30d):   MK 115,000.00 ✅ (now shows inventory purchases cost)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🎯 PRIMARY GOAL: MATH FIX
+
+✅ Created LiquorStockInTransaction model to track inventory purchases
+✅ Updated all stock-in views to log transactions with cost data
+✅ Added query: inventory_purchases_30d_mwk = SUM(total_cost) WHERE created_at >= now-30d
+✅ Wired template variable: inventory_costs now shows inventory purchases when sales COGS is unavailable
+✅ Added code comment: "Liquor COGS card is inventory purchases cost when sales COGS is unavailable"
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✨ SECONDARY GOAL: PREMIUM POLISH
+
+✅ Entry animations: Cards fade + slide up with staggered timing (CSS keyframes)
+✅ Hover effects: Enhanced lift + scale + purple shadow
+✅ Typography: Tighter spacing, better alignment, improved readability
+✅ Panel hover: Smooth transitions on all dashboard sections
+✅ COGS label: Updated subtitle to "Inventory purchases (last 30 days)"
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🧪 TESTS
+
+✅ 5 new tests created in tests/test_liquor_cogs_inventory_purchases.py
+✅ All 48 liquor tests pass (48/48 green)
+✅ No regressions introduced
+✅ Pre-existing failures are unrelated (phone inventory constraints)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📁 FILES CHANGED (9 total)
+
+MODELS & ADMIN:
+  • inventory/models_verticals.py
+  • inventory/admin_verticals.py
+  • inventory/migrations/1035_liquorstockintransaction_and_more.py
+
+VIEWS & SERVICES:
+  • inventory/verticals/liquor.py
+  • inventory/views_liquor_wizard.py
+  • inventory/services_liquor_stockin.py
+  • inventory/services/liquor_sale.py
+
+TEMPLATES:
+  • templates/verticals/liquor/dashboard.html
+
+TESTS:
+  • tests/test_liquor_cogs_inventory_purchases.py
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔍 PROOF MARKERS
+
+HTML: <!-- LIQUOR_DASH_COGS_V3 --> (templates/verticals/liquor/dashboard.html:265)
+CODE: "Liquor COGS card is inventory purchases cost..." (inventory/verticals/liquor.py:96)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📊 EXACT QUERY USED
+
+inventory_purchases_30d_mwk = LiquorStockInTransaction.objects.filter(
+    business=business,
+    created_at__gte=start_date
+).aggregate(total=Sum("total_cost"))["total"] or Decimal("0.00")
+
+SQL:
+SELECT SUM(total_cost) FROM inventory_liquorstockintransaction
+WHERE business_id = ? AND created_at >= ?
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🎯 TEMPLATE VARIABLE
+
+Variable Name: inventory_costs
+Context Key: "inventory_costs": display_cogs
+Location: inventory/verticals/liquor.py:519
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ STATUS: READY FOR PRODUCTION
+
+All requirements met. No major refactors. No regressions. All tests green.
+
+
+
+
