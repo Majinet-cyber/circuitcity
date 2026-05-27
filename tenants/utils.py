@@ -1220,6 +1220,14 @@ def bootstrap_manager_tenant(
             # Do not block signup on seed failures
             pass
 
+    # Mixed Retail: ensure department enrollment records exist
+    if getattr(b, "business_kind", None) == "mixed_retail":
+        try:
+            from inventory.mixed_retail_seed import ensure_mixed_retail_defaults
+            ensure_mixed_retail_defaults(b)
+        except Exception:
+            pass
+
     # Activate for this session (+ thread-local mirror)
     set_active_business(request, b)
 

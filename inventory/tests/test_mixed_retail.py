@@ -76,13 +76,42 @@ class MixedRetailSeedTest(TestCase):
         self.assertEqual(count_after_first, count_after_second, "Seed created duplicates on second run")
 
     def test_get_departments_for_business(self):
-        """get_departments_for_business returns seeded global departments."""
-        from inventory.mixed_retail_seed import seed_mixed_retail_catalog, get_departments_for_business
+        """get_departments_for_business returns enabled seeded departments for a business."""
+        from inventory.mixed_retail_seed import (
+            seed_mixed_retail_catalog, get_departments_for_business, ensure_mixed_retail_defaults,
+        )
 
         seed_mixed_retail_catalog()
         business = _make_business()
+        # Enrollment records must exist for the business to see departments
+        ensure_mixed_retail_defaults(business)
         depts = get_departments_for_business(business)
         self.assertGreater(len(depts), 0)
+
+    def test_ensure_mixed_retail_defaults_idempotent(self):
+        """ensure_mixed_retail_defaults can be called multiple times without duplicating records."""
+        from inventory.mixed_retail_seed import (
+            seed_mixed_retail_catalog, ensure_mixed_retail_defaults,
+        )
+        from inventory.models_mixed_retail import RetailBusinessDepartment
+
+        seed_mixed_retail_catalog()
+        business = _make_business()
+        ensure_mixed_retail_defaults(business)
+        count_1 = RetailBusinessDepartment.objects.filter(business=business).count()
+
+        ensure_mixed_retail_defaults(business)
+        count_2 = RetailBusinessDepartment.objects.filter(business=business).count()
+
+        self.assertEqual(count_1, count_2, "ensure_mixed_retail_defaults duplicated enrollment records")
+
+    def test_product_templates_seeded(self):
+        """Seeded departments have product templates."""
+        from inventory.mixed_retail_seed import seed_mixed_retail_catalog
+        from inventory.models_mixed_retail import RetailProductTemplate
+
+        seed_mixed_retail_catalog()
+        self.assertGreater(RetailProductTemplate.objects.filter(is_active=True).count(), 0)
 
 
 class MixedRetailCustomDeptCatTest(TestCase):

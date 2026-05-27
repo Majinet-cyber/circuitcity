@@ -1,75 +1,365 @@
 {% extends "base.html" %}
 {% block title %}Departments · {{ business.name }}{% endblock %}
-{% block content %}
-<div style="max-width:800px;margin:0 auto;padding:20px 14px;">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
-    <h1 style="font-size:1.3rem;font-weight:900;margin:0;">Departments</h1>
-    <a href="{% url 'mixed_retail:dashboard' %}" style="color:#64748b;font-size:.85rem;text-decoration:none;">← Dashboard</a>
-  </div>
-  {% if messages %}{% for msg in messages %}<div class="msg msg-{{ msg.tags }}" style="margin-bottom:12px;">{{ msg }}</div>{% endfor %}{% endif %}
 
-  <!-- Add Custom Department -->
-  <div style="background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:16px;margin-bottom:20px;">
-    <div style="font-size:.75rem;text-transform:uppercase;letter-spacing:.07em;font-weight:800;color:#475569;margin-bottom:12px;">Add Custom Department</div>
-    <form method="post" style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;">
+{% block extra_css %}
+<style>
+/* ── Layout ── */
+.dept-wrap { max-width: 1100px; margin: 0 auto; padding: 24px 16px; }
+
+/* ── Stats bar ── */
+.stats-bar { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 24px; }
+@media (max-width: 640px) { .stats-bar { grid-template-columns: repeat(2, 1fr); } }
+.stat-card {
+  background: #fff; border: 1px solid #e2e8f0; border-radius: 14px;
+  padding: 16px 18px; display: flex; flex-direction: column; gap: 4px;
+}
+.stat-num { font-size: 1.7rem; font-weight: 900; color: #0f172a; line-height: 1; }
+.stat-lbl { font-size: .72rem; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; }
+
+/* ── Progress steps ── */
+.progress-steps { background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 16px 20px; margin-bottom: 24px; }
+.progress-title { font-size: .7rem; text-transform: uppercase; letter-spacing: .08em; font-weight: 800; color: #64748b; margin-bottom: 12px; }
+.steps { display: flex; gap: 0; align-items: center; flex-wrap: wrap; gap: 8px; }
+.step { display: flex; align-items: center; gap: 8px; font-size: .82rem; font-weight: 600; color: #94a3b8; }
+.step.active { color: #0f172a; }
+.step.done { color: #16a34a; }
+.step-num {
+  width: 24px; height: 24px; border-radius: 50%; border: 2px solid #e2e8f0;
+  display: flex; align-items: center; justify-content: center; font-size: .72rem; font-weight: 800;
+  background: #f8fafc; color: #94a3b8; flex-shrink: 0;
+}
+.step.active .step-num { background: #f97316; border-color: #f97316; color: #fff; }
+.step.done .step-num { background: #16a34a; border-color: #16a34a; color: #fff; }
+.step-arrow { color: #cbd5e1; font-size: .8rem; margin: 0 4px; }
+@media (max-width: 500px) { .step-arrow { display: none; } }
+
+/* ── Section header ── */
+.section-hdr { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 8px; }
+.section-title { font-size: 1rem; font-weight: 800; color: #0f172a; }
+.section-sub { font-size: .8rem; color: #64748b; margin-top: 2px; }
+
+/* ── Department grid ── */
+.dept-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; margin-bottom: 28px; }
+@media (max-width: 500px) { .dept-grid { grid-template-columns: 1fr; } }
+
+.dept-card {
+  background: #fff; border: 1px solid #e2e8f0; border-radius: 16px;
+  padding: 18px; display: flex; flex-direction: column; gap: 10px;
+  transition: box-shadow .15s, border-color .15s; position: relative;
+}
+.dept-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,.07); border-color: #cbd5e1; }
+.dept-card.enabled { border-color: #bbf7d0; background: linear-gradient(135deg, #f0fdf4 0%, #fff 60%); }
+
+.dept-icon-wrap {
+  width: 44px; height: 44px; border-radius: 12px; display: flex;
+  align-items: center; justify-content: center; font-size: 1.3rem;
+  background: #f1f5f9; color: #10b981; flex-shrink: 0;
+}
+.dept-card.enabled .dept-icon-wrap { background: #d1fae5; color: #059669; }
+
+.dept-card-head { display: flex; align-items: flex-start; gap: 12px; }
+.dept-card-info { flex: 1; min-width: 0; }
+.dept-card-name { font-size: .95rem; font-weight: 800; color: #0f172a; line-height: 1.2; margin-bottom: 3px; }
+.dept-card-desc { font-size: .75rem; color: #64748b; line-height: 1.4; }
+
+.dept-meta { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 9px; border-radius: 99px; font-size: .7rem; font-weight: 700; }
+.badge-enabled { background: #d1fae5; color: #065f46; }
+.badge-disabled { background: #f1f5f9; color: #64748b; }
+.badge-template { background: #eff6ff; color: #1d4ed8; }
+.badge-custom { background: #fef9c3; color: #854d0e; }
+
+.dept-card-footer { margin-top: auto; }
+.btn-enable {
+  width: 100%; padding: 8px 16px; border: none; border-radius: 8px;
+  font-size: .82rem; font-weight: 700; cursor: pointer; transition: background .15s;
+}
+.btn-enable.enable { background: #f97316; color: #fff; }
+.btn-enable.enable:hover { background: #ea6c0a; }
+.btn-enable.disable { background: #f1f5f9; color: #64748b; border: 1px solid #e2e8f0; }
+.btn-enable.disable:hover { background: #e2e8f0; }
+
+/* ── Empty state ── */
+.empty-state {
+  text-align: center; padding: 40px 20px;
+  background: #fff; border: 1px dashed #cbd5e1; border-radius: 16px; margin-bottom: 24px;
+}
+.empty-state-title { font-size: 1.05rem; font-weight: 800; color: #0f172a; margin-bottom: 8px; }
+.empty-state-sub { font-size: .85rem; color: #64748b; margin-bottom: 18px; }
+
+/* ── Custom dept section ── */
+.custom-section { background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 20px; margin-bottom: 24px; }
+.form-control {
+  width: 100%; padding: 9px 12px; border: 1px solid #d1d5db; border-radius: 8px;
+  font-size: .9rem; box-sizing: border-box; background: #fff;
+}
+.form-control:focus { outline: none; border-color: #10b981; box-shadow: 0 0 0 3px rgba(16,185,129,.1); }
+.form-label { display: block; font-size: .8rem; font-weight: 700; color: #374151; margin-bottom: 4px; }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 480px) { .form-row { grid-template-columns: 1fr; } }
+.form-group { margin-bottom: 12px; }
+.btn-primary { padding: 10px 22px; background: #f97316; color: #fff; border: none; border-radius: 8px; font-weight: 700; font-size: .9rem; cursor: pointer; }
+.btn-primary:hover { background: #ea6c0a; }
+.btn-secondary { padding: 10px 22px; background: #f1f5f9; color: #374151; border: 1px solid #e2e8f0; border-radius: 8px; font-weight: 700; font-size: .9rem; cursor: pointer; }
+
+/* ── Icon selector ── */
+.icon-grid { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.icon-opt {
+  width: 36px; height: 36px; border-radius: 8px; border: 2px solid #e2e8f0;
+  display: flex; align-items: center; justify-content: center; cursor: pointer;
+  font-size: 1rem; color: #64748b; transition: border-color .1s;
+}
+.icon-opt:hover, .icon-opt.selected { border-color: #10b981; background: #f0fdf4; color: #059669; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="dept-wrap">
+
+  <!-- Page header -->
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px;">
+    <div>
+      <h1 style="font-size:1.4rem;font-weight:900;color:#0f172a;margin:0;">Departments</h1>
+      <p style="font-size:.85rem;color:#64748b;margin:4px 0 0;">Enable the areas your shop sells in. We already prepared the common options for you.</p>
+    </div>
+    <a href="{% url 'mixed_retail:dashboard' %}" style="color:#64748b;font-size:.85rem;text-decoration:none;display:flex;align-items:center;gap:5px;">
+      <i class="bi bi-arrow-left"></i> Dashboard
+    </a>
+  </div>
+
+  <!-- Messages -->
+  {% if messages %}
+    {% for msg in messages %}
+    <div class="msg msg-{{ msg.tags }}" style="margin-bottom:12px;">{{ msg }}</div>
+    {% endfor %}
+  {% endif %}
+
+  <!-- Stats bar -->
+  <div class="stats-bar">
+    <div class="stat-card">
+      <div class="stat-num">{{ enabled_count }}</div>
+      <div class="stat-lbl">Enabled Departments</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-num">{{ seeded_count }}</div>
+      <div class="stat-lbl">Available Templates</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-num">{{ custom_count }}</div>
+      <div class="stat-lbl">Custom Departments</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-num">{{ total_templates }}</div>
+      <div class="stat-lbl">Product Templates</div>
+    </div>
+  </div>
+
+  <!-- Setup progress -->
+  <div class="progress-steps">
+    <div class="progress-title">Setup Progress</div>
+    <div class="steps">
+      <div class="step {% if enabled_count > 0 %}done{% else %}active{% endif %}">
+        <div class="step-num">{% if enabled_count > 0 %}<i class="bi bi-check"></i>{% else %}1{% endif %}</div>
+        Enable Departments
+      </div>
+      <div class="step-arrow">›</div>
+      <div class="step {% if enabled_count > 0 %}active{% endif %}">
+        <div class="step-num">2</div>
+        Add Products
+      </div>
+      <div class="step-arrow">›</div>
+      <div class="step">
+        <div class="step-num">3</div>
+        Stock In
+      </div>
+      <div class="step-arrow">›</div>
+      <div class="step">
+        <div class="step-num">4</div>
+        Start Selling
+      </div>
+    </div>
+  </div>
+
+  <!-- Empty state (no departments enabled) -->
+  {% if enabled_count == 0 %}
+  <div class="empty-state">
+    <div style="font-size:2rem;margin-bottom:10px;color:#10b981;"><i class="bi bi-grid-3x3-gap"></i></div>
+    <div class="empty-state-title">Start by enabling departments your shop sells in</div>
+    <div class="empty-state-sub">Choose from the list below or enable common starter departments in one click.</div>
+    <form method="post" style="display:inline;">
       {% csrf_token %}
-      <input type="hidden" name="action" value="add">
-      <div>
-        <label style="font-size:.82rem;font-weight:600;display:block;margin-bottom:4px;">Name</label>
-        <input type="text" name="name" required placeholder="e.g. Hardware & Tools" style="padding:9px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:.9rem;width:250px;">
-      </div>
-      <div>
-        <label style="font-size:.82rem;font-weight:600;display:block;margin-bottom:4px;">Icon (Bootstrap)</label>
-        <input type="text" name="icon" value="bi-bag" placeholder="bi-bag" style="padding:9px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:.9rem;width:130px;">
-      </div>
-      <button type="submit" style="padding:9px 18px;background:#2563eb;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-size:.9rem;">Add</button>
+      <input type="hidden" name="action" value="enable_defaults">
+      <button type="submit" class="btn-primary">
+        <i class="bi bi-lightning-charge"></i> Enable Common Departments
+      </button>
     </form>
   </div>
+  {% endif %}
 
-  <!-- Department List -->
-  <div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;">
+  <!-- Seeded department grid -->
+  <div class="section-hdr">
+    <div>
+      <div class="section-title">Available Departments</div>
+      <div class="section-sub">Enable the ones your shop needs. You can change this at any time.</div>
+    </div>
+    {% if enabled_count == 0 %}
+    <form method="post" style="display:inline;">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="enable_defaults">
+      <button type="submit" class="btn-secondary" style="font-size:.8rem;padding:7px 14px;">
+        <i class="bi bi-lightning-charge"></i> Enable Starters
+      </button>
+    </form>
+    {% endif %}
+  </div>
+
+  <div class="dept-grid">
+    {% for item in dept_list %}
+    {% if not item.is_custom %}
+    <div class="dept-card {% if item.is_enabled %}enabled{% endif %}">
+      <div class="dept-card-head">
+        <div class="dept-icon-wrap">
+          <i class="bi {{ item.dept.icon }}"></i>
+        </div>
+        <div class="dept-card-info">
+          <div class="dept-card-name">{{ item.dept.name }}</div>
+          {% if item.dept.description %}
+          <div class="dept-card-desc">{{ item.dept.description }}</div>
+          {% endif %}
+        </div>
+      </div>
+      <div class="dept-meta">
+        {% if item.is_enabled %}
+        <span class="badge badge-enabled"><i class="bi bi-check-circle-fill"></i> Enabled</span>
+        {% else %}
+        <span class="badge badge-disabled">Disabled</span>
+        {% endif %}
+        {% if item.template_count %}
+        <span class="badge badge-template"><i class="bi bi-grid"></i> {{ item.template_count }} templates</span>
+        {% endif %}
+      </div>
+      <div class="dept-card-footer">
+        <form method="post">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="toggle">
+          <input type="hidden" name="dept_id" value="{{ item.dept.id }}">
+          {% if item.is_enabled %}
+          <button type="submit" class="btn-enable disable">
+            <i class="bi bi-pause-circle"></i> Disable
+          </button>
+          {% else %}
+          <button type="submit" class="btn-enable enable">
+            <i class="bi bi-plus-circle"></i> Enable
+          </button>
+          {% endif %}
+        </form>
+      </div>
+    </div>
+    {% endif %}
+    {% endfor %}
+  </div>
+
+  <!-- Custom departments section -->
+  <div style="margin-bottom:10px;">
+    <div class="section-title">Custom Departments</div>
+    <div class="section-sub">Add departments specific to your business that are not listed above.</div>
+  </div>
+
+  <!-- Existing custom depts -->
+  {% if custom_count > 0 %}
+  <div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;margin-bottom:20px;">
     <table style="width:100%;border-collapse:collapse;font-size:.85rem;">
       <thead>
         <tr style="background:#f8fafc;">
-          <th style="padding:10px 14px;text-align:left;font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;color:#64748b;">Department</th>
-          <th style="padding:10px 14px;text-align:left;font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;color:#64748b;">Type</th>
-          <th style="padding:10px 14px;text-align:left;font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;color:#64748b;">Status</th>
-          <th style="padding:10px 14px;text-align:left;font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;color:#64748b;">Action</th>
+          <th style="padding:10px 14px;text-align:left;font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;color:#64748b;font-weight:700;">Department</th>
+          <th style="padding:10px 14px;text-align:left;font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;color:#64748b;font-weight:700;">Status</th>
+          <th style="padding:10px 14px;text-align:left;font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;color:#64748b;font-weight:700;">Action</th>
         </tr>
       </thead>
       <tbody>
-        {% for dept in departments %}
-        <tr style="border-top:1px solid #f1f5f9;{% if not dept.is_enabled %}opacity:.6;{% endif %}">
+        {% for item in dept_list %}
+        {% if item.is_custom %}
+        <tr style="border-top:1px solid #f1f5f9;">
           <td style="padding:10px 14px;">
             <div style="display:flex;align-items:center;gap:8px;">
-              <i class="bi {{ dept.icon }}" style="font-size:1rem;color:#64748b;"></i>
-              <span style="font-weight:700;">{{ dept.name }}</span>
+              <div style="width:32px;height:32px;border-radius:8px;background:#f1f5f9;display:flex;align-items:center;justify-content:center;color:#10b981;">
+                <i class="bi {{ item.dept.icon }}"></i>
+              </div>
+              <div>
+                <div style="font-weight:700;color:#0f172a;">{{ item.dept.name }}</div>
+                {% if item.dept.description %}<div style="font-size:.72rem;color:#64748b;">{{ item.dept.description }}</div>{% endif %}
+              </div>
             </div>
           </td>
           <td style="padding:10px 14px;">
-            <span style="background:#f1f5f9;padding:2px 8px;border-radius:99px;font-size:.72rem;color:#475569;">
-              {% if dept.is_seeded %}Global{% else %}Custom{% endif %}
-            </span>
-          </td>
-          <td style="padding:10px 14px;">
-            {% if dept.is_enabled %}<span style="color:#16a34a;font-weight:600;font-size:.82rem;">Enabled</span>{% else %}<span style="color:#94a3b8;font-size:.82rem;">Disabled</span>{% endif %}
+            {% if item.is_enabled %}
+            <span class="badge badge-enabled"><i class="bi bi-check-circle-fill"></i> Enabled</span>
+            {% else %}
+            <span class="badge badge-disabled">Disabled</span>
+            {% endif %}
           </td>
           <td style="padding:10px 14px;">
             <form method="post" style="display:inline;">
               {% csrf_token %}
               <input type="hidden" name="action" value="toggle">
-              <input type="hidden" name="dept_id" value="{{ dept.id }}">
-              <button type="submit" style="padding:4px 10px;border:1px solid #e2e8f0;border-radius:6px;background:#fff;font-size:.78rem;cursor:pointer;color:#374151;">
-                {% if dept.is_enabled %}Disable{% else %}Enable{% endif %}
+              <input type="hidden" name="dept_id" value="{{ item.dept.id }}">
+              <button type="submit" style="padding:5px 12px;border:1px solid #e2e8f0;border-radius:6px;background:#fff;font-size:.78rem;cursor:pointer;color:#374151;font-weight:600;">
+                {% if item.is_enabled %}Disable{% else %}Enable{% endif %}
               </button>
             </form>
           </td>
         </tr>
-        {% empty %}
-        <tr><td colspan="4" style="text-align:center;padding:30px;color:#94a3b8;">No departments yet. <a href="{% url 'mixed_retail:dashboard' %}">Run the seed command</a> or add custom ones above.</td></tr>
+        {% endif %}
         {% endfor %}
       </tbody>
     </table>
   </div>
+  {% endif %}
+
+  <!-- Add custom department form -->
+  <div class="custom-section">
+    <div style="font-size:.75rem;text-transform:uppercase;letter-spacing:.07em;font-weight:800;color:#475569;margin-bottom:16px;">
+      <i class="bi bi-plus-circle" style="color:#10b981;"></i> Add Custom Department
+    </div>
+    <form method="post" id="add-dept-form">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="add">
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Department Name *</label>
+          <input type="text" name="name" class="form-control" placeholder="e.g. Auto Spare Parts" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Description</label>
+          <input type="text" name="description" class="form-control" placeholder="Brief description of what you sell here">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Icon</label>
+        <input type="hidden" name="icon" id="selected-icon" value="bi-bag">
+        <div class="icon-grid" id="icon-grid">
+          {% for icon_val in icons_list %}
+          <div class="icon-opt {% if icon_val == 'bi-bag' %}selected{% endif %}" data-icon="{{ icon_val }}" onclick="selectIcon(this)">
+            <i class="bi {{ icon_val }}"></i>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:4px;">
+        <button type="submit" class="btn-primary">
+          <i class="bi bi-plus"></i> Add Department
+        </button>
+      </div>
+    </form>
+  </div>
+
 </div>
+
+<script>
+function selectIcon(el) {
+  document.querySelectorAll('.icon-opt').forEach(e => e.classList.remove('selected'));
+  el.classList.add('selected');
+  document.getElementById('selected-icon').value = el.dataset.icon;
+}
+</script>
 {% endblock %}

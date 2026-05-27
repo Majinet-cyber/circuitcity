@@ -19,4 +19,5 @@ urlpatterns = [
     path("reports/", mixed_retail.reports, name="reports"),
     path("api/products/", mixed_retail.api_product_lookup, name="api_products"),
     path("api/categories/", mixed_retail.api_categories, name="api_categories"),
+    path("api/product-templates/", mixed_retail.api_product_templates, name="api_product_templates"),
 ]

@@ -88,6 +88,14 @@ def _ensure_seed_on_switch(biz: Business) -> None:
     except Exception:
         pass  # never block a switch
 
+    # Mixed Retail: ensure department enrollment records exist
+    if getattr(biz, "business_kind", None) == "mixed_retail":
+        try:
+            from inventory.mixed_retail_seed import ensure_mixed_retail_defaults
+            ensure_mixed_retail_defaults(biz)
+        except Exception:
+            pass  # never block a switch
+
 
 def _esc(s: str) -> str:
     return (

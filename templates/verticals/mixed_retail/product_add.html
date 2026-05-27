@@ -5,54 +5,127 @@
 
 {% block extra_css %}
 <style>
-.form-wrap { max-width: 680px; margin: 0 auto; padding: 20px 14px; }
-.form-section { background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 20px; margin-bottom: 16px; }
-.form-section-title { font-size: .75rem; text-transform: uppercase; letter-spacing: .07em; font-weight: 800; color: #475569; margin-bottom: 14px; }
+.form-wrap { max-width: 720px; margin: 0 auto; padding: 24px 16px; }
+
+.form-section {
+  background: #fff; border: 1px solid #e2e8f0; border-radius: 14px;
+  padding: 20px; margin-bottom: 16px;
+}
+.form-section-title {
+  font-size: .72rem; text-transform: uppercase; letter-spacing: .07em;
+  font-weight: 800; color: #475569; margin-bottom: 16px;
+  display: flex; align-items: center; gap: 7px;
+}
+.form-section-title i { color: #10b981; font-size: .9rem; }
+
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 520px) { .form-row { grid-template-columns: 1fr; } }
 .form-group { margin-bottom: 12px; }
-.form-group label { display: block; font-size: .82rem; font-weight: 600; color: #374151; margin-bottom: 4px; }
-.form-control { width: 100%; padding: 9px 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: .9rem; box-sizing: border-box; }
-.form-control:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,.1); }
+.form-label { display: block; font-size: .82rem; font-weight: 700; color: #374151; margin-bottom: 5px; }
+.form-control {
+  width: 100%; padding: 9px 12px; border: 1px solid #d1d5db; border-radius: 8px;
+  font-size: .9rem; box-sizing: border-box; background: #fff;
+}
+.form-control:focus { outline: none; border-color: #10b981; box-shadow: 0 0 0 3px rgba(16,185,129,.1); }
+.form-hint { font-size: .73rem; color: #94a3b8; margin-top: 3px; }
+
+/* ── Template chips ── */
+#template-area { margin-top: 8px; }
+.template-label { font-size: .73rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 8px; }
+.template-chips { display: flex; flex-wrap: wrap; gap: 7px; }
+.tpl-chip {
+  padding: 5px 12px; background: #f1f5f9; border: 1.5px solid #e2e8f0;
+  border-radius: 99px; font-size: .8rem; font-weight: 600; color: #374151;
+  cursor: pointer; transition: background .12s, border-color .12s;
+  user-select: none;
+}
+.tpl-chip:hover { background: #e0f2fe; border-color: #0ea5e9; color: #0369a1; }
+.tpl-chip.selected { background: #d1fae5; border-color: #10b981; color: #065f46; }
+
+/* ── Optional fields collapsible ── */
 .optional-fields { display: none; }
 .optional-fields.show { display: block; }
+.toggle-optional { cursor: pointer; font-size: .78rem; color: #64748b; font-weight: 600; display: flex; align-items: center; gap: 5px; margin-top: 4px; }
+
+/* ── No dept warning ── */
+.no-dept-warn {
+  background: #fffbeb; border: 1px solid #fcd34d; border-radius: 12px;
+  padding: 16px 18px; margin-bottom: 16px; display: flex; gap: 12px; align-items: flex-start;
+}
+.no-dept-warn i { font-size: 1.2rem; color: #d97706; flex-shrink: 0; margin-top: 1px; }
+
+/* ── Margin preview ── */
+#margin-preview { font-size: .82rem; color: #64748b; margin-top: 6px; min-height: 20px; }
+#margin-preview.good { color: #059669; font-weight: 700; }
+#margin-preview.warn { color: #d97706; font-weight: 700; }
+
+/* ── Submit button ── */
+.btn-submit {
+  width: 100%; padding: 13px; background: #f97316; color: #fff;
+  border: none; border-radius: 10px; font-size: 1rem; font-weight: 800; cursor: pointer;
+  transition: background .15s;
+}
+.btn-submit:hover { background: #ea6c0a; }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="form-wrap">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
-    <h1 style="font-size:1.3rem;font-weight:900;margin:0;">Add Product</h1>
-    <a href="{% url 'mixed_retail:products' %}" style="color:#64748b;font-size:.85rem;text-decoration:none;">← Back to Products</a>
+
+  <!-- Header -->
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+    <div>
+      <h1 style="font-size:1.4rem;font-weight:900;color:#0f172a;margin:0;">Add Product</h1>
+      <p style="font-size:.82rem;color:#64748b;margin:3px 0 0;">Pick a department, choose a template, set pricing, and save.</p>
+    </div>
+    <a href="{% url 'mixed_retail:products' %}" style="color:#64748b;font-size:.85rem;text-decoration:none;display:flex;align-items:center;gap:5px;">
+      <i class="bi bi-arrow-left"></i> Products
+    </a>
   </div>
 
+  <!-- Messages -->
   {% if messages %}
     {% for msg in messages %}
-    <div class="msg msg-{{ msg.tags }}">{{ msg }}</div>
+    <div class="msg msg-{{ msg.tags }}" style="margin-bottom:12px;">{{ msg }}</div>
     {% endfor %}
   {% endif %}
 
-  <form method="post">
+  <!-- No departments warning -->
+  {% if no_departments %}
+  <div class="no-dept-warn">
+    <i class="bi bi-exclamation-triangle"></i>
+    <div>
+      <div style="font-weight:800;color:#92400e;margin-bottom:4px;">No departments enabled yet</div>
+      <div style="font-size:.83rem;color:#78350f;">
+        Enable at least one department before adding products.
+        <a href="{% url 'mixed_retail:departments' %}" style="color:#f97316;font-weight:700;">Go to Departments →</a>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <form method="post" id="product-form">
     {% csrf_token %}
 
-    <!-- Core Fields -->
+    <!-- Section 1: Department & Template -->
     <div class="form-section">
-      <div class="form-section-title">Product Details</div>
-      <div class="form-group">
-        <label>Product Name *</label>
-        <input type="text" name="name" class="form-control" placeholder="e.g. Samsung A15" required autofocus>
-      </div>
+      <div class="form-section-title"><i class="bi bi-grid-3x3-gap"></i> Department & Product</div>
+
       <div class="form-row">
         <div class="form-group">
-          <label>Department</label>
+          <label class="form-label">Department</label>
           <select name="department_id" id="department_id" class="form-control">
             <option value="">— Select Department —</option>
             {% for dept in departments %}
             <option value="{{ dept.id }}" {% if preselect_dept and preselect_dept.id == dept.id %}selected{% endif %}>{{ dept.name }}</option>
             {% endfor %}
           </select>
+          {% if not departments %}
+          <div class="form-hint" style="color:#d97706;">No departments enabled. <a href="{% url 'mixed_retail:departments' %}" style="color:#f97316;font-weight:700;">Enable departments</a></div>
+          {% endif %}
         </div>
         <div class="form-group">
-          <label>Category</label>
+          <label class="form-label">Category</label>
           <select name="category_id" id="category_id" class="form-control">
             <option value="">— Select Category —</option>
             {% for cat in preselect_cats %}
@@ -61,44 +134,71 @@
           </select>
         </div>
       </div>
+
+      <!-- Product template chips -->
+      <div id="template-area" {% if not preselect_templates %}style="display:none;"{% endif %}>
+        <div class="template-label"><i class="bi bi-lightning-charge" style="color:#10b981;"></i> Quick Templates — click to pre-fill name</div>
+        <div class="template-chips" id="template-chips">
+          {% for tpl in preselect_templates %}
+          <div class="tpl-chip" data-name="{{ tpl.name }}" data-unit="{{ tpl.suggested_unit }}" onclick="selectTemplate(this)">
+            {{ tpl.name }}
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 2: Product Identity -->
+    <div class="form-section">
+      <div class="form-section-title"><i class="bi bi-tag"></i> Product Details</div>
+
+      <div class="form-group">
+        <label class="form-label">Product Name *</label>
+        <input type="text" name="name" id="product-name" class="form-control" placeholder="e.g. Samsung A15, White Rice 2kg, Office Chair" required autofocus>
+      </div>
       <div class="form-row">
         <div class="form-group">
-          <label>Brand</label>
+          <label class="form-label">Brand</label>
           <input type="text" name="brand" class="form-control" placeholder="e.g. Samsung, Nike, Generic">
         </div>
         <div class="form-group">
-          <label>SKU / Code</label>
+          <label class="form-label">SKU / Code</label>
           <input type="text" name="sku" class="form-control" placeholder="e.g. SAM-A15-BLK">
         </div>
       </div>
     </div>
 
-    <!-- Pricing & Stock -->
+    <!-- Section 3: Pricing & Stock -->
     <div class="form-section">
-      <div class="form-section-title">Pricing & Stock</div>
+      <div class="form-section-title"><i class="bi bi-currency-exchange"></i> Pricing & Stock</div>
+
       <div class="form-row">
         <div class="form-group">
-          <label>Cost Price (MWK) *</label>
-          <input type="number" name="cost_price" step="0.01" min="0" class="form-control" value="0" required>
+          <label class="form-label">Cost Price (MWK)</label>
+          <input type="number" name="cost_price" id="cost_price" step="0.01" min="0" class="form-control" value="0" oninput="updateMargin()">
         </div>
         <div class="form-group">
-          <label>Selling Price (MWK) *</label>
-          <input type="number" name="selling_price" step="0.01" min="0" class="form-control" value="0" required>
+          <label class="form-label">Selling Price (MWK)</label>
+          <input type="number" name="selling_price" id="selling_price" step="0.01" min="0" class="form-control" value="0" oninput="updateMargin()">
         </div>
       </div>
-      <div class="form-row">
+      <div id="margin-preview"></div>
+
+      <div class="form-row" style="margin-top:8px;">
         <div class="form-group">
-          <label>Opening Stock</label>
+          <label class="form-label">Opening Stock</label>
           <input type="number" name="stock_quantity" step="0.01" min="0" class="form-control" value="0">
+          <div class="form-hint">Leave 0 — stock in later via Scan IN</div>
         </div>
         <div class="form-group">
-          <label>Reorder Level</label>
+          <label class="form-label">Reorder Level</label>
           <input type="number" name="reorder_level" step="0.01" min="0" class="form-control" value="5">
+          <div class="form-hint">Alert when stock falls below this</div>
         </div>
       </div>
       <div class="form-group">
-        <label>Unit</label>
-        <select name="unit" class="form-control">
+        <label class="form-label">Unit</label>
+        <select name="unit" id="unit_select" class="form-control">
           {% for val, label in unit_choices %}
           <option value="{{ val }}">{{ label }}</option>
           {% endfor %}
@@ -106,29 +206,32 @@
       </div>
     </div>
 
-    <!-- Optional Attributes -->
+    <!-- Section 4: Optional Attributes (collapsed) -->
     <div class="form-section">
-      <div class="form-section-title" style="display:flex;justify-content:space-between;cursor:pointer;" onclick="document.getElementById('opt-fields').classList.toggle('show');">
-        Optional Attributes <span style="font-weight:400;color:#94a3b8;font-size:.75rem;">▼ expand</span>
+      <div class="form-section-title" style="justify-content:space-between;">
+        <span><i class="bi bi-sliders"></i> Optional Attributes</span>
+        <span class="toggle-optional" onclick="document.getElementById('opt-fields').classList.toggle('show');this.querySelector('i').className='bi bi-chevron-'+(document.getElementById('opt-fields').classList.contains('show')?'up':'down');">
+          <i class="bi bi-chevron-down"></i> expand
+        </span>
       </div>
       <div id="opt-fields" class="optional-fields">
         <div class="form-row">
           <div class="form-group">
-            <label>Size</label>
+            <label class="form-label">Size</label>
             <input type="text" name="size" class="form-control" placeholder="S, M, L, 42, etc.">
           </div>
           <div class="form-group">
-            <label>Color</label>
+            <label class="form-label">Color</label>
             <input type="text" name="color" class="form-control" placeholder="Black, Red, etc.">
           </div>
         </div>
         <div class="form-row">
           <div class="form-group">
-            <label>Material</label>
-            <input type="text" name="material" class="form-control" placeholder="Cotton, Metal, etc.">
+            <label class="form-label">Material</label>
+            <input type="text" name="material" class="form-control">
           </div>
           <div class="form-group">
-            <label>Condition</label>
+            <label class="form-label">Condition</label>
             <select name="condition" class="form-control">
               {% for val, label in condition_choices %}
               <option value="{{ val }}">{{ label }}</option>
@@ -138,43 +241,56 @@
         </div>
         <div class="form-row">
           <div class="form-group">
-            <label>Serial Number</label>
-            <input type="text" name="serial_number" class="form-control">
+            <label class="form-label">IMEI (phones/tablets)</label>
+            <input type="text" name="imei" class="form-control" maxlength="20">
           </div>
           <div class="form-group">
-            <label>IMEI (phones/tablets)</label>
-            <input type="text" name="imei" class="form-control" maxlength="20">
+            <label class="form-label">Serial Number</label>
+            <input type="text" name="serial_number" class="form-control">
           </div>
         </div>
         <div class="form-row">
           <div class="form-group">
-            <label>Warranty (months)</label>
+            <label class="form-label">Warranty (months)</label>
             <input type="number" name="warranty_months" class="form-control" min="0">
           </div>
           <div class="form-group">
-            <label>Supplier Name</label>
+            <label class="form-label">Supplier Name</label>
             <input type="text" name="supplier_name" class="form-control">
           </div>
         </div>
         <div class="form-group">
-          <label>Notes</label>
+          <label class="form-label">Notes</label>
           <textarea name="notes" class="form-control" rows="2"></textarea>
         </div>
       </div>
     </div>
 
-    <button type="submit" style="width:100%;padding:12px;background:#2563eb;color:#fff;border:none;border-radius:10px;font-size:1rem;font-weight:700;cursor:pointer;">Save Product</button>
+    <button type="submit" class="btn-submit" {% if no_departments %}disabled style="opacity:.5;cursor:not-allowed;"{% endif %}>
+      <i class="bi bi-check-circle"></i> Save Product
+    </button>
   </form>
 </div>
 
 <script>
-// Dynamic category load when department changes
+const TEMPLATES_API = "{% url 'mixed_retail:api_product_templates' %}";
+const CATEGORIES_API = "{% url 'mixed_retail:api_categories' %}";
+
+// When department changes: load categories + templates
 document.getElementById('department_id').addEventListener('change', function() {
   const deptId = this.value;
+
+  // Reset category
   const catSelect = document.getElementById('category_id');
   catSelect.innerHTML = '<option value="">Loading…</option>';
-  if (!deptId) { catSelect.innerHTML = '<option value="">— Select Category —</option>'; return; }
-  fetch(`{% url 'mixed_retail:api_categories' %}?dept_id=${deptId}`)
+  if (!deptId) {
+    catSelect.innerHTML = '<option value="">— Select Category —</option>';
+    document.getElementById('template-area').style.display = 'none';
+    return;
+  }
+
+  // Load categories
+  fetch(`${CATEGORIES_API}?dept_id=${deptId}`)
     .then(r => r.json())
     .then(data => {
       catSelect.innerHTML = '<option value="">— Select Category —</option>';
@@ -184,6 +300,68 @@ document.getElementById('department_id').addEventListener('change', function() {
         catSelect.appendChild(opt);
       });
     });
+
+  // Load product templates
+  fetch(`${TEMPLATES_API}?dept_id=${deptId}`)
+    .then(r => r.json())
+    .then(data => {
+      const area = document.getElementById('template-area');
+      const chips = document.getElementById('template-chips');
+      chips.innerHTML = '';
+      if (data.templates && data.templates.length > 0) {
+        data.templates.forEach(t => {
+          const chip = document.createElement('div');
+          chip.className = 'tpl-chip';
+          chip.dataset.name = t.name;
+          chip.dataset.unit = t.unit;
+          chip.textContent = t.name;
+          chip.onclick = function() { selectTemplate(this); };
+          chips.appendChild(chip);
+        });
+        area.style.display = 'block';
+      } else {
+        area.style.display = 'none';
+      }
+    });
 });
+
+function selectTemplate(el) {
+  // Toggle selection
+  const wasSelected = el.classList.contains('selected');
+  document.querySelectorAll('.tpl-chip').forEach(c => c.classList.remove('selected'));
+  if (!wasSelected) {
+    el.classList.add('selected');
+    document.getElementById('product-name').value = el.dataset.name;
+    // Set unit
+    const unit = el.dataset.unit;
+    const unitSel = document.getElementById('unit_select');
+    if (unitSel) {
+      for (let i = 0; i < unitSel.options.length; i++) {
+        if (unitSel.options[i].value === unit) {
+          unitSel.selectedIndex = i;
+          break;
+        }
+      }
+    }
+    document.getElementById('product-name').focus();
+  }
+}
+
+function updateMargin() {
+  const cost = parseFloat(document.getElementById('cost_price').value) || 0;
+  const sell = parseFloat(document.getElementById('selling_price').value) || 0;
+  const el = document.getElementById('margin-preview');
+  if (sell > 0 && cost >= 0) {
+    const margin = sell - cost;
+    const pct = sell > 0 ? (margin / sell * 100).toFixed(1) : 0;
+    const stockVal = cost;
+    el.textContent = `Margin: MWK ${margin.toLocaleString()} (${pct}%)`;
+    el.className = 'good';
+    if (pct < 5 && sell > 0) el.className = 'warn';
+  } else {
+    el.textContent = '';
+    el.className = '';
+  }
+}
 </script>
 {% endblock %}

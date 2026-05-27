@@ -24,13 +24,20 @@ from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from inventory.helpers import get_active_business
-from inventory.mixed_retail_seed import get_categories_for_department, get_departments_for_business
+from inventory.mixed_retail_seed import (
+    get_all_departments_with_status,
+    get_categories_for_department,
+    get_departments_for_business,
+    get_product_templates_for_department,
+)
 from inventory.models_mixed_retail import (
+    RetailBusinessDepartment,
     RetailCategory,
     RetailDepartment,
     RetailExpense,
     RetailPaymentMethod,
     RetailProduct,
+    RetailProductTemplate,
     RetailSale,
 )
 from tenants.utils import require_business
@@ -351,12 +358,17 @@ def product_add(request):
     preselect_dept_id = request.GET.get("dept")
     preselect_dept = None
     preselect_cats = []
+    preselect_templates = []
     if preselect_dept_id:
         try:
             preselect_dept = RetailDepartment.objects.get(pk=preselect_dept_id)
             preselect_cats = get_categories_for_department(preselect_dept, business)
+            preselect_templates = get_product_templates_for_department(preselect_dept)
         except RetailDepartment.DoesNotExist:
             pass
+
+    # Departments with no enabled depts → show setup prompt
+    no_departments = not departments
 
     ctx = {
         "business": business,
@@ -364,8 +376,10 @@ def product_add(request):
         "departments": departments,
         "preselect_dept": preselect_dept,
         "preselect_cats": preselect_cats,
+        "preselect_templates": preselect_templates,
         "unit_choices": RetailProduct.UNIT_CHOICES,
         "condition_choices": RetailProduct.CONDITION_CHOICES,
+        "no_departments": no_departments,
     }
     return render(request, "verticals/mixed_retail/product_add.html", ctx)
 
@@ -822,49 +836,140 @@ def reports(request):
 @require_business
 def departments(request):
     """View/manage departments for this business."""
+    from django.utils.text import slugify
+    from inventory.mixed_retail_seed import (
+        ensure_mixed_retail_defaults, get_all_departments_with_status,
+        DEFAULT_ENABLED_DEPT_SLUGS,
+    )
+
     business = get_active_business(request)
+
+    # Ensure enrollment records exist (no-op if already set up)
+    try:
+        ensure_mixed_retail_defaults(business)
+    except Exception:
+        pass
 
     if request.method == "POST":
         action = request.POST.get("action", "add")
+
         if action == "add":
             try:
                 name = request.POST.get("name", "").strip()
                 if not name:
                     messages.error(request, "Department name is required.")
                 else:
-                    from django.utils.text import slugify
                     RetailDepartment.objects.create(
                         business=business,
                         name=name,
                         slug=slugify(name),
                         icon=request.POST.get("icon", "bi-bag"),
+                        description=request.POST.get("description", "").strip(),
                         is_seeded=False,
-                        created_at=timezone.now(),
+                        is_enabled=True,
                     )
                     messages.success(request, f"Department '{name}' added.")
             except Exception as exc:
                 messages.error(request, f"Error: {exc}")
+
         elif action == "toggle":
             dept_id = request.POST.get("dept_id")
             try:
-                dept = RetailDepartment.objects.get(
-                    Q(pk=dept_id, business=None) | Q(pk=dept_id, business=business)
-                )
-                dept.is_enabled = not dept.is_enabled
-                dept.save(update_fields=["is_enabled"])
-                state = "enabled" if dept.is_enabled else "disabled"
-                messages.success(request, f"Department '{dept.name}' {state}.")
+                dept = RetailDepartment.objects.get(pk=dept_id)
+                if dept.business is None and dept.is_seeded:
+                    # Per-business toggle via enrollment record
+                    enrollment, _ = RetailBusinessDepartment.objects.get_or_create(
+                        business=business, department=dept,
+                        defaults={"is_enabled": False},
+                    )
+                    enrollment.is_enabled = not enrollment.is_enabled
+                    enrollment.save(update_fields=["is_enabled", "updated_at"])
+                    state = "enabled" if enrollment.is_enabled else "disabled"
+                else:
+                    # Custom dept — toggle directly
+                    if dept.business != business:
+                        raise RetailDepartment.DoesNotExist
+                    dept.is_enabled = not dept.is_enabled
+                    dept.save(update_fields=["is_enabled"])
+                    state = "enabled" if dept.is_enabled else "disabled"
+                messages.success(request, f"'{dept.name}' {state}.")
             except RetailDepartment.DoesNotExist:
                 messages.error(request, "Department not found.")
+
+        elif action == "enable_defaults":
+            # Bulk-enable the default common departments
+            from inventory.models_mixed_retail import RetailDepartment as RD
+            enabled = 0
+            for slug in DEFAULT_ENABLED_DEPT_SLUGS:
+                dept = RD.objects.filter(business=None, slug=slug).first()
+                if dept:
+                    enrollment, _ = RetailBusinessDepartment.objects.get_or_create(
+                        business=business, department=dept,
+                        defaults={"is_enabled": True},
+                    )
+                    if not enrollment.is_enabled:
+                        enrollment.is_enabled = True
+                        enrollment.save(update_fields=["is_enabled", "updated_at"])
+                    enabled += 1
+            messages.success(request, f"{enabled} common departments enabled. Add more as needed.")
+
         return redirect("mixed_retail:departments")
 
-    all_depts = RetailDepartment.objects.filter(
-        Q(business=None, is_seeded=True) | Q(business=business)
-    ).order_by("sort_order", "name")
+    # Build context
+    dept_list = get_all_departments_with_status(business)
+    enabled_count = sum(1 for d in dept_list if d["is_enabled"])
+    seeded_count = sum(1 for d in dept_list if not d["is_custom"])
+    custom_count = sum(1 for d in dept_list if d["is_custom"])
+    total_templates = sum(d["template_count"] for d in dept_list if not d["is_custom"])
+
+    icons_list = [
+        "bi-bag", "bi-shop", "bi-cart", "bi-box-seam", "bi-tools",
+        "bi-phone", "bi-truck", "bi-house-gear", "bi-scissors", "bi-cup-hot",
+        "bi-book", "bi-bicycle", "bi-palette", "bi-camera", "bi-music-note",
+        "bi-wrench", "bi-globe", "bi-heart-pulse", "bi-tree", "bi-stars",
+        "bi-car-front", "bi-bricks", "bi-boot", "bi-handbag", "bi-capsule",
+        "bi-balloon-heart", "bi-flower2", "bi-trophy", "bi-cash-coin", "bi-three-dots",
+    ]
 
     ctx = {
         "business": business,
         "active_tab": "departments",
-        "departments": all_depts,
+        "dept_list": dept_list,
+        "enabled_count": enabled_count,
+        "seeded_count": seeded_count,
+        "custom_count": custom_count,
+        "total_templates": total_templates,
+        "icons_list": icons_list,
     }
     return render(request, "verticals/mixed_retail/departments.html", ctx)
+
+
+# ---------------------------------------------------------------------------
+# API: Product templates for a department
+# ---------------------------------------------------------------------------
+
+@login_required
+@require_business
+def api_product_templates(request):
+    """Return product templates for a department (for Add Product page)."""
+    business = get_active_business(request)
+    dept_id = request.GET.get("dept_id")
+
+    if not dept_id:
+        return JsonResponse({"templates": []})
+
+    try:
+        dept = RetailDepartment.objects.get(pk=dept_id)
+    except RetailDepartment.DoesNotExist:
+        return JsonResponse({"templates": []})
+
+    templates = RetailProductTemplate.objects.filter(
+        department=dept, is_active=True
+    ).order_by("sort_order", "name")
+
+    return JsonResponse({
+        "templates": [
+            {"id": t.id, "name": t.name, "unit": t.suggested_unit}
+            for t in templates
+        ]
+    })

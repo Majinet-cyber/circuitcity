@@ -350,6 +350,74 @@ class RetailSale(models.Model):
 
 
 # ---------------------------------------------------------------------------
+# Business Department Enrollment (per-business enable/disable for global depts)
+# ---------------------------------------------------------------------------
+
+class RetailBusinessDepartment(models.Model):
+    """
+    Tracks whether a specific business has enabled a global seeded department.
+    Global (seeded) departments are never toggled globally — each business
+    controls its own enabled set via this model.
+    """
+    business = models.ForeignKey(
+        Business,
+        on_delete=models.CASCADE,
+        related_name="retail_dept_enrollments",
+    )
+    department = models.ForeignKey(
+        RetailDepartment,
+        on_delete=models.CASCADE,
+        related_name="business_enrollments",
+    )
+    is_enabled = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = [("business", "department")]
+        verbose_name = "Business Department Enrollment"
+        verbose_name_plural = "Business Department Enrollments"
+
+    def __str__(self):
+        state = "enabled" if self.is_enabled else "disabled"
+        return f"{self.business.name} — {self.department.name} ({state})"
+
+
+# ---------------------------------------------------------------------------
+# Product Template (global quick-start suggestions)
+# ---------------------------------------------------------------------------
+
+class RetailProductTemplate(models.Model):
+    """
+    Global product suggestion / quick-start template.
+    Merchants browse these and create real RetailProduct records from them.
+    No stock quantities or prices — those are set by the merchant.
+    """
+    department = models.ForeignKey(
+        RetailDepartment,
+        on_delete=models.CASCADE,
+        related_name="product_templates",
+    )
+    name = models.CharField(max_length=255)
+    suggested_unit = models.CharField(
+        max_length=20,
+        default="pcs",
+        help_text="Suggested unit of measure",
+    )
+    description = models.TextField(blank=True)
+    sort_order = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["sort_order", "name"]
+        verbose_name = "Product Template"
+        verbose_name_plural = "Product Templates"
+
+    def __str__(self):
+        return f"{self.department.name} › {self.name}"
+
+
+# ---------------------------------------------------------------------------
 # Retail Expense
 # ---------------------------------------------------------------------------
 
