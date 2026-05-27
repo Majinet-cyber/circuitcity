@@ -19,7 +19,8 @@ User = settings.AUTH_USER_MODEL
 class MobileMoneyNetwork(models.TextChoices):
     AIRTEL = "airtel", "Airtel Money"
     TNM = "tnm", "TNM Mpamba"
-    OTHER = "other", "Other"
+    BANK = "bank", "Bank Agent"
+    OTHER = "other", "Other / Custom"
 
 
 class MobileMoneyTxType(models.TextChoices):

@@ -11,18 +11,18 @@
   --cc-safe-bottom: max(env(safe-area-inset-bottom), 0px);
 }
 
-/* ---------- Theme Tokens ---------- */
-:root[data-theme="style-1"] {
-  --cc-bg: #f6f9ff;
+/* ---------- Theme Tokens — Orange Brand ---- */
+:root[data-theme="style-1"], :root {
+  --cc-bg: #f8f9fb;
   --cc-panel: #ffffff;
-  --cc-panel-2: #f2f7ff;
-  --cc-border: #e2e8f0;
+  --cc-panel-2: #fafbfc;
+  --cc-border: #e4e7ec;
   --cc-text: #0f172a;
   --cc-muted: #64748b;
-  --cc-accent: #2563eb;
-  --cc-accent-soft: #60a5fa;
+  --cc-accent: #ff6a1a;
+  --cc-accent-soft: #ffb380;
   --cc-accent-green: #10b981;
-  --cc-chip: #f1f5f9;
+  --cc-chip: #f4f6f8;
   --cc-shadow: 0 6px 18px rgba(16, 24, 40, 0.06);
   --cc-chart-grid: rgba(2, 6, 23, 0.06);
 }
@@ -34,9 +34,9 @@
   --cc-border: #21324d;
   --cc-text: #e5e7eb;
   --cc-muted: #a8b3cf;
-  --cc-accent: #3c82ff;
-  --cc-accent-soft: #8fc3ff;
-  --cc-accent-green: #22d3ee;
+  --cc-accent: #ff6a1a;
+  --cc-accent-soft: #ffb380;
+  --cc-accent-green: #10b981;
   --cc-chip: #1f2d4a;
   --cc-shadow: 0 6px 18px rgba(2, 8, 23, 0.3);
   --cc-chart-grid: #1a2a45;
@@ -49,9 +49,9 @@
   --cc-border: #223454;
   --cc-text: #e7ecfb;
   --cc-muted: #9fb0cf;
-  --cc-accent: #10b981;
-  --cc-accent-soft: #34d399;
-  --cc-accent-green: #22d3ee;
+  --cc-accent: #ff6a1a;
+  --cc-accent-soft: #ffb380;
+  --cc-accent-green: #10b981;
   --cc-chip: #1c2d4a;
   --cc-shadow: 0 6px 18px rgba(2, 8, 23, 0.3);
   --cc-chart-grid: #1b2b48;
@@ -197,7 +197,7 @@ img, svg, video, canvas { max-width: 100%; height: auto; }
   vertical-align: middle;
 }
 #stockTable tbody tr:hover td {
-  background: rgba(47, 109, 246, 0.08);
+  background: rgba(255, 106, 26, 0.06);
 }
 #stockTable td.num {
   text-align: right;

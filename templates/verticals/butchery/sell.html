@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Quick Sell · {{ business.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+.bt-wrap { max-width: 900px; margin: 0 auto; padding: 20px 14px; }
+.form-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 24px; box-shadow: 0 1px 4px rgba(15,23,42,.06); }
+.form-label { display: block; font-size: .78rem; font-weight: 700; color: #374151; margin-bottom: 5px; text-transform: uppercase; letter-spacing: .05em; }
+.form-input { width: 100%; padding: 9px 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: .9rem; box-sizing: border-box; }
+.form-input:focus { outline: none; border-color: #10b981; box-shadow: 0 0 0 3px rgba(16,185,129,.1); }
+.cut-row { display: grid; grid-template-columns: 2fr 1fr 1fr auto; gap: 10px; align-items: end; margin-bottom: 10px; }
+.empty-state { text-align: center; padding: 60px 20px; color: #94a3b8; }
+.empty-state h3 { font-size: 1rem; font-weight: 700; color: #64748b; margin-bottom: 6px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="bt-wrap">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px;">
+    <div>
+      <h1 style="font-size:1.4rem;font-weight:900;margin:0 0 4px;color:#0f172a;">Quick Sell</h1>
+      <p style="color:#64748b;font-size:.85rem;margin:0;">{{ business.name }} &middot; {{ today|date:"d M Y" }}</p>
+    </div>
+    <a href="{% url 'butchery:sales' %}" style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border:1px solid #e2e8f0;border-radius:9px;background:#fff;font-size:.85rem;font-weight:600;text-decoration:none;color:#374151;">
+      <i class="bi bi-receipt"></i> Sales History
+    </a>
+  </div>
+
+  {% if messages %}
+  {% for msg in messages %}
+  <div style="padding:10px 14px;border-radius:8px;margin-bottom:12px;background:{% if msg.tags == 'error' %}#fee2e2{% else %}#dcfce7{% endif %};color:{% if msg.tags == 'error' %}#991b1b{% else %}#166534{% endif %};font-size:.85rem;border:1px solid {% if msg.tags == 'error' %}#fca5a5{% else %}#86efac{% endif %};">{{ msg }}</div>
+  {% endfor %}
+  {% endif %}
+
+  {% if products %}
+  <div class="form-card">
+    <form method="post" id="sellForm">
+      {% csrf_token %}
+
+      <h2 style="font-size:1rem;font-weight:800;color:#0f172a;margin:0 0 16px;">Items</h2>
+      <div id="cutRows">
+        <div class="cut-row">
+          <div>
+            <label class="form-label">Cut / Product</label>
+            <select name="product_id" class="form-input product-select" onchange="fillPrice(this)">
+              <option value="">— Select cut —</option>
+              {% for p in products %}
+              <option value="{{ p.id }}" data-price="{{ p.selling_price }}" data-unit="{{ p.unit }}" data-stock="{{ p.stock_quantity }}">
+                {{ p.name }} ({{ p.stock_quantity|floatformat:2 }} {{ p.unit }} in stock)
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+          <div>
+            <label class="form-label">Quantity</label>
+            <input type="number" name="quantity" class="form-input" step="0.001" min="0.001" value="1" placeholder="Qty">
+          </div>
+          <div>
+            <label class="form-label">Unit Price (MWK)</label>
+            <input type="number" name="unit_price" class="form-input" step="0.01" min="0" value="0" placeholder="Price">
+          </div>
+          <div>
+            <label class="form-label">&nbsp;</label>
+            <button type="button" onclick="removeCutRow(this)" style="padding:9px 12px;background:#fee2e2;color:#991b1b;border:1px solid #fca5a5;border-radius:8px;cursor:pointer;font-size:.85rem;">
+              <i class="bi bi-trash"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <button type="button" onclick="addCutRow()" style="margin-top:6px;padding:8px 16px;background:#f0fdf4;color:#15803d;border:1px solid #86efac;border-radius:8px;font-size:.83rem;font-weight:700;cursor:pointer;">
+        <i class="bi bi-plus-lg"></i> Add Another Cut
+      </button>
+
+      <hr style="border:none;border-top:1px solid #e2e8f0;margin:20px 0;">
+
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;">
+        <div>
+          <label class="form-label">Payment Method</label>
+          <select name="payment_method" class="form-input">
+            {% for val, label in payment_methods %}<option value="{{ val }}">{{ label }}</option>{% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="form-label">Customer Name (optional)</label>
+          <input type="text" name="customer_name" class="form-input" placeholder="e.g. John Banda">
+        </div>
+        <div>
+          <label class="form-label">Customer Phone (optional)</label>
+          <input type="text" name="customer_phone" class="form-input" placeholder="e.g. 0888 000 000">
+        </div>
+        <div>
+          <label class="form-label">Notes (optional)</label>
+          <input type="text" name="notes" class="form-input" placeholder="e.g. Delivery order">
+        </div>
+      </div>
+
+      <div style="margin-top:20px;">
+        <button type="submit" style="padding:12px 32px;background:#10b981;color:#fff;border:none;border-radius:10px;font-size:.95rem;font-weight:800;cursor:pointer;letter-spacing:.03em;">
+          <i class="bi bi-check-circle"></i> Record Sale
+        </button>
+      </div>
+    </form>
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <i class="bi bi-box-seam" style="font-size:3rem;display:block;margin-bottom:12px;opacity:.4;"></i>
+    <h3>No products in stock</h3>
+    <p style="font-size:.85rem;">Add cuts to your product list first, then record intake to bring stock in.</p>
+    <div style="display:flex;gap:10px;justify-content:center;margin-top:16px;flex-wrap:wrap;">
+      <a href="{% url 'butchery:product_add' %}" style="padding:9px 18px;background:#10b981;color:#fff;border-radius:9px;font-size:.85rem;font-weight:700;text-decoration:none;">Add Cut</a>
+      <a href="{% url 'butchery:intake' %}" style="padding:9px 18px;background:#fff;color:#374151;border:1px solid #d1d5db;border-radius:9px;font-size:.85rem;font-weight:700;text-decoration:none;">Record Intake</a>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+<script>
+// Product select options JSON (for adding new rows)
+const productOptions = [
+  {% for p in products %}
+  { id: "{{ p.id }}", name: "{{ p.name }} ({{ p.stock_quantity|floatformat:2 }} {{ p.unit }} in stock)", price: "{{ p.selling_price }}", unit: "{{ p.unit }}", stock: "{{ p.stock_quantity }}" },
+  {% endfor %}
+];
+
+function fillPrice(sel) {
+  const opt = sel.options[sel.selectedIndex];
+  const row = sel.closest('.cut-row');
+  const priceInput = row.querySelector('input[name="unit_price"]');
+  if (opt.dataset.price) priceInput.value = opt.dataset.price;
+}
+
+function addCutRow() {
+  const container = document.getElementById('cutRows');
+  const row = document.createElement('div');
+  row.className = 'cut-row';
+  let opts = '<option value="">— Select cut —</option>';
+  productOptions.forEach(p => {
+    opts += `<option value="${p.id}" data-price="${p.price}">${p.name}</option>`;
+  });
+  row.innerHTML = `
+    <div><label class="form-label">Cut / Product</label>
+    <select name="product_id" class="form-input product-select" onchange="fillPrice(this)">${opts}</select></div>
+    <div><label class="form-label">Quantity</label>
+    <input type="number" name="quantity" class="form-input" step="0.001" min="0.001" value="1" placeholder="Qty"></div>
+    <div><label class="form-label">Unit Price (MWK)</label>
+    <input type="number" name="unit_price" class="form-input" step="0.01" min="0" value="0" placeholder="Price"></div>
+    <div><label class="form-label">&nbsp;</label>
+    <button type="button" onclick="removeCutRow(this)" style="padding:9px 12px;background:#fee2e2;color:#991b1b;border:1px solid #fca5a5;border-radius:8px;cursor:pointer;font-size:.85rem;"><i class="bi bi-trash"></i></button></div>`;
+  container.appendChild(row);
+}
+
+function removeCutRow(btn) {
+  const rows = document.querySelectorAll('.cut-row');
+  if (rows.length > 1) btn.closest('.cut-row').remove();
+}
+</script>
+{% endblock %}

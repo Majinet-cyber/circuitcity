@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+
+{% block title %}Add Cut · {{ business.name }}{% endblock %}
+
+{% block content %}
+<div style="max-width:600px;margin:0 auto;padding:24px 14px;">
+  <div style="margin-bottom:20px;">
+    <h1 style="font-size:1.4rem;font-weight:900;margin:0 0 4px;color:#0f172a;">Add Cut / Product</h1>
+    <p style="color:#64748b;font-size:.85rem;margin:0;">{{ business.name }}</p>
+  </div>
+
+  {% if messages %}
+  {% for msg in messages %}
+  <div style="padding:10px 14px;border-radius:8px;margin-bottom:12px;background:{% if msg.tags == 'error' %}#fee2e2{% else %}#dcfce7{% endif %};color:{% if msg.tags == 'error' %}#991b1b{% else %}#166534{% endif %};font-size:.85rem;border:1px solid {% if msg.tags == 'error' %}#fca5a5{% else %}#86efac{% endif %};">
+    {{ msg }}
+  </div>
+  {% endfor %}
+  {% endif %}
+
+  <form method="post" style="background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:24px;box-shadow:0 1px 4px rgba(15,23,42,.06);">
+    {% csrf_token %}
+
+    <div style="display:grid;gap:16px;">
+      <div>
+        <label style="display:block;font-size:.78rem;font-weight:700;color:#374151;margin-bottom:5px;text-transform:uppercase;letter-spacing:.05em;">Name *</label>
+        <input type="text" name="name" required placeholder="e.g. Beef Steak, Goat Ribs, Mince..." style="width:100%;padding:9px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:.9rem;box-sizing:border-box;">
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div>
+          <label style="display:block;font-size:.78rem;font-weight:700;color:#374151;margin-bottom:5px;text-transform:uppercase;letter-spacing:.05em;">Meat Type</label>
+          <select name="meat_type" style="width:100%;padding:9px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:.9rem;">
+            {% for val, label in meat_types %}
+            <option value="{{ val }}">{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label style="display:block;font-size:.78rem;font-weight:700;color:#374151;margin-bottom:5px;text-transform:uppercase;letter-spacing:.05em;">Unit</label>
+          <select name="unit" style="width:100%;padding:9px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:.9rem;">
+            {% for val, label in unit_choices %}
+            <option value="{{ val }}">{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div>
+          <label style="display:block;font-size:.78rem;font-weight:700;color:#374151;margin-bottom:5px;text-transform:uppercase;letter-spacing:.05em;">Cost Price per Unit (MWK)</label>
+          <input type="number" name="cost_price" step="0.01" min="0" value="0" style="width:100%;padding:9px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:.9rem;box-sizing:border-box;">
+        </div>
+        <div>
+          <label style="display:block;font-size:.78rem;font-weight:700;color:#374151;margin-bottom:5px;text-transform:uppercase;letter-spacing:.05em;">Selling Price per Unit (MWK)</label>
+          <input type="number" name="selling_price" step="0.01" min="0" value="0" style="width:100%;padding:9px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:.9rem;box-sizing:border-box;">
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div>
+          <label style="display:block;font-size:.78rem;font-weight:700;color:#374151;margin-bottom:5px;text-transform:uppercase;letter-spacing:.05em;">Opening Stock</label>
+          <input type="number" name="stock_quantity" step="0.001" min="0" value="0" style="width:100%;padding:9px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:.9rem;box-sizing:border-box;">
+        </div>
+        <div>
+          <label style="display:block;font-size:.78rem;font-weight:700;color:#374151;margin-bottom:5px;text-transform:uppercase;letter-spacing:.05em;">Reorder Level</label>
+          <input type="number" name="reorder_level" step="0.001" min="0" value="2" style="width:100%;padding:9px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:.9rem;box-sizing:border-box;">
+        </div>
+      </div>
+
+      <div>
+        <label style="display:block;font-size:.78rem;font-weight:700;color:#374151;margin-bottom:5px;text-transform:uppercase;letter-spacing:.05em;">Description (optional)</label>
+        <textarea name="description" rows="2" placeholder="e.g. Boneless, well-trimmed..." style="width:100%;padding:9px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:.9rem;box-sizing:border-box;resize:vertical;"></textarea>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:10px;margin-top:20px;">
+      <button type="submit" style="flex:1;padding:11px;background:#10b981;color:#fff;border:none;border-radius:9px;font-size:.9rem;font-weight:700;cursor:pointer;">
+        <i class="bi bi-check-lg"></i> Save Cut
+      </button>
+      <a href="{% url 'butchery:products' %}" style="padding:11px 20px;background:#fff;color:#374151;border:1px solid #d1d5db;border-radius:9px;font-size:.9rem;font-weight:700;text-decoration:none;text-align:center;">
+        Cancel
+      </a>
+    </div>
+  </form>
+</div>
+{% endblock %}

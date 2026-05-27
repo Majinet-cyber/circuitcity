@@ -236,6 +236,27 @@
     margin-top: 4px;
   }
 
+  .specs-custom-input {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    transition: border-color 0.2s;
+    box-sizing: border-box;
+  }
+
+  .specs-custom-input:focus {
+    outline: none;
+    border-color: var(--brand-color);
+    box-shadow: 0 0 0 3px rgba(var(--brand-color-rgb), 0.1);
+  }
+
+  .specs-custom-input.specs-custom-active {
+    border-color: #6366f1;
+    background: #faf5ff;
+  }
+
   .btn-submit {
     width: 100%;
     padding: 12px;
@@ -365,13 +386,13 @@
     }
 
     .specs-grid {
-      grid-template-columns: repeat(2, 1fr);
-      gap: 8px;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
     }
 
     .spec-card {
-      padding: 12px 8px;
-      font-size: 0.85rem;
+      padding: 10px 6px;
+      font-size: 0.82rem;
     }
   }
 </style>
@@ -444,16 +465,27 @@
           <div class="form-group">
             <label>Storage + RAM Configuration <span style="color: #ef4444;">*</span></label>
             <div class="specs-grid">
+              <button type="button" class="spec-card" data-specs="32+2">32+2</button>
+              <button type="button" class="spec-card" data-specs="32+3">32+3</button>
               <button type="button" class="spec-card" data-specs="64+2">64+2</button>
               <button type="button" class="spec-card" data-specs="64+3">64+3</button>
+              <button type="button" class="spec-card" data-specs="64+4">64+4</button>
               <button type="button" class="spec-card" data-specs="128+3">128+3</button>
               <button type="button" class="spec-card" data-specs="128+4">128+4</button>
+              <button type="button" class="spec-card" data-specs="128+6">128+6</button>
               <button type="button" class="spec-card" data-specs="128+8">128+8</button>
               <button type="button" class="spec-card" data-specs="256+4">256+4</button>
+              <button type="button" class="spec-card" data-specs="256+6">256+6</button>
               <button type="button" class="spec-card" data-specs="256+8">256+8</button>
+              <button type="button" class="spec-card" data-specs="256+12">256+12</button>
+              <button type="button" class="spec-card" data-specs="512+8">512+8</button>
+              <button type="button" class="spec-card" data-specs="512+12">512+12</button>
             </div>
-            <input type="hidden" name="specs" required>
-            <div class="form-help">ROM+RAM format (Storage+Memory), Malawi-relevant specs</div>
+            <input type="text" name="specs" class="specs-custom-input"
+                   placeholder="e.g. 128+6, 256+12, 512+12"
+                   autocomplete="off"
+                   style="margin-top: 8px;">
+            <div class="form-help">Select a preset above or type any configuration &mdash; e.g. 128+6, 256+12, 512+8, 1TB+16</div>
           </div>
 
           <div class="form-group">
@@ -575,27 +607,56 @@ document.addEventListener('DOMContentLoaded', function() {
       });
     });
 
-    // Spec card selection
+    // Spec card + custom input interaction
     const specCards = panel.querySelectorAll('.spec-card');
     const specsInput = panel.querySelector('input[name="specs"]');
 
+    // Clicking a preset chip fills the text input and marks that chip selected
     specCards.forEach(card => {
       card.addEventListener('click', function(e) {
         e.preventDefault();
         e.stopPropagation();
 
-        // Remove selected class from all spec cards in this panel
         panel.querySelectorAll('.spec-card').forEach(c => c.classList.remove('selected'));
-
-        // Add selected class to clicked card
         this.classList.add('selected');
 
-        // Update hidden input value
         if (specsInput) {
           specsInput.value = this.dataset.specs;
+          specsInput.classList.remove('specs-custom-active');
         }
       });
     });
+
+    // Typing in the text input deselects presets (unless value matches one)
+    if (specsInput) {
+      specsInput.addEventListener('input', function() {
+        const typed = this.value.trim();
+        let matched = false;
+        panel.querySelectorAll('.spec-card').forEach(c => {
+          if (c.dataset.specs === typed) {
+            c.classList.add('selected');
+            matched = true;
+          } else {
+            c.classList.remove('selected');
+          }
+        });
+        this.classList.toggle('specs-custom-active', typed.length > 0 && !matched);
+      });
+    }
+
+    // Form submit validation: ensure specs field is not blank
+    const form = panel.querySelector('.inline-form form');
+    if (form) {
+      form.addEventListener('submit', function(e) {
+        if (specsInput && !specsInput.value.trim()) {
+          e.preventDefault();
+          specsInput.focus();
+          specsInput.style.borderColor = '#ef4444';
+          specsInput.placeholder = 'Required — select a preset or type e.g. 128+6';
+          setTimeout(() => { specsInput.style.borderColor = ''; }, 2000);
+        }
+      });
+    }
   });
 });
 </script>

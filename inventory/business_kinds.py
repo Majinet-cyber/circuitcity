@@ -37,6 +37,9 @@ class BusinessKind(models.TextChoices):
     CAR_DEALER = "car_dealer", "Car Dealer"  # NEW: Vehicle dealership & marketplace
     ENERGY = "energy", "Renewable Energy"  # NEW: Solar, battery & energy management
     MOBILE_MONEY = "mobile_money", "Mobile Money Agent"  # NEW: Mobile money agent reconciliation
+    MIXED_RETAIL = "mixed_retail", "Mixed Retail"  # NEW: Multi-department retail (clothing+electronics+furniture+etc.)
+    CONSULTANCY = "consultancy", "Consultancy & Services"  # NEW: Consulting, freelance, agencies, repair, advisory
+    BUTCHERY = "butchery", "Butchery"  # NEW: Butchery / meat shop with intake, processing & cut-based sales
 
 
 __all__ = ["BusinessKind"]

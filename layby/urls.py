@@ -33,4 +33,6 @@ urlpatterns = [
     # Pay Now / QR
     path("pay/<int:order_id>/", views.pay_now, name="pay_now"),
     path("qr/<int:order_id>.png", views.qr_png, name="qr_png"),
+    # PDF agreement
+    path("<int:pk>/pdf/", views.layby_agreement_pdf, name="agreement_pdf"),
 ]

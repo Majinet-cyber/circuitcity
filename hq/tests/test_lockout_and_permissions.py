@@ -85,8 +85,8 @@ class SubscriptionLockoutTestCase(TestCase):
         # If 403, check for agent-specific message
         if response.status_code == 403:
             content = response.content.decode("utf-8")
-            self.assertIn("Account locked", content.lower())
-            self.assertIn("Contact your manager", content.lower())
+            self.assertIn("account locked", content.lower())
+            self.assertIn("contact your manager", content.lower())
 
     def test_manager_blocked_when_subscription_expired(self):
         """Managers should be blocked when subscription is expired."""
@@ -108,7 +108,7 @@ class SubscriptionLockoutTestCase(TestCase):
         # If 403, check for manager-specific message
         if response.status_code == 403:
             content = response.content.decode("utf-8")
-            self.assertIn("Account locked", content.lower())
+            self.assertIn("account locked", content.lower())
             # Manager should see payment/admin message
             self.assertTrue("pay subscription" in content.lower() or "contact admin" in content.lower())
 

@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block title %}{{ invoice.invoice_number }} · {{ business.name }}{% endblock %}
+{% block content %}
+<div style="max-width:780px;margin:0 auto;padding:20px 14px;">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:10px;">
+    <div>
+      <a href="{% url 'consultancy:invoices' %}" style="color:#64748b;font-size:.82rem;text-decoration:none;">← Invoices</a>
+      <h1 style="font-size:1.3rem;font-weight:900;margin:4px 0 0;">{{ invoice.invoice_number }}</h1>
+    </div>
+    {% if invoice.status == 'draft' %}
+    <form method="post">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="mark_sent">
+      <button type="submit" style="padding:7px 14px;background:#2563eb;color:#fff;border:none;border-radius:7px;font-size:.85rem;font-weight:700;cursor:pointer;">Mark as Sent</button>
+    </form>
+    {% endif %}
+  </div>
+  {% if messages %}{% for msg in messages %}<div class="msg msg-{{ msg.tags }}" style="margin-bottom:12px;">{{ msg }}</div>{% endfor %}{% endif %}
+
+  <div style="background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:20px;margin-bottom:14px;">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:.88rem;margin-bottom:16px;">
+      <div><span style="color:#64748b;">Client:</span> <strong>{{ invoice.client.name }}</strong></div>
+      <div><span style="color:#64748b;">Status:</span>
+        <span style="padding:2px 8px;border-radius:99px;font-size:.78rem;font-weight:600;
+          background:{% if invoice.status == 'paid' %}#dcfce7{% elif invoice.status == 'overdue' %}#fef2f2{% elif invoice.status == 'partial' %}#fefce8{% else %}#f1f5f9{% endif %};
+          color:{% if invoice.status == 'paid' %}#166534{% elif invoice.status == 'overdue' %}#991b1b{% elif invoice.status == 'partial' %}#854d0e{% else %}#475569{% endif %};">
+          {{ invoice.get_status_display }}
+        </span>
+      </div>
+      <div><span style="color:#64748b;">Issued:</span> {{ invoice.issued_at|date:"d M Y" }}</div>
+      {% if invoice.due_date %}<div><span style="color:#64748b;">Due:</span> {{ invoice.due_date|date:"d M Y" }}</div>{% endif %}
+      {% if invoice.project %}<div><span style="color:#64748b;">Project:</span> <a href="{% url 'consultancy:project_detail' project_id=invoice.project.id %}" style="color:#2563eb;text-decoration:none;">{{ invoice.project.title }}</a></div>{% endif %}
+    </div>
+
+    <table style="width:100%;border-collapse:collapse;font-size:.88rem;">
+      <thead>
+        <tr style="background:#f8fafc;">
+          <th style="padding:8px 12px;text-align:left;font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;color:#64748b;">Description</th>
+          <th style="padding:8px 12px;text-align:right;font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;color:#64748b;">Qty</th>
+          <th style="padding:8px 12px;text-align:right;font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;color:#64748b;">Unit Price</th>
+          <th style="padding:8px 12px;text-align:right;font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;color:#64748b;">Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in line_items %}
+        <tr style="border-top:1px solid #f1f5f9;">
+          <td style="padding:8px 12px;">{{ item.description }}</td>
+          <td style="padding:8px 12px;text-align:right;">{{ item.quantity|floatformat:2 }}</td>
+          <td style="padding:8px 12px;text-align:right;">{{ item.unit_price|floatformat:0|intcomma }}</td>
+          <td style="padding:8px 12px;text-align:right;font-weight:600;">{{ item.total|floatformat:0|intcomma }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot>
+        {% if invoice.discount %}<tr><td colspan="3" style="padding:6px 12px;text-align:right;color:#64748b;">Discount:</td><td style="padding:6px 12px;text-align:right;color:#ef4444;">–{{ invoice.discount|floatformat:0|intcomma }}</td></tr>{% endif %}
+        {% if invoice.tax %}<tr><td colspan="3" style="padding:6px 12px;text-align:right;color:#64748b;">Tax:</td><td style="padding:6px 12px;text-align:right;">{{ invoice.tax|floatformat:0|intcomma }}</td></tr>{% endif %}
+        <tr style="border-top:2px solid #e2e8f0;"><td colspan="3" style="padding:8px 12px;text-align:right;font-weight:800;">TOTAL:</td><td style="padding:8px 12px;text-align:right;font-weight:900;font-size:1.1rem;">MWK {{ invoice.total_amount|floatformat:0|intcomma }}</td></tr>
+        <tr><td colspan="3" style="padding:4px 12px;text-align:right;color:#16a34a;">Paid:</td><td style="padding:4px 12px;text-align:right;font-weight:700;color:#16a34a;">MWK {{ invoice.amount_paid|floatformat:0|intcomma }}</td></tr>
+        <tr><td colspan="3" style="padding:4px 12px;text-align:right;font-weight:700;">Balance Due:</td><td style="padding:4px 12px;text-align:right;font-weight:900;font-size:1rem;color:{% if invoice.balance_due > 0 %}#f59e0b{% else %}#16a34a{% endif %};">MWK {{ invoice.balance_due|floatformat:0|intcomma }}</td></tr>
+      </tfoot>
+    </table>
+    {% if invoice.notes %}<p style="margin-top:12px;font-size:.85rem;color:#64748b;">{{ invoice.notes }}</p>{% endif %}
+  </div>
+
+  <!-- Record Payment -->
+  {% if invoice.status != 'paid' %}
+  <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:14px;padding:16px;margin-bottom:14px;">
+    <div style="font-size:.75rem;text-transform:uppercase;letter-spacing:.07em;font-weight:800;color:#166534;margin-bottom:10px;">Record Payment</div>
+    <form method="post" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="record_payment">
+      <div>
+        <label style="font-size:.82rem;font-weight:600;display:block;margin-bottom:4px;">Amount (MWK) *</label>
+        <input type="number" name="amount" step="0.01" min="0.01" required placeholder="{{ invoice.balance_due }}" style="width:100%;padding:9px 12px;border:1px solid #86efac;border-radius:8px;font-size:.9rem;box-sizing:border-box;">
+      </div>
+      <div>
+        <label style="font-size:.82rem;font-weight:600;display:block;margin-bottom:4px;">Payment Method</label>
+        <select name="payment_method" style="width:100%;padding:9px 12px;border:1px solid #86efac;border-radius:8px;font-size:.9rem;">
+          {% for val, label in payment_method_choices %}<option value="{{ val }}">{{ label }}</option>{% endfor %}
+        </select>
+      </div>
+      <div>
+        <label style="font-size:.82rem;font-weight:600;display:block;margin-bottom:4px;">Reference</label>
+        <input type="text" name="reference" placeholder="Transaction ref." style="width:100%;padding:9px 12px;border:1px solid #86efac;border-radius:8px;font-size:.9rem;box-sizing:border-box;">
+      </div>
+      <div>
+        <label style="font-size:.82rem;font-weight:600;display:block;margin-bottom:4px;">Notes</label>
+        <input type="text" name="notes" style="width:100%;padding:9px 12px;border:1px solid #86efac;border-radius:8px;font-size:.9rem;box-sizing:border-box;">
+      </div>
+      <div style="grid-column:1/-1;">
+        <button type="submit" style="padding:10px 24px;background:#16a34a;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;">Record Payment</button>
+      </div>
+    </form>
+  </div>
+  {% endif %}
+
+  <!-- Payment History -->
+  {% if payments %}
+  <div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:16px;">
+    <div style="font-size:.75rem;text-transform:uppercase;letter-spacing:.07em;font-weight:800;color:#475569;margin-bottom:10px;">Payment History</div>
+    {% for p in payments %}
+    <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f1f5f9;">
+      <div><strong>MWK {{ p.amount|floatformat:0|intcomma }}</strong> · {{ p.get_payment_method_display }}</div>
+      <div style="color:#64748b;font-size:.82rem;">{{ p.paid_at|date:"d M Y H:i" }} {% if p.reference %}· ref: {{ p.reference }}{% endif %}</div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

@@ -198,16 +198,11 @@
     <!-- STEP 1: Select Top Category -->
     {% if step == 1 %}
     <div class="wizard-panel">
-      <h2 class="wizard-section-title">What are you adding?</h2>
-      <p style="color:#64748b;font-size:.9rem;margin:-8px 0 20px">
-        Select the type of product. <em>All categories accept custom names — suggestions are optional guides.</em>
-      </p>
+      <h2 class="wizard-section-title">Select Category</h2>
       <div class="card-grid">
         {% for cat in top_categories %}
         <button type="button" class="option-card premium-category-card cc-category-card" data-category="{{ cat.key }}" data-label="{{ cat.label }}" style="background:linear-gradient(135deg,{{ cat.color|default:'#f1f5f9' }}15,{{ cat.color|default:'#f1f5f9' }}05);border-left:4px solid {{ cat.color|default:'#94a3b8' }}">
-          {% if cat.icon %}<div style="font-size:1.4rem;margin-bottom:4px">{{ cat.icon }}</div>{% endif %}
           <div class="card-label">{{ cat.label }}</div>
-          {% if cat.description %}<small style="color:#64748b;font-size:.72rem;margin-top:3px;display:block;line-height:1.3">{{ cat.description }}</small>{% endif %}
           {% if cat.product_count is not None %}
           <small class="product-count-badge">{{ cat.product_count }} product{{ cat.product_count|pluralize }}</small>
           {% endif %}
@@ -546,7 +541,8 @@ document.addEventListener('DOMContentLoaded', function() {
         if (item.toLowerCase().includes('other') || 
             item.toLowerCase().includes('custom') || 
             item.toLowerCase().includes('create new') ||
-            item.toLowerCase().includes('add custom')) {
+            item.toLowerCase().includes('add custom') ||
+            item.toLowerCase() === 'other') {
           productNameInput.value = '';
           productNameInput.placeholder = 'Enter custom product name';
           productNameInput.focus();

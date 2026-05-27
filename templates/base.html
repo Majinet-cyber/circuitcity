@@ -8,7 +8,7 @@
   <title>{% block title %}Emajinet{% endblock %}</title>
   <meta name="description" content="{% block meta_description %}A digital record and AI driven MBA manager for every ledger and common person{% endblock %}">
   <meta name="color-scheme" content="light" />
-  <meta name="theme-color" content="#f5f8ff" />
+  <meta name="theme-color" content="#ff6a1a" />
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
@@ -161,7 +161,14 @@
       --bg:#f5f7fe; --ink:#0b1220; --muted:#475569;
       --line:#d9e2ef; --card:#ffffff;
 
-      --cc-accent: var(--cc-brand, #2563eb);
+      --cc-accent: var(--cc-brand, #ff6a1a);
+
+      /* Bootstrap 5 primary → Emajinet Orange */
+      --bs-primary: #ff6a1a;
+      --bs-primary-rgb: 255, 106, 26;
+      --bs-link-color: #ff6a1a;
+      --bs-link-hover-color: #f25c05;
+      --bs-btn-color: #fff;
 
       --font-sans: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, "Noto Sans";
 
@@ -178,8 +185,8 @@
       --mid-ink:#0f172a;
       --mid-ink-dim:#64748b;
       --mid-sep: rgba(148,163,184,.20);
-      --mid-active: rgba(37,99,235,.12);
-      --mid-hover: rgba(37,99,235,.06);
+      --mid-active: rgba(255,106,26,.12);
+      --mid-hover: rgba(255,106,26,.06);
 
       /* Mobile dock */
       --safe-bottom: max(env(safe-area-inset-bottom), 0px);
@@ -218,8 +225,8 @@
       display:flex; flex-direction:column; gap:14px;
       color: var(--mid-ink); color-scheme: light;
       background:
-        radial-gradient(1200px 800px at -10% -10%, rgba(37,99,235,.05), transparent 40%),
-        radial-gradient(1000px 600px at 110% 110%, rgba(16,185,129,.04), transparent 45%),
+        radial-gradient(1200px 800px at -10% -10%, rgba(255,106,26,.04), transparent 40%),
+        radial-gradient(1000px 600px at 110% 110%, rgba(242,92,5,.03), transparent 45%),
         var(--mid-bg);
       border-right: 1px solid var(--mid-sep);
       -webkit-backdrop-filter: blur(14px) saturate(120%);
@@ -233,8 +240,8 @@
       color: var(--mid-ink); background: transparent; border:1px solid transparent;
       transition:transform var(--fast) var(--elevate), box-shadow var(--fast) var(--elevate), background var(--fast) var(--elevate), border-color var(--fast) var(--elevate);
     }
-    .navlink:hover{ background: var(--mid-hover); border-color: rgba(37,99,235,.20); }
-    .navlink.active{ background: var(--mid-active); border-color: rgba(37,99,235,.30); color:#1e40af; font-weight:700; }
+    .navlink:hover{ background: var(--mid-hover); border-color: rgba(255,106,26,.20); }
+    .navlink.active{ background: var(--mid-active); border-color: rgba(255,106,26,.30); color:#d94f04; font-weight:700; }
 
     .cc-main{ flex:1 1 auto; min-width:0; position:relative; z-index:0; background:var(--bg); color:var(--ink); }
     .cc-page{ max-width:1200px; margin:0 auto; padding:18px; }
@@ -407,7 +414,7 @@
     .topbar-user .presence-dot{
       position:absolute; right:-2px; bottom:-2px;
       width:10px; height:10px; border-radius:999px;
-      background:#10b981; box-shadow:0 0 0 2px #fff;
+      background:#10b981; box-shadow:0 0 0 2px #fff; /* green = user online — semantic */
     }
     .topbar-user .presence-dot.offline{ background:#9ca3af; }
     .tenant-dot.offline{
@@ -427,7 +434,7 @@
     .tenant-pill:hover{ transform:translateY(-1px); box-shadow:0 8px 18px rgba(0,0,0,.10); }
     .tenant-dot{
       width:10px; height:10px; border-radius:999px;
-      background:#10b981; box-shadow:0 0 0 2px rgba(16,185,129,.25);
+      background:#ff6a1a; box-shadow:0 0 0 2px rgba(255,106,26,.25);
     }
     .tenant-name{ font-size:14px; }
     .tenant-role{ font-size:12px; opacity:.75; }
@@ -445,7 +452,7 @@
       padding:.75rem 1rem; text-decoration:none; color:var(--ink);
       font-weight:600; transition:background .12s ease;
     }
-    .tenant-item:hover{ background:rgba(37,99,235,.06); }
+    .tenant-item:hover{ background:rgba(255,106,26,.06); }
     .tenant-divider{ height:1px; background:var(--line); margin:.5rem 0; }
 
     .notif-btn{
@@ -639,8 +646,8 @@
     .user-btn .avatar{
       display:flex; align-items:center; justify-content:center;
       width:100%; height:100%;
-      font-weight:700; font-size:14px; color:var(--cc-accent, #2563eb);
-      background:rgba(37,99,235,.08); border-radius:50%;
+      font-weight:700; font-size:14px; color:var(--cc-accent, #ff6a1a);
+      background:rgba(255,106,26,.08); border-radius:50%;
     }
     .topbar-user .dropdown-menu{
       border-radius:12px !important;
@@ -816,8 +823,8 @@
                       <div style="padding:.5rem 1rem .25rem;font-size:11px;font-weight:700;color:#94a3b8;letter-spacing:.06em;text-transform:uppercase">Your Workspaces</div>
                       {% for ws in user_workspaces %}
                         {% if ws.business.id == active_business_id %}
-                          <div class="tenant-item" style="background:rgba(37,99,235,.07);cursor:default;">
-                            <span style="width:8px;height:8px;border-radius:50%;background:#10b981;display:inline-block;flex-shrink:0"></span>
+                          <div class="tenant-item" style="background:rgba(255,106,26,.07);cursor:default;">
+                            <span style="width:8px;height:8px;border-radius:50%;background:#ff6a1a;display:inline-block;flex-shrink:0"></span>
                             <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ ws.business.name }}</span>
                             <span style="font-size:11px;opacity:.6;font-weight:400">{{ ws.role|title }}</span>
                           </div>
@@ -1978,7 +1985,7 @@ document.addEventListener('DOMContentLoaded', function() {
           banner.style.boxShadow = "0 10px 30px rgba(0,0,0,0.25)";
           banner.innerHTML = `
             <span style="margin-right: 0.75rem;">New version of Emajinet is available.</span>
-            <button type="button" style="border:none; cursor:pointer; border-radius:999px; padding:0.25rem 0.9rem; background:#4f46e5; color:#fff; font-size:0.8rem;">
+            <button type="button" style="border:none; cursor:pointer; border-radius:999px; padding:0.25rem 0.9rem; background:#ff6a1a; color:#fff; font-size:0.8rem;">
               Refresh
             </button>
           `;

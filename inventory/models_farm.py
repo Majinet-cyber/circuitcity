@@ -624,7 +624,8 @@ class FarmBatchImage(models.Model):
 
 
 class FarmLivestockEventType(models.TextChoices):
-    """Types of livestock events that affect count"""
+    """Types of livestock events — affects count or health tracking."""
+    # Count-changing events
     BIRTH = "birth", "Birth"
     DEATH = "death", "Death"
     PURCHASE = "purchase", "Purchase"
@@ -632,6 +633,47 @@ class FarmLivestockEventType(models.TextChoices):
     TRANSFER_IN = "transfer_in", "Transfer In"
     TRANSFER_OUT = "transfer_out", "Transfer Out"
     SLAUGHTER = "slaughter", "Slaughter"
+    # Health / care events (non-count)
+    VACCINATION = "vaccination", "Vaccination"
+    TREATMENT = "treatment", "Veterinary Treatment"
+    FEEDING = "feeding", "Feed / Feeding Record"
+    WEIGHT_CHECK = "weight_check", "Weight Check"
+    DISEASE_OUTBREAK = "disease_outbreak", "Disease Outbreak"
+    BREEDING = "breeding", "Breeding / Mating"
+    EGG_COLLECTION = "egg_collection", "Egg Collection"
+    MILK_COLLECTION = "milk_collection", "Milk Collection"
+    HOUSING_MAINTENANCE = "housing_maintenance", "Housing / Pen Maintenance"
+    OTHER = "other", "Other"
+
+
+# Events that change count (positive: add animals)
+LIVESTOCK_COUNT_ADDING_EVENTS = {
+    FarmLivestockEventType.BIRTH,
+    FarmLivestockEventType.PURCHASE,
+    FarmLivestockEventType.TRANSFER_IN,
+}
+
+# Events that change count (negative: remove animals)
+LIVESTOCK_COUNT_REMOVING_EVENTS = {
+    FarmLivestockEventType.DEATH,
+    FarmLivestockEventType.SALE,
+    FarmLivestockEventType.TRANSFER_OUT,
+    FarmLivestockEventType.SLAUGHTER,
+}
+
+# Events that do NOT affect count
+LIVESTOCK_NON_COUNT_EVENTS = {
+    FarmLivestockEventType.VACCINATION,
+    FarmLivestockEventType.TREATMENT,
+    FarmLivestockEventType.FEEDING,
+    FarmLivestockEventType.WEIGHT_CHECK,
+    FarmLivestockEventType.DISEASE_OUTBREAK,
+    FarmLivestockEventType.BREEDING,
+    FarmLivestockEventType.EGG_COLLECTION,
+    FarmLivestockEventType.MILK_COLLECTION,
+    FarmLivestockEventType.HOUSING_MAINTENANCE,
+    FarmLivestockEventType.OTHER,
+}
 
 
 class FarmLivestockEvent(models.Model):
@@ -653,8 +695,9 @@ class FarmLivestockEvent(models.Model):
     )
     date = models.DateField(default=timezone.now, db_index=True)
     count = models.PositiveIntegerField(
-        validators=[MinValueValidator(1)],
-        help_text="Number of animals affected",
+        default=0,
+        validators=[MinValueValidator(0)],
+        help_text="Number of animals affected (0 for non-count events like vaccination)",
     )
     
     # Financial details (for purchase/sale)
@@ -675,6 +718,46 @@ class FarmLivestockEvent(models.Model):
         on_delete=models.SET_NULL,
         related_name="transfers_to",
         help_text="Target batch for transfers",
+    )
+
+    # Extended tracking fields (for health/production events)
+    weight_kg = models.DecimalField(
+        max_digits=8,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(Decimal("0.01"))],
+        help_text="Average weight per animal (for weight checks)",
+    )
+    quantity = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(Decimal("0.01"))],
+        help_text="Quantity of output (e.g. eggs collected, litres of milk)",
+    )
+    quantity_unit = models.CharField(
+        max_length=20,
+        blank=True,
+        default="",
+        help_text="Unit for quantity (e.g. 'eggs', 'litres', 'kg')",
+    )
+    cost_impact_mwk = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(Decimal("0.00"))],
+        help_text="Cost of this event (e.g. vaccination cost, feed cost)",
+    )
+    revenue_impact_mwk = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(Decimal("0.00"))],
+        help_text="Revenue from this event (e.g. egg sales, milk sales)",
     )
     
     # Notes
@@ -707,14 +790,13 @@ class FarmLivestockEvent(models.Model):
         """
         Return the signed count change for this event.
         Positive = adds animals, Negative = removes animals.
+        Zero = non-count event (health, feeding, etc.)
         """
-        if self.event_type in (
-            FarmLivestockEventType.BIRTH,
-            FarmLivestockEventType.PURCHASE,
-            FarmLivestockEventType.TRANSFER_IN,
-        ):
+        if self.event_type in LIVESTOCK_COUNT_ADDING_EVENTS:
             return self.count
-        return -self.count
+        if self.event_type in LIVESTOCK_COUNT_REMOVING_EVENTS:
+            return -self.count
+        return 0  # non-count events (vaccination, feeding, etc.)
     
     @property
     def total_value_mwk(self) -> Decimal | None:

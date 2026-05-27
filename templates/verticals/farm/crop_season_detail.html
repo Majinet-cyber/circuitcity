@@ -14,23 +14,157 @@
     </nav>
 
     <!-- Season Header -->
-    <div class="card border-0 shadow-sm mb-4">
+    <div class="card border-0 shadow-sm mb-4" style="background:linear-gradient(135deg,#f0fdf4,#dcfce7);border-left:4px solid #16a34a!important;">
         <div class="card-body">
-            <div class="row">
+            <div class="row align-items-center">
                 <div class="col-md-8">
-                    <h4 class="mb-1">{{ season.name }}</h4>
-                    <p class="text-muted mb-0">
+                    <div class="text-muted fw-bold" style="font-size:.7rem;text-transform:uppercase;letter-spacing:.07em;">Crop Season</div>
+                    <h4 class="mb-1 mt-1">{{ season.name }}</h4>
+                    <p class="text-muted mb-0 small">
                         {{ season.get_crop_type_display }} · {{ season.area_value }} {{ season.get_area_unit_display }}
+                        {% if season.start_date %} · Started {{ season.start_date|date:"M j, Y" }}{% endif %}
+                        {% if weeks_since_planting %} · Week {{ weeks_since_planting }}{% endif %}
                     </p>
                 </div>
-                <div class="col-md-4 text-md-end">
-                    <span class="badge fs-6 bg-{% if season.status == 'active' %}success{% elif season.status == 'harvested' %}info{% elif season.status == 'closed' %}secondary{% else %}warning{% endif %}">
+                <div class="col-md-4 text-md-end mt-2 mt-md-0">
+                    <span class="badge rounded-pill fs-6 bg-{% if season.status == 'active' %}success{% elif season.status == 'harvested' %}info{% elif season.status == 'closed' %}secondary{% else %}warning{% endif %}">
                         {{ season.get_status_display }}
                     </span>
+                    {% if crop_intelligence %}
+                    <div class="mt-2">
+                      <span class="badge rounded-pill" style="background:{% if crop_intelligence.risk_level == 'low' %}#dcfce7;color:#166534{% elif crop_intelligence.risk_level == 'medium' %}#fef9c3;color:#92400e{% else %}#fee2e2;color:#991b1b{% endif %};">
+                        Risk: {{ crop_intelligence.risk_level|title|default:"Unknown" }}
+                      </span>
+                    </div>
+                    {% endif %}
                 </div>
             </div>
         </div>
     </div>
+
+    <!-- ═══ CROP INTELLIGENCE CARDS ═══ -->
+    {% if crop_intelligence %}
+    <div class="row g-3 mb-4">
+      <div class="col-12"><h5 class="fw-bold" style="color:#0f172a;">🌾 Crop Intelligence</h5></div>
+
+      <!-- Harvest Readiness -->
+      <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm p-3 text-center h-100"
+          style="background:{% if crop_intelligence.harvest_readiness == 'ready' or crop_intelligence.harvest_readiness == 'harvested' %}#f0fdf4{% elif crop_intelligence.harvest_readiness == 'near' %}#fefce8{% else %}#f8fafc{% endif %}">
+          <div style="font-size:1.8rem;margin-bottom:4px;">
+            {% if crop_intelligence.harvest_readiness == 'ready' %}🌟
+            {% elif crop_intelligence.harvest_readiness == 'near' %}⏰
+            {% elif crop_intelligence.harvest_readiness == 'harvested' %}✅
+            {% else %}🌱{% endif %}
+          </div>
+          <div class="text-muted fw-bold" style="font-size:.65rem;text-transform:uppercase;letter-spacing:.06em;">Harvest</div>
+          <div class="fw-black mt-1" style="font-size:.9rem;color:#0f172a;">{{ crop_intelligence.harvest_readiness|title }}</div>
+          {% if crop_intelligence.days_to_harvest is not None %}
+          <div class="text-muted" style="font-size:.72rem;">
+            {% if crop_intelligence.days_to_harvest <= 0 %}Harvest now!
+            {% else %}{{ crop_intelligence.days_to_harvest }} days left{% endif %}
+          </div>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Projected Income -->
+      <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm p-3 text-center h-100">
+          <div style="font-size:1.8rem;margin-bottom:4px;">💵</div>
+          <div class="text-muted fw-bold" style="font-size:.65rem;text-transform:uppercase;letter-spacing:.06em;">Projected Income</div>
+          <div class="fw-black mt-1" style="font-size:.9rem;color:#0f172a;">
+            {% if crop_intelligence.projected_income_mwk %}
+              MWK {{ crop_intelligence.projected_income_mwk|floatformat:0|intcomma }}
+            {% else %}—{% endif %}
+          </div>
+        </div>
+      </div>
+
+      <!-- Actual Profit -->
+      <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm p-3 text-center h-100"
+          style="{% if crop_intelligence.actual_profit_mwk is not None %}background:{% if crop_intelligence.actual_profit_mwk >= 0 %}#f0fdf4{% else %}#fef2f2{% endif %}{% endif %}">
+          <div style="font-size:1.8rem;margin-bottom:4px;">{% if crop_intelligence.actual_profit_mwk is not None and crop_intelligence.actual_profit_mwk >= 0 %}📈{% else %}📉{% endif %}</div>
+          <div class="text-muted fw-bold" style="font-size:.65rem;text-transform:uppercase;letter-spacing:.06em;">Actual Profit</div>
+          <div class="fw-black mt-1" style="font-size:.9rem;color:{% if crop_intelligence.actual_profit_mwk is not None and crop_intelligence.actual_profit_mwk >= 0 %}#15803d{% else %}#dc2626{% endif %}">
+            {% if crop_intelligence.actual_profit_mwk is not None %}
+              MWK {{ crop_intelligence.actual_profit_mwk|floatformat:0|intcomma }}
+            {% else %}—{% endif %}
+          </div>
+        </div>
+      </div>
+
+      <!-- Break-even Price -->
+      <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm p-3 text-center h-100">
+          <div style="font-size:1.8rem;margin-bottom:4px;">⚖️</div>
+          <div class="text-muted fw-bold" style="font-size:.65rem;text-transform:uppercase;letter-spacing:.06em;">Break-even Price</div>
+          <div class="fw-black mt-1" style="font-size:.9rem;color:#0f172a;">
+            {% if crop_intelligence.break_even_price %}
+              MWK {{ crop_intelligence.break_even_price|floatformat:0|intcomma }}/{{ season.get_yield_unit_display }}
+            {% else %}—{% endif %}
+          </div>
+        </div>
+      </div>
+
+      <!-- Yield per Acre -->
+      <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm p-3 text-center h-100">
+          <div style="font-size:1.8rem;margin-bottom:4px;">📐</div>
+          <div class="text-muted fw-bold" style="font-size:.65rem;text-transform:uppercase;letter-spacing:.06em;">Yield / Acre</div>
+          <div class="fw-black mt-1" style="font-size:.9rem;color:#0f172a;">
+            {% if crop_intelligence.yield_per_acre %}
+              {{ crop_intelligence.yield_per_acre|floatformat:1 }} {{ season.get_yield_unit_display }}/acre
+            {% else %}—{% endif %}
+          </div>
+        </div>
+      </div>
+
+      <!-- Input Cost per Acre -->
+      <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm p-3 text-center h-100">
+          <div style="font-size:1.8rem;margin-bottom:4px;">🌿</div>
+          <div class="text-muted fw-bold" style="font-size:.65rem;text-transform:uppercase;letter-spacing:.06em;">Cost / Acre</div>
+          <div class="fw-black mt-1" style="font-size:.9rem;color:#0f172a;">
+            {% if crop_intelligence.input_cost_per_acre %}
+              MWK {{ crop_intelligence.input_cost_per_acre|floatformat:0|intcomma }}
+            {% else %}—{% endif %}
+          </div>
+        </div>
+      </div>
+
+      <!-- Risk Level -->
+      <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm p-3 text-center h-100"
+          style="background:{% if crop_intelligence.risk_level == 'good' %}#f0fdf4{% elif crop_intelligence.risk_level == 'watch' %}#fefce8{% elif crop_intelligence.risk_level == 'risky' %}#fef2f2{% else %}#f8fafc{% endif %}">
+          <div style="font-size:1.8rem;margin-bottom:4px;">
+            {% if crop_intelligence.risk_level == 'good' %}💚
+            {% elif crop_intelligence.risk_level == 'watch' %}🟡
+            {% elif crop_intelligence.risk_level == 'risky' %}🔴
+            {% else %}⬜{% endif %}
+          </div>
+          <div class="text-muted fw-bold" style="font-size:.65rem;text-transform:uppercase;letter-spacing:.06em;">Risk Level</div>
+          <div class="fw-black mt-1" style="font-size:.9rem;">{{ crop_intelligence.risk_level|title }}</div>
+        </div>
+      </div>
+
+      <!-- Recommendations -->
+      {% if crop_intelligence.recommendations %}
+      <div class="col-12">
+        <div class="p-3 rounded-3" style="background:#eff6ff;border:1px solid #bfdbfe;">
+          <h6 class="fw-bold mb-2" style="color:#1d4ed8;font-size:.82rem;"><i class="bi bi-lightbulb-fill me-1"></i>Intelligence Insights</h6>
+          {% for rec in crop_intelligence.recommendations %}
+          <div class="d-flex align-items-start gap-2 mb-1">
+            <i class="bi bi-arrow-right-circle-fill text-primary flex-shrink-0 mt-1" style="font-size:.8rem;"></i>
+            <span style="font-size:.82rem;color:#1e40af;">{{ rec }}</span>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+    </div>
+    {% endif %}
 
     <!-- Projections vs Actuals -->
     <div class="row g-4 mb-4">

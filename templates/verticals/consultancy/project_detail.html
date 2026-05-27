@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block title %}{{ project.title }} · {{ business.name }}{% endblock %}
+{% block content %}
+<div style="max-width:900px;margin:0 auto;padding:20px 14px;">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
+    <div>
+      <a href="{% url 'consultancy:projects' %}" style="color:#64748b;font-size:.82rem;text-decoration:none;">← Projects</a>
+      <h1 style="font-size:1.3rem;font-weight:900;margin:4px 0 0;">{{ project.title }}</h1>
+      <div style="color:#64748b;font-size:.85rem;">{{ project.client.name }}{% if project.client.company %} · {{ project.client.company }}{% endif %}</div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <a href="{% url 'consultancy:quote_create' %}?project_id={{ project.id }}&client_id={{ project.client.id }}" style="padding:7px 12px;background:#f59e0b;color:#fff;border-radius:7px;text-decoration:none;font-size:.82rem;font-weight:700;">+ Quote</a>
+      <a href="{% url 'consultancy:invoice_create' %}?project_id={{ project.id }}" style="padding:7px 12px;background:#16a34a;color:#fff;border-radius:7px;text-decoration:none;font-size:.82rem;font-weight:700;">+ Invoice</a>
+    </div>
+  </div>
+  {% if messages %}{% for msg in messages %}<div class="msg msg-{{ msg.tags }}" style="margin-bottom:12px;">{{ msg }}</div>{% endfor %}{% endif %}
+
+  <div style="display:grid;grid-template-columns:2fr 1fr;gap:16px;">
+    <!-- Left -->
+    <div>
+      <!-- Details card -->
+      <div style="background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:16px;margin-bottom:14px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+          <div style="font-size:.75rem;text-transform:uppercase;letter-spacing:.07em;font-weight:800;color:#475569;">Project Details</div>
+          <form method="post" style="display:flex;gap:6px;align-items:center;">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="update_status">
+            <select name="status" style="padding:5px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:.82rem;">
+              {% for val, label in status_choices %}<option value="{{ val }}" {% if project.status == val %}selected{% endif %}>{{ label }}</option>{% endfor %}
+            </select>
+            <button type="submit" style="padding:5px 10px;background:#2563eb;color:#fff;border:none;border-radius:6px;font-size:.8rem;font-weight:700;cursor:pointer;">Update</button>
+          </form>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:.88rem;">
+          <div><span style="color:#64748b;">Type:</span> <strong>{{ project.get_project_type_display }}</strong></div>
+          <div><span style="color:#64748b;">Status:</span>
+            <span style="padding:2px 8px;border-radius:99px;font-size:.78rem;font-weight:600;
+              background:{% if project.status == 'paid' %}#dcfce7{% elif project.status == 'overdue' %}#fef2f2{% elif project.status == 'in_progress' %}#eff6ff{% else %}#f1f5f9{% endif %};
+              color:{% if project.status == 'paid' %}#166534{% elif project.status == 'overdue' %}#991b1b{% elif project.status == 'in_progress' %}#1d4ed8{% else %}#475569{% endif %};">
+              {{ project.get_status_display }}
+            </span>
+          </div>
+          {% if project.agreed_value %}<div><span style="color:#64748b;">Agreed Value:</span> <strong>MWK {{ project.agreed_value|floatformat:0|intcomma }}</strong></div>{% endif %}
+          {% if project.monthly_retainer %}<div><span style="color:#64748b;">Monthly Retainer:</span> <strong>MWK {{ project.monthly_retainer|floatformat:0|intcomma }}</strong></div>{% endif %}
+          {% if project.start_date %}<div><span style="color:#64748b;">Start:</span> {{ project.start_date|date:"d M Y" }}</div>{% endif %}
+          {% if project.deadline %}<div><span style="color:#64748b;">Deadline:</span> <strong {% if project.is_overdue %}style="color:#ef4444;"{% endif %}>{{ project.deadline|date:"d M Y" }}{% if project.is_overdue %} ⚠️ Overdue{% endif %}</strong></div>{% endif %}
+        </div>
+        {% if project.description %}<p style="margin-top:12px;font-size:.88rem;color:#374151;">{{ project.description }}</p>{% endif %}
+      </div>
+
+      <!-- Financial summary -->
+      <div style="background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:16px;margin-bottom:14px;">
+        <div style="font-size:.75rem;text-transform:uppercase;letter-spacing:.07em;font-weight:800;color:#475569;margin-bottom:10px;">Financials</div>
+        <div style="display:flex;gap:20px;flex-wrap:wrap;">
+          <div><div style="font-size:.7rem;color:#64748b;">Invoiced</div><div style="font-size:1.1rem;font-weight:800;">MWK {{ project.total_invoiced|floatformat:0|intcomma }}</div></div>
+          <div><div style="font-size:.7rem;color:#64748b;">Paid</div><div style="font-size:1.1rem;font-weight:800;color:#16a34a;">MWK {{ project.total_paid|floatformat:0|intcomma }}</div></div>
+          <div><div style="font-size:.7rem;color:#64748b;">Outstanding</div><div style="font-size:1.1rem;font-weight:800;color:{% if project.outstanding_balance > 0 %}#f59e0b{% else %}#16a34a{% endif %};">MWK {{ project.outstanding_balance|floatformat:0|intcomma }}</div></div>
+        </div>
+      </div>
+
+      <!-- Quotes -->
+      {% if quotes %}
+      <div style="background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:16px;margin-bottom:14px;">
+        <div style="font-size:.75rem;text-transform:uppercase;letter-spacing:.07em;font-weight:800;color:#475569;margin-bottom:10px;">Quotes</div>
+        {% for q in quotes %}
+        <a href="{% url 'consultancy:quote_detail' quote_id=q.id %}" style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f1f5f9;text-decoration:none;color:inherit;">
+          <span style="font-weight:600;">{{ q.quote_number }}</span>
+          <span style="font-weight:700;">MWK {{ q.total_amount|floatformat:0|intcomma }}</span>
+          <span style="font-size:.78rem;color:#64748b;">{{ q.get_status_display }}</span>
+        </a>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      <!-- Invoices -->
+      {% if invoices %}
+      <div style="background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:16px;">
+        <div style="font-size:.75rem;text-transform:uppercase;letter-spacing:.07em;font-weight:800;color:#475569;margin-bottom:10px;">Invoices</div>
+        {% for inv in invoices %}
+        <a href="{% url 'consultancy:invoice_detail' invoice_id=inv.id %}" style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f1f5f9;text-decoration:none;color:inherit;">
+          <span style="font-weight:600;">{{ inv.invoice_number }}</span>
+          <span style="font-weight:700;">MWK {{ inv.total_amount|floatformat:0|intcomma }}</span>
+          <span style="font-size:.78rem;color:#64748b;">{{ inv.get_status_display }}</span>
+        </a>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Right -->
+    <div>
+      <div style="background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:14px;position:sticky;top:16px;">
+        <div style="font-size:.75rem;text-transform:uppercase;letter-spacing:.07em;font-weight:800;color:#475569;margin-bottom:12px;">Quick Actions</div>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <a href="{% url 'consultancy:quote_create' %}?project_id={{ project.id }}&client_id={{ project.client.id }}" style="padding:9px 12px;background:#fefce8;border:1px solid #fde047;border-radius:8px;text-decoration:none;color:#92400e;font-weight:700;font-size:.85rem;text-align:center;">Create Quote</a>
+          <a href="{% url 'consultancy:invoice_create' %}?project_id={{ project.id }}" style="padding:9px 12px;background:#dcfce7;border:1px solid #86efac;border-radius:8px;text-decoration:none;color:#166534;font-weight:700;font-size:.85rem;text-align:center;">Create Invoice</a>
+          <a href="{% url 'consultancy:expenses' %}?project_id={{ project.id }}" style="padding:9px 12px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:8px;text-decoration:none;color:#475569;font-weight:700;font-size:.85rem;text-align:center;">Add Expense</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

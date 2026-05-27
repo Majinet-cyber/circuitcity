@@ -38,7 +38,7 @@
       <div class="card border-0 shadow-sm rounded-4 h-100 p-3" style="background:rgba(255,255,255,.94);">
         <div class="d-flex align-items-center gap-2 mb-2">
           <span class="rounded-circle d-inline-flex align-items-center justify-content-center"
-                style="width:34px;height:34px;background:#f0fdf4;color:#059669;">
+                style="width:34px;height:34px;background:#fff1e8;color:#ff6a1a;">
             <i class="bi {{ card.icon }}"></i>
           </span>
           <span class="text-muted fw-bold text-uppercase" style="font-size:.7rem;letter-spacing:.04em;">{{ card.label }}</span>
@@ -53,9 +53,11 @@
 
   {% if health.is_onboarding %}
   <!-- ── Onboarding state ── -->
-  <div class="card border-0 shadow-sm rounded-4 p-4 text-center mb-4" style="background:linear-gradient(135deg,#f0fdf4,#ecfdf5);">
-    <div style="font-size:3.5rem;margin-bottom:1rem;">📊</div>
-    <h2 class="h4 fw-bold mb-2" style="color:#065f46;">Not enough data yet</h2>
+  <div class="card border-0 shadow-sm rounded-4 p-4 text-center mb-4" style="background:linear-gradient(135deg,#fffaf7,#fff1e8);">
+    <div style="width:64px;height:64px;background:linear-gradient(135deg,#fff1e8,#ffe4d0);border-radius:18px;display:grid;place-items:center;margin:0 auto 16px;">
+      <i class="bi bi-bar-chart-line" style="font-size:1.8rem;color:#ea580c;"></i>
+    </div>
+    <h2 class="h4 fw-bold mb-2" style="color:#9a3412;">Not enough data yet</h2>
     <p class="text-muted mb-3" style="max-width:480px;margin:0 auto;">
       Your Business Health Score will appear here once you start recording sales and adding inventory.
       The more you use Emajinet, the more accurate your score becomes.
@@ -65,7 +67,7 @@
       <li class="mb-2"><i class="bi bi-arrow-right-circle-fill text-success me-2"></i>{{ rec }}</li>
       {% endfor %}
     </ul>
-    <a href="{% url 'dashboard:home' %}" class="btn btn-success px-4 rounded-pill">
+    <a href="{% url 'dashboard:home' %}" class="btn btn-primary px-4 rounded-pill">
       Go to Dashboard
     </a>
   </div>
@@ -75,7 +77,7 @@
   <div class="row g-3 mb-4">
     <div class="col-12 col-md-4">
       <div class="card border-0 shadow-sm rounded-4 h-100 p-4 text-center"
-           style="background:linear-gradient(135deg,#f0fdf4,#ecfdf5);">
+           style="background:linear-gradient(135deg,#fffaf7,#fff1e8);border:1px solid #ffd1b5 !important;">
         <!-- Circular score -->
         <div class="position-relative d-inline-flex align-items-center justify-content-center mx-auto mb-3"
              style="width:120px;height:120px;">
@@ -123,6 +125,58 @@
       </div>
     </div>
   </div>
+
+  <!-- ── Badges ── -->
+  {% if badges %}
+  <div class="mb-4">
+    <p class="text-muted fw-semibold mb-2" style="font-size:.8rem;text-transform:uppercase;letter-spacing:.06em;">Earned Badges</p>
+    <div class="d-flex flex-wrap gap-2">
+      {% for badge in badges %}
+      <span class="badge rounded-pill d-inline-flex align-items-center gap-1 px-3 py-2
+        {% if badge.variant == 'success' %}bg-success
+        {% elif badge.variant == 'info' %}bg-info text-dark
+        {% elif badge.variant == 'warning' %}bg-warning text-dark
+        {% elif badge.variant == 'danger' %}bg-danger
+        {% else %}bg-secondary{% endif %}"
+        style="font-size:.82rem;font-weight:700;">
+        <i class="bi {{ badge.icon }}"></i> {{ badge.label }}
+      </span>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- ── Grade + Mission ── -->
+  {% if health.grade or health.weekly_mission or health.encouraging_summary %}
+  <div class="row g-3 mb-4">
+    {% if health.grade %}
+    <div class="col-12 col-sm-4">
+      <div class="card border-0 shadow-sm rounded-4 p-3 text-center h-100">
+        <div class="text-muted fw-bold text-uppercase mb-1" style="font-size:.7rem;letter-spacing:.05em;">Grade</div>
+        <div class="fw-black" style="font-size:3rem;line-height:1;color:{% if health.grade == 'A+' or health.grade == 'A' %}#059669{% elif health.grade == 'B' %}#2563eb{% elif health.grade == 'C' %}#d97706{% else %}#dc2626{% endif %};">{{ health.grade }}</div>
+        <div class="text-muted" style="font-size:.78rem;">{{ health.risk_level }} Risk</div>
+      </div>
+    </div>
+    {% endif %}
+    {% if health.weekly_mission %}
+    <div class="col-12 col-sm-8">
+      <div class="card border-0 shadow-sm rounded-4 p-3 h-100" style="background:#fefce8;border-left:4px solid #f59e0b!important;">
+        <div class="d-flex align-items-center gap-2 mb-2">
+          <i class="bi bi-trophy-fill text-warning"></i>
+          <span class="fw-bold text-uppercase" style="font-size:.72rem;letter-spacing:.06em;color:#92400e;">Weekly Mission</span>
+        </div>
+        <p class="mb-0 fw-semibold" style="font-size:.95rem;color:#78350f;">{{ health.weekly_mission }}</p>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+  {% if health.encouraging_summary %}
+  <div class="alert mb-4" style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:14px 18px;">
+    <i class="bi bi-stars text-success me-2"></i>
+    <span style="color:#065f46;font-size:.95rem;font-style:italic;">{{ health.encouraging_summary }}</span>
+  </div>
+  {% endif %}
+  {% endif %}
 
   <!-- ── Component breakdown ── -->
   <h2 class="h5 fw-bold mb-3" style="color:#0f172a;">Score Breakdown</h2>
@@ -339,6 +393,36 @@
       </div>
     </div>
     {% endwith %}
+
+    <!-- Vertical-specific components (mixed retail / mobile money / consultancy) -->
+    {% if c.stock_movement or c.dead_stock or c.category_concentration or c.float_health or c.reconciliation_discipline or c.provider_concentration or c.invoice_health or c.client_concentration or c.delivery_health %}
+    <div class="col-12 mt-2">
+      <h6 class="fw-bold text-uppercase mb-2" style="font-size:.72rem;letter-spacing:.07em;color:#64748b;">
+        <i class="bi bi-layers me-1"></i>Vertical Insights
+      </h6>
+    </div>
+    {% for comp_key, icon, label in "stock_movement,bi-boxes,Stock Movement|dead_stock,bi-archive,Dead Stock|category_concentration,bi-diagram-3,Category Spread|float_health,bi-currency-exchange,Float Health|reconciliation_discipline,bi-check2-square,Reconciliation|provider_concentration,bi-wifi,Provider Spread|invoice_health,bi-receipt,Invoice Health|client_concentration,bi-people,Client Spread|delivery_health,bi-clock-history,Delivery Health"|split:"|" %}
+    {% endfor %}
+    <!-- Static rendering of vertical components (can't iterate choices in template) -->
+    {% if c.stock_movement and c.stock_movement.score is not None %}
+    {% with comp=c.stock_movement %}<div class="col-12 col-sm-6 col-lg-4"><div class="card border-0 shadow-sm rounded-4 p-3 h-100"><div class="d-flex align-items-center gap-2 mb-2"><span class="rounded-circle d-inline-flex align-items-center justify-content-center" style="width:36px;height:36px;background:#f0fdf4;"><i class="bi bi-boxes text-success"></i></span><span class="fw-semibold" style="font-size:.9rem;color:#1e293b;">Stock Movement</span><span class="badge ms-auto rounded-pill {% if comp.score >= 70 %}bg-success{% elif comp.score >= 50 %}bg-warning text-dark{% else %}bg-danger{% endif %}" style="font-size:.7rem;">{{ comp.score }}</span></div><div class="progress mb-2" style="height:6px;border-radius:99px;"><div class="progress-bar {% if comp.score >= 70 %}bg-success{% elif comp.score >= 50 %}bg-warning{% else %}bg-danger{% endif %}" style="width:{{ comp.score }}%;border-radius:99px;"></div></div><div class="fw-semibold mb-1" style="font-size:.85rem;color:{% if comp.score >= 70 %}#059669{% elif comp.score >= 50 %}#d97706{% else %}#dc2626{% endif %};">{{ comp.label }}</div><p class="text-muted mb-0" style="font-size:.8rem;line-height:1.4;">{{ comp.explanation }}</p></div></div>{% endwith %}
+    {% endif %}
+    {% if c.dead_stock and c.dead_stock.score is not None %}
+    {% with comp=c.dead_stock %}<div class="col-12 col-sm-6 col-lg-4"><div class="card border-0 shadow-sm rounded-4 p-3 h-100"><div class="d-flex align-items-center gap-2 mb-2"><span class="rounded-circle d-inline-flex align-items-center justify-content-center" style="width:36px;height:36px;background:#fef2f2;"><i class="bi bi-archive text-danger"></i></span><span class="fw-semibold" style="font-size:.9rem;color:#1e293b;">Dead Stock</span><span class="badge ms-auto rounded-pill {% if comp.score >= 70 %}bg-success{% elif comp.score >= 50 %}bg-warning text-dark{% else %}bg-danger{% endif %}" style="font-size:.7rem;">{{ comp.score }}</span></div><div class="progress mb-2" style="height:6px;border-radius:99px;"><div class="progress-bar {% if comp.score >= 70 %}bg-success{% elif comp.score >= 50 %}bg-warning{% else %}bg-danger{% endif %}" style="width:{{ comp.score }}%;border-radius:99px;"></div></div><div class="fw-semibold mb-1" style="font-size:.85rem;color:{% if comp.score >= 70 %}#059669{% elif comp.score >= 50 %}#d97706{% else %}#dc2626{% endif %};">{{ comp.label }}</div><p class="text-muted mb-0" style="font-size:.8rem;line-height:1.4;">{{ comp.explanation }}</p></div></div>{% endwith %}
+    {% endif %}
+    {% if c.float_health and c.float_health.score is not None %}
+    {% with comp=c.float_health %}<div class="col-12 col-sm-6 col-lg-4"><div class="card border-0 shadow-sm rounded-4 p-3 h-100"><div class="d-flex align-items-center gap-2 mb-2"><span class="rounded-circle d-inline-flex align-items-center justify-content-center" style="width:36px;height:36px;background:#eff6ff;"><i class="bi bi-currency-exchange" style="color:#2563eb;"></i></span><span class="fw-semibold" style="font-size:.9rem;color:#1e293b;">Float Health</span><span class="badge ms-auto rounded-pill {% if comp.score >= 70 %}bg-success{% elif comp.score >= 50 %}bg-warning text-dark{% else %}bg-danger{% endif %}" style="font-size:.7rem;">{{ comp.score }}</span></div><div class="progress mb-2" style="height:6px;border-radius:99px;"><div class="progress-bar {% if comp.score >= 70 %}bg-success{% elif comp.score >= 50 %}bg-warning{% else %}bg-danger{% endif %}" style="width:{{ comp.score }}%;border-radius:99px;"></div></div><div class="fw-semibold mb-1" style="font-size:.85rem;">{{ comp.label }}</div><p class="text-muted mb-0" style="font-size:.8rem;line-height:1.4;">{{ comp.explanation }}</p></div></div>{% endwith %}
+    {% endif %}
+    {% if c.reconciliation_discipline and c.reconciliation_discipline.score is not None %}
+    {% with comp=c.reconciliation_discipline %}<div class="col-12 col-sm-6 col-lg-4"><div class="card border-0 shadow-sm rounded-4 p-3 h-100"><div class="d-flex align-items-center gap-2 mb-2"><span class="rounded-circle d-inline-flex align-items-center justify-content-center" style="width:36px;height:36px;background:#f0fdf4;"><i class="bi bi-check2-square text-success"></i></span><span class="fw-semibold" style="font-size:.9rem;color:#1e293b;">Reconciliation</span><span class="badge ms-auto rounded-pill {% if comp.score >= 70 %}bg-success{% elif comp.score >= 50 %}bg-warning text-dark{% else %}bg-danger{% endif %}" style="font-size:.7rem;">{{ comp.score }}</span></div><div class="progress mb-2" style="height:6px;border-radius:99px;"><div class="progress-bar {% if comp.score >= 70 %}bg-success{% elif comp.score >= 50 %}bg-warning{% else %}bg-danger{% endif %}" style="width:{{ comp.score }}%;border-radius:99px;"></div></div><div class="fw-semibold mb-1" style="font-size:.85rem;">{{ comp.label }}</div><p class="text-muted mb-0" style="font-size:.8rem;line-height:1.4;">{{ comp.explanation }}</p></div></div>{% endwith %}
+    {% endif %}
+    {% if c.invoice_health and c.invoice_health.score is not None %}
+    {% with comp=c.invoice_health %}<div class="col-12 col-sm-6 col-lg-4"><div class="card border-0 shadow-sm rounded-4 p-3 h-100"><div class="d-flex align-items-center gap-2 mb-2"><span class="rounded-circle d-inline-flex align-items-center justify-content-center" style="width:36px;height:36px;background:#fdf4ff;"><i class="bi bi-receipt" style="color:#7c3aed;"></i></span><span class="fw-semibold" style="font-size:.9rem;color:#1e293b;">Invoice Health</span><span class="badge ms-auto rounded-pill {% if comp.score >= 70 %}bg-success{% elif comp.score >= 50 %}bg-warning text-dark{% else %}bg-danger{% endif %}" style="font-size:.7rem;">{{ comp.score }}</span></div><div class="progress mb-2" style="height:6px;border-radius:99px;"><div class="progress-bar {% if comp.score >= 70 %}bg-success{% elif comp.score >= 50 %}bg-warning{% else %}bg-danger{% endif %}" style="width:{{ comp.score }}%;border-radius:99px;"></div></div><div class="fw-semibold mb-1" style="font-size:.85rem;">{{ comp.label }}</div><p class="text-muted mb-0" style="font-size:.8rem;line-height:1.4;">{{ comp.explanation }}</p></div></div>{% endwith %}
+    {% endif %}
+    {% if c.delivery_health and c.delivery_health.score is not None %}
+    {% with comp=c.delivery_health %}<div class="col-12 col-sm-6 col-lg-4"><div class="card border-0 shadow-sm rounded-4 p-3 h-100"><div class="d-flex align-items-center gap-2 mb-2"><span class="rounded-circle d-inline-flex align-items-center justify-content-center" style="width:36px;height:36px;background:#eff6ff;"><i class="bi bi-clock-history" style="color:#2563eb;"></i></span><span class="fw-semibold" style="font-size:.9rem;color:#1e293b;">Delivery Health</span><span class="badge ms-auto rounded-pill {% if comp.score >= 70 %}bg-success{% elif comp.score >= 50 %}bg-warning text-dark{% else %}bg-danger{% endif %}" style="font-size:.7rem;">{{ comp.score }}</span></div><div class="progress mb-2" style="height:6px;border-radius:99px;"><div class="progress-bar {% if comp.score >= 70 %}bg-success{% elif comp.score >= 50 %}bg-warning{% else %}bg-danger{% endif %}" style="width:{{ comp.score }}%;border-radius:99px;"></div></div><div class="fw-semibold mb-1" style="font-size:.85rem;">{{ comp.label }}</div><p class="text-muted mb-0" style="font-size:.8rem;line-height:1.4;">{{ comp.explanation }}</p></div></div>{% endwith %}
+    {% endif %}
+    {% endif %}
 
     {% endwith %}
   </div>

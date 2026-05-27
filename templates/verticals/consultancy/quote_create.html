@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block title %}New Quote · {{ business.name }}{% endblock %}
+{% block extra_css %}
+<style>
+.line-row { display:grid; grid-template-columns:1fr 80px 120px 100px 30px; gap:8px; align-items:center; margin-bottom:6px; }
+</style>
+{% endblock %}
+{% block content %}
+<div style="max-width:780px;margin:0 auto;padding:20px 14px;">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+    <h1 style="font-size:1.3rem;font-weight:900;margin:0;">New Quote</h1>
+    <a href="{% url 'consultancy:quotes' %}" style="color:#64748b;font-size:.85rem;text-decoration:none;">← Quotes</a>
+  </div>
+  {% if messages %}{% for msg in messages %}<div class="msg msg-{{ msg.tags }}" style="margin-bottom:12px;">{{ msg }}</div>{% endfor %}{% endif %}
+  <form method="post">
+    {% csrf_token %}
+    <div style="background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:20px;margin-bottom:14px;">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div>
+          <label style="font-size:.82rem;font-weight:600;display:block;margin-bottom:4px;">Client *</label>
+          <select name="client_id" required style="width:100%;padding:9px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:.9rem;">
+            <option value="">— Select client —</option>
+            {% for c in clients %}<option value="{{ c.id }}" {% if preselect_client_id == c.id|stringformat:'s' %}selected{% endif %}>{{ c.name }}</option>{% endfor %}
+          </select>
+        </div>
+        <div>
+          <label style="font-size:.82rem;font-weight:600;display:block;margin-bottom:4px;">Quote Title</label>
+          <input type="text" name="title" placeholder="e.g. Web Development Quote" style="width:100%;padding:9px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:.9rem;box-sizing:border-box;">
+        </div>
+        <div>
+          <label style="font-size:.82rem;font-weight:600;display:block;margin-bottom:4px;">Valid Until</label>
+          <input type="date" name="valid_until" style="width:100%;padding:9px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:.9rem;box-sizing:border-box;">
+        </div>
+        <div>
+          <label style="font-size:.82rem;font-weight:600;display:block;margin-bottom:4px;">Notes</label>
+          <input type="text" name="notes" style="width:100%;padding:9px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:.9rem;box-sizing:border-box;">
+        </div>
+      </div>
+    </div>
+
+    <!-- Line Items -->
+    <div style="background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:20px;margin-bottom:14px;">
+      <div style="font-size:.75rem;text-transform:uppercase;letter-spacing:.07em;font-weight:800;color:#475569;margin-bottom:10px;">Line Items</div>
+      <div class="line-row" style="font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;color:#94a3b8;font-weight:700;">
+        <span>Description</span><span>Qty</span><span>Unit Price</span><span>Total</span><span></span>
+      </div>
+      <div id="lineItems">
+        <div class="line-row">
+          <input type="text" name="item_description" placeholder="Service / deliverable" style="padding:8px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:.88rem;">
+          <input type="number" name="item_quantity" value="1" step="0.01" min="0" style="padding:8px;border:1px solid #d1d5db;border-radius:6px;font-size:.88rem;" onchange="calcLine(this)">
+          <input type="number" name="item_unit_price" value="0" step="0.01" min="0" style="padding:8px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:.88rem;" onchange="calcLine(this)">
+          <input type="text" readonly style="padding:8px;border:1px solid #e2e8f0;border-radius:6px;font-size:.88rem;background:#f8fafc;text-align:right;" value="0">
+          <span></span>
+        </div>
+      </div>
+      <button type="button" onclick="addLine()" style="margin-top:8px;padding:6px 12px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:6px;font-size:.82rem;font-weight:700;cursor:pointer;color:#475569;">+ Add Line</button>
+
+      <div style="margin-top:14px;display:flex;justify-content:flex-end;gap:16px;flex-wrap:wrap;">
+        <div style="display:flex;gap:8px;align-items:center;">
+          <label style="font-size:.82rem;font-weight:600;">Discount:</label>
+          <input type="number" name="discount" value="0" step="0.01" min="0" style="width:100px;padding:7px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:.88rem;" onchange="calcTotal()">
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <label style="font-size:.82rem;font-weight:600;">Tax:</label>
+          <input type="number" name="tax" value="0" step="0.01" min="0" style="width:100px;padding:7px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:.88rem;" onchange="calcTotal()">
+        </div>
+      </div>
+      <div style="text-align:right;margin-top:10px;font-size:1.1rem;font-weight:900;color:#0f172a;">Total: MWK <span id="grandTotal">0</span></div>
+    </div>
+
+    <button type="submit" style="width:100%;padding:12px;background:#2563eb;color:#fff;border:none;border-radius:10px;font-size:1rem;font-weight:700;cursor:pointer;">Create Quote</button>
+  </form>
+</div>
+<script>
+function calcLine(input) {
+  const row = input.closest('.line-row');
+  const qty = parseFloat(row.querySelector('[name="item_quantity"]').value) || 0;
+  const price = parseFloat(row.querySelector('[name="item_unit_price"]').value) || 0;
+  row.querySelectorAll('input[readonly]')[0].value = (qty * price).toFixed(2);
+  calcTotal();
+}
+function calcTotal() {
+  let subtotal = 0;
+  document.querySelectorAll('#lineItems .line-row').forEach(row => {
+    const qty = parseFloat(row.querySelector('[name="item_quantity"]').value) || 0;
+    const price = parseFloat(row.querySelector('[name="item_unit_price"]').value) || 0;
+    subtotal += qty * price;
+  });
+  const disc = parseFloat(document.querySelector('[name="discount"]').value) || 0;
+  const tax = parseFloat(document.querySelector('[name="tax"]').value) || 0;
+  document.getElementById('grandTotal').textContent = (subtotal - disc + tax).toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+}
+function addLine() {
+  const tmpl = document.querySelector('#lineItems .line-row').cloneNode(true);
+  tmpl.querySelectorAll('input:not([readonly])').forEach(i => { if (i.name !== 'item_quantity') i.value = ''; else i.value = '1'; });
+  tmpl.querySelector('input[readonly]').value = '0';
+  const btn = document.createElement('button');
+  btn.type = 'button'; btn.textContent = '×'; btn.style.cssText = 'border:none;background:none;color:#ef4444;cursor:pointer;font-size:1.1rem;';
+  btn.onclick = function() { tmpl.remove(); calcTotal(); };
+  tmpl.lastElementChild.appendChild(btn);
+  document.getElementById('lineItems').appendChild(tmpl);
+}
+</script>
+{% endblock %}

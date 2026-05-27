@@ -28,6 +28,20 @@ from inventory.verticals import (
 )
 
 try:
+    from inventory.verticals import mixed_retail as _mixed_retail_module
+    _HAS_MIXED_RETAIL = True
+except ImportError:
+    _mixed_retail_module = None  # type: ignore
+    _HAS_MIXED_RETAIL = False
+
+try:
+    from inventory.verticals import consultancy as _consultancy_module
+    _HAS_CONSULTANCY = True
+except ImportError:
+    _consultancy_module = None  # type: ignore
+    _HAS_CONSULTANCY = False
+
+try:
     from inventory.verticals import energy as _energy_module
     _HAS_ENERGY = True
 except ImportError:
@@ -266,7 +280,24 @@ urlpatterns = [
     path("farm/livestock/create/", farm.livestock_batch_create, name="farm_livestock_create"),
     path("farm/livestock/add-batch/", farm.livestock_batch_create, name="farm_livestock_add_batch"),
     path("farm/livestock/add-event/", farm.livestock_add_event, name="farm_livestock_add_event"),
-    
+    path(
+        "farm/livestock/<int:batch_id>/simulate/",
+        farm.livestock_simulate,
+        name="farm_livestock_simulate",
+    ),
+    path(
+        "farm/livestock/<int:batch_id>/housing-planner/",
+        farm.livestock_housing_planner,
+        name="farm_livestock_housing_planner",
+    ),
+
+    # Egg / Poultry Tracking
+    path("farm/eggs/", farm.egg_tracking_list, name="farm_egg_tracking"),
+    path("farm/eggs/record/", farm.egg_tracking_record, name="farm_egg_record"),
+
+    # Farm Business Health
+    path("farm/business-health/", farm.farm_business_health_view, name="farm_business_health"),
+
     # Crops/Seasons
     path("farm/crops/", farm.crops_list, name="farm_crops_list"),
     path("farm/crops/create/", farm.crop_season_create, name="farm_crop_create"),
@@ -363,6 +394,39 @@ urlpatterns = [
 if _HAS_CAR_DEALER and _car_dealer_module:
     urlpatterns += [
         path("car_dealer/dashboard/", _car_dealer_module.car_dealer_dashboard, name="car_dealer_dashboard"),
+    ]
+
+# Mixed Retail vertical
+if _HAS_MIXED_RETAIL and _mixed_retail_module:
+    urlpatterns += [
+        path("mixed-retail/dashboard/", _mixed_retail_module.dashboard, name="mixed_retail_dashboard"),
+        path("mixed-retail/products/", _mixed_retail_module.products_list, name="mixed_retail_products"),
+        path("mixed-retail/products/add/", _mixed_retail_module.product_add, name="mixed_retail_product_add"),
+        path("mixed-retail/products/<int:product_id>/edit/", _mixed_retail_module.product_edit, name="mixed_retail_product_edit"),
+        path("mixed-retail/stock-in/", _mixed_retail_module.stock_in, name="mixed_retail_stock_in"),
+        path("mixed-retail/sell/", _mixed_retail_module.sell, name="mixed_retail_sell"),
+        path("mixed-retail/sales/", _mixed_retail_module.sales_history, name="mixed_retail_sales"),
+        path("mixed-retail/expenses/", _mixed_retail_module.expenses, name="mixed_retail_expenses"),
+        path("mixed-retail/departments/", _mixed_retail_module.departments, name="mixed_retail_departments"),
+        path("mixed-retail/api/products/", _mixed_retail_module.api_product_lookup, name="mixed_retail_api_products"),
+        path("mixed-retail/api/categories/", _mixed_retail_module.api_categories, name="mixed_retail_api_categories"),
+    ]
+
+# Consultancy & Services vertical
+if _HAS_CONSULTANCY and _consultancy_module:
+    urlpatterns += [
+        path("consultancy/dashboard/", _consultancy_module.dashboard, name="consultancy_dashboard"),
+        path("consultancy/clients/", _consultancy_module.clients_list, name="consultancy_clients"),
+        path("consultancy/projects/", _consultancy_module.projects_list, name="consultancy_projects"),
+        path("consultancy/projects/add/", _consultancy_module.project_add, name="consultancy_project_add"),
+        path("consultancy/projects/<int:project_id>/", _consultancy_module.project_detail, name="consultancy_project_detail"),
+        path("consultancy/quotes/", _consultancy_module.quotes_list, name="consultancy_quotes"),
+        path("consultancy/quotes/create/", _consultancy_module.quote_create, name="consultancy_quote_create"),
+        path("consultancy/quotes/<int:quote_id>/", _consultancy_module.quote_detail, name="consultancy_quote_detail"),
+        path("consultancy/invoices/", _consultancy_module.invoices_list, name="consultancy_invoices"),
+        path("consultancy/invoices/create/", _consultancy_module.invoice_create, name="consultancy_invoice_create"),
+        path("consultancy/invoices/<int:invoice_id>/", _consultancy_module.invoice_detail, name="consultancy_invoice_detail"),
+        path("consultancy/expenses/", _consultancy_module.expenses, name="consultancy_expenses"),
     ]
 
 # Renewable Energy vertical (flagship)

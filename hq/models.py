@@ -145,7 +145,21 @@ class SupportActionLog(models.Model):
 
 # Contract models (for HQ contract management)
 class MerchantContract(models.Model):
-    """Business contract storage and management."""
+    """Business contract storage and management with e-signature support."""
+
+    CONTRACT_STATUS_DRAFT = "draft"
+    CONTRACT_STATUS_SENT = "sent"
+    CONTRACT_STATUS_VIEWED = "viewed"
+    CONTRACT_STATUS_SIGNED = "signed"
+    CONTRACT_STATUS_VOID = "void"
+
+    CONTRACT_STATUS_CHOICES = [
+        (CONTRACT_STATUS_DRAFT, "Draft"),
+        (CONTRACT_STATUS_SENT, "Sent to Merchant"),
+        (CONTRACT_STATUS_VIEWED, "Viewed by Merchant"),
+        (CONTRACT_STATUS_SIGNED, "Signed"),
+        (CONTRACT_STATUS_VOID, "Void"),
+    ]
 
     business = models.ForeignKey("tenants.Business", on_delete=models.CASCADE, related_name="contracts")
     title = models.CharField(max_length=255, default="Merchant Services Agreement")
@@ -153,8 +167,27 @@ class MerchantContract(models.Model):
     contract_type = models.CharField(max_length=50, default="standard")
     notes = models.TextField(blank=True, default="")
 
+    # Status & lifecycle
+    status = models.CharField(
+        max_length=20,
+        choices=CONTRACT_STATUS_CHOICES,
+        default=CONTRACT_STATUS_DRAFT,
+        db_index=True,
+    )
+
     signed_at = models.DateTimeField(null=True, blank=True)
     expires_at = models.DateTimeField(null=True, blank=True)
+
+    # E-signature fields
+    signature_name = models.CharField(
+        max_length=255, blank=True, default="",
+        help_text="Full name typed by the merchant when signing",
+    )
+    signed_ip = models.GenericIPAddressField(null=True, blank=True)
+    signed_user_agent = models.TextField(blank=True, default="")
+
+    # Signing token (used for secure merchant portal link)
+    sign_token = models.UUIDField(default=uuid.uuid4, unique=True, db_index=True)
 
     # Template expects these field names
     uploaded_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name="+")
@@ -170,10 +203,21 @@ class MerchantContract(models.Model):
     def created_at(self):
         return self.uploaded_at
 
+    @property
+    def is_signed(self):
+        return self.status == self.CONTRACT_STATUS_SIGNED
+
+    def get_sign_url(self):
+        """Return the merchant-facing e-signature URL."""
+        from django.urls import reverse
+        return reverse("hq:contract_sign_portal", kwargs={"token": self.sign_token})
+
     class Meta:
         ordering = ["-uploaded_at"]
         indexes = [
             models.Index(fields=["business", "contract_type"]),
+            models.Index(fields=["status"]),
+            models.Index(fields=["sign_token"]),
         ]
 
     def __str__(self):

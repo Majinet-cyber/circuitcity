@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block title %}Edit {{ product.name }} · {{ business.name }}{% endblock %}
+{% block content %}
+<div style="max-width:680px;margin:0 auto;padding:20px 14px;">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+    <h1 style="font-size:1.3rem;font-weight:900;margin:0;">Edit: {{ product.name }}</h1>
+    <a href="{% url 'mixed_retail:products' %}" style="color:#64748b;font-size:.85rem;text-decoration:none;">← Products</a>
+  </div>
+  {% if messages %}{% for msg in messages %}<div class="msg msg-{{ msg.tags }}" style="margin-bottom:12px;">{{ msg }}</div>{% endfor %}{% endif %}
+  <form method="post" style="display:flex;flex-direction:column;gap:14px;">
+    {% csrf_token %}
+    <div style="background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:20px;">
+      <div style="font-size:.75rem;text-transform:uppercase;letter-spacing:.07em;font-weight:800;color:#475569;margin-bottom:14px;">Product Details</div>
+      <div style="margin-bottom:10px;"><label style="font-size:.82rem;font-weight:600;display:block;margin-bottom:4px;">Product Name *</label>
+        <input type="text" name="name" value="{{ product.name }}" required style="width:100%;padding:9px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:.9rem;box-sizing:border-box;"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div><label style="font-size:.82rem;font-weight:600;display:block;margin-bottom:4px;">Department</label>
+          <select name="department_id" id="department_id" style="width:100%;padding:9px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:.9rem;">
+            <option value="">— None —</option>
+            {% for dept in departments %}<option value="{{ dept.id }}" {% if product.department and product.department.id == dept.id %}selected{% endif %}>{{ dept.name }}</option>{% endfor %}
+          </select></div>
+        <div><label style="font-size:.82rem;font-weight:600;display:block;margin-bottom:4px;">Category</label>
+          <select name="category_id" id="category_id" style="width:100%;padding:9px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:.9rem;">
+            <option value="">— None —</option>
+            {% for cat in categories %}<option value="{{ cat.id }}" {% if product.category and product.category.id == cat.id %}selected{% endif %}>{{ cat.name }}</option>{% endfor %}
+          </select></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:10px;">
+        <div><label style="font-size:.82rem;font-weight:600;display:block;margin-bottom:4px;">Brand</label>
+          <input type="text" name="brand" value="{{ product.brand }}" style="width:100%;padding:9px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:.9rem;box-sizing:border-box;"></div>
+        <div><label style="font-size:.82rem;font-weight:600;display:block;margin-bottom:4px;">SKU</label>
+          <input type="text" name="sku" value="{{ product.sku }}" style="width:100%;padding:9px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:.9rem;box-sizing:border-box;"></div>
+      </div>
+    </div>
+    <div style="background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:20px;">
+      <div style="font-size:.75rem;text-transform:uppercase;letter-spacing:.07em;font-weight:800;color:#475569;margin-bottom:14px;">Pricing & Stock</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div><label style="font-size:.82rem;font-weight:600;display:block;margin-bottom:4px;">Cost Price (MWK)</label>
+          <input type="number" name="cost_price" value="{{ product.cost_price }}" step="0.01" min="0" style="width:100%;padding:9px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:.9rem;box-sizing:border-box;"></div>
+        <div><label style="font-size:.82rem;font-weight:600;display:block;margin-bottom:4px;">Selling Price (MWK)</label>
+          <input type="number" name="selling_price" value="{{ product.selling_price }}" step="0.01" min="0" style="width:100%;padding:9px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:.9rem;box-sizing:border-box;"></div>
+        <div><label style="font-size:.82rem;font-weight:600;display:block;margin-bottom:4px;">Stock Quantity</label>
+          <input type="number" name="stock_quantity" value="{{ product.stock_quantity }}" step="0.01" min="0" style="width:100%;padding:9px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:.9rem;box-sizing:border-box;"></div>
+        <div><label style="font-size:.82rem;font-weight:600;display:block;margin-bottom:4px;">Reorder Level</label>
+          <input type="number" name="reorder_level" value="{{ product.reorder_level }}" step="0.01" min="0" style="width:100%;padding:9px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:.9rem;box-sizing:border-box;"></div>
+      </div>
+      <div style="margin-top:10px;"><label style="font-size:.82rem;font-weight:600;display:block;margin-bottom:4px;">Unit</label>
+        <select name="unit" style="width:100%;padding:9px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:.9rem;">
+          {% for val, label in unit_choices %}<option value="{{ val }}" {% if product.unit == val %}selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select></div>
+    </div>
+    <button type="submit" style="padding:12px;background:#2563eb;color:#fff;border:none;border-radius:10px;font-size:1rem;font-weight:700;cursor:pointer;">Save Changes</button>
+  </form>
+</div>
+<script>
+document.getElementById('department_id').addEventListener('change', function() {
+  const deptId = this.value;
+  const catSelect = document.getElementById('category_id');
+  if (!deptId) { catSelect.innerHTML = '<option value="">— None —</option>'; return; }
+  fetch(`{% url 'mixed_retail:api_categories' %}?dept_id=${deptId}`)
+    .then(r => r.json())
+    .then(data => {
+      catSelect.innerHTML = '<option value="">— None —</option>';
+      data.categories.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c.id; opt.text = c.name;
+        catSelect.appendChild(opt);
+      });
+    });
+});
+</script>
+{% endblock %}

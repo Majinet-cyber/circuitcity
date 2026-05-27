@@ -202,10 +202,11 @@ def dashboard(request):
         if total_units == 0:
             continue
         
-        icon = category_icons.get(category, "👕")
+        from inventory.clothing_config import get_category_display, get_category_icon
+        icon = get_category_icon(category) if category in {v for v, *_ in CLOTHING_CATEGORIES} else category_icons.get(category, "👕")
         stock_summary_display.append(
             {
-                "category": category.title(),
+                "category": get_category_display(category),
                 "icon": icon,
                 "total_items": total_styles,  # Total number of distinct product styles
                 "total_quantity": total_units,  # Total units in stock (tracked + common)
@@ -525,30 +526,24 @@ def scan_in(request):
     """
     Gamified clothing stock-in flow.
     Step-by-step process: Category → Size → Color → Quantity/Cost
+
+    Supports "Other" category with a required custom category name input.
+    Supports optional brand, item subtype, and auto-generated description.
     """
+    import json
+    import re
     from django import forms
     from django.db import transaction
     from django.contrib import messages
     from django.shortcuts import redirect
+    from inventory.clothing_config import CLOTHING_SUBTYPES
 
     business = base.base_context(request).get("business")
 
-    # Define clothing categories (expanded with more product types)
-    CLOTHING_CATEGORIES = [
-        ("suit", "Suit", "🤵"),
-        ("dress", "Dress", "👗"),
-        ("shirt", "Shirt", "👔"),
-        ("trousers", "Trousers", "👖"),
-        ("jeans", "Jeans", "👖"),
-        ("shorts", "Shorts", "🩳"),
-        ("shoes", "Shoes", "👞"),
-        ("jacket", "Jacket", "🧥"),
-        ("skirt", "Skirt", "🩱"),
-        ("belts", "Belts", "🔗"),
-        ("perfumes", "Perfumes", "🌸"),
-        ("handbags", "Hand Bags", "👜"),
-        ("schoolbags", "School Bags", "🎒"),
-        ("other", "Other", "👕"),
+    # Use SSOT categories — convert 4-tuple to 3-tuple for template
+    SCAN_IN_CATEGORIES = [
+        (val, label, icon)
+        for val, label, icon, _ in CLOTHING_CATEGORIES
     ]
 
     # Define sizes
@@ -559,11 +554,34 @@ def scan_in(request):
 
     class ClothingStockInForm(forms.Form):
         category = forms.ChoiceField(
-            choices=[(cat[0], cat[1]) for cat in CLOTHING_CATEGORIES],
+            choices=[(cat[0], cat[1]) for cat in SCAN_IN_CATEGORIES],
             widget=forms.Select(attrs={"class": "form-control form-select"}),
         )
-        size = forms.ChoiceField(
-            choices=[(s, s) for s in SIZES], widget=forms.Select(attrs={"class": "form-control form-select"})
+        # Required when category == "other"
+        custom_category = forms.CharField(
+            max_length=50,
+            required=False,
+            widget=forms.TextInput(attrs={
+                "class": "form-control",
+                "placeholder": "e.g. Hats, Swimwear, Overalls, Uniforms",
+                "maxlength": "50",
+            }),
+        )
+        brand = forms.CharField(
+            max_length=100,
+            required=False,
+            widget=forms.TextInput(attrs={"class": "form-control", "placeholder": "Brand (optional)"}),
+        )
+        item_subtype = forms.CharField(
+            max_length=60,
+            required=False,
+            widget=forms.TextInput(attrs={"class": "form-control", "placeholder": "Item type (optional)"}),
+        )
+        # CharField instead of ChoiceField to accept custom sizes already supported in template
+        size = forms.CharField(
+            max_length=20,
+            required=False,
+            widget=forms.TextInput(attrs={"class": "form-control", "placeholder": "Size"}),
         )
         color = forms.ChoiceField(
             choices=[(c, c) for c in COLORS], widget=forms.Select(attrs={"class": "form-control form-select"})
@@ -586,6 +604,25 @@ def scan_in(request):
                 attrs={"class": "form-control", "step": "0.01", "placeholder": "Selling price (optional)"}
             ),
         )
+        description = forms.CharField(
+            max_length=200,
+            required=False,
+            widget=forms.TextInput(attrs={
+                "class": "form-control",
+                "placeholder": "Item description (auto-generated if blank)",
+            }),
+        )
+
+        def clean(self):
+            cleaned = super().clean()
+            category = cleaned.get("category", "")
+            custom_category = (cleaned.get("custom_category") or "").strip()
+            if category == "other" and not custom_category:
+                self.add_error(
+                    "custom_category",
+                    "Please enter a category name when 'Other' is selected."
+                )
+            return cleaned
 
     if request.method == "POST":
         # NEW: Barcode workflow
@@ -613,7 +650,7 @@ def scan_in(request):
                 ctx = {
                     "business": business,
                     "form": form,
-                    "categories": CLOTHING_CATEGORIES,
+                    "categories": SCAN_IN_CATEGORIES,
                     "recent_logs": recent_logs,
                 }
                 return render(request, "verticals/clothing/scan_in.html", ctx)
@@ -640,7 +677,7 @@ def scan_in(request):
                 ctx = {
                     "business": business,
                     "form": form,
-                    "categories": CLOTHING_CATEGORIES,
+                    "categories": SCAN_IN_CATEGORIES,
                     "recent_logs": recent_logs,
                 }
                 return render(request, "verticals/clothing/scan_in.html", ctx)
@@ -672,7 +709,7 @@ def scan_in(request):
                 ctx = {
                     "business": business,
                     "form": form,
-                    "categories": CLOTHING_CATEGORIES,
+                    "categories": SCAN_IN_CATEGORIES,
                     "recent_logs": recent_logs,
                 }
                 return render(request, "verticals/clothing/scan_in.html", ctx)
@@ -681,16 +718,36 @@ def scan_in(request):
         if form.is_valid():
             data = form.cleaned_data
 
-            # Create product name from category, size, and color
-            product_name = f"{data['category'].title()} - {data['size']} - {data['color']}"
+            # Resolve actual category slug and display name
+            raw_category = data["category"]
+            custom_category_text = (data.get("custom_category") or "").strip()
+
+            if raw_category == "other" and custom_category_text:
+                # Slugify custom category and truncate to 30 chars for DB field
+                actual_category = re.sub(r"[^a-z0-9]+", "-", custom_category_text.lower()).strip("-")[:30]
+                category_display = custom_category_text.title()
+            else:
+                actual_category = raw_category
+                category_display = next(
+                    (label for val, label, _ in SCAN_IN_CATEGORIES if val == raw_category),
+                    raw_category.title(),
+                )
+
+            brand = (data.get("brand") or "").strip()
+            item_subtype = (data.get("item_subtype") or "").strip()
+            size = (data.get("size") or "").strip()
+            color = data.get("color", "")
+
+            # Build descriptive product name
+            name_parts = [p for p in [brand, item_subtype, category_display] if p]
+            base_name = " ".join(name_parts) if name_parts else category_display
+            product_name = f"{base_name} - {size} - {color}" if size else f"{base_name} - {color}"
 
             # Prepare barcode value (None if not provided or if "no barcode" selected)
             final_barcode = barcode_value if (has_barcode == "yes" and barcode_value) else None
 
             with transaction.atomic():
-                # Check if product exists
-                # CRITICAL FIX: Set spec_label for clothing (use size, prevents NULL constraint)
-                spec_label_value = data.get("size", "") or ""
+                spec_label_value = size or ""
                 if spec_label_value and not spec_label_value.startswith("Size "):
                     spec_label_value = f"Size {spec_label_value}"
 
@@ -699,42 +756,34 @@ def scan_in(request):
                     name=product_name,
                     defaults={
                         "kind": BusinessKind.CLOTHING,
-                        "category": data["category"],
-                        "size": data["size"],
-                        "color": data["color"],
-                        "spec_label": spec_label_value,  # CRITICAL: Always set spec_label (prevents NULL constraint)
+                        "category": actual_category,
+                        "brand": brand,
+                        "item_type": item_subtype,
+                        "size": size,
+                        "color": color,
+                        "spec_label": spec_label_value,
                         "cost_price": data["cost_price"],
                         "selling_price": data.get("selling_price"),
                         "quantity_in_stock": data["quantity"],
                         "is_active": True,
                         "track_inventory": True,
-                        "barcode": final_barcode,  # CRITICAL: Explicitly set barcode (None if not provided)
+                        "barcode": final_barcode,
                     },
                 )
 
-                # NEW: Store barcode if provided
-                if final_barcode and created:
-                    # Barcode already set in defaults, no need to set again
-                    pass
-
                 if not created:
-                    # Update existing product stock
                     product.quantity_in_stock += data["quantity"]
                     product.cost_price = data["cost_price"]
                     if data.get("selling_price"):
                         product.selling_price = data["selling_price"]
-
-                    # Update barcode if provided for existing product (only if has_barcode is yes)
                     if has_barcode == "yes" and final_barcode:
                         product.barcode = final_barcode
-                    # If has_barcode is "no", don't change existing barcode (may have been set before)
 
                     update_fields = ["quantity_in_stock", "cost_price", "selling_price"]
                     if has_barcode == "yes" and final_barcode:
                         update_fields.append("barcode")
                     product.save(update_fields=update_fields)
 
-                # Log the stock-in action
                 from inventory.models_verticals import ClothingProductLog, ClothingProductAction
 
                 ClothingProductLog.objects.create(
@@ -744,16 +793,17 @@ def scan_in(request):
                         "quantity_added": data["quantity"],
                         "cost_price": str(data["cost_price"]),
                         "new_stock": product.quantity_in_stock,
+                        "custom_category": custom_category_text or None,
                     },
                     performed_by=request.user,
                 )
 
             messages.success(
-                request, f"✅ Stock added: {data['quantity']} × {product_name} (K {data['cost_price']} each)"
+                request,
+                f"✅ Stock added: {data['quantity']} × {product_name} (K {data['cost_price']} each)"
             )
             return redirect("verticals:clothing_scan_in")
         else:
-            # Form validation failed - show errors
             messages.error(request, "Please correct the errors below.")
     else:
         form = ClothingStockInForm()
@@ -768,13 +818,14 @@ def scan_in(request):
             .select_related("product", "performed_by")
             .order_by("-created_at")[:10]
         )
-    except:
+    except Exception:
         pass
 
     ctx = {
         "business": business,
         "form": form,
-        "categories": CLOTHING_CATEGORIES,
+        "categories": SCAN_IN_CATEGORIES,
+        "subtypes_json": json.dumps(CLOTHING_SUBTYPES),
         "recent_logs": recent_logs,
     }
 

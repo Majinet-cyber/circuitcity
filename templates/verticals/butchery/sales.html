@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Sales History · {{ business.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+.bt-wrap { max-width: 1100px; margin: 0 auto; padding: 20px 14px; }
+.data-table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+.data-table th { text-align: left; padding: 8px 12px; font-size: .72rem; text-transform: uppercase; letter-spacing: .05em; color: #64748b; border-bottom: 2px solid #e2e8f0; }
+.data-table td { padding: 10px 12px; border-bottom: 1px solid #f1f5f9; }
+.data-table tr:last-child td { border-bottom: none; }
+.data-table tr:hover td { background: #f8fafc; }
+.filter-bar { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px 18px; margin-bottom: 20px; display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; }
+.summary-strip { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 20px; }
+.summary-pill { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px 16px; }
+.empty-state { text-align: center; padding: 60px 20px; color: #94a3b8; }
+.empty-state h3 { font-size: 1rem; font-weight: 700; color: #64748b; margin-bottom: 6px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="bt-wrap">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px;">
+    <div>
+      <h1 style="font-size:1.4rem;font-weight:900;margin:0 0 4px;color:#0f172a;">Sales History</h1>
+      <p style="color:#64748b;font-size:.85rem;margin:0;">{{ business.name }} &middot; Butchery</p>
+    </div>
+    <a href="{% url 'butchery:sell' %}" style="display:inline-flex;align-items:center;gap:6px;padding:9px 18px;background:#10b981;color:#fff;border-radius:10px;font-size:.85rem;font-weight:700;text-decoration:none;">
+      <i class="bi bi-cart-plus"></i> Quick Sell
+    </a>
+  </div>
+
+  <!-- Date Filter -->
+  <form method="get" class="filter-bar">
+    <div>
+      <label style="font-size:.75rem;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:4px;display:block;">From</label>
+      <input type="date" name="from" value="{{ date_from|date:'Y-m-d' }}" style="padding:7px 10px;border:1px solid #d1d5db;border-radius:8px;font-size:.85rem;">
+    </div>
+    <div>
+      <label style="font-size:.75rem;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:4px;display:block;">To</label>
+      <input type="date" name="to" value="{{ date_to|date:'Y-m-d' }}" style="padding:7px 10px;border:1px solid #d1d5db;border-radius:8px;font-size:.85rem;">
+    </div>
+    <button type="submit" style="padding:8px 16px;background:#10b981;color:#fff;border:none;border-radius:8px;font-size:.85rem;font-weight:700;cursor:pointer;"><i class="bi bi-funnel"></i> Filter</button>
+  </form>
+
+  <!-- Summary -->
+  <div class="summary-strip">
+    <div class="summary-pill">
+      <div style="font-size:.7rem;color:#64748b;text-transform:uppercase;font-weight:700;">Revenue</div>
+      <div style="font-size:1.2rem;font-weight:900;color:#0f172a;">MWK {{ total_revenue|floatformat:0|intcomma }}</div>
+    </div>
+    <div class="summary-pill">
+      <div style="font-size:.7rem;color:#64748b;text-transform:uppercase;font-weight:700;">Profit</div>
+      <div style="font-size:1.2rem;font-weight:900;color:#16a34a;">MWK {{ total_profit|floatformat:0|intcomma }}</div>
+    </div>
+    <div class="summary-pill">
+      <div style="font-size:.7rem;color:#64748b;text-transform:uppercase;font-weight:700;">Transactions</div>
+      <div style="font-size:1.2rem;font-weight:900;color:#0f172a;">{{ count }}</div>
+    </div>
+  </div>
+
+  {% if sales %}
+  <div style="background:#fff;border:1px solid #e2e8f0;border-radius:14px;overflow:hidden;box-shadow:0 1px 4px rgba(15,23,42,.05);">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Date & Time</th>
+          <th>Cut</th>
+          <th>Receipt</th>
+          <th style="text-align:right;">Qty</th>
+          <th style="text-align:right;">Unit Price</th>
+          <th style="text-align:right;">Total</th>
+          <th>Payment</th>
+          <th>Customer</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in sales %}
+        <tr>
+          <td style="white-space:nowrap;color:#64748b;">{{ s.sold_at|date:"d M Y H:i" }}</td>
+          <td>
+            <div style="font-weight:700;color:#0f172a;">{{ s.product.name }}</div>
+            <div style="font-size:.72rem;color:#94a3b8;">{{ s.product.get_meat_type_display }}</div>
+          </td>
+          <td style="font-family:monospace;font-size:.8rem;color:#64748b;">{{ s.receipt_ref|default:"—" }}</td>
+          <td style="text-align:right;font-weight:700;">{{ s.quantity|floatformat:3 }} {{ s.product.unit }}</td>
+          <td style="text-align:right;">MWK {{ s.unit_price|floatformat:2|intcomma }}</td>
+          <td style="text-align:right;font-weight:800;">MWK {{ s.total_amount|floatformat:0|intcomma }}</td>
+          <td><span style="background:#e0f2fe;color:#075985;padding:2px 8px;border-radius:99px;font-size:.75rem;font-weight:700;">{{ s.get_payment_method_display }}</span></td>
+          <td style="color:#64748b;font-size:.83rem;">{{ s.customer_name|default:"—" }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <i class="bi bi-receipt" style="font-size:3rem;display:block;margin-bottom:12px;opacity:.4;"></i>
+    <h3>No sales in this period</h3>
+    <p style="font-size:.85rem;">Adjust the date range or record your first sale.</p>
+    <a href="{% url 'butchery:sell' %}" style="display:inline-block;margin-top:12px;padding:9px 20px;background:#10b981;color:#fff;border-radius:9px;font-size:.85rem;font-weight:700;text-decoration:none;">Start Selling</a>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

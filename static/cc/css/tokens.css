@@ -8,11 +8,11 @@
    COLOR TOKENS
    ============================================================================ */
 :root {
-  /* Primary Blue - Main brand color */
-  --cc-primary: #2563eb;
-  --cc-primary-hover: #1d4ed8;
-  --cc-primary-active: #1e40af;
-  --cc-primary-focus: rgba(37, 99, 235, 0.25);
+  /* Primary Orange - Emajinet brand color */
+  --cc-primary: #ff6a1a;
+  --cc-primary-hover: #f25c05;
+  --cc-primary-active: #d94f04;
+  --cc-primary-focus: rgba(255, 106, 26, 0.25);
   
   /* Secondary colors */
   --cc-secondary: #6b7280;

@@ -91,7 +91,7 @@ class TestPharmacyFastSellNoRecursion(TestCase):
                 merch_product=self.product,
                 batch_number="BATCH001",
                 quantity=100,
-                unit_cost=50.00,
+                cost_price=50.00,
                 selling_price=80.00,
             )
 

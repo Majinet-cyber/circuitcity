@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Intake · {{ business.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+.bt-wrap { max-width: 1100px; margin: 0 auto; padding: 20px 14px; }
+.form-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 24px; box-shadow: 0 1px 4px rgba(15,23,42,.06); margin-bottom: 24px; }
+.form-label { display: block; font-size: .78rem; font-weight: 700; color: #374151; margin-bottom: 5px; text-transform: uppercase; letter-spacing: .05em; }
+.form-input { width: 100%; padding: 9px 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: .9rem; box-sizing: border-box; }
+.form-input:focus { outline: none; border-color: #10b981; box-shadow: 0 0 0 3px rgba(16,185,129,.1); }
+.section-head { font-size: .8rem; text-transform: uppercase; letter-spacing: .07em; font-weight: 800; color: #475569; margin: 20px 0 12px; }
+.intake-table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+.intake-table th { text-align: left; padding: 8px 12px; font-size: .72rem; text-transform: uppercase; letter-spacing: .05em; color: #64748b; border-bottom: 2px solid #e2e8f0; }
+.intake-table td { padding: 10px 12px; border-bottom: 1px solid #f1f5f9; }
+.intake-table tr:last-child td { border-bottom: none; }
+.intake-table tr:hover td { background: #f8fafc; }
+.empty-state { text-align: center; padding: 40px 20px; color: #94a3b8; }
+.empty-state h3 { font-size: .95rem; font-weight: 700; color: #64748b; margin-bottom: 6px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="bt-wrap">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px;">
+    <div>
+      <h1 style="font-size:1.4rem;font-weight:900;margin:0 0 4px;color:#0f172a;">Intake / Stock In</h1>
+      <p style="color:#64748b;font-size:.85rem;margin:0;">{{ business.name }} &middot; Record carcass or bulk meat intake</p>
+    </div>
+    <a href="{% url 'butchery:dashboard' %}" style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border:1px solid #e2e8f0;border-radius:9px;background:#fff;font-size:.85rem;font-weight:600;text-decoration:none;color:#374151;">
+      <i class="bi bi-arrow-left"></i> Dashboard
+    </a>
+  </div>
+
+  {% if messages %}
+  {% for msg in messages %}
+  <div style="padding:10px 14px;border-radius:8px;margin-bottom:12px;background:{% if msg.tags == 'error' %}#fee2e2{% else %}#dcfce7{% endif %};color:{% if msg.tags == 'error' %}#991b1b{% else %}#166534{% endif %};font-size:.85rem;border:1px solid {% if msg.tags == 'error' %}#fca5a5{% else %}#86efac{% endif %};">{{ msg }}</div>
+  {% endfor %}
+  {% endif %}
+
+  <!-- Record New Intake -->
+  <div class="form-card">
+    <h2 style="font-size:1rem;font-weight:800;color:#0f172a;margin:0 0 16px;">Record New Intake</h2>
+    <form method="post">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="record_intake">
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:14px;">
+        <div>
+          <label class="form-label">Date</label>
+          <input type="date" name="intake_date" class="form-input" value="{{ today|date:'Y-m-d' }}">
+        </div>
+        <div>
+          <label class="form-label">Meat Type *</label>
+          <select name="meat_type" class="form-input">
+            {% for val, label in meat_types %}<option value="{{ val }}">{{ label }}</option>{% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="form-label">Weight (kg) *</label>
+          <input type="number" name="intake_weight_kg" class="form-input" step="0.001" min="0.001" placeholder="e.g. 50.5" required>
+        </div>
+        <div>
+          <label class="form-label">Total Cost (MWK) *</label>
+          <input type="number" name="total_cost" class="form-input" step="0.01" min="0" placeholder="e.g. 85000" required>
+        </div>
+        <div>
+          <label class="form-label">Supplier Name</label>
+          <input type="text" name="supplier_name" class="form-input" placeholder="e.g. ABC Farms">
+        </div>
+        <div>
+          <label class="form-label">Batch Reference</label>
+          <input type="text" name="batch_ref" class="form-input" placeholder="e.g. BTH-001">
+        </div>
+      </div>
+      <div style="margin-top:14px;">
+        <label class="form-label">Description / Notes</label>
+        <input type="text" name="description" class="form-input" placeholder="e.g. 1 whole beef carcass, well-conditioned">
+      </div>
+      <button type="submit" style="margin-top:16px;padding:10px 24px;background:#10b981;color:#fff;border:none;border-radius:9px;font-size:.9rem;font-weight:700;cursor:pointer;">
+        <i class="bi bi-save"></i> Record Intake
+      </button>
+    </form>
+  </div>
+
+  <!-- Allocate Stock to Cuts -->
+  {% if intakes and products %}
+  <div class="form-card">
+    <h2 style="font-size:1rem;font-weight:800;color:#0f172a;margin:0 0 6px;">Allocate Intake to Cuts (Optional)</h2>
+    <p style="color:#64748b;font-size:.83rem;margin:0 0 16px;">Select an intake batch and assign quantities to your named cuts. This updates stock automatically.</p>
+    <form method="post">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="allocate">
+      <div style="margin-bottom:14px;">
+        <label class="form-label">Select Intake Batch</label>
+        <select name="intake_id" class="form-input" style="max-width:400px;">
+          {% for i in intakes %}
+          <option value="{{ i.id }}">{{ i.intake_date|date:"d M Y" }} — {{ i.get_meat_type_display }} {{ i.intake_weight_kg }}kg (MWK {{ i.total_cost|floatformat:0|intcomma }})</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;margin-bottom:14px;">
+        {% for p in products %}
+        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px;">
+          <div style="font-weight:700;font-size:.88rem;color:#0f172a;margin-bottom:4px;">{{ p.name }}</div>
+          <div style="font-size:.75rem;color:#64748b;margin-bottom:8px;">{{ p.get_meat_type_display }} · Stock: {{ p.stock_quantity|floatformat:2 }} {{ p.unit }}</div>
+          <input type="hidden" name="product_id" value="{{ p.id }}">
+          <input type="number" name="alloc_kg" step="0.001" min="0" value="0" placeholder="kg to allocate" style="width:100%;padding:7px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:.85rem;box-sizing:border-box;">
+        </div>
+        {% endfor %}
+      </div>
+      <button type="submit" style="padding:10px 24px;background:#3b82f6;color:#fff;border:none;border-radius:9px;font-size:.9rem;font-weight:700;cursor:pointer;">
+        <i class="bi bi-distribute-horizontal"></i> Allocate &amp; Update Stock
+      </button>
+    </form>
+  </div>
+  {% endif %}
+
+  <!-- Intake History -->
+  <div class="section-head">Intake History</div>
+  {% if intakes %}
+  <div style="background:#fff;border:1px solid #e2e8f0;border-radius:14px;overflow:hidden;box-shadow:0 1px 4px rgba(15,23,42,.05);">
+    <table class="intake-table">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Meat Type</th>
+          <th>Supplier</th>
+          <th>Batch Ref</th>
+          <th style="text-align:right;">Weight (kg)</th>
+          <th style="text-align:right;">Total Cost</th>
+          <th style="text-align:right;">Cost/kg</th>
+          <th>Notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for i in intakes %}
+        <tr>
+          <td style="font-weight:600;">{{ i.intake_date|date:"d M Y" }}</td>
+          <td>{{ i.get_meat_type_display }}</td>
+          <td>{{ i.supplier_name|default:"—" }}</td>
+          <td style="font-family:monospace;font-size:.8rem;">{{ i.batch_ref|default:"—" }}</td>
+          <td style="text-align:right;font-weight:700;">{{ i.intake_weight_kg|floatformat:2 }}</td>
+          <td style="text-align:right;">MWK {{ i.total_cost|floatformat:0|intcomma }}</td>
+          <td style="text-align:right;color:#64748b;">MWK {{ i.cost_per_kg|floatformat:2 }}</td>
+          <td style="color:#64748b;font-size:.8rem;">{{ i.description|truncatewords:6|default:"—" }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <i class="bi bi-truck" style="font-size:3rem;display:block;margin-bottom:12px;opacity:.4;"></i>
+    <h3>No intake recorded yet</h3>
+    <p style="font-size:.85rem;">Use the form above to record your first carcass or bulk meat purchase.</p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

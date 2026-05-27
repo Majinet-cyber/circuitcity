@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}New Project · {{ business.name }}{% endblock %}
+{% block content %}
+<div style="max-width:680px;margin:0 auto;padding:20px 14px;">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+    <h1 style="font-size:1.3rem;font-weight:900;margin:0;">New Project</h1>
+    <a href="{% url 'consultancy:projects' %}" style="color:#64748b;font-size:.85rem;text-decoration:none;">← Projects</a>
+  </div>
+  {% if messages %}{% for msg in messages %}<div class="msg msg-{{ msg.tags }}" style="margin-bottom:12px;">{{ msg }}</div>{% endfor %}{% endif %}
+  <form method="post" style="display:flex;flex-direction:column;gap:14px;">
+    {% csrf_token %}
+    <div style="background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:20px;">
+      <div style="font-size:.75rem;text-transform:uppercase;letter-spacing:.07em;font-weight:800;color:#475569;margin-bottom:14px;">Project Details</div>
+      <div style="margin-bottom:10px;">
+        <label style="font-size:.82rem;font-weight:600;display:block;margin-bottom:4px;">Client *</label>
+        <select name="client_id" required style="width:100%;padding:9px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:.9rem;">
+          <option value="">— Select client —</option>
+          {% for c in clients %}<option value="{{ c.id }}" {% if preselect_client_id == c.id|stringformat:'s' %}selected{% endif %}>{{ c.name }}{% if c.company %} ({{ c.company }}){% endif %}</option>{% endfor %}
+        </select>
+        {% if not clients %}<div style="margin-top:6px;"><a href="{% url 'consultancy:clients' %}" style="font-size:.8rem;color:#2563eb;">Add a client first</a></div>{% endif %}
+      </div>
+      <div style="margin-bottom:10px;">
+        <label style="font-size:.82rem;font-weight:600;display:block;margin-bottom:4px;">Project Title *</label>
+        <input type="text" name="title" required placeholder="e.g. Website Redesign for Acme Ltd" style="width:100%;padding:9px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:.9rem;box-sizing:border-box;">
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div>
+          <label style="font-size:.82rem;font-weight:600;display:block;margin-bottom:4px;">Project Type</label>
+          <select name="project_type" style="width:100%;padding:9px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:.9rem;">
+            {% for val, label in type_choices %}<option value="{{ val }}">{{ label }}</option>{% endfor %}
+          </select>
+        </div>
+        <div>
+          <label style="font-size:.82rem;font-weight:600;display:block;margin-bottom:4px;">Status</label>
+          <select name="status" style="width:100%;padding:9px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:.9rem;">
+            {% for val, label in status_choices %}<option value="{{ val }}">{{ label }}</option>{% endfor %}
+          </select>
+        </div>
+        <div>
+          <label style="font-size:.82rem;font-weight:600;display:block;margin-bottom:4px;">Agreed Value (MWK)</label>
+          <input type="number" name="agreed_value" step="0.01" min="0" placeholder="Optional" style="width:100%;padding:9px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:.9rem;box-sizing:border-box;">
+        </div>
+        <div>
+          <label style="font-size:.82rem;font-weight:600;display:block;margin-bottom:4px;">Monthly Retainer (MWK)</label>
+          <input type="number" name="monthly_retainer" step="0.01" min="0" placeholder="For retainer types" style="width:100%;padding:9px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:.9rem;box-sizing:border-box;">
+        </div>
+        <div>
+          <label style="font-size:.82rem;font-weight:600;display:block;margin-bottom:4px;">Start Date</label>
+          <input type="date" name="start_date" style="width:100%;padding:9px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:.9rem;box-sizing:border-box;">
+        </div>
+        <div>
+          <label style="font-size:.82rem;font-weight:600;display:block;margin-bottom:4px;">Deadline</label>
+          <input type="date" name="deadline" style="width:100%;padding:9px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:.9rem;box-sizing:border-box;">
+        </div>
+      </div>
+      <div style="margin-top:10px;">
+        <label style="font-size:.82rem;font-weight:600;display:block;margin-bottom:4px;">Description</label>
+        <textarea name="description" rows="3" placeholder="Scope of work, deliverables, etc." style="width:100%;padding:9px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:.9rem;box-sizing:border-box;resize:vertical;"></textarea>
+      </div>
+      <div style="margin-top:10px;">
+        <label style="font-size:.82rem;font-weight:600;display:block;margin-bottom:4px;">Notes</label>
+        <textarea name="notes" rows="2" style="width:100%;padding:9px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:.9rem;box-sizing:border-box;resize:vertical;"></textarea>
+      </div>
+    </div>
+    <button type="submit" style="padding:12px;background:#2563eb;color:#fff;border:none;border-radius:10px;font-size:1rem;font-weight:700;cursor:pointer;">Create Project</button>
+  </form>
+</div>
+{% endblock %}

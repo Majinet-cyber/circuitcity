@@ -66,28 +66,32 @@ def get_costs_and_commissions_panel(
     if revenue is not None:
         result["revenue_this_period"] = revenue
     else:
-        # Try to calculate from sales
+        # Try to calculate from Sale model first (preferred - DateField, simple date comparison)
         try:
             from sales.models import Sale
 
-            sales_qs = Sale.objects.filter(sold_at__gte=start_date, sold_at__lte=end_date)
-
-            # Scope to business if Sale model has business field
-            if hasattr(Sale, "business"):
-                sales_qs = sales_qs.filter(business=business)
-            elif hasattr(Sale, "location"):
-                # Scope by location.business
-                sales_qs = sales_qs.filter(location__business=business)
-
+            sales_qs = Sale.objects.filter(
+                sold_at__gte=start_date,
+                sold_at__lte=end_date,
+                is_rolled_back=False,
+            )
+            # Scope to business via location FK
+            business_pk = getattr(business, "pk", None) or getattr(business, "id", None)
+            if business_pk is not None:
+                sales_qs = sales_qs.filter(location__business_id=business_pk)
             revenue_sum = sales_qs.aggregate(total=Sum("price"))["total"] or Decimal("0.00")
             result["revenue_this_period"] = revenue_sum
         except Exception:
             # Fallback: calculate from InventoryItem sold in period
+            # Note: InventoryItem.sold_at is DateTimeField — use __date__ lookup
             try:
                 from inventory.models import InventoryItem
 
                 sold_items = InventoryItem.objects.filter(
-                    business=business, status="SOLD", sold_at__gte=start_date, sold_at__lte=end_date
+                    business=business,
+                    status="SOLD",
+                    sold_at__date__gte=start_date,
+                    sold_at__date__lte=end_date,
                 )
                 revenue_sum = sold_items.aggregate(total=Sum("selling_price"))["total"] or Decimal("0.00")
                 result["revenue_this_period"] = revenue_sum
@@ -98,16 +102,19 @@ def get_costs_and_commissions_panel(
     # Gross Profit = Revenue - Cost of Goods Sold (order_price/cost_price)
     try:
         from inventory.models import InventoryItem
+        from django.db.models import F as _F, ExpressionWrapper as _EW, DecimalField as _DF
 
+        # InventoryItem.sold_at is DateTimeField — use __date__ lookup for correct date range
         sold_items = InventoryItem.objects.filter(
-            business=business, status="SOLD", sold_at__gte=start_date, sold_at__lte=end_date
+            business=business,
+            status="SOLD",
+            sold_at__date__gte=start_date,
+            sold_at__date__lte=end_date,
         )
 
         # Calculate profit: sum(selling_price - order_price)
-        from django.db.models import F, Sum, ExpressionWrapper, DecimalField
-
-        profit_expr = ExpressionWrapper(
-            F("selling_price") - F("order_price"), output_field=DecimalField(max_digits=14, decimal_places=2)
+        profit_expr = _EW(
+            _F("selling_price") - _F("order_price"), output_field=_DF(max_digits=14, decimal_places=2)
         )
         gross_profit = sold_items.aggregate(profit=Sum(profit_expr))["profit"] or Decimal("0.00")
         result["gross_profit_this_period"] = gross_profit

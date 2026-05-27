@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block title %}Invoices · {{ business.name }}{% endblock %}
+{% block content %}
+<div style="max-width:1000px;margin:0 auto;padding:20px 14px;">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
+    <h1 style="font-size:1.3rem;font-weight:900;margin:0;">Invoices</h1>
+    <div style="display:flex;gap:8px;">
+      <a href="{% url 'consultancy:invoice_create' %}" style="padding:8px 14px;background:#16a34a;color:#fff;border-radius:8px;text-decoration:none;font-size:.85rem;font-weight:700;">+ New Invoice</a>
+    </div>
+  </div>
+
+  {% if total_outstanding > 0 %}
+  <div style="background:#fefce8;border:1px solid #fde047;border-radius:10px;padding:12px 16px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;">
+    <span style="font-weight:700;color:#92400e;">Outstanding Balance:</span>
+    <span style="font-size:1.1rem;font-weight:900;color:#92400e;">MWK {{ total_outstanding|floatformat:0|intcomma }}</span>
+  </div>
+  {% endif %}
+
+  <form method="get" style="margin-bottom:12px;">
+    <select name="status" onchange="this.form.submit()" style="padding:7px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:.82rem;">
+      <option value="">All Statuses</option>
+      {% for val, label in status_choices %}<option value="{{ val }}" {% if status_filter == val %}selected{% endif %}>{{ label }}</option>{% endfor %}
+    </select>
+  </form>
+
+  <div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;">
+    <table style="width:100%;border-collapse:collapse;font-size:.85rem;">
+      <thead>
+        <tr style="background:#f8fafc;">
+          <th style="padding:10px 14px;text-align:left;font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;color:#64748b;">#</th>
+          <th style="padding:10px 14px;text-align:left;font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;color:#64748b;">Client</th>
+          <th style="padding:10px 14px;text-align:right;font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;color:#64748b;">Total</th>
+          <th style="padding:10px 14px;text-align:right;font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;color:#64748b;">Paid</th>
+          <th style="padding:10px 14px;text-align:right;font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;color:#64748b;">Balance</th>
+          <th style="padding:10px 14px;text-align:left;font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;color:#64748b;">Status</th>
+          <th style="padding:10px 14px;text-align:left;font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;color:#64748b;">Due</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for inv in invoices %}
+        <tr style="border-top:1px solid #f1f5f9;">
+          <td style="padding:10px 14px;"><a href="{% url 'consultancy:invoice_detail' invoice_id=inv.id %}" style="font-weight:700;color:#2563eb;text-decoration:none;">{{ inv.invoice_number }}</a></td>
+          <td style="padding:10px 14px;">{{ inv.client.name }}</td>
+          <td style="padding:10px 14px;text-align:right;font-weight:700;">{{ inv.total_amount|floatformat:0|intcomma }}</td>
+          <td style="padding:10px 14px;text-align:right;color:#16a34a;">{{ inv.amount_paid|floatformat:0|intcomma }}</td>
+          <td style="padding:10px 14px;text-align:right;font-weight:700;color:{% if inv.balance_due > 0 %}#f59e0b{% else %}#16a34a{% endif %};">{{ inv.balance_due|floatformat:0|intcomma }}</td>
+          <td style="padding:10px 14px;">
+            <span style="padding:2px 8px;border-radius:99px;font-size:.75rem;font-weight:600;
+              background:{% if inv.status == 'paid' %}#dcfce7{% elif inv.status == 'overdue' %}#fef2f2{% elif inv.status == 'partial' %}#fefce8{% else %}#f1f5f9{% endif %};
+              color:{% if inv.status == 'paid' %}#166534{% elif inv.status == 'overdue' %}#991b1b{% elif inv.status == 'partial' %}#854d0e{% else %}#475569{% endif %};">
+              {{ inv.get_status_display }}
+            </span>
+          </td>
+          <td style="padding:10px 14px;color:#64748b;">{% if inv.due_date %}{{ inv.due_date|date:"d M Y" }}{% else %}—{% endif %}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="7" style="text-align:center;padding:30px;color:#94a3b8;">No invoices yet. <a href="{% url 'consultancy:invoice_create' %}">Create your first invoice</a></td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

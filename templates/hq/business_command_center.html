@@ -190,28 +190,28 @@
     {% with active_tab|default:"overview" as current_tab %}
     <div class="tabs-nav">
         <a href="?tab=overview" class="tab-item {% if current_tab == 'overview' %}active{% endif %}">
-            📊 Overview
+            <i class="bi bi-grid-3x3-gap me-1"></i>Overview
         </a>
         <a href="?tab=subscription" class="tab-item {% if current_tab == 'subscription' %}active{% endif %}">
-            💳 Subscription
+            <i class="bi bi-credit-card me-1"></i>Subscription
         </a>
         <a href="?tab=users" class="tab-item {% if current_tab == 'users' %}active{% endif %}">
-            👥 Users
+            <i class="bi bi-people me-1"></i>Users
         </a>
         <a href="?tab=data" class="tab-item {% if current_tab == 'data' %}active{% endif %}">
-            📦 Data & Inventory
+            <i class="bi bi-box-seam me-1"></i>Data &amp; Inventory
         </a>
         <a href="?tab=sales" class="tab-item {% if current_tab == 'sales' %}active{% endif %}">
-            💰 Sales & Wallet
+            <i class="bi bi-cash-stack me-1"></i>Sales &amp; Wallet
         </a>
         <a href="?tab=health" class="tab-item {% if current_tab == 'health' %}active{% endif %}">
-            ❤️ Health
+            <i class="bi bi-heart-pulse me-1"></i>Health
         </a>
         <a href="?tab=tickets" class="tab-item {% if current_tab == 'tickets' %}active{% endif %}">
-            🎫 Tickets
+            <i class="bi bi-ticket me-1"></i>Tickets
         </a>
         <a href="?tab=audit" class="tab-item {% if current_tab == 'audit' %}active{% endif %}">
-            📝 Audit Log
+            <i class="bi bi-journal-text me-1"></i>Audit Log
         </a>
     </div>
 
@@ -264,7 +264,7 @@
                 <div class="kpi-label">Sales (30d)</div>
             </div>
             <div class="kpi-card">
-                <div class="kpi-icon">💰</div>
+                <div class="kpi-icon"><i class="bi bi-cash-coin"></i></div>
                 <div class="kpi-value">{{ sales_total_30d|intcomma }}</div>
                 <div class="kpi-label">Revenue (30d)</div>
             </div>
@@ -323,7 +323,7 @@
 
         <!-- Payment History -->
         <div class="content-card">
-            <div class="section-title">💰 Payment History</div>
+            <div class="section-title"><i class="bi bi-clock-history me-1"></i>Payment History</div>
             {% if invoices %}
                 <div class="cc-table-scroll">
                     <table class="data-table">
@@ -349,7 +349,7 @@
                 </div>
             {% else %}
                 <div class="empty-state">
-                    <div class="empty-state-icon">💰</div>
+                    <div class="empty-state-icon"><i class="bi bi-receipt" style="font-size:2.5rem;color:#94a3b8;"></i></div>
                     <p>No payment history available.</p>
                 </div>
             {% endif %}
@@ -474,7 +474,7 @@
         <!-- Sales & Wallet Tab -->
         <div class="kpi-grid">
             <div class="kpi-card">
-                <div class="kpi-icon">💰</div>
+                <div class="kpi-icon"><i class="bi bi-cash-coin"></i></div>
                 <div class="kpi-value">{{ wallet_total_income|intcomma }}</div>
                 <div class="kpi-label">Total Income</div>
             </div>
@@ -489,7 +489,7 @@
         <div class="row mb-4">
             <div class="col-md-6 mb-3">
                 <div class="content-card">
-                    <h5 class="section-title">📊 Transaction Types</h5>
+                    <h5 class="section-title"><i class="bi bi-pie-chart me-1"></i>Transaction Types</h5>
                     <div class="cc-chart-container" style="height:300px">
                         <canvas id="transactionTypesChart"></canvas>
                     </div>

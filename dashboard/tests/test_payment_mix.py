@@ -23,7 +23,7 @@ class PaymentMixTest(TestCase):
         # Import models
         try:
             from tenants.models import Business
-            from inventory.models import Location
+            from inventory.models import Location, Product
             from sales.models import Sale, PaymentMethod
             from inventory.models import InventoryItem
 
@@ -38,6 +38,11 @@ class PaymentMixTest(TestCase):
 
             # Create test location
             self.location = Location.objects.create(business=self.business, name="Main Store")
+
+            # Create test product
+            self.product = Product.objects.create(
+                code="TEST001", brand="TestBrand", model="TestModel", cost_price=100, sale_price=150
+            )
 
             # Create test user
             self.user = User.objects.create_user(username="testuser", password="pass")
@@ -55,7 +60,8 @@ class PaymentMixTest(TestCase):
         """Test payment mix with single payment method."""
         # Create inventory item
         item = self.InventoryItem.objects.create(
-            business=self.business, location=self.location, status="SOLD", sold_price=Decimal("100.00")
+            business=self.business, product=self.product, current_location=self.location,
+            status="SOLD", selling_price=Decimal("100.00"),
         )
 
         # Create sale
@@ -83,7 +89,8 @@ class PaymentMixTest(TestCase):
 
         # Create cash sale
         item1 = self.InventoryItem.objects.create(
-            business=self.business, location=self.location, status="SOLD", sold_price=Decimal("100.00")
+            business=self.business, product=self.product, current_location=self.location,
+            status="SOLD", selling_price=Decimal("100.00"),
         )
         self.Sale.objects.create(
             item=item1,
@@ -96,7 +103,8 @@ class PaymentMixTest(TestCase):
 
         # Create bank sale
         item2 = self.InventoryItem.objects.create(
-            business=self.business, location=self.location, status="SOLD", sold_price=Decimal("200.00")
+            business=self.business, product=self.product, current_location=self.location,
+            status="SOLD", selling_price=Decimal("200.00"),
         )
         self.Sale.objects.create(
             item=item2,
@@ -127,7 +135,8 @@ class PaymentMixTest(TestCase):
 
         # Create sale from yesterday
         item1 = self.InventoryItem.objects.create(
-            business=self.business, location=self.location, status="SOLD", sold_price=Decimal("100.00")
+            business=self.business, product=self.product, current_location=self.location,
+            status="SOLD", selling_price=Decimal("100.00"),
         )
         self.Sale.objects.create(
             item=item1,
@@ -140,7 +149,8 @@ class PaymentMixTest(TestCase):
 
         # Create sale from today
         item2 = self.InventoryItem.objects.create(
-            business=self.business, location=self.location, status="SOLD", sold_price=Decimal("200.00")
+            business=self.business, product=self.product, current_location=self.location,
+            status="SOLD", selling_price=Decimal("200.00"),
         )
         self.Sale.objects.create(
             item=item2,
@@ -167,7 +177,8 @@ class PaymentMixTest(TestCase):
 
         # Create sale for test user
         item1 = self.InventoryItem.objects.create(
-            business=self.business, location=self.location, status="SOLD", sold_price=Decimal("100.00")
+            business=self.business, product=self.product, current_location=self.location,
+            status="SOLD", selling_price=Decimal("100.00"),
         )
         self.Sale.objects.create(
             item=item1,
@@ -180,7 +191,8 @@ class PaymentMixTest(TestCase):
 
         # Create sale for other user
         item2 = self.InventoryItem.objects.create(
-            business=self.business, location=self.location, status="SOLD", sold_price=Decimal("200.00")
+            business=self.business, product=self.product, current_location=self.location,
+            status="SOLD", selling_price=Decimal("200.00"),
         )
         self.Sale.objects.create(
             item=item2,

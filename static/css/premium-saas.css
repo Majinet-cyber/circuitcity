@@ -5,12 +5,12 @@
    NO DARK MODE — light-only, calm, data-focused.
    ============================================================= */
 
-/* ── Brand overrides: shift primary to green ── */
+/* ── Brand overrides: Emajinet Orange primary ── */
 :root {
-  --cc-brand: #059669;          /* emerald-600 — primary green */
-  --cc-brand-lt: #ecfdf5;      /* emerald-50  */
-  --cc-brand-600: #047857;     /* emerald-700 hover */
-  --cc-brand-glow: rgba(5,150,105,.15);
+  --cc-brand: #ff6a1a;          /* orange — primary brand */
+  --cc-brand-lt: #fff1e8;       /* soft orange surface */
+  --cc-brand-600: #f25c05;      /* orange hover */
+  --cc-brand-glow: rgba(255,106,26,.15);
 
   /* Neutral surfaces */
   --cc-surface:    #ffffff;
@@ -427,16 +427,47 @@
   box-shadow: var(--cc-shadow-md);
 }
 
-/* ── Improve Bootstrap primary buttons to use green ── */
-.btn-success,
+/* ── Bootstrap primary → Emajinet Orange ── */
+.btn-primary,
 .btn-primary.btn-green {
-  background-color: var(--cc-brand) !important;
+  background: linear-gradient(135deg, #ff7a2e, var(--cc-brand-600)) !important;
   border-color: var(--cc-brand) !important;
+  color: #fff !important;
+  box-shadow: 0 4px 14px rgba(255,106,26,.26);
+  font-weight: 700;
 }
-.btn-success:hover,
+.btn-primary:hover,
 .btn-primary.btn-green:hover {
-  background-color: var(--cc-brand-600) !important;
-  border-color: var(--cc-brand-600) !important;
+  background: linear-gradient(135deg, #ff8840, #d94f04) !important;
+  border-color: #d94f04 !important;
+  box-shadow: 0 6px 20px rgba(255,106,26,.36);
+  transform: translateY(-1px);
+}
+.btn-primary:active,
+.btn-primary.btn-green:active {
+  transform: translateY(0) !important;
+  box-shadow: 0 2px 6px rgba(255,106,26,.20) !important;
+}
+/* Keep btn-success green (semantic — means success/positive) */
+.btn-success {
+  background-color: #16a34a !important;
+  border-color: #16a34a !important;
+  color: #fff !important;
+}
+.btn-success:hover {
+  background-color: #15803d !important;
+  border-color: #15803d !important;
+}
+/* Secondary outline → orange tint */
+.btn-outline-primary {
+  color: var(--cc-brand) !important;
+  border-color: var(--cc-brand) !important;
+  background: transparent !important;
+}
+.btn-outline-primary:hover {
+  background: var(--cc-brand-lt) !important;
+  border-color: var(--cc-brand) !important;
+  color: var(--cc-brand-600) !important;
 }
 
 /* ── Dashboard hero stat row ── */

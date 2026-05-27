@@ -160,6 +160,31 @@ VERTICAL_ALIASES = {
     "inverter": "energy",
     "green energy": "energy",
     "clean energy": "energy",
+    # Mobile Money Agent
+    "mobile_money": "mobile_money",
+    "mobile money": "mobile_money",
+    "mobile money agent": "mobile_money",
+    "momo agent": "mobile_money",
+    "mobile money reconciliation": "mobile_money",
+    # Mixed Retail (multi-department shop)
+    "mixed_retail": "mixed_retail",
+    "mixed retail": "mixed_retail",
+    "multi retail": "mixed_retail",
+    "general shop": "mixed_retail",
+    "multi-department": "mixed_retail",
+    # Consultancy & Services
+    "consultancy": "consultancy",
+    "consulting": "consultancy",
+    "freelance": "consultancy",
+    "agency": "consultancy",
+    "services": "consultancy",
+    "advisory": "consultancy",
+    # Butchery
+    "butchery": "butchery",
+    "butcher": "butchery",
+    "meat shop": "butchery",
+    "butchery shop": "butchery",
+    "abattoir": "butchery",
 }
 
 

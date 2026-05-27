@@ -46,6 +46,7 @@ def get_vertical_kind(business) -> str:
     valid_kinds = [
         "phones", "gym", "clothing", "liquor", "pharmacy", "grocery",
         "hardware", "cement", "farm", "welding", "car_hire", "car_dealer", "energy",
+        "mobile_money", "mixed_retail", "consultancy", "butchery",
     ]
     if kind in valid_kinds:
         return kind
@@ -87,6 +88,10 @@ def get_vertical_dashboard_url(vertical_kind: str) -> Optional[str]:
         "car_hire": "verticals:car_hire_dashboard",
         "car_dealer": "car_dealer:dashboard",
         "energy": "verticals:energy_dashboard",
+        "mobile_money": "mobilemoney:dashboard",
+        "mixed_retail": "mixed_retail:dashboard",
+        "consultancy": "consultancy:dashboard",
+        "butchery": "butchery:dashboard",
         "generic": "inventory:generic_dashboard",
     }
     return vertical_dashboard_map.get(vertical_kind)
@@ -291,6 +296,10 @@ def get_vertical_display_name(vertical_kind: str) -> str:
         "car_hire": "Car Hire Service",  # Vehicle rental and fleet management
         "car_dealer": "Car Dealer",  # Vehicle dealership and marketplace
         "energy": "Renewable Energy",  # Solar, battery, and energy management
+        "mobile_money": "Mobile Money Agent",  # Agent float management
+        "mixed_retail": "Mixed Retail",  # Multi-department retail
+        "consultancy": "Consultancy & Services",  # Consulting, freelance, agencies
+        "butchery": "Butchery",  # Butchery / meat shop
         "generic": "Business",
     }
     return display_names.get(vertical_kind, vertical_kind.title())
@@ -2698,6 +2707,7 @@ def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
             {
                 "section": "MORE",
                 "key": "simulations",
+                "testid": "nav-energy-simulations",
                 "url": "verticals:energy_simulations",
                 "label": "Simulations",
                 "icon": "bi-play-circle",
@@ -2821,6 +2831,146 @@ def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
             },
         ]
         return _inject_data_correction_into_sidebar(items, "energy")
+
+    elif business_kind == "mobile_money":
+        items = [
+            {"section": "MAIN", "key": "dashboard", "url": "mobilemoney:dashboard", "label": "Dashboard",
+             "icon": "bi-speedometer2", "active_prefix": "/mobile-money/dashboard", "active_pattern": "/mobile-money/dashboard",
+             "require_manager": False, "is_menu": False, "is_header": False},
+            {"section": "MAIN", "key": "transactions", "url": "mobilemoney:transactions", "label": "Transactions",
+             "icon": "bi-arrow-left-right", "active_prefix": "/mobile-money/transactions", "active_pattern": "/mobile-money/transactions",
+             "require_manager": False, "is_menu": False, "is_header": False},
+            {"section": "MAIN", "key": "reconciliation", "url": "mobilemoney:reconciliation", "label": "Reconciliation",
+             "icon": "bi-calculator", "active_prefix": "/mobile-money/reconciliation", "active_pattern": "/mobile-money/reconciliation",
+             "require_manager": False, "is_menu": False, "is_header": False},
+            {"section": "MAIN", "key": "commissions", "url": "mobilemoney:commissions", "label": "Commissions",
+             "icon": "bi-percent", "active_prefix": "/mobile-money/commissions", "active_pattern": "/mobile-money/commissions",
+             "require_manager": False, "is_menu": False, "is_header": False},
+            {"section": "MORE", "key": "credits", "url": "mobilemoney:credits", "label": "Credits & Debts",
+             "icon": "bi-credit-card", "active_prefix": "/mobile-money/credits", "active_pattern": "/mobile-money/credits",
+             "require_manager": False, "is_menu": False, "is_header": False, "group": "more"},
+            {"section": "MORE", "key": "settlements", "url": "mobilemoney:settlements", "label": "Agent Settlements",
+             "icon": "bi-people", "active_prefix": "/mobile-money/settlements", "active_pattern": "/mobile-money/settlements",
+             "require_manager": True, "is_menu": False, "is_header": False, "group": "more"},
+            {"section": "MORE", "key": "reports", "url": "reports:home", "label": "Reports",
+             "icon": "bi-file-earmark-bar-graph", "active_prefix": "/reports/", "active_pattern": "/reports/",
+             "require_manager": True, "is_menu": False, "is_header": False, "group": "more"},
+            {"section": "MORE", "key": "health", "url": "dashboard:business_health", "label": "Business Health",
+             "icon": "bi-heart-pulse", "active_prefix": "/dashboard/health", "active_pattern": "/dashboard/health",
+             "require_manager": True, "is_menu": False, "is_header": False, "group": "more"},
+        ]
+        return items
+
+    elif business_kind == "mixed_retail":
+        items = [
+            # ── MAIN ──────────────────────────────────────────────────────────
+            {"section": "MAIN", "key": "dashboard", "url": "mixed_retail:dashboard", "label": "Dashboard",
+             "icon": "bi-speedometer2", "active_prefix": "/mixed-retail/dashboard", "active_pattern": "/mixed-retail/dashboard",
+             "require_manager": False, "is_menu": False, "is_header": False},
+            {"section": "MAIN", "key": "sell", "url": "mixed_retail:sell", "label": "Quick Sell",
+             "icon": "bi-cart-plus", "active_prefix": "/mixed-retail/sell", "active_pattern": "/mixed-retail/sell",
+             "require_manager": False, "is_menu": False, "is_header": False},
+            {"section": "MAIN", "key": "stock_in", "url": "mixed_retail:stock_in", "label": "Scan IN / Stock In",
+             "icon": "bi-upc-scan", "active_prefix": "/mixed-retail/stock-in", "active_pattern": "/mixed-retail/stock-in",
+             "require_manager": False, "is_menu": False, "is_header": False},
+            # ── PRODUCTS ──────────────────────────────────────────────────────
+            {"section": "PRODUCTS", "key": "products", "url": "mixed_retail:products", "label": "Products",
+             "icon": "bi-box-seam", "active_prefix": "/mixed-retail/products", "active_pattern": "/mixed-retail/products",
+             "require_manager": False, "is_menu": False, "is_header": False},
+            {"section": "PRODUCTS", "key": "product_add", "url": "mixed_retail:product_add", "label": "Add Product",
+             "icon": "bi-plus-square", "active_prefix": "/mixed-retail/products/add", "active_pattern": "/mixed-retail/products/add",
+             "require_manager": False, "is_menu": False, "is_header": False},
+            {"section": "PRODUCTS", "key": "departments", "url": "mixed_retail:departments", "label": "Departments",
+             "icon": "bi-grid-3x3-gap", "active_prefix": "/mixed-retail/departments", "active_pattern": "/mixed-retail/departments",
+             "require_manager": False, "is_menu": False, "is_header": False},
+            # ── SALES ─────────────────────────────────────────────────────────
+            {"section": "SALES", "key": "sales", "url": "mixed_retail:sales", "label": "Sales History",
+             "icon": "bi-receipt", "active_prefix": "/mixed-retail/sales", "active_pattern": "/mixed-retail/sales",
+             "require_manager": False, "is_menu": False, "is_header": False},
+            # ── FINANCE ───────────────────────────────────────────────────────
+            {"section": "FINANCE", "key": "expenses", "url": "mixed_retail:expenses", "label": "Costs & Expenses",
+             "icon": "bi-cash-stack", "active_prefix": "/mixed-retail/expenses", "active_pattern": "/mixed-retail/expenses",
+             "require_manager": False, "is_menu": False, "is_header": False},
+            # ── REPORTS ───────────────────────────────────────────────────────
+            {"section": "REPORTS", "key": "reports", "url": "mixed_retail:reports", "label": "Reports",
+             "icon": "bi-bar-chart-line", "active_prefix": "/mixed-retail/reports", "active_pattern": "/mixed-retail/reports",
+             "require_manager": True, "is_menu": False, "is_header": False},
+            {"section": "REPORTS", "key": "health", "url": "dashboard:business_health", "label": "Business Health",
+             "icon": "bi-heart-pulse", "active_prefix": "/dashboard/health", "active_pattern": "/dashboard/health",
+             "require_manager": True, "is_menu": False, "is_header": False},
+            # ── SETTINGS ──────────────────────────────────────────────────────
+            {"section": "SETTINGS", "key": "biz_settings", "url": "/dashboard/settings/", "label": "Business Settings",
+             "icon": "bi-gear", "active_prefix": "/dashboard/settings", "active_pattern": "/dashboard/settings",
+             "require_manager": True, "is_menu": False, "is_header": False},
+        ]
+        return items
+
+    elif business_kind == "butchery":
+        items = [
+            # ── MAIN ──────────────────────────────────────────────────────────
+            {"section": "MAIN", "key": "dashboard", "url": "butchery:dashboard", "label": "Dashboard",
+             "icon": "bi-speedometer2", "active_prefix": "/butchery/dashboard", "active_pattern": "/butchery/dashboard",
+             "require_manager": False, "is_menu": False, "is_header": False},
+            {"section": "MAIN", "key": "sell", "url": "butchery:sell", "label": "Quick Sell",
+             "icon": "bi-cart-plus", "active_prefix": "/butchery/sell", "active_pattern": "/butchery/sell",
+             "require_manager": False, "is_menu": False, "is_header": False},
+            {"section": "MAIN", "key": "intake", "url": "butchery:intake", "label": "Intake / Stock In",
+             "icon": "bi-truck", "active_prefix": "/butchery/intake", "active_pattern": "/butchery/intake",
+             "require_manager": False, "is_menu": False, "is_header": False},
+            # ── PRODUCTS ──────────────────────────────────────────────────────
+            {"section": "PRODUCTS", "key": "products", "url": "butchery:products", "label": "Cuts & Products",
+             "icon": "bi-box-seam", "active_prefix": "/butchery/products", "active_pattern": "/butchery/products",
+             "require_manager": False, "is_menu": False, "is_header": False},
+            {"section": "PRODUCTS", "key": "product_add", "url": "butchery:product_add", "label": "Add Cut / Product",
+             "icon": "bi-plus-square", "active_prefix": "/butchery/products/add", "active_pattern": "/butchery/products/add",
+             "require_manager": False, "is_menu": False, "is_header": False},
+            # ── SALES ─────────────────────────────────────────────────────────
+            {"section": "SALES", "key": "sales", "url": "butchery:sales", "label": "Sales History",
+             "icon": "bi-receipt", "active_prefix": "/butchery/sales", "active_pattern": "/butchery/sales",
+             "require_manager": False, "is_menu": False, "is_header": False},
+            # ── FINANCE ───────────────────────────────────────────────────────
+            {"section": "FINANCE", "key": "expenses", "url": "butchery:expenses", "label": "Costs & Expenses",
+             "icon": "bi-cash-stack", "active_prefix": "/butchery/expenses", "active_pattern": "/butchery/expenses",
+             "require_manager": False, "is_menu": False, "is_header": False},
+            # ── REPORTS ───────────────────────────────────────────────────────
+            {"section": "REPORTS", "key": "reports", "url": "butchery:reports", "label": "Reports",
+             "icon": "bi-bar-chart-line", "active_prefix": "/butchery/reports", "active_pattern": "/butchery/reports",
+             "require_manager": True, "is_menu": False, "is_header": False},
+            {"section": "REPORTS", "key": "health", "url": "dashboard:business_health", "label": "Business Health",
+             "icon": "bi-heart-pulse", "active_prefix": "/dashboard/health", "active_pattern": "/dashboard/health",
+             "require_manager": True, "is_menu": False, "is_header": False},
+            # ── SETTINGS ──────────────────────────────────────────────────────
+            {"section": "SETTINGS", "key": "biz_settings", "url": "/dashboard/settings/", "label": "Business Settings",
+             "icon": "bi-gear", "active_prefix": "/dashboard/settings", "active_pattern": "/dashboard/settings",
+             "require_manager": True, "is_menu": False, "is_header": False},
+        ]
+        return items
+
+    elif business_kind == "consultancy":
+        items = [
+            {"section": "MAIN", "key": "dashboard", "url": "consultancy:dashboard", "label": "Dashboard",
+             "icon": "bi-speedometer2", "active_prefix": "/consultancy/dashboard", "active_pattern": "/consultancy/dashboard",
+             "require_manager": False, "is_menu": False, "is_header": False},
+            {"section": "MAIN", "key": "clients", "url": "consultancy:clients", "label": "Clients",
+             "icon": "bi-people", "active_prefix": "/consultancy/clients", "active_pattern": "/consultancy/clients",
+             "require_manager": False, "is_menu": False, "is_header": False},
+            {"section": "MAIN", "key": "projects", "url": "consultancy:projects", "label": "Projects",
+             "icon": "bi-kanban", "active_prefix": "/consultancy/projects", "active_pattern": "/consultancy/projects",
+             "require_manager": False, "is_menu": False, "is_header": False},
+            {"section": "MAIN", "key": "quotes", "url": "consultancy:quotes", "label": "Quotes",
+             "icon": "bi-file-earmark-text", "active_prefix": "/consultancy/quotes", "active_pattern": "/consultancy/quotes",
+             "require_manager": False, "is_menu": False, "is_header": False},
+            {"section": "MAIN", "key": "invoices", "url": "consultancy:invoices", "label": "Invoices",
+             "icon": "bi-receipt-cutoff", "active_prefix": "/consultancy/invoices", "active_pattern": "/consultancy/invoices",
+             "require_manager": False, "is_menu": False, "is_header": False},
+            {"section": "MORE", "key": "expenses", "url": "consultancy:expenses", "label": "Expenses",
+             "icon": "bi-cash-stack", "active_prefix": "/consultancy/expenses", "active_pattern": "/consultancy/expenses",
+             "require_manager": True, "is_menu": False, "is_header": False, "group": "more"},
+            {"section": "MORE", "key": "health", "url": "dashboard:business_health", "label": "Business Health",
+             "icon": "bi-heart-pulse", "active_prefix": "/dashboard/health", "active_pattern": "/dashboard/health",
+             "require_manager": True, "is_menu": False, "is_header": False, "group": "more"},
+        ]
+        return items
 
     else:  # "phones" or default
         items = [

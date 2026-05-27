@@ -583,7 +583,7 @@ input:focus, select:focus, textarea:focus, .form-control:focus {
   .sidebar .nav-link.active {
     background: #13203a !important;
     color: #ffffff !important;
-    border-left: 3px solid #3b82f6 !important;
+    border-left: 3px solid #ff6a1a !important;
   }
 
   .cc-sidebar hr, .nav-sidebar hr, .sidebar hr {
@@ -616,12 +616,12 @@ input:focus, select:focus, textarea:focus, .form-control:focus {
   --glass-br: 16px;
   --glass-bd: 1px solid rgba(148,163,184,.35);
   --glass-shadow: 0 20px 60px rgba(2,6,23,.10);
-  --glass-ring: 0 0 0 4px color-mix(in oklab, #3b82f6 18%, transparent);
+  --glass-ring: 0 0 0 4px color-mix(in oklab, #ff6a1a 18%, transparent);
 }
 body.accounts-auth, body.accounts-forgot {
   background:
-    radial-gradient(1200px 800px at -10% -10%, rgba(59,130,246,.10), transparent 40%),
-    radial-gradient(900px 600px at 110% 110%, rgba(16,185,129,.10), transparent 45%),
+    radial-gradient(1200px 800px at -10% -10%, rgba(255,106,26,.07), transparent 40%),
+    radial-gradient(900px 600px at 110% 110%, rgba(255,140,60,.06), transparent 45%),
     var(--cc-bg);
 }
 .auth-glass{
@@ -652,18 +652,18 @@ body.accounts-auth, body.accounts-forgot {
 }
 .auth-glass input:focus{
   outline: none;
-  border-color: color-mix(in oklab, #3b82f6 48%, #94a3b8);
+  border-color: color-mix(in oklab, #ff6a1a 48%, #94a3b8);
   box-shadow: var(--glass-ring);
 }
 .auth-glass .btn-primary,
 .auth-glass button[type="submit"]{
   border-radius: 12px;
-  box-shadow: 0 10px 26px rgba(59,130,246,.28);
+  box-shadow: 0 10px 26px rgba(255,106,26,.28);
 }
 .auth-glass .btn-primary:hover,
 .auth-glass button[type="submit"]:hover{
   transform: translateY(-1px);
-  box-shadow: 0 14px 36px rgba(59,130,246,.32);
+  box-shadow: 0 14px 36px rgba(255,106,26,.32);
 }
 .auth-version{
   position: fixed;

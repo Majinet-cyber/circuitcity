@@ -1,0 +1,189 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Add Product · Mixed Retail · {{ business.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+.form-wrap { max-width: 680px; margin: 0 auto; padding: 20px 14px; }
+.form-section { background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 20px; margin-bottom: 16px; }
+.form-section-title { font-size: .75rem; text-transform: uppercase; letter-spacing: .07em; font-weight: 800; color: #475569; margin-bottom: 14px; }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.form-group { margin-bottom: 12px; }
+.form-group label { display: block; font-size: .82rem; font-weight: 600; color: #374151; margin-bottom: 4px; }
+.form-control { width: 100%; padding: 9px 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: .9rem; box-sizing: border-box; }
+.form-control:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,.1); }
+.optional-fields { display: none; }
+.optional-fields.show { display: block; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="form-wrap">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+    <h1 style="font-size:1.3rem;font-weight:900;margin:0;">Add Product</h1>
+    <a href="{% url 'mixed_retail:products' %}" style="color:#64748b;font-size:.85rem;text-decoration:none;">← Back to Products</a>
+  </div>
+
+  {% if messages %}
+    {% for msg in messages %}
+    <div class="msg msg-{{ msg.tags }}">{{ msg }}</div>
+    {% endfor %}
+  {% endif %}
+
+  <form method="post">
+    {% csrf_token %}
+
+    <!-- Core Fields -->
+    <div class="form-section">
+      <div class="form-section-title">Product Details</div>
+      <div class="form-group">
+        <label>Product Name *</label>
+        <input type="text" name="name" class="form-control" placeholder="e.g. Samsung A15" required autofocus>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Department</label>
+          <select name="department_id" id="department_id" class="form-control">
+            <option value="">— Select Department —</option>
+            {% for dept in departments %}
+            <option value="{{ dept.id }}" {% if preselect_dept and preselect_dept.id == dept.id %}selected{% endif %}>{{ dept.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Category</label>
+          <select name="category_id" id="category_id" class="form-control">
+            <option value="">— Select Category —</option>
+            {% for cat in preselect_cats %}
+            <option value="{{ cat.id }}">{{ cat.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Brand</label>
+          <input type="text" name="brand" class="form-control" placeholder="e.g. Samsung, Nike, Generic">
+        </div>
+        <div class="form-group">
+          <label>SKU / Code</label>
+          <input type="text" name="sku" class="form-control" placeholder="e.g. SAM-A15-BLK">
+        </div>
+      </div>
+    </div>
+
+    <!-- Pricing & Stock -->
+    <div class="form-section">
+      <div class="form-section-title">Pricing & Stock</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Cost Price (MWK) *</label>
+          <input type="number" name="cost_price" step="0.01" min="0" class="form-control" value="0" required>
+        </div>
+        <div class="form-group">
+          <label>Selling Price (MWK) *</label>
+          <input type="number" name="selling_price" step="0.01" min="0" class="form-control" value="0" required>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Opening Stock</label>
+          <input type="number" name="stock_quantity" step="0.01" min="0" class="form-control" value="0">
+        </div>
+        <div class="form-group">
+          <label>Reorder Level</label>
+          <input type="number" name="reorder_level" step="0.01" min="0" class="form-control" value="5">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Unit</label>
+        <select name="unit" class="form-control">
+          {% for val, label in unit_choices %}
+          <option value="{{ val }}">{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+
+    <!-- Optional Attributes -->
+    <div class="form-section">
+      <div class="form-section-title" style="display:flex;justify-content:space-between;cursor:pointer;" onclick="document.getElementById('opt-fields').classList.toggle('show');">
+        Optional Attributes <span style="font-weight:400;color:#94a3b8;font-size:.75rem;">▼ expand</span>
+      </div>
+      <div id="opt-fields" class="optional-fields">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Size</label>
+            <input type="text" name="size" class="form-control" placeholder="S, M, L, 42, etc.">
+          </div>
+          <div class="form-group">
+            <label>Color</label>
+            <input type="text" name="color" class="form-control" placeholder="Black, Red, etc.">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Material</label>
+            <input type="text" name="material" class="form-control" placeholder="Cotton, Metal, etc.">
+          </div>
+          <div class="form-group">
+            <label>Condition</label>
+            <select name="condition" class="form-control">
+              {% for val, label in condition_choices %}
+              <option value="{{ val }}">{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Serial Number</label>
+            <input type="text" name="serial_number" class="form-control">
+          </div>
+          <div class="form-group">
+            <label>IMEI (phones/tablets)</label>
+            <input type="text" name="imei" class="form-control" maxlength="20">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Warranty (months)</label>
+            <input type="number" name="warranty_months" class="form-control" min="0">
+          </div>
+          <div class="form-group">
+            <label>Supplier Name</label>
+            <input type="text" name="supplier_name" class="form-control">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Notes</label>
+          <textarea name="notes" class="form-control" rows="2"></textarea>
+        </div>
+      </div>
+    </div>
+
+    <button type="submit" style="width:100%;padding:12px;background:#2563eb;color:#fff;border:none;border-radius:10px;font-size:1rem;font-weight:700;cursor:pointer;">Save Product</button>
+  </form>
+</div>
+
+<script>
+// Dynamic category load when department changes
+document.getElementById('department_id').addEventListener('change', function() {
+  const deptId = this.value;
+  const catSelect = document.getElementById('category_id');
+  catSelect.innerHTML = '<option value="">Loading…</option>';
+  if (!deptId) { catSelect.innerHTML = '<option value="">— Select Category —</option>'; return; }
+  fetch(`{% url 'mixed_retail:api_categories' %}?dept_id=${deptId}`)
+    .then(r => r.json())
+    .then(data => {
+      catSelect.innerHTML = '<option value="">— Select Category —</option>';
+      data.categories.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c.id; opt.text = c.name;
+        catSelect.appendChild(opt);
+      });
+    });
+});
+</script>
+{% endblock %}

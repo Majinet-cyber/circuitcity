@@ -1616,8 +1616,8 @@ def stock_list(request: HttpRequest, *args, **kwargs) -> HttpResponse:
     items = list(qs[:per_page])
 
     template = _select_first_existing_template(
-        ("inventory/list.html", "inventory/stock_list.html"),
-        default="inventory/list.html",
+        ("inventory/stock_list.html", "inventory/list.html"),
+        default="inventory/stock_list.html",
     )
 
     # Add manager agents for stock assignment (if manager)

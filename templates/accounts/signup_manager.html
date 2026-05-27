@@ -214,11 +214,20 @@
             <option value="" {% if not request.POST.business_kind %}selected{% endif %}>---------</option>
             <option value="phones" {% if request.POST.business_kind == 'phones' %}selected{% endif %}>Phones & Electronics</option>
             <option value="clothing" {% if request.POST.business_kind == 'clothing' %}selected{% endif %}>Clothing & Fashion</option>
+            <option value="mixed_retail" {% if request.POST.business_kind == 'mixed_retail' %}selected{% endif %}>Mixed Retail (Multi-department)</option>
+            <option value="mobile_money" {% if request.POST.business_kind == 'mobile_money' %}selected{% endif %}>Mobile Money Agent</option>
+            <option value="consultancy" {% if request.POST.business_kind == 'consultancy' %}selected{% endif %}>Consultancy & Services</option>
             <option value="liquor" {% if request.POST.business_kind == 'liquor' %}selected{% endif %}>Liquor / Bar</option>
             <option value="pharmacy" {% if request.POST.business_kind == 'pharmacy' %}selected{% endif %}>Pharmacy</option>
             <option value="grocery" {% if request.POST.business_kind == 'grocery' %}selected{% endif %}>Grocery / General</option>
             <option value="gym" {% if request.POST.business_kind == 'gym' %}selected{% endif %}>Gym & Fitness</option>
             <option value="hardware" {% if request.POST.business_kind == 'hardware' %}selected{% endif %}>Hardware & General Dealers</option>
+            <option value="butchery" {% if request.POST.business_kind == 'butchery' %}selected{% endif %}>Butchery / Meat Shop</option>
+            <option value="farm" {% if request.POST.business_kind == 'farm' %}selected{% endif %}>Farm / Agriculture</option>
+            <option value="welding" {% if request.POST.business_kind == 'welding' %}selected{% endif %}>Welding Workshop</option>
+            <option value="car_hire" {% if request.POST.business_kind == 'car_hire' %}selected{% endif %}>Car Hire Service</option>
+            <option value="car_dealer" {% if request.POST.business_kind == 'car_dealer' %}selected{% endif %}>Car Dealer</option>
+            <option value="energy" {% if request.POST.business_kind == 'energy' %}selected{% endif %}>Renewable Energy</option>
           </select>
 
           <div class="cc-select" id="ccBizSelect">
@@ -269,9 +278,63 @@
               </div>
               <div class="cc-option" data-value="hardware">
                 <span class="cc-icon">
-                  <svg viewBox="0 0 24 24"><path d="M3 21v-2h18v2H3zm0-4v-2h18v2H3zm0-4v-2h18v2H3zm0-4V7h18v2H3zm0-4V3h18v2H3z"/></svg>
+                  <svg viewBox="0 0 24 24"><path d="M15.5 2.1L11 6.6V3H9v6h6V7h-3.4l4.5-4.5-1.6-1.4zm3.4 14.8a1 1 0 010 1.4l-1.4 1.4a1 1 0 01-1.4 0L5.2 8.4a1 1 0 010-1.4l1.4-1.4a1 1 0 011.4 0l11.3 11.3z"/></svg>
                 </span>
                 Hardware &amp; General Dealers
+              </div>
+              <div class="cc-option" data-value="mixed_retail">
+                <span class="cc-icon">
+                  <svg viewBox="0 0 24 24"><path d="M3 3h18v2H3V3zm0 4h18v2H3V7zm0 4h18v2H3v-2zm0 4h12v2H3v-2z"/></svg>
+                </span>
+                Mixed Retail
+              </div>
+              <div class="cc-option" data-value="mobile_money">
+                <span class="cc-icon">
+                  <svg viewBox="0 0 24 24"><path d="M6 2a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V4a2 2 0 00-2-2H6zm6 3a4 4 0 110 8 4 4 0 010-8zm0 2a2 2 0 100 4 2 2 0 000-4zm-5 9h10v1H7v-1z"/></svg>
+                </span>
+                Mobile Money Agent
+              </div>
+              <div class="cc-option" data-value="consultancy">
+                <span class="cc-icon">
+                  <svg viewBox="0 0 24 24"><path d="M20 2H4a2 2 0 00-2 2v18l4-4h14a2 2 0 002-2V4a2 2 0 00-2-2zM8 13H6v-2h2v2zm4 0h-2v-2h2v2zm4 0h-2v-2h2v2z"/></svg>
+                </span>
+                Consultancy &amp; Services
+              </div>
+              <div class="cc-option" data-value="farm">
+                <span class="cc-icon">
+                  <svg viewBox="0 0 24 24"><path d="M12 3L2 9h3v12h14V9h3zm0 2.4L19 9H5l7-3.6z"/></svg>
+                </span>
+                Farm / Agriculture
+              </div>
+              <div class="cc-option" data-value="butchery">
+                <span class="cc-icon">
+                  <svg viewBox="0 0 24 24"><path d="M8.5 2a6.5 6.5 0 016.5 6.5c0 1.2-.33 2.33-.9 3.3l7.4 7.4-1.8 1.8-7.4-7.4A6.5 6.5 0 118.5 2zm0 2a4.5 4.5 0 100 9 4.5 4.5 0 000-9z"/></svg>
+                </span>
+                Butchery / Meat Shop
+              </div>
+              <div class="cc-option" data-value="welding">
+                <span class="cc-icon">
+                  <svg viewBox="0 0 24 24"><path d="M12 2l3 7h7l-5.5 4 2 7L12 16l-6.5 4 2-7L2 9h7z"/></svg>
+                </span>
+                Welding Workshop
+              </div>
+              <div class="cc-option" data-value="car_hire">
+                <span class="cc-icon">
+                  <svg viewBox="0 0 24 24"><path d="M5 11l1.5-4.5h11L19 11M3 11h18v8H3zm2 8v1h2v-1m12 0v1h2v-1M5 15a1 1 0 110-2 1 1 0 010 2zm14 0a1 1 0 110-2 1 1 0 010 2z"/></svg>
+                </span>
+                Car Hire Service
+              </div>
+              <div class="cc-option" data-value="car_dealer">
+                <span class="cc-icon">
+                  <svg viewBox="0 0 24 24"><path d="M7 11l1.5-4.5h7L17 11M5 11h14v7H5zm2 7v1h2v-1m8 0v1h2v-1M7 15a1 1 0 110-2 1 1 0 010 2zm10 0a1 1 0 110-2 1 1 0 010 2z"/></svg>
+                </span>
+                Car Dealer
+              </div>
+              <div class="cc-option" data-value="energy">
+                <span class="cc-icon">
+                  <svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 110 20A10 10 0 0112 2zm1 6h-4l-1 6h3l-1 6 7-9h-4l2-3z"/></svg>
+                </span>
+                Renewable Energy
               </div>
             </div>
           </div>
@@ -283,7 +346,7 @@
         {% with has_err=form.errors.subdomain %}
         <div class="field">
           <div class="label">Subdomain <span style="color:#7c8aa3">(optional)</span></div>
-          <span class="addon">🔗</span>
+          <span class="addon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg></span>
           <input class="input{% if has_err %} is-error{% endif %}" aria-invalid="{% if has_err %}true{% else %}false{% endif %}"
                  type="text" name="subdomain" inputmode="lowercase" placeholder="e.g. circuitly"
                  value="{{ request.POST.subdomain|default:'' }}">
@@ -305,11 +368,11 @@
         {% with has_err=form.errors.password1 %}
         <div class="field">
           <div class="label">Password</div>
-          <span class="addon">🔒</span>
+          <span class="addon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg></span>
           <input id="pw1" class="input{% if has_err %} is-error{% endif %}" aria-invalid="{% if has_err %}true{% else %}false{% endif %}"
                  type="password" name="password1" required autocomplete="new-password"
                  placeholder="Create a strong password" minlength="12">
-          <span id="eye1" class="eye" title="Show/Hide">👁️</span>
+          <span id="eye1" class="eye" title="Show/Hide"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></span>
           <div class="meter"><span id="bar1"></span></div>
           {% if has_err %}<div class="err">{{ form.errors.password1|striptags }}</div>{% else %}
           <div class="hint">Use at least 12 characters (letters, numbers, symbol).</div>{% endif %}
@@ -320,11 +383,11 @@
         {% with has_err=form.errors.password2 %}
         <div class="field">
           <div class="label">Confirm password</div>
-          <span class="addon">✅</span>
+          <span class="addon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg></span>
           <input id="pw2" class="input{% if has_err %} is-error{% endif %}" aria-invalid="{% if has_err %}true{% else %}false{% endif %}"
                  type="password" name="password2" required autocomplete="new-password"
                  placeholder="Repeat your password" minlength="12">
-          <span id="eye2" class="eye" title="Show/Hide">👁️</span>
+          <span id="eye2" class="eye" title="Show/Hide"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></span>
           <div class="meter"><span id="bar2"></span></div>
           {% if has_err %}<div class="err">{{ form.errors.password2|striptags }}</div>{% endif %}
         </div>

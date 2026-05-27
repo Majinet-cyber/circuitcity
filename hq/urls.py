@@ -28,6 +28,11 @@ except ImportError:
     views_contracts = None
 
 try:
+    from . import views_esignature
+except ImportError:
+    views_esignature = None
+
+try:
     from . import views_business_detail
 except ImportError:
     views_business_detail = None
@@ -231,6 +236,17 @@ if views_contracts is not None:
             path("staff/tour-guide.pdf", views_contracts.staff_tour_guide_pdf, name="staff_tour_guide_pdf"),
             # Generate per-merchant contract PDF
             path("contracts/<int:business_id>/generate-pdf/", views_contracts.generate_merchant_contract_pdf, name="generate_merchant_contract_pdf"),
+        ]
+    )
+
+if views_esignature is not None:
+    urlpatterns.extend(
+        [
+            # Merchant-facing e-signature portal (accessible with valid token, requires login)
+            path("contracts/sign/<uuid:token>/", views_esignature.merchant_contract_portal, name="contract_sign_portal"),
+            path("contracts/sign/<uuid:token>/submit/", views_esignature.merchant_contract_sign, name="contract_sign_submit"),
+            # HQ action: mark contract as sent
+            path("contracts/<int:contract_id>/send/", views_esignature.contract_send_to_merchant, name="contract_send_to_merchant"),
         ]
     )
 

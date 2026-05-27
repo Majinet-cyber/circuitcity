@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Products · Mixed Retail · {{ business.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+.mr-wrap { max-width: 1100px; margin: 0 auto; padding: 20px 14px; }
+.prod-card {
+  background: #fff; border: 1px solid #e2e8f0; border-radius: 12px;
+  padding: 14px 16px; transition: box-shadow .12s;
+}
+.prod-card:hover { box-shadow: 0 4px 12px rgba(15,23,42,.08); }
+.prod-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+.prod-name { font-weight: 700; color: #0f172a; margin-bottom: 4px; }
+.prod-meta { font-size: .75rem; color: #94a3b8; }
+.prod-price-row { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; }
+.prod-price { font-size: 1rem; font-weight: 800; color: #2563eb; }
+.prod-stock { font-size: .8rem; font-weight: 600; }
+.prod-stock.ok { color: #16a34a; }
+.prod-stock.low { color: #f59e0b; }
+.prod-stock.out { color: #ef4444; }
+.tag { display: inline-block; padding: 2px 8px; border-radius: 99px; font-size: .7rem; font-weight: 600; background: #f1f5f9; color: #475569; }
+.dept-filter-bar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+.dept-btn { padding: 6px 12px; border-radius: 99px; font-size: .78rem; font-weight: 600; border: 1px solid #e2e8f0; background: #fff; color: #475569; text-decoration: none; cursor: pointer; }
+.dept-btn.active, .dept-btn:hover { background: #2563eb; border-color: #2563eb; color: #fff; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="mr-wrap">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
+    <h1 style="font-size:1.3rem;font-weight:900;margin:0;">Products <span style="font-size:.8rem;color:#94a3b8;font-weight:400;">({{ total_count }})</span></h1>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <a href="{% url 'mixed_retail:product_add' %}{% if dept_id %}?dept={{ dept_id }}{% endif %}" class="dept-btn active">+ Add Product</a>
+      <a href="{% url 'mixed_retail:dashboard' %}" class="dept-btn">← Dashboard</a>
+    </div>
+  </div>
+
+  <!-- Search -->
+  <form method="get" style="display:flex;gap:8px;margin-bottom:16px;">
+    {% if dept_id %}<input type="hidden" name="dept" value="{{ dept_id }}">{% endif %}
+    {% if cat_id %}<input type="hidden" name="cat" value="{{ cat_id }}">{% endif %}
+    <input type="text" name="q" value="{{ search }}" placeholder="Search name, SKU, brand…"
+           style="flex:1;padding:8px 12px;border-radius:8px;border:1px solid #d1d5db;font-size:.9rem;">
+    <button type="submit" style="padding:8px 16px;border-radius:8px;background:#2563eb;color:#fff;border:none;font-weight:700;">Search</button>
+    {% if search or dept_id or cat_id %}<a href="{% url 'mixed_retail:products' %}" style="padding:8px 14px;border-radius:8px;border:1px solid #e2e8f0;font-size:.85rem;color:#475569;text-decoration:none;">Clear</a>{% endif %}
+  </form>
+
+  <!-- Department filter -->
+  {% if departments %}
+  <div class="dept-filter-bar">
+    <a href="{% url 'mixed_retail:products' %}" class="dept-btn {% if not dept_id %}active{% endif %}">All</a>
+    {% for dept in departments %}
+    <a href="{% url 'mixed_retail:products' %}?dept={{ dept.id }}" class="dept-btn {% if dept_id == dept.id|stringformat:'s' %}active{% endif %}">
+      {{ dept.name }}
+    </a>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <!-- Category filter (if dept selected) -->
+  {% if selected_dept and categories %}
+  <div class="dept-filter-bar" style="margin-bottom:16px;">
+    <a href="{% url 'mixed_retail:products' %}?dept={{ dept_id }}" class="dept-btn {% if not cat_id %}active{% endif %}">All {{ selected_dept.name }}</a>
+    {% for cat in categories %}
+    <a href="{% url 'mixed_retail:products' %}?dept={{ dept_id }}&cat={{ cat.id }}" class="dept-btn {% if cat_id == cat.id|stringformat:'s' %}active{% endif %}">
+      {{ cat.name }}
+    </a>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {% if products %}
+  <div class="prod-grid">
+    {% for product in products %}
+    <div class="prod-card">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;">
+        <div>
+          <div class="prod-name">{{ product.name }}</div>
+          <div class="prod-meta">
+            {% if product.brand %}{{ product.brand }} &middot; {% endif %}
+            {% if product.department %}{{ product.department.name }}{% endif %}
+            {% if product.category %} › {{ product.category.name }}{% endif %}
+          </div>
+        </div>
+        <a href="{% url 'mixed_retail:product_edit' product.id %}" style="color:#94a3b8;font-size:.8rem;text-decoration:none;">Edit</a>
+      </div>
+
+      {% if product.sku %}
+      <span class="tag">{{ product.sku }}</span>
+      {% endif %}
+
+      <div class="prod-price-row">
+        <div class="prod-price">MWK {{ product.selling_price|floatformat:0|intcomma }}</div>
+        <div class="prod-stock {% if product.is_out_of_stock %}out{% elif product.id in low_stock_ids %}low{% else %}ok{% endif %}">
+          {% if product.is_out_of_stock %}
+            ⚠ Out of stock
+          {% elif product.id in low_stock_ids %}
+            ⚠ Low: {{ product.stock_quantity|floatformat:0 }} {{ product.unit }}
+          {% else %}
+            ✓ {{ product.stock_quantity|floatformat:0 }} {{ product.unit }}
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div style="text-align:center;padding:40px;color:#94a3b8;">
+    <i class="bi bi-box-seam" style="font-size:2.5rem;display:block;margin-bottom:12px;"></i>
+    <p style="font-size:1.1rem;font-weight:600;color:#475569;">No products yet</p>
+    <a href="{% url 'mixed_retail:product_add' %}" style="display:inline-block;margin-top:12px;padding:10px 20px;background:#2563eb;color:#fff;border-radius:8px;text-decoration:none;font-weight:700;">Add First Product</a>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

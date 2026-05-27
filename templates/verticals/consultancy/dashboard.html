@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block title %}Dashboard · Consultancy · {{ business.name }}{% endblock %}
+{% block content %}
+<div style="max-width:1100px;margin:0 auto;padding:20px 14px;">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px;">
+    <div>
+      <h1 style="font-size:1.5rem;font-weight:900;margin:0;color:#0f172a;">{{ business.name }}</h1>
+      <p style="margin:2px 0 0;color:#64748b;font-size:.85rem;">Consultancy & Services — {{ today|date:"l, j F Y" }}</p>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <a href="{% url 'consultancy:quote_create' %}" style="padding:8px 14px;background:#2563eb;color:#fff;border-radius:8px;text-decoration:none;font-size:.85rem;font-weight:700;">+ Quote</a>
+      <a href="{% url 'consultancy:invoice_create' %}" style="padding:8px 14px;background:#16a34a;color:#fff;border-radius:8px;text-decoration:none;font-size:.85rem;font-weight:700;">+ Invoice</a>
+      <a href="{% url 'consultancy:project_add' %}" style="padding:8px 14px;background:#f59e0b;color:#fff;border-radius:8px;text-decoration:none;font-size:.85rem;font-weight:700;">+ Project</a>
+    </div>
+  </div>
+
+  <!-- KPI Cards -->
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;margin-bottom:20px;">
+    <div style="background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:16px;">
+      <div style="font-size:.7rem;text-transform:uppercase;letter-spacing:.07em;font-weight:700;color:#64748b;">Month Revenue</div>
+      <div style="font-size:1.4rem;font-weight:900;color:#0f172a;margin-top:4px;">MWK {{ month_revenue|floatformat:0|intcomma }}</div>
+      <div style="font-size:.75rem;color:#16a34a;margin-top:2px;">Payments received</div>
+    </div>
+    <div style="background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:16px;">
+      <div style="font-size:.7rem;text-transform:uppercase;letter-spacing:.07em;font-weight:700;color:#64748b;">Outstanding</div>
+      <div style="font-size:1.4rem;font-weight:900;color:{% if outstanding_amount > 0 %}#f59e0b{% else %}#0f172a{% endif %};margin-top:4px;">MWK {{ outstanding_amount|floatformat:0|intcomma }}</div>
+      <div style="font-size:.75rem;color:#64748b;margin-top:2px;">Unpaid invoices</div>
+    </div>
+    <div style="background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:16px;">
+      <div style="font-size:.7rem;text-transform:uppercase;letter-spacing:.07em;font-weight:700;color:#64748b;">Active Projects</div>
+      <div style="font-size:1.4rem;font-weight:900;color:#2563eb;margin-top:4px;">{{ active_projects }}</div>
+      <div style="font-size:.75rem;color:#64748b;margin-top:2px;">In progress</div>
+    </div>
+    <div style="background:#fff;border:{% if overdue_count > 0 %}2px solid #ef4444{% else %}1px solid #e2e8f0{% endif %};border-radius:14px;padding:16px;">
+      <div style="font-size:.7rem;text-transform:uppercase;letter-spacing:.07em;font-weight:700;color:#64748b;">Overdue</div>
+      <div style="font-size:1.4rem;font-weight:900;color:{% if overdue_count > 0 %}#ef4444{% else %}#16a34a{% endif %};margin-top:4px;">{{ overdue_count }}</div>
+      <div style="font-size:.75rem;color:#64748b;margin-top:2px;">Invoice{{ overdue_count|pluralize }}</div>
+    </div>
+    <div style="background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:16px;">
+      <div style="font-size:.7rem;text-transform:uppercase;letter-spacing:.07em;font-weight:700;color:#64748b;">Clients</div>
+      <div style="font-size:1.4rem;font-weight:900;color:#0f172a;margin-top:4px;">{{ total_clients }}</div>
+      <div style="font-size:.75rem;color:#64748b;margin-top:2px;">Active</div>
+    </div>
+    <div style="background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:16px;">
+      <div style="font-size:.7rem;text-transform:uppercase;letter-spacing:.07em;font-weight:700;color:#64748b;">Month Expenses</div>
+      <div style="font-size:1.4rem;font-weight:900;color:#ef4444;margin-top:4px;">MWK {{ month_expenses|floatformat:0|intcomma }}</div>
+      <div style="font-size:.75rem;color:#64748b;margin-top:2px;">This month</div>
+    </div>
+  </div>
+
+  <!-- Badges -->
+  {% if badges %}
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px;">
+    {% for badge in badges %}
+    <div style="background:#fff;border:1px solid #e2e8f0;border-radius:20px;padding:7px 14px;display:flex;align-items:center;gap:6px;">
+      <i class="bi {{ badge.icon }}" style="color:var(--bs-{{ badge.color }},#2563eb);"></i>
+      <span style="font-weight:700;font-size:.82rem;">{{ badge.name }}</span>
+      <span style="font-size:.75rem;color:#94a3b8;">{{ badge.description }}</span>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+    <!-- Recent Projects -->
+    <div style="background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:16px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <div style="font-size:.75rem;text-transform:uppercase;letter-spacing:.07em;font-weight:800;color:#475569;">Recent Projects</div>
+        <a href="{% url 'consultancy:projects' %}" style="font-size:.75rem;color:#2563eb;text-decoration:none;">View all</a>
+      </div>
+      {% for p in recent_projects %}
+      <a href="{% url 'consultancy:project_detail' project_id=p.id %}" style="display:block;padding:8px 0;border-bottom:1px solid #f1f5f9;text-decoration:none;color:inherit;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+          <div>
+            <div style="font-weight:600;font-size:.88rem;">{{ p.title }}</div>
+            <div style="font-size:.75rem;color:#94a3b8;">{{ p.client.name }}</div>
+          </div>
+          <span style="font-size:.72rem;padding:2px 8px;border-radius:99px;background:#f1f5f9;color:#475569;white-space:nowrap;">{{ p.get_status_display }}</span>
+        </div>
+      </a>
+      {% empty %}
+      <div style="color:#94a3b8;text-align:center;padding:20px;font-size:.85rem;">No projects yet. <a href="{% url 'consultancy:project_add' %}">Add one</a></div>
+      {% endfor %}
+    </div>
+
+    <!-- Recent Invoices -->
+    <div style="background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:16px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <div style="font-size:.75rem;text-transform:uppercase;letter-spacing:.07em;font-weight:800;color:#475569;">Recent Invoices</div>
+        <a href="{% url 'consultancy:invoices' %}" style="font-size:.75rem;color:#2563eb;text-decoration:none;">View all</a>
+      </div>
+      {% for inv in recent_invoices %}
+      <a href="{% url 'consultancy:invoice_detail' invoice_id=inv.id %}" style="display:block;padding:8px 0;border-bottom:1px solid #f1f5f9;text-decoration:none;color:inherit;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+          <div>
+            <div style="font-weight:600;font-size:.88rem;">{{ inv.invoice_number }}</div>
+            <div style="font-size:.75rem;color:#94a3b8;">{{ inv.client.name }}</div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-weight:700;font-size:.85rem;">MWK {{ inv.total_amount|floatformat:0|intcomma }}</div>
+            <span style="font-size:.72rem;padding:2px 6px;border-radius:99px;
+              background:{% if inv.status == 'paid' %}#dcfce7{% elif inv.status == 'overdue' %}#fef2f2{% else %}#fefce8{% endif %};
+              color:{% if inv.status == 'paid' %}#166534{% elif inv.status == 'overdue' %}#991b1b{% else %}#854d0e{% endif %};">
+              {{ inv.get_status_display }}
+            </span>
+          </div>
+        </div>
+      </a>
+      {% empty %}
+      <div style="color:#94a3b8;text-align:center;padding:20px;font-size:.85rem;">No invoices yet. <a href="{% url 'consultancy:invoice_create' %}">Create one</a></div>
+      {% endfor %}
+    </div>
+  </div>
+
+  {% if best_client %}
+  <div style="margin-top:16px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:14px 16px;display:flex;align-items:center;gap:10px;">
+    <i class="bi bi-star-fill" style="color:#f59e0b;font-size:1.2rem;"></i>
+    <div><span style="font-weight:800;">Best Client:</span> {{ best_client.name }} — MWK {{ best_client.total|floatformat:0|intcomma }} invoiced</div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

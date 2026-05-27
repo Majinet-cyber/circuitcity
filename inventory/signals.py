@@ -480,7 +480,12 @@ if Sale is not None:
 
                 # sold_at from sale timestamp if not already set
                 if not getattr(item, "sold_at", None):
-                    item.sold_at = getattr(instance, "sold_at", None) or timezone.now()
+                    raw_sold_at = getattr(instance, "sold_at", None)
+                    if isinstance(raw_sold_at, date) and not isinstance(raw_sold_at, datetime):
+                        # Sale.sold_at is a DateField; convert to aware datetime for DateTimeField
+                        from django.utils.timezone import make_aware
+                        raw_sold_at = make_aware(datetime.combine(raw_sold_at, datetime.min.time()))
+                    item.sold_at = raw_sold_at or timezone.now()
                     updates.append("sold_at from sale")
 
                 # carry price if item does not already have a selling value

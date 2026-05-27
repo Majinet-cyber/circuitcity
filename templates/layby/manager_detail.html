@@ -47,9 +47,14 @@
 </style>
 
 <div class="detail-page">
-  <a href="{% url 'layby:dashboard' %}" class="back-link">
-    <i class="bi bi-arrow-left"></i> Back to Layby Dashboard
-  </a>
+  <div class="d-flex align-items-center gap-3 mb-3 flex-wrap">
+    <a href="{% url 'layby:dashboard' %}" class="back-link mb-0">
+      <i class="bi bi-arrow-left"></i> Back to Layby Dashboard
+    </a>
+    <a href="{% url 'layby:agreement_pdf' pk=order.pk %}" class="btn btn-sm ms-auto" style="background:#0f172a;color:#fff;border-radius:8px;padding:8px 16px;font-weight:600;text-decoration:none;" target="_blank">
+      <i class="bi bi-file-earmark-pdf-fill me-1" style="color:#ef4444;"></i> Download Agreement PDF
+    </a>
+  </div>
 
   <div class="detail-header">
     <h1><i class="bi bi-journal-check"></i> Layby #{{ order.ref|default:order.id }}</h1>

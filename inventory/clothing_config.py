@@ -98,11 +98,17 @@ CLOTHING_CATEGORIES: List[Tuple[str, str, str, str]] = [
 
 
 def get_category_display(category_value: str) -> str:
-    """Get human-readable category name"""
+    """Get human-readable category name.
+
+    For predefined categories, returns the configured display name.
+    For custom categories (slugified, e.g. 'soccer-jerseys'), converts
+    hyphens/underscores to spaces and title-cases: 'Soccer Jerseys'.
+    """
     for val, display, _, _ in CLOTHING_CATEGORIES:
         if val == category_value:
             return display
-    return category_value.title()
+    # Custom category stored as slug — convert back to readable form
+    return category_value.replace("-", " ").replace("_", " ").title()
 
 
 def get_category_icon(category_value: str) -> str:
@@ -280,6 +286,43 @@ CLOTHING_SUBTYPES = {
 def get_subtypes_for_category(category_value: str) -> List[str]:
     """Get subtypes for a given category"""
     return CLOTHING_SUBTYPES.get(category_value, [])
+
+
+def generate_auto_description(
+    category: str,
+    custom_category: Optional[str] = None,
+    brand: Optional[str] = None,
+    item_subtype: Optional[str] = None,
+    size: Optional[str] = None,
+    color: Optional[str] = None,
+) -> str:
+    """
+    Build a clean auto-generated product description from selected attributes.
+
+    Example: brand=Lacoste, subtype=Polo Shirt, category=shirt, size=M, color=Navy
+    → "Navy Lacoste Polo Shirt, Size M"
+
+    Returns empty string if no useful parts are available.
+    """
+    display_category = (
+        custom_category.strip().title() if custom_category and category == "other"
+        else get_category_display(category)
+    )
+
+    parts: List[str] = []
+    if color and color.lower() not in ("other", ""):
+        parts.append(color.strip())
+    if brand:
+        parts.append(brand.strip())
+    if item_subtype:
+        parts.append(item_subtype.strip())
+    elif display_category:
+        parts.append(display_category)
+
+    result = " ".join(parts)
+    if size:
+        result = f"{result}, Size {size}" if result else f"Size {size}"
+    return result
 
 
 # ============================================================================
@@ -536,15 +579,19 @@ def check_badges_earned(sales_count: int, revenue: Decimal, profit: Decimal, str
 __all__ = [
     "ClothingItemType",
     "CLOTHING_CATEGORIES",
+    "CLOTHING_SUBTYPES",
     "APPAREL_SIZES",
     "FOOTWEAR_SIZES",
     "TROUSER_SIZES",
     "ALL_SIZES",
     "CLOTHING_COLORS",
+    "CLOTHING_BRANDS",
     "get_category_display",
     "get_category_icon",
     "get_item_type_for_category",
     "get_sizes_for_category",
+    "get_subtypes_for_category",
+    "generate_auto_description",
     "generate_internal_sku",
     "generate_variant_sku",
     "sign_product_qr_data",

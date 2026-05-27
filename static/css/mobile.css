@@ -141,7 +141,7 @@
 }
 
 .cc-bottomnav__item--active {
-  color: var(--cc-ink);
+  color: #ff6a1a;
   font-weight: 700;
 }
 

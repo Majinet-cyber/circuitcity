@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Record Egg Collection{% endblock %}
+
+{% block content %}
+<div class="container py-4" style="max-width: 600px;">
+
+  <nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb small">
+      <li class="breadcrumb-item"><a href="{% url 'verticals:farm_dashboard' %}">Farm</a></li>
+      <li class="breadcrumb-item"><a href="{% url 'verticals:farm_egg_tracking' %}">Egg Tracking</a></li>
+      <li class="breadcrumb-item active">Record Collection</li>
+    </ol>
+  </nav>
+
+  <div class="d-flex align-items-center gap-2 mb-4">
+    <span class="fs-2">🥚</span>
+    <div>
+      <h1 class="h3 mb-0">Record Egg Collection</h1>
+      <p class="text-muted mb-0 small">Log today's production for a layer flock</p>
+    </div>
+  </div>
+
+  {% if messages %}
+  {% for message in messages %}
+  <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show">
+    {{ message }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  </div>
+  {% endfor %}
+  {% endif %}
+
+  <div class="card border-0 shadow-sm">
+    <div class="card-body p-4">
+      <form method="post" action="">
+        {% csrf_token %}
+
+        <div class="mb-4">
+          <label class="form-label fw-semibold">Flock / Batch <span class="text-danger">*</span></label>
+          <select name="batch_id" class="form-select form-select-lg" required>
+            <option value="">Select a layer flock…</option>
+            {% for batch in layer_batches %}
+            <option value="{{ batch.pk }}" {% if batch.pk|stringformat:"s" == preselect_batch %}selected{% endif %}>
+              {{ batch.name }} ({{ batch.current_birds }} birds)
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="mb-4">
+          <label class="form-label fw-semibold">Date <span class="text-danger">*</span></label>
+          <input type="date" name="date" class="form-control form-control-lg"
+                 value="{{ today|date:'Y-m-d' }}" required>
+        </div>
+
+        <div class="mb-4">
+          <label class="form-label fw-semibold">Eggs Collected <span class="text-danger">*</span></label>
+          <input type="number" name="eggs_collected" class="form-control form-control-lg"
+                 placeholder="e.g. 120" min="0" required>
+          <div class="form-text">Total good eggs collected today</div>
+        </div>
+
+        <div class="row g-3 mb-4">
+          <div class="col-6">
+            <label class="form-label fw-semibold">Deaths Today</label>
+            <input type="number" name="deaths" class="form-control" placeholder="0" min="0" value="0">
+          </div>
+          <div class="col-6">
+            <label class="form-label fw-semibold">Feed Given (kg)</label>
+            <input type="number" name="feed_kg" class="form-control" placeholder="0.0" min="0" step="0.1">
+          </div>
+        </div>
+
+        <div class="mb-4">
+          <label class="form-label fw-semibold">Medication / Treatment</label>
+          <input type="text" name="medication" class="form-control"
+                 placeholder="e.g. Newcastle vaccine, antibiotics…">
+        </div>
+
+        <div class="mb-4">
+          <label class="form-label fw-semibold">Remarks</label>
+          <textarea name="remarks" class="form-control" rows="2"
+                    placeholder="Any observations, issues, or notes…"></textarea>
+        </div>
+
+        <div class="d-grid gap-2">
+          <button type="submit" class="btn btn-success btn-lg">
+            <i class="bi bi-check-circle-fill me-2"></i>Save Collection Record
+          </button>
+          <a href="{% url 'verticals:farm_egg_tracking' %}" class="btn btn-outline-secondary">
+            Cancel
+          </a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

@@ -957,3 +957,233 @@ def manager_new_sale(request: HttpRequest) -> HttpResponse:
             "active_nav": "layby",
         },
     )
+
+
+@login_required
+def layby_agreement_pdf(request: HttpRequest, pk: int) -> HttpResponse:
+    """
+    Generate a professional layby agreement PDF using reportlab.
+    Downloads as: layby-agreement-<ref>.pdf
+    """
+    from decimal import Decimal as D
+    from io import BytesIO
+
+    try:
+        from reportlab.lib import colors
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib.units import cm
+        from reportlab.platypus import (
+            SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
+        )
+    except ImportError:
+        return HttpResponse("PDF library not available. Contact support.", status=503)
+
+    order = _scope_layby_order(request, pk)
+    payments = _collect_payments(order)
+
+    # Build document
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        rightMargin=2 * cm,
+        leftMargin=2 * cm,
+        topMargin=2 * cm,
+        bottomMargin=2 * cm,
+    )
+
+    styles = getSampleStyleSheet()
+    orange = colors.HexColor("#ff6a1a")
+    dark = colors.HexColor("#0f172a")
+    muted = colors.HexColor("#64748b")
+    green = colors.HexColor("#059669")
+
+    title_style = ParagraphStyle(
+        "Title", parent=styles["Heading1"],
+        fontSize=22, textColor=orange, spaceAfter=4, leading=26,
+    )
+    subtitle_style = ParagraphStyle(
+        "Subtitle", parent=styles["Normal"],
+        fontSize=10, textColor=muted, spaceAfter=12,
+    )
+    section_style = ParagraphStyle(
+        "Section", parent=styles["Heading2"],
+        fontSize=11, textColor=dark, spaceBefore=14, spaceAfter=6,
+        borderPad=4,
+    )
+    body_style = ParagraphStyle(
+        "Body", parent=styles["Normal"],
+        fontSize=10, textColor=dark, leading=14,
+    )
+    small_style = ParagraphStyle(
+        "Small", parent=styles["Normal"],
+        fontSize=8, textColor=muted, leading=11,
+    )
+
+    try:
+        business = get_active_business(request)
+        biz_name = getattr(business, "name", "Business") if business else "Business"
+    except Exception:
+        biz_name = "Business"
+
+    ref = getattr(order, "ref", str(order.pk))
+    total = getattr(order, "total_price", D("0.00")) or D("0.00")
+    deposit = getattr(order, "deposit_amount", D("0.00")) or D("0.00")
+    balance = getattr(order, "balance", D("0.00"))
+    term_months = getattr(order, "term_months", 3)
+    created_at = getattr(order, "created_at", timezone.now())
+    created_date = created_at.strftime("%d %B %Y") if created_at else "—"
+    due_date_approx = (created_at + timedelta(days=term_months * 30)).strftime("%d %B %Y") if created_at else "—"
+
+    elements = []
+
+    # Header
+    elements.append(Paragraph(f"LAYBY AGREEMENT", title_style))
+    elements.append(Paragraph(f"{biz_name} · Ref: {ref} · Date: {created_date}", subtitle_style))
+    elements.append(HRFlowable(width="100%", thickness=2, color=orange, spaceAfter=12))
+
+    # Customer Details
+    elements.append(Paragraph("CUSTOMER DETAILS", section_style))
+    customer_data = [
+        ["Full Name", getattr(order, "customer_name", "—") or "—"],
+        ["Phone", getattr(order, "customer_phone", "—") or "—"],
+        ["ID Number", getattr(order, "id_number", "—") or "—"],
+    ]
+    if getattr(order, "kin1_name", ""):
+        customer_data.append(["Next of Kin", f"{order.kin1_name} — {order.kin1_phone or '—'}"])
+    ct = Table(customer_data, colWidths=[4 * cm, None])
+    ct.setStyle(TableStyle([
+        ("FONTSIZE", (0, 0), (-1, -1), 9),
+        ("TEXTCOLOR", (0, 0), (0, -1), muted),
+        ("TEXTCOLOR", (1, 0), (1, -1), dark),
+        ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
+        ("ROWBACKGROUNDS", (0, 0), (-1, -1), [colors.white, colors.HexColor("#f8fafc")]),
+        ("TOPPADDING", (0, 0), (-1, -1), 5),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+        ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#e2e8f0")),
+    ]))
+    elements.append(ct)
+
+    # Product Details
+    elements.append(Paragraph("PRODUCT / ITEM", section_style))
+    product_data = [
+        ["Item", getattr(order, "item_name", "—") or "—"],
+        ["SKU / Reference", getattr(order, "sku", "—") or "—"],
+    ]
+    pt = Table(product_data, colWidths=[4 * cm, None])
+    pt.setStyle(TableStyle([
+        ("FONTSIZE", (0, 0), (-1, -1), 9),
+        ("TEXTCOLOR", (0, 0), (0, -1), muted),
+        ("TEXTCOLOR", (1, 0), (1, -1), dark),
+        ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
+        ("ROWBACKGROUNDS", (0, 0), (-1, -1), [colors.white, colors.HexColor("#f8fafc")]),
+        ("TOPPADDING", (0, 0), (-1, -1), 5),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+        ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#e2e8f0")),
+    ]))
+    elements.append(pt)
+
+    # Payment Summary
+    elements.append(Paragraph("PAYMENT SUMMARY", section_style))
+    summary_data = [
+        ["TOTAL PRICE", f"MWK {total:,.2f}"],
+        ["INITIAL DEPOSIT", f"MWK {deposit:,.2f}"],
+        ["BALANCE DUE", f"MWK {balance:,.2f}"],
+        ["TERM", f"{term_months} month{'s' if term_months != 1 else ''}"],
+        ["DUE DATE (approx.)", due_date_approx],
+        ["STATUS", (getattr(order, "status", "active") or "active").upper()],
+    ]
+    st = Table(summary_data, colWidths=[5 * cm, None])
+    st.setStyle(TableStyle([
+        ("FONTSIZE", (0, 0), (-1, -1), 10),
+        ("TEXTCOLOR", (0, 0), (0, -1), muted),
+        ("TEXTCOLOR", (1, 0), (1, -1), dark),
+        ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
+        ("FONTNAME", (1, 0), (1, -1), "Helvetica-Bold"),
+        ("ROWBACKGROUNDS", (0, 0), (-1, -1), [colors.white, colors.HexColor("#f8fafc")]),
+        ("TOPPADDING", (0, 0), (-1, -1), 6),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+        ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#e2e8f0")),
+        # Highlight balance row
+        ("BACKGROUND", (0, 2), (1, 2), colors.HexColor("#fef3c7")),
+        ("TEXTCOLOR", (1, 2), (1, 2), colors.HexColor("#92400e")),
+    ]))
+    elements.append(st)
+
+    # Payment History
+    if payments:
+        elements.append(Paragraph("PAYMENT HISTORY", section_style))
+        ph_data = [["Date", "Amount", "Method", "Received By"]]
+        for p in payments:
+            date_str = ""
+            if hasattr(p, "received_at") and p.received_at:
+                date_str = p.received_at.strftime("%d %b %Y")
+            elif isinstance(p, dict):
+                date_str = str(p.get("received_at", "")[:10] if p.get("received_at") else "—")
+            ph_data.append([
+                date_str or "—",
+                f"MWK {(p.amount if hasattr(p, 'amount') else p.get('amount', 0)):,.2f}",
+                (p.method if hasattr(p, "method") else p.get("method", "cash")) or "cash",
+                str(getattr(p, "received_by", None) or p.get("received_by", "—") or "—"),
+            ])
+        pht = Table(ph_data, colWidths=[3.5 * cm, 3.5 * cm, 3 * cm, None])
+        pht.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), orange),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("FONTSIZE", (0, 0), (-1, -1), 9),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f0fdf4")]),
+            ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#e2e8f0")),
+            ("TOPPADDING", (0, 0), (-1, -1), 5),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+        ]))
+        elements.append(pht)
+
+    # Terms & Conditions
+    elements.append(Spacer(1, 0.5 * cm))
+    elements.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#e2e8f0"), spaceAfter=10))
+    elements.append(Paragraph("TERMS AND CONDITIONS", section_style))
+    terms = [
+        "1. The customer agrees to pay the balance in full by the due date specified above.",
+        "2. A minimum deposit as specified must be paid before the item is reserved.",
+        "3. Items are reserved pending full payment. Stock may be released if payments are not made on time.",
+        "4. Deposits are non-refundable in case of cancellation by the customer.",
+        "5. The business reserves the right to cancel the agreement if payment terms are not met.",
+        "6. All prices are in Malawian Kwacha (MWK) unless otherwise stated.",
+    ]
+    for term in terms:
+        elements.append(Paragraph(term, small_style))
+
+    # Signature block
+    elements.append(Spacer(1, 1 * cm))
+    sig_data = [
+        ["Customer Signature:", "___________________________", "Date:", "_______________"],
+        ["Agent Signature:", "___________________________", "Date:", "_______________"],
+    ]
+    sig_t = Table(sig_data, colWidths=[3.5 * cm, 6 * cm, 1.5 * cm, 3.5 * cm])
+    sig_t.setStyle(TableStyle([
+        ("FONTSIZE", (0, 0), (-1, -1), 9),
+        ("TEXTCOLOR", (0, 0), (0, -1), muted),
+        ("TEXTCOLOR", (2, 0), (2, -1), muted),
+        ("TOPPADDING", (0, 0), (-1, -1), 8),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+        ("LINEABOVE", (1, 0), (1, -1), 0.5, muted),
+        ("LINEABOVE", (3, 0), (3, -1), 0.5, muted),
+    ]))
+    elements.append(sig_t)
+
+    # Footer
+    elements.append(Spacer(1, 0.5 * cm))
+    elements.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#e2e8f0")))
+    elements.append(Paragraph(
+        f"Generated by Emajinet · {biz_name} · Ref: {ref} · {created_date}",
+        small_style,
+    ))
+
+    doc.build(elements)
+    buffer.seek(0)
+    filename = f"layby-agreement-{ref}.pdf"
+    response = HttpResponse(buffer, content_type="application/pdf")
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+    return response

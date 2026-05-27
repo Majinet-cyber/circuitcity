@@ -70,12 +70,291 @@
     </div>
   </div>
 
+  <!-- ═══ INTELLIGENCE CARDS ═══ -->
+  {% if intelligence %}
+  <div style="margin-bottom:1.5rem;">
+    <h5 class="fw-bold mb-3 d-flex align-items-center gap-2" style="color:#0f172a;">
+      <i class="bi bi-cpu text-primary"></i> Batch Intelligence
+    </h5>
+    <div class="row g-3">
+
+      <!-- Mortality Risk -->
+      <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm h-100 p-3 text-center"
+          style="background:{% if intelligence.mortality_risk_level == 'good' %}#f0fdf4{% elif intelligence.mortality_risk_level == 'watch' %}#fefce8{% elif intelligence.mortality_risk_level == 'high_risk' %}#fff7ed{% else %}#fef2f2{% endif %}">
+          <i class="bi bi-activity mb-2"
+            style="font-size:1.6rem;color:{% if intelligence.mortality_risk_level == 'good' %}#15803d{% elif intelligence.mortality_risk_level == 'watch' %}#92400e{% elif intelligence.mortality_risk_level == 'high_risk' %}#c2410c{% else %}#dc2626{% endif %}"></i>
+          <div class="text-muted fw-bold" style="font-size:.65rem;text-transform:uppercase;letter-spacing:.06em;">Mortality Risk</div>
+          <div class="fw-black mt-1"
+            style="font-size:1rem;color:{% if intelligence.mortality_risk_level == 'good' %}#15803d{% elif intelligence.mortality_risk_level == 'watch' %}#92400e{% elif intelligence.mortality_risk_level == 'high_risk' %}#c2410c{% else %}#dc2626{% endif %}">
+            {{ intelligence.mortality_risk_level|replace:"_, "|title }}
+          </div>
+          {% if intelligence.mortality_rate is not None %}
+          <div class="text-muted" style="font-size:.75rem;">{{ intelligence.mortality_rate|floatformat:1 }}% rate</div>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Health Score -->
+      <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm h-100 p-3 text-center">
+          <i class="bi bi-heart-pulse mb-2"
+            style="font-size:1.6rem;color:{% if intelligence.batch_health_score >= 75 %}#15803d{% elif intelligence.batch_health_score >= 50 %}#d97706{% else %}#dc2626{% endif %}"></i>
+          <div class="text-muted fw-bold" style="font-size:.65rem;text-transform:uppercase;letter-spacing:.06em;">Health Score</div>
+          <div class="fw-black mt-1"
+            style="font-size:1.5rem;color:{% if intelligence.batch_health_score >= 75 %}#15803d{% elif intelligence.batch_health_score >= 50 %}#d97706{% else %}#dc2626{% endif %}">
+            {{ intelligence.batch_health_score }}<span style="font-size:0.85rem;color:#64748b;">/100</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Cost Per Animal -->
+      <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm h-100 p-3 text-center">
+          <i class="bi bi-cash-coin mb-2" style="font-size:1.6rem;color:#0369a1;"></i>
+          <div class="text-muted fw-bold" style="font-size:.65rem;text-transform:uppercase;letter-spacing:.06em;">Cost / Animal</div>
+          <div class="fw-black mt-1" style="font-size:1rem;color:#0f172a;">
+            {% if intelligence.cost_per_surviving_animal_mwk %}
+              MWK {{ intelligence.cost_per_surviving_animal_mwk|floatformat:0|intcomma }}
+            {% else %}—{% endif %}
+          </div>
+        </div>
+      </div>
+
+      <!-- Break-even Price -->
+      <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm h-100 p-3 text-center">
+          <i class="bi bi-bar-chart-line mb-2" style="font-size:1.6rem;color:#7c3aed;"></i>
+          <div class="text-muted fw-bold" style="font-size:.65rem;text-transform:uppercase;letter-spacing:.06em;">Break-even</div>
+          <div class="fw-black mt-1" style="font-size:1rem;color:#0f172a;">
+            {% if intelligence.break_even_price_mwk %}
+              MWK {{ intelligence.break_even_price_mwk|floatformat:0|intcomma }}
+            {% else %}—{% endif %}
+          </div>
+        </div>
+      </div>
+
+      <!-- Feed Cost -->
+      <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm h-100 p-3 text-center">
+          <i class="bi bi-basket mb-2" style="font-size:1.6rem;color:#059669;"></i>
+          <div class="text-muted fw-bold" style="font-size:.65rem;text-transform:uppercase;letter-spacing:.06em;">Feed Cost</div>
+          <div class="fw-black mt-1" style="font-size:1rem;color:#0f172a;">
+            MWK {{ intelligence.feed_cost_mwk|floatformat:0|intcomma|default:"0" }}
+          </div>
+        </div>
+      </div>
+
+      <!-- Net Profit -->
+      <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm h-100 p-3 text-center"
+          style="background:{% if intelligence.net_profit_mwk >= 0 %}#f0fdf4{% else %}#fef2f2{% endif %}">
+          <i class="bi bi-{% if intelligence.net_profit_mwk >= 0 %}graph-up-arrow{% else %}graph-down-arrow{% endif %} mb-2"
+            style="font-size:1.6rem;color:{% if intelligence.net_profit_mwk >= 0 %}#15803d{% else %}#dc2626{% endif %};"></i>
+          <div class="text-muted fw-bold" style="font-size:.65rem;text-transform:uppercase;letter-spacing:.06em;">Net Profit</div>
+          <div class="fw-black mt-1"
+            style="font-size:1rem;color:{% if intelligence.net_profit_mwk >= 0 %}#15803d{% else %}#dc2626{% endif %}">
+            MWK {{ intelligence.net_profit_mwk|floatformat:0|intcomma }}
+          </div>
+        </div>
+      </div>
+
+      <!-- Days in Cycle -->
+      <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm h-100 p-3 text-center">
+          <i class="bi bi-calendar-range mb-2" style="font-size:1.6rem;color:#0ea5e9;"></i>
+          <div class="text-muted fw-bold" style="font-size:.65rem;text-transform:uppercase;letter-spacing:.06em;">Days in Cycle</div>
+          <div class="fw-black mt-1" style="font-size:1.5rem;color:#0f172a;">{{ intelligence.days_in_cycle }}</div>
+        </div>
+      </div>
+
+      <!-- Survival Rate -->
+      <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm h-100 p-3 text-center">
+          <i class="bi bi-shield-check mb-2" style="font-size:1.6rem;color:#059669;"></i>
+          <div class="text-muted fw-bold" style="font-size:.65rem;text-transform:uppercase;letter-spacing:.06em;">Survival Rate</div>
+          <div class="fw-black mt-1" style="font-size:1rem;color:#0f172a;">
+            {% if intelligence.survival_rate is not None %}
+              {{ intelligence.survival_rate|floatformat:1 }}%
+            {% else %}—{% endif %}
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Recommendations from intelligence -->
+    {% if intelligence.recommendations %}
+    <div class="mt-3 p-3 rounded-3" style="background:#eff6ff;border:1px solid #bfdbfe;">
+      <h6 class="fw-bold mb-2" style="color:#1d4ed8;font-size:.85rem;">
+        <i class="bi bi-compass me-1"></i>Smart Recommendations
+      </h6>
+      {% for rec in intelligence.recommendations %}
+      <div class="d-flex align-items-start gap-2 mb-1">
+        <i class="bi bi-arrow-right-circle-fill text-primary flex-shrink-0 mt-1" style="font-size:.8rem;"></i>
+        <span style="font-size:.82rem;color:#1e40af;">{{ rec }}</span>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  <!-- ═══ LIVESTOCK SIMULATION PANEL ═══ -->
+  <div class="card border-0 shadow-sm mb-4" style="border-left:4px solid #7c3aed!important;">
+    <div class="card-header bg-transparent d-flex align-items-center gap-2">
+      <i class="bi bi-calculator" style="color:#7c3aed;font-size:1.1rem;"></i>
+      <h6 class="mb-0 fw-bold">Profit Simulation</h6>
+      <span style="background:#f3e8ff;color:#7c3aed;font-size:.62rem;padding:2px 7px;border-radius:99px;font-weight:700;text-transform:uppercase;">Simulator</span>
+    </div>
+    <div class="card-body">
+      <form method="get" id="simulation-form" class="row g-3 mb-3">
+        <div class="col-6 col-md-3">
+          <label class="form-label fw-semibold" style="font-size:.8rem;">Sale Price / Animal (MWK)</label>
+          <input type="number" name="sim_sale_price" class="form-control form-control-sm" step="100"
+            value="{{ sim_sale_price }}" placeholder="e.g. 25000">
+        </div>
+        <div class="col-6 col-md-3">
+          <label class="form-label fw-semibold" style="font-size:.8rem;">Animals to Sell</label>
+          <input type="number" name="sim_animals_to_sell" class="form-control form-control-sm" step="1"
+            value="{{ sim_animals_to_sell }}" placeholder="{{ batch.count_current|default:0 }}">
+        </div>
+        <div class="col-6 col-md-3">
+          <label class="form-label fw-semibold" style="font-size:.8rem;">Expected Mortality (%)</label>
+          <input type="number" name="sim_expected_mortality" class="form-control form-control-sm" step="0.5" min="0" max="100"
+            value="{{ sim_expected_mortality }}" placeholder="0">
+        </div>
+        <div class="col-6 col-md-3">
+          <label class="form-label fw-semibold" style="font-size:.8rem;">Extra Feed Cost (MWK)</label>
+          <input type="number" name="sim_extra_feed_cost" class="form-control form-control-sm" step="100"
+            value="{{ sim_extra_feed_cost }}" placeholder="0">
+        </div>
+        <div class="col-12">
+          <button type="submit" class="btn btn-sm" style="background:#7c3aed;color:#fff;border-radius:20px;padding:6px 20px;font-weight:700;">
+            <i class="bi bi-play-circle me-1"></i> Run Simulation
+          </button>
+        </div>
+      </form>
+
+      {% if simulation_result %}
+      <div class="row g-2 mt-1">
+        <div class="col-12">
+          <div class="alert alert-sm mb-2 py-2 px-3 rounded-3"
+            style="background:{% if simulation_result.projected_profit >= 0 %}#f0fdf4;border-color:#86efac{% else %}#fef2f2;border-color:#fca5a5{% endif %};">
+            <div class="d-flex flex-wrap gap-4 align-items-center">
+              <div>
+                <span class="text-muted" style="font-size:.7rem;">Animals Sold</span>
+                <div class="fw-black" style="font-size:1.2rem;">{{ simulation_result.animals_sold }}</div>
+              </div>
+              <div>
+                <span class="text-muted" style="font-size:.7rem;">Projected Revenue</span>
+                <div class="fw-black text-success" style="font-size:1.2rem;">MWK {{ simulation_result.projected_revenue|floatformat:0|intcomma }}</div>
+              </div>
+              <div>
+                <span class="text-muted" style="font-size:.7rem;">Total Cost</span>
+                <div class="fw-black text-danger" style="font-size:1.2rem;">MWK {{ simulation_result.total_cost|floatformat:0|intcomma }}</div>
+              </div>
+              <div>
+                <span class="text-muted" style="font-size:.7rem;">Projected Profit</span>
+                <div class="fw-black" style="font-size:1.4rem;color:{% if simulation_result.projected_profit >= 0 %}#15803d{% else %}#dc2626{% endif %}">
+                  MWK {{ simulation_result.projected_profit|floatformat:0|intcomma }}
+                </div>
+              </div>
+              {% if simulation_result.roi_pct is not None %}
+              <div>
+                <span class="text-muted" style="font-size:.7rem;">ROI</span>
+                <div class="fw-black" style="font-size:1.2rem;color:{% if simulation_result.roi_pct >= 0 %}#15803d{% else %}#dc2626{% endif %}">
+                  {{ simulation_result.roi_pct|floatformat:1 }}%
+                </div>
+              </div>
+              {% endif %}
+              {% if simulation_result.break_even_price %}
+              <div>
+                <span class="text-muted" style="font-size:.7rem;">Break-even Price</span>
+                <div class="fw-black" style="font-size:1.2rem;color:#1d4ed8;">MWK {{ simulation_result.break_even_price|floatformat:0|intcomma }}</div>
+              </div>
+              {% endif %}
+            </div>
+          </div>
+          <!-- Best/Worst case row -->
+          <div class="d-flex gap-3 flex-wrap mt-1">
+            <div class="p-2 rounded-2" style="background:#f0fdf4;flex:1;min-width:120px;">
+              <div class="text-muted" style="font-size:.65rem;font-weight:700;text-transform:uppercase;">Best Case</div>
+              <div class="fw-bold text-success" style="font-size:.95rem;">MWK {{ simulation_result.best_case_profit|floatformat:0|intcomma }}</div>
+            </div>
+            <div class="p-2 rounded-2" style="background:#fef3c7;flex:1;min-width:120px;">
+              <div class="text-muted" style="font-size:.65rem;font-weight:700;text-transform:uppercase;">Expected</div>
+              <div class="fw-bold" style="font-size:.95rem;color:#92400e;">MWK {{ simulation_result.projected_profit|floatformat:0|intcomma }}</div>
+            </div>
+            <div class="p-2 rounded-2" style="background:#fef2f2;flex:1;min-width:120px;">
+              <div class="text-muted" style="font-size:.65rem;font-weight:700;text-transform:uppercase;">Worst Case</div>
+              <div class="fw-bold text-danger" style="font-size:.95rem;">MWK {{ simulation_result.worst_case_profit|floatformat:0|intcomma }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      {% else %}
+      <div class="text-muted text-center py-3" style="font-size:.85rem;">
+        <i class="bi bi-calculator" style="font-size:1.5rem;display:block;margin-bottom:6px;"></i>
+        Enter a sale price and click <strong>Run Simulation</strong> to see projected profit, ROI, and break-even.
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- ═══ HOUSING PLANNER PLACEHOLDER ═══ -->
+  <div class="card border-0 shadow-sm mb-4" style="border-left:4px solid #0ea5e9!important;">
+    <div class="card-header bg-transparent d-flex align-items-center gap-2">
+      <i class="bi bi-house-gear" style="color:#0284c7;font-size:1.1rem;"></i>
+      <h6 class="mb-0 fw-bold">Housing Planner</h6>
+      <span style="background:#e0f2fe;color:#0284c7;font-size:.62rem;padding:2px 7px;border-radius:99px;font-weight:700;text-transform:uppercase;">Beta</span>
+    </div>
+    <div class="card-body">
+      <div class="row g-3">
+        {% if housing_space_estimate %}
+        <div class="col-6 col-md-4">
+          <div class="text-muted fw-bold" style="font-size:.7rem;text-transform:uppercase;">Recommended Space</div>
+          <div class="fw-black" style="font-size:1.25rem;">{{ housing_space_estimate|floatformat:1 }} m²</div>
+          <div class="text-muted" style="font-size:.75rem;">For {{ batch.count_current }} {{ batch.get_animal_type_display }}</div>
+        </div>
+        {% endif %}
+        <div class="col-6 col-md-4">
+          <div class="text-muted fw-bold" style="font-size:.7rem;text-transform:uppercase;">Housing Type</div>
+          <div class="fw-semibold" style="font-size:.9rem;">
+            {% if batch.animal_type == 'chickens' %}Poultry House
+            {% elif batch.animal_type == 'pigs' %}Pig Pen
+            {% elif batch.animal_type == 'cattle' %}Kraal / Shed
+            {% elif batch.animal_type == 'goats' %}Goat Pen
+            {% else %}Animal Housing{% endif %}
+          </div>
+        </div>
+        <div class="col-12">
+          <div class="checklist mt-1" style="display:flex;flex-wrap:wrap;gap:8px;">
+            <span style="background:#f0fdf4;color:#166534;font-size:.75rem;font-weight:600;padding:4px 10px;border-radius:8px;border:1px solid #bbf7d0;"><i class="bi bi-check-circle-fill me-1"></i>Adequate ventilation</span>
+            <span style="background:#f0fdf4;color:#166534;font-size:.75rem;font-weight:600;padding:4px 10px;border-radius:8px;border:1px solid #bbf7d0;"><i class="bi bi-check-circle-fill me-1"></i>Fresh water access</span>
+            <span style="background:#f0fdf4;color:#166534;font-size:.75rem;font-weight:600;padding:4px 10px;border-radius:8px;border:1px solid #bbf7d0;"><i class="bi bi-check-circle-fill me-1"></i>Feed storage area</span>
+            <span style="background:#f0fdf4;color:#166534;font-size:.75rem;font-weight:600;padding:4px 10px;border-radius:8px;border:1px solid #bbf7d0;"><i class="bi bi-check-circle-fill me-1"></i>Separate sick pen</span>
+            <span style="background:#f0fdf4;color:#166534;font-size:.75rem;font-weight:600;padding:4px 10px;border-radius:8px;border:1px solid #bbf7d0;"><i class="bi bi-check-circle-fill me-1"></i>Hygiene protocol</span>
+          </div>
+        </div>
+        <div class="col-12">
+          <div class="p-3 rounded-3 text-center" style="background:linear-gradient(135deg,#f0f9ff,#e0f2fe);border:1.5px dashed #38bdf8;">
+            <i class="bi bi-grid-3x3-gap" style="font-size:2rem;color:#0284c7;display:block;margin-bottom:6px;"></i>
+            <div class="fw-bold" style="color:#0284c7;font-size:.85rem;">3D Housing Preview — Coming Soon</div>
+            <div class="text-muted" style="font-size:.75rem;margin-top:2px;">Interactive layout planner with WebGL/Three.js integration</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- ===== SMART LIVESTOCK ASSISTANT ===== -->
   <div class="card border-0 shadow-sm mb-4" id="smart-livestock-panel">
     <div class="card-header bg-transparent d-flex align-items-center justify-content-between">
-      <h6 class="mb-0">
-        🧠 Smart Livestock Assistant
-        <span style="background:#dbeafe;color:#1d4ed8;font-size:.6rem;padding:2px 7px;border-radius:99px;font-weight:700;text-transform:uppercase;margin-left:6px">AI Guide</span>
+      <h6 class="mb-0 d-flex align-items-center gap-2">
+        <i class="bi bi-stars text-primary"></i>
+        Smart Livestock Assistant
+        <span style="background:#dbeafe;color:#1d4ed8;font-size:.6rem;padding:2px 7px;border-radius:99px;font-weight:700;text-transform:uppercase;">Guide</span>
       </h6>
       <button type="button" onclick="toggleLivestockGuide()" id="livestock-guide-toggle"
         style="background:#f1f5f9;color:#475569;border:none;border-radius:6px;padding:5px 12px;font-weight:700;cursor:pointer;font-size:.8rem">
@@ -131,7 +410,7 @@
           { weeks: [6,7], label: "Week 6–7", title: "Finisher / Harvest Prep",
             tasks: ["Switch to finisher feed at Week 6", "Target market weight: 1.8–2.5kg by Week 7", "Withdraw anti-coccidial 5 days before slaughter",
                     "Arrange transport and market", "Calculate profit per bird"],
-            feed_per_bird_g: 130, alert: "🌾 Optimal slaughter window is Day 42–49. Delay reduces feed efficiency significantly." },
+            feed_per_bird_g: 130, alert: "Optimal slaughter window is Day 42–49. Delay reduces feed efficiency significantly." },
         ]
       },
       pig: {

@@ -20,12 +20,75 @@ from django.shortcuts import render, redirect
 from django.urls import reverse
 from django.views.decorators.http import require_http_methods
 
+import re
+
 from tenants.utils import get_active_business, require_business
 from tenants.utils_roles import is_manager
 from inventory.models_phone_products import PhoneProductCatalog, ElectronicsCategory
 from inventory.business_kinds import BusinessKind
 from inventory.authz import require_business_kind
 from core.decorators import manager_required
+
+
+def _parse_phone_specs(specs: str):
+    """
+    Parse a phone storage+RAM spec string into (rom_gb, ram_gb, normalized_label).
+
+    Accepts formats like:
+        128+4      → (128, 4, "128+4")
+        128+6      → (128, 6, "128+6")
+        256+12     → (256, 12, "256+12")
+        512+12     → (512, 12, "512+12")
+        64GB+4GB   → (64, 4, "64+4")
+        1TB+16     → (1000, 16, "1000+16")
+        256GB+12GB → (256, 12, "256+12")
+
+    Returns (rom_gb: int, ram_gb: int, normalized_label: str)
+    Raises ValueError with a user-friendly message on invalid input.
+    """
+    if not specs or not specs.strip():
+        raise ValueError("Storage + RAM configuration is required.")
+
+    # Collapse whitespace, make uppercase for unit handling
+    s = specs.strip()
+    # Normalise separators: accept "+" or "/" or " / "
+    s = re.sub(r"\s*/\s*", "+", s)  # "128/4" → "128+4"
+    s = re.sub(r"\s+", "", s)       # remove all spaces
+
+    if "+" not in s:
+        raise ValueError(
+            "Use format like 128+4 or 256+12 (Storage+RAM)."
+        )
+
+    parts = s.split("+", 1)
+    if len(parts) != 2:
+        raise ValueError("Expected exactly one '+' separator, e.g. 128+4.")
+
+    def _to_gb(token: str) -> int:
+        """Convert a storage/RAM token like '128GB', '1TB', '512' to integer GB."""
+        t = token.upper()
+        # TB (1 TB ≈ 1000 GB for display purposes)
+        m = re.fullmatch(r"(\d+(?:\.\d+)?)T(?:B)?", t)
+        if m:
+            return round(float(m.group(1)) * 1000)
+        # GB
+        m = re.fullmatch(r"(\d+)G(?:B)?", t)
+        if m:
+            return int(m.group(1))
+        # Plain integer (MB not supported)
+        m = re.fullmatch(r"(\d+)", t)
+        if m:
+            return int(m.group(1))
+        raise ValueError(f"Cannot parse '{token}' as a storage/RAM value.")
+
+    rom_gb = _to_gb(parts[0])
+    ram_gb = _to_gb(parts[1])
+
+    if rom_gb <= 0 or ram_gb <= 0:
+        raise ValueError("Storage and RAM values must be positive numbers.")
+
+    normalized = f"{rom_gb}+{ram_gb}"
+    return rom_gb, ram_gb, normalized
 
 
 # =============================================================================
@@ -158,20 +221,14 @@ def add_phone_products(request: HttpRequest) -> HttpResponse:
             return redirect(request.path)
 
         if not specs:
-            messages.error(request, "Specs (ROM+RAM, e.g., '128+4') are required.")
+            messages.error(request, "Select a preset or enter a custom Storage + RAM configuration (e.g. 128+4).")
             return redirect(request.path)
 
-        # Parse specs - Format: ROM+RAM (e.g., "128+4" or "256+8")
+        # Parse specs — accepts "128+4", "256+12", "512+12", "128GB+6GB", "1TB+16", etc.
         try:
-            parts = specs.replace(" ", "").split("+")
-            if len(parts) != 2:
-                raise ValueError("Invalid format")
-            rom_gb = int(parts[0])  # First part is ROM (storage)
-            ram_gb = int(parts[1])  # Second part is RAM (memory)
-            if ram_gb <= 0 or rom_gb <= 0:
-                raise ValueError("RAM and ROM must be positive")
-        except (ValueError, IndexError):
-            messages.error(request, "Invalid specs format. Use format like '128+4' or '256+8' (ROM+RAM).")
+            rom_gb, ram_gb, specs = _parse_phone_specs(specs)
+        except ValueError as exc:
+            messages.error(request, f"Invalid Storage + RAM: {exc}")
             return redirect(request.path)
 
         # Parse order price (optional)

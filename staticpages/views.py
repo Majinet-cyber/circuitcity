@@ -55,84 +55,109 @@ def get_all_verticals():
     
     This is the canonical list used for landing page, docs, and onboarding.
     """
+    _svg = lambda path: f'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:22px;height:22px;">{path}</svg>'
     return [
         {
             'code': 'phones',
             'name': 'Phones & Electronics',
             'description': 'Track phone inventory, accessories, and repairs',
-            'icon': '📱',
+            'icon': _svg('<rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/>'),
         },
         {
-            'code': 'gym',
-            'name': 'Gym & Fitness',
-            'description': 'Manage memberships, check-ins, and trainers',
-            'icon': '💪',
-        },
-        {
-            'code': 'farm',
-            'name': 'Farm Manager',
-            'description': 'Crop & livestock tracking, season management, and farm profitability',
-            'icon': '🌾',
-        },
-        {
-            'code': 'pharmacy',
-            'name': 'Pharmacy & Cosmetics',
-            'description': 'Inventory tracking for medicines and cosmetics',
-            'icon': '💊',
+            'code': 'mixed_retail',
+            'name': 'Mixed Retail',
+            'description': 'Universal multi-department retail — sell anything from one dashboard',
+            'icon': _svg('<path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><polyline points="9 22 9 12 15 12 15 22"/>'),
         },
         {
             'code': 'clothing',
             'name': 'Clothing Store',
             'description': 'Manage apparel inventory with sizes and colors',
-            'icon': '👔',
-        },
-        {
-            'code': 'car_dealer',
-            'name': 'Car Dealer',
-            'description': 'Vehicle dealership, stock management, sales & marketplace',
-            'icon': '🏎️',
-        },
-        {
-            'code': 'liquor',
-            'name': 'Liquor Store',
-            'description': 'Track bottles, shots, and bar credit',
-            'icon': '🍺',
+            'icon': _svg('<path d="M20.38 3.46L16 2a4 4 0 01-8 0L3.62 3.46a2 2 0 00-1.34 2.23l.58 3.57a1 1 0 00.99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 002-2V10h2.15a1 1 0 00.99-.84l.58-3.57a2 2 0 00-1.34-2.23z"/>'),
         },
         {
             'code': 'grocery',
             'name': 'Grocery Store',
             'description': 'General merchandise and daily essentials',
-            'icon': '🛒',
+            'icon': _svg('<circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6"/>'),
+        },
+        {
+            'code': 'liquor',
+            'name': 'Liquor / Bar',
+            'description': 'Track bottles, shots, and bar credit',
+            'icon': _svg('<path d="M8 2h8"/><path d="M9 2v2.789a4 4 0 01-.672 2.219l-.656.984A4 4 0 007 10.212V20a2 2 0 002 2h6a2 2 0 002-2v-9.788a4 4 0 00-.672-2.219l-.656-.984A4 4 0 0115 4.79V2"/>'),
+        },
+        {
+            'code': 'pharmacy',
+            'name': 'Pharmacy & Cosmetics',
+            'description': 'Inventory tracking for medicines and cosmetics',
+            'icon': _svg('<path d="M8 21H16M12 21V15M12 3v6M9 12l1.5-1.5M15 12l-1.5-1.5M12 9a3 3 0 100 6 3 3 0 000-6z"/><circle cx="12" cy="12" r="9"/>'),
+        },
+        {
+            'code': 'butchery',
+            'name': 'Butchery / Meat Shop',
+            'description': 'Intake, processing, cut-based sales, and profit tracking',
+            'icon': _svg('<path d="M14.5 10c-.83 0-1.5-.67-1.5-1.5v-5c0-.83.67-1.5 1.5-1.5s1.5.67 1.5 1.5v5c0 .83-.67 1.5-1.5 1.5z"/><path d="M20.5 10H19V8.5c0-.83.67-1.5 1.5-1.5s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/><path d="M9.5 14.5v-5c0-.83-.67-1.5-1.5-1.5S6.5 8.67 6.5 9.5v5c0 .83.67 1.5 1.5 1.5s1.5-.67 1.5-1.5z"/><path d="M3.5 14.5H5V16c0 .83-.67 1.5-1.5 1.5S2 16.83 2 16s.67-1.5 1.5-1.5z"/>'),
         },
         {
             'code': 'hardware',
             'name': 'Hardware & General Dealers',
             'description': 'Building materials and hardware supplies',
-            'icon': '🔨',
+            'icon': _svg('<path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/>'),
         },
         {
-            'code': 'cement',
-            'name': 'Cement / Building Materials',
-            'description': 'Specialized cement and construction supplies',
-            'icon': '🏗️',
+            'code': 'farm',
+            'name': 'Farm Manager',
+            'description': 'Crop & livestock tracking, season management, and farm profitability',
+            'icon': _svg('<path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><path d="M12 22V12"/><path d="M8 12h8"/><path d="M12 7v5"/>'),
+        },
+        {
+            'code': 'gym',
+            'name': 'Gym & Fitness',
+            'description': 'Manage memberships, check-ins, and trainers',
+            'icon': _svg('<path d="M18 8h1a4 4 0 010 8h-1"/><path d="M2 8h16v9a4 4 0 01-4 4H6a4 4 0 01-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/>'),
+        },
+        {
+            'code': 'mobile_money',
+            'name': 'Mobile Money Agent',
+            'description': 'Mobile money agent reconciliation and float management',
+            'icon': _svg('<rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/><path d="M9 10h6"/><path d="M9 14h4"/>'),
+        },
+        {
+            'code': 'consultancy',
+            'name': 'Consultancy & Services',
+            'description': 'Consulting, freelance, agencies, repair, and advisory',
+            'icon': _svg('<path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>'),
         },
         {
             'code': 'welding',
             'name': 'Welding Workshop',
             'description': 'Job estimation and welding project invoicing',
-            'icon': '🔥',
+            'icon': _svg('<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>'),
         },
         {
             'code': 'car_hire',
             'name': 'Car Hire Service',
             'description': 'Fleet management and vehicle rental bookings',
-            'icon': '🚗',
+            'icon': _svg('<path d="M5 17H3a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v9a2 2 0 01-2 2h-2"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/>'),
+        },
+        {
+            'code': 'car_dealer',
+            'name': 'Car Dealer',
+            'description': 'Vehicle dealership, stock management, sales & marketplace',
+            'icon': _svg('<rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/>'),
         },
         {
             'code': 'energy',
             'name': 'Renewable Energy',
             'description': 'Monitor solar sites, assets, maintenance, and energy economics',
-            'icon': '⚡',
+            'icon': _svg('<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>'),
+        },
+        {
+            'code': 'cement',
+            'name': 'Cement / Building Materials',
+            'description': 'Specialized cement and construction supplies',
+            'icon': _svg('<rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16"/>'),
         },
     ]
 

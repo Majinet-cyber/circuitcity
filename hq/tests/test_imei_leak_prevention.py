@@ -208,8 +208,8 @@ class IMEILeakPreventionTestCase(TestCase):
         # Check success message
         content = response.content.decode("utf-8")
 
-        # Should have success message
-        self.assertIn("Sale recorded", content)
+        # Should have success message (wizard uses "Sale completed successfully!")
+        self.assertIn("Sale completed", content)
 
         # But should NOT contain IMEI
         self.assertNotIn(self.test_imei, content, "Success message should not show IMEI to agents")
@@ -233,8 +233,8 @@ class IMEILeakPreventionTestCase(TestCase):
         # Check success message
         content = response.content.decode("utf-8")
 
-        # Should have success message with IMEI for managers
-        self.assertIn("Sale recorded", content)
+        # Should have success message with IMEI for managers (wizard uses "Sale completed successfully!")
+        self.assertIn("Sale completed", content)
         self.assertIn(self.test_imei, content, "Success message should show IMEI to managers")
 
     def test_no_imei_in_javascript_context_for_agents(self):

@@ -1247,8 +1247,8 @@ def pharmacy_stock_in_wizard(request: HttpRequest) -> HttpResponse:
                     # Fall back to prefills
                     items = [{"name": name, "icon": "💡", "is_prefill": True} for name in prefills]
 
-            # ALWAYS add "+ Add Custom Product" option at the end
-            items.append({"name": "+ Add Custom Product", "icon": "📝", "is_custom": True})
+            # ALWAYS add "Other / Custom Product" option at the end
+            items.append({"name": "Other", "icon": "📝", "is_custom": True})
 
             # CRITICAL: Ensure items list is never empty
             if len(items) == 1:  # Only custom option

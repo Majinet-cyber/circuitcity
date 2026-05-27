@@ -1776,14 +1776,16 @@ def business_health_view(request):
     URL: /dashboard/business-health/
     Scoped to request.business — no cross-tenant leakage.
     """
-    from dashboard.services_health import calculate_business_health_score
+    from dashboard.services_health import calculate_business_health_score, get_health_badges
 
     business = request.business
     health = calculate_business_health_score(business)
+    badges = get_health_badges(health)
 
     return render(request, "dashboard/business_health.html", {
         "business": business,
         "health": health,
+        "badges": badges,
         "active_tab": "business_health",
         "show_search": False,
     })

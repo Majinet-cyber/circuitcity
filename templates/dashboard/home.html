@@ -7,13 +7,13 @@
 {% block extra_css %}
 <style>
   :root {
-    --dash-bg: #0b1220;
+    --dash-bg: #f8fafc;
     --dash-text: #0f172a;
     --dash-muted: #64748b;
     --dash-panel: #ffffff;
     --dash-panel-2: #f8fafc;
     --dash-border: #e2e8f0;
-    --dash-accent: #2563eb;
+    --dash-accent: #ff6a1a;
     --dash-success: #16a34a;
     --dash-shadow: 0 4px 14px rgba(2, 6, 23, .08);
   }
@@ -85,7 +85,7 @@
     left: 0;
     right: 0;
     height: 3px;
-    background: linear-gradient(90deg, var(--dash-accent), #06b6d4);
+    background: linear-gradient(90deg, #ff7a2e, #f25c05);
   }
 
   .stat-label {
@@ -939,7 +939,7 @@
       <a href="{% url 'inventory:scan_in' %}" class="btn btn-primary">
         <i class="bi bi-upc-scan"></i> Scan IN
       </a>
-      <a href="{% url 'inventory:scan_sell_landing' %}" class="btn btn-success">
+      <a href="{% url 'inventory:scan_sell_landing' %}" class="btn btn-primary">
         <i class="bi bi-bag-check"></i> Scan &amp; Sell
       </a>
       <a href="{% url 'inventory:stock_list' %}" class="btn btn-outline-primary">

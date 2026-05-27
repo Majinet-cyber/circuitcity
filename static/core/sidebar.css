@@ -26,7 +26,7 @@
 .sidebar .brand{
   display:flex; align-items:center; gap:10px; margin-bottom:14px;
 }
-.sidebar .brand .dot{ width:8px; height:8px; border-radius:999px; background:#22c55e; }
+.sidebar .brand .dot{ width:8px; height:8px; border-radius:999px; background:#ff6a1a; }
 
 /* groups */
 .sidebar .group-title{
@@ -49,8 +49,10 @@
   transform: translateY(-1px);
 }
 .sidebar a.nav.active{
-  background: rgba(99,102,241,.10);
-  box-shadow: inset 0 0 0 1px rgba(99,102,241,.22);
+  background: rgba(255,106,26,.10);
+  box-shadow: inset 0 0 0 1px rgba(255,106,26,.22);
+  color: #ff6a1a;
+  font-weight: 600;
 }
 
 /* small “chip” (e.g., counts) */

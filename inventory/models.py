@@ -165,6 +165,48 @@ except Exception:
     LaptopSerial = None
     LaptopBrand = None
 
+# Re-export Mixed Retail models for syncdb table creation
+try:
+    from .models_mixed_retail import (  # noqa: F401
+        RetailDepartment,
+        RetailCategory,
+        RetailProduct,
+        RetailSale,
+        RetailExpense,
+    )
+except Exception:
+    RetailDepartment = RetailCategory = RetailProduct = RetailSale = RetailExpense = None
+
+# Re-export Consultancy models for syncdb table creation
+try:
+    from .models_consultancy import (  # noqa: F401
+        ConsultancyClient,
+        ConsultancyProject,
+        ConsultancyQuote,
+        ConsultancyQuoteItem,
+        ConsultancyInvoice,
+        ConsultancyInvoiceItem,
+        ConsultancyPayment,
+        ConsultancyExpense,
+    )
+except Exception:
+    ConsultancyClient = ConsultancyProject = ConsultancyQuote = None
+    ConsultancyQuoteItem = ConsultancyInvoice = ConsultancyInvoiceItem = None
+    ConsultancyPayment = ConsultancyExpense = None
+
+# Re-export Butchery models for syncdb table creation
+try:
+    from .models_butchery import (  # noqa: F401
+        ButcheryProduct,
+        ButcheryIntake,
+        ButcheryIntakeAllocation,
+        ButcherySale,
+        ButcheryExpense,
+    )
+except Exception:
+    ButcheryProduct = ButcheryIntake = ButcheryIntakeAllocation = None
+    ButcherySale = ButcheryExpense = None
+
 
 # ==========================================================
 # SINGLE SOURCE OF TRUTH: IMEI normalization (15 digits)
@@ -2116,3 +2158,37 @@ class RecurringCost(models.Model):
             return base + timedelta(days=91)
         else:
             return date(base.year + 1, base.month, base.day)
+
+
+# ---------------------------------------------------------------------------
+# Register all models from separate model files so Django's app registry
+# (and syncdb in tests) can discover and create their tables.
+# models_alerts.py is intentionally excluded because it imports from this file.
+# ---------------------------------------------------------------------------
+from .models_accessories import *  # noqa: F401, F403, E402
+from .models_approval import *  # noqa: F401, F403, E402
+from .models_attendance import *  # noqa: F401, F403, E402
+from .models_audit import *  # noqa: F401, F403, E402
+from .models_barcodes import *  # noqa: F401, F403, E402
+from .models_butchery import *  # noqa: F401, F403, E402
+from .models_car_dealer import *  # noqa: F401, F403, E402
+from .models_car_hire import *  # noqa: F401, F403, E402
+from .models_clothing_barcode import *  # noqa: F401, F403, E402
+from .models_consultancy import *  # noqa: F401, F403, E402
+from .models_data_correction import *  # noqa: F401, F403, E402
+from .models_docs import *  # noqa: F401, F403, E402
+from .models_energy import *  # noqa: F401, F403, E402
+from .models_farm import *  # noqa: F401, F403, E402
+from .models_gamification import *  # noqa: F401, F403, E402
+from .models_iot import *  # noqa: F401, F403, E402
+from .models_laptops import *  # noqa: F401, F403, E402
+from .models_liquor_assignment import *  # noqa: F401, F403, E402
+from .models_marketplace import *  # noqa: F401, F403, E402
+from .models_mixed_retail import *  # noqa: F401, F403, E402
+from .models_mobilemoney import *  # noqa: F401, F403, E402
+from .models_pharmacy import *  # noqa: F401, F403, E402
+from .models_phone_products import *  # noqa: F401, F403, E402
+from .models_stock_barcodes import *  # noqa: F401, F403, E402
+from .models_timeclock import *  # noqa: F401, F403, E402
+from .models_verticals import *  # noqa: F401, F403, E402
+from .models_welding import *  # noqa: F401, F403, E402

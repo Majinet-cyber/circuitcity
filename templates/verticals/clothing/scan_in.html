@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load static %}
+{% load static clothing_tags %}
 
 {% block title %}Stock In · Clothing · Emajinet{% endblock %}
 
@@ -67,6 +67,7 @@
     <form method="post" id="stockInForm">
       {% csrf_token %}
       
+      <!-- STEP 1: Category -->
       <div class="form-step">
         <label for="id_category">1️⃣ Select Category</label>
         <div class="category-grid">
@@ -80,8 +81,38 @@
         {{ form.category }}
       </div>
 
+      <!-- Custom Category (shown only when "Other" is selected) -->
+      <div class="form-step" id="custom-category-row" style="display:none;">
+        <label for="id_custom_category" style="color:#dc2626;">
+          ✏️ Name your category <span style="color:#dc2626">*</span>
+        </label>
+        {{ form.custom_category }}
+        {% if form.custom_category.errors %}
+          <div style="color:#dc2626;font-size:0.875rem;margin-top:4px;">{{ form.custom_category.errors.0 }}</div>
+        {% endif %}
+        <small style="color:#64748b;font-size:0.85rem;margin-top:4px;display:block;">
+          E.g. "Hats", "Swimwear", "Overalls", "Uniforms" — max 50 characters.
+        </small>
+      </div>
+
+      <!-- Optional Item Subtype (shown when a category with subtypes is selected) -->
+      <div class="form-step" id="subtype-row" style="display:none;">
+        <label for="id_item_subtype">🏷️ Item Type <small style="font-weight:400;color:#64748b">(optional)</small></label>
+        <select id="id_item_subtype" name="item_subtype" class="form-control form-select">
+          <option value="">— Any type —</option>
+        </select>
+        <small style="color:#64748b;font-size:0.85rem;margin-top:4px;display:block;">Select a more specific type (optional).</small>
+      </div>
+
+      <!-- Optional Brand -->
+      <div class="form-step" id="brand-row">
+        <label for="id_brand">🏪 Brand <small style="font-weight:400;color:#64748b">(optional)</small></label>
+        {{ form.brand }}
+      </div>
+
+      <!-- STEP 2: Size -->
       <div class="form-step">
-        <label for="id_size">2️⃣ Select Size</label>
+        <label>2️⃣ Select Size <small style="font-weight:400;color:#64748b">(optional)</small></label>
         <div class="size-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(70px,1fr));gap:10px;margin-top:8px">
           <button type="button" class="size-btn" data-size="XS">XS</button>
           <button type="button" class="size-btn" data-size="S">S</button>
@@ -99,23 +130,21 @@
           <button type="button" class="size-btn" data-size="42">42</button>
           <button type="button" class="size-btn" data-size="44">44</button>
         </div>
-        
         <!-- Custom Size Input -->
         <div style="margin-top:16px;padding:14px;background:#f8fafc;border:2px dashed #cbd5e1;border-radius:12px">
           <label style="display:block;margin-bottom:6px;font-size:0.9rem;color:#64748b;font-weight:600">
             <input type="checkbox" id="use-custom-size" style="margin-right:6px;cursor:pointer">
             Use custom size
           </label>
-          <input type="text" id="custom-size-input" placeholder="e.g., 3XL, 46, Free Size" 
+          <input type="text" id="custom-size-input" placeholder="e.g., 3XL, 46, Free Size"
                  style="width:100%;padding:10px 14px;border:2px solid #e2e8f0;border-radius:8px;display:none">
-          <small style="color:#64748b;font-size:0.85rem;display:block;margin-top:4px">
-            Enter any size not listed above
-          </small>
+          <small style="color:#64748b;font-size:0.85rem;display:block;margin-top:4px">Enter any size not listed above</small>
         </div>
-        
-        {{ form.size }}
+        {# size is now a CharField rendered as hidden; JS populates it #}
+        <input type="hidden" name="size" id="id_size" value="{{ form.size.value|default:'' }}">
       </div>
 
+      <!-- STEP 3: Color -->
       <div class="form-step">
         <label for="id_color">3️⃣ Select Color</label>
         <div class="color-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:10px;margin-top:8px">
@@ -133,25 +162,33 @@
         {{ form.color }}
       </div>
 
+      <!-- STEP 4: Quantity -->
       <div class="form-step">
         <label for="id_quantity">4️⃣ Quantity</label>
         {{ form.quantity }}
       </div>
 
+      <!-- STEP 5: Cost Price -->
       <div class="form-step" id="cost-price-step">
         <label for="id_cost_price">5️⃣ Cost Price (per unit)</label>
         {{ form.cost_price }}
       </div>
 
+      <!-- STEP 6: Selling Price -->
       <div class="form-step">
         <label for="id_selling_price">6️⃣ Selling Price</label>
         {{ form.selling_price }}
-        
-        <!-- Smart Pricing Feedback -->
         <div id="clothing-pricing-feedback" class="pricing-feedback-container">
           <span class="pricing-feedback-icon"></span>
           <span class="pricing-feedback-message"></span>
         </div>
+      </div>
+
+      <!-- Optional Description (auto-generated) -->
+      <div class="form-step" id="description-row">
+        <label for="id_description">📝 Description <small style="font-weight:400;color:#64748b">(optional — auto-generated if blank)</small></label>
+        {{ form.description }}
+        <small style="color:#10b981;font-size:0.82rem;margin-top:4px;display:block;" id="description-preview"></small>
       </div>
 
       <!-- Barcode Workflow -->
@@ -159,15 +196,13 @@
         <label style="display:block;margin-bottom:8px;font-weight:700;">Has Barcode?</label>
         <div style="display:flex;gap:16px;margin-bottom:8px;">
           <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
-            <input type="radio" name="has_barcode" value="no" checked style="cursor:pointer;">
-            <span>No</span>
+            <input type="radio" name="has_barcode" value="no" checked style="cursor:pointer;"><span>No</span>
           </label>
           <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
-            <input type="radio" name="has_barcode" value="yes" style="cursor:pointer;">
-            <span>Yes</span>
+            <input type="radio" name="has_barcode" value="yes" style="cursor:pointer;"><span>Yes</span>
           </label>
         </div>
-        <small style="color:#64748b;font-size:0.85rem;">If your product has a printed barcode, choose Yes and scan/type it. If not, choose No.</small>
+        <small style="color:#64748b;font-size:0.85rem;">If your product has a printed barcode, choose Yes and scan/type it.</small>
       </div>
 
       <div class="form-step" id="barcode-field" style="display:none;">
@@ -176,8 +211,6 @@
           <input type="text" name="barcode" id="barcode-input" class="form-control" placeholder="Scan or type barcode" maxlength="100" style="width:100%;">
         </div>
         <small style="color:#64748b;font-size:0.85rem;display:block;margin-bottom:8px;">Required when Has Barcode = Yes</small>
-        
-        <!-- Standard Scanner Integration -->
         {% include "components/scanner_modal.html" with input_id="barcode-input" mode="general" button_text="📷 Scan Barcode" %}
       </div>
 
@@ -196,6 +229,7 @@
           <small>
             +{{ log.changes.quantity_added }} units · 
             K {{ log.changes.cost_price }} each · 
+            {% if log.product.category %}<span style="background:#f0fdf4;color:#166534;padding:1px 6px;border-radius:6px;font-size:.75rem;">{{ log.product.category|clothing_category_display }}</span> · {% endif %}
             by {{ log.performed_by.get_full_name|default:log.performed_by.username }}
           </small>
         </div>
@@ -211,124 +245,202 @@
 
 <script src="{% static 'js/pricing-helpers.js' %}"></script>
 <script>
+// Subtypes lookup from server
+const CLOTHING_SUBTYPES = {{ subtypes_json|safe }};
+
 document.addEventListener('DOMContentLoaded', function() {
-  // Hide the actual select elements
-  const categorySelect = document.getElementById('id_category');
-  const sizeSelect = document.getElementById('id_size');
-  const colorSelect = document.getElementById('id_color');
-  
+  // ── Element refs ──────────────────────────────────────────────────
+  const categorySelect   = document.getElementById('id_category');
+  const colorSelect      = document.getElementById('id_color');
+  const sizeHidden       = document.getElementById('id_size');
+
+  const customCatRow     = document.getElementById('custom-category-row');
+  const customCatInput   = document.getElementById('id_custom_category');
+  const subtypeRow       = document.getElementById('subtype-row');
+  const subtypeSelect    = document.getElementById('id_item_subtype');
+
+  const descInput        = document.getElementById('id_description');
+  const descPreview      = document.getElementById('description-preview');
+
+  // Hide rendered category/color selects (we drive them via cards/buttons)
   if (categorySelect) categorySelect.style.display = 'none';
-  if (sizeSelect) sizeSelect.style.display = 'none';
   if (colorSelect) colorSelect.style.display = 'none';
 
-  // Category card selection
+  // ── Category card selection ────────────────────────────────────────
   const categoryCards = document.querySelectorAll('.category-card');
+
+  function onCategorySelected(categoryValue) {
+    // Show/hide "Other" custom input
+    if (categoryValue === 'other') {
+      customCatRow.style.display = 'block';
+      if (customCatInput) customCatInput.required = true;
+    } else {
+      customCatRow.style.display = 'none';
+      if (customCatInput) { customCatInput.required = false; customCatInput.value = ''; }
+    }
+
+    // Populate subtype dropdown
+    const subtypes = CLOTHING_SUBTYPES[categoryValue] || [];
+    if (subtypes.length > 0) {
+      subtypeRow.style.display = 'block';
+      subtypeSelect.innerHTML = '<option value="">— Any type —</option>';
+      subtypes.forEach(st => {
+        const opt = document.createElement('option');
+        opt.value = st;
+        opt.textContent = st;
+        subtypeSelect.appendChild(opt);
+      });
+    } else {
+      subtypeRow.style.display = 'none';
+      subtypeSelect.innerHTML = '<option value="">— Any type —</option>';
+      // Also clear hidden item_subtype if category has no subtypes
+      const subtypeHidden = document.querySelector('input[name="item_subtype"]');
+      if (subtypeHidden) subtypeHidden.value = '';
+    }
+
+    updateDescriptionPreview();
+  }
+
   categoryCards.forEach(card => {
     card.addEventListener('click', function() {
       categoryCards.forEach(c => c.classList.remove('selected'));
       this.classList.add('selected');
-      const categoryValue = this.dataset.category;
-      if (categorySelect) {
-        categorySelect.value = categoryValue;
-      }
+      if (categorySelect) categorySelect.value = this.dataset.category;
+      onCategorySelected(this.dataset.category);
     });
   });
 
-  // Pre-select if value exists
+  // Pre-select on load
   if (categorySelect && categorySelect.value) {
-    const selectedCard = document.querySelector(`.category-card[data-category="${categorySelect.value}"]`);
-    if (selectedCard) selectedCard.classList.add('selected');
+    const sel = document.querySelector(`.category-card[data-category="${categorySelect.value}"]`);
+    if (sel) sel.classList.add('selected');
+    onCategorySelected(categorySelect.value);
   }
 
-  // Size button selection
+  // Sync subtype select → hidden field
+  if (subtypeSelect) {
+    subtypeSelect.addEventListener('change', function() {
+      // item_subtype is rendered as a text input by Django; we update its value
+      const subtypeInput = document.getElementById('id_item_subtype_hidden') ||
+                           document.querySelector('input[name="item_subtype"]');
+      // The rendered select IS the name="item_subtype" element, so nothing extra needed
+      updateDescriptionPreview();
+    });
+  }
+
+  // Custom category input triggers description update
+  if (customCatInput) {
+    customCatInput.addEventListener('input', updateDescriptionPreview);
+  }
+
+  // ── Size button selection ──────────────────────────────────────────
   const sizeButtons = document.querySelectorAll('.size-btn');
   sizeButtons.forEach(btn => {
     btn.addEventListener('click', function() {
       sizeButtons.forEach(b => b.classList.remove('selected'));
       this.classList.add('selected');
-      const sizeValue = this.dataset.size;
-      if (sizeSelect) {
-        sizeSelect.value = sizeValue;
-      }
-      // Uncheck custom size when clicking a button
-      const customCheckbox = document.getElementById('use-custom-size');
-      if (customCheckbox) customCheckbox.checked = false;
-      document.getElementById('custom-size-input').style.display = 'none';
+      if (sizeHidden) sizeHidden.value = this.dataset.size;
+      const cb = document.getElementById('use-custom-size');
+      if (cb) cb.checked = false;
+      const ci = document.getElementById('custom-size-input');
+      if (ci) ci.style.display = 'none';
+      updateDescriptionPreview();
     });
   });
 
-  // Pre-select size if value exists
-  if (sizeSelect && sizeSelect.value) {
-    const selectedSize = document.querySelector(`.size-btn[data-size="${sizeSelect.value}"]`);
-    if (selectedSize) selectedSize.classList.add('selected');
+  // Pre-select size
+  if (sizeHidden && sizeHidden.value) {
+    const sel = document.querySelector(`.size-btn[data-size="${sizeHidden.value}"]`);
+    if (sel) sel.classList.add('selected');
   }
 
   // Custom size toggle
   const customSizeCheckbox = document.getElementById('use-custom-size');
-  const customSizeInput = document.getElementById('custom-size-input');
+  const customSizeInput    = document.getElementById('custom-size-input');
   if (customSizeCheckbox && customSizeInput) {
     customSizeCheckbox.addEventListener('change', function() {
       if (this.checked) {
         customSizeInput.style.display = 'block';
         customSizeInput.focus();
-        // Deselect all size buttons
         sizeButtons.forEach(b => b.classList.remove('selected'));
-        if (sizeSelect) sizeSelect.value = '';
+        if (sizeHidden) sizeHidden.value = '';
       } else {
         customSizeInput.style.display = 'none';
         customSizeInput.value = '';
       }
     });
-
-    // Update hidden select when custom input changes
     customSizeInput.addEventListener('input', function() {
       if (customSizeCheckbox.checked && this.value) {
-        if (sizeSelect) sizeSelect.value = this.value.trim();
+        if (sizeHidden) sizeHidden.value = this.value.trim();
+        updateDescriptionPreview();
       }
     });
   }
 
-  // Color button selection
+  // ── Color button selection ─────────────────────────────────────────
   const colorButtons = document.querySelectorAll('.color-btn');
   colorButtons.forEach(btn => {
     btn.addEventListener('click', function() {
       colorButtons.forEach(b => b.classList.remove('selected'));
       this.classList.add('selected');
-      const colorValue = this.dataset.color;
-      if (colorSelect) {
-        colorSelect.value = colorValue;
-      }
+      if (colorSelect) colorSelect.value = this.dataset.color;
+      updateDescriptionPreview();
     });
   });
 
-  // Pre-select color if value exists
   if (colorSelect && colorSelect.value) {
-    const selectedColor = document.querySelector(`.color-btn[data-color="${colorSelect.value}"]`);
-    if (selectedColor) selectedColor.classList.add('selected');
+    const sel = document.querySelector(`.color-btn[data-color="${colorSelect.value}"]`);
+    if (sel) sel.classList.add('selected');
   }
 
-  // Barcode workflow: show/hide barcode field based on radio selection
+  // ── Description auto-builder ──────────────────────────────────────
+  function updateDescriptionPreview() {
+    if (!descInput || !descPreview) return;
+    if (descInput.value.trim()) { descPreview.textContent = ''; return; } // user typed something
+
+    const catVal  = categorySelect ? categorySelect.value : '';
+    const catCard = document.querySelector(`.category-card[data-category="${catVal}"]`);
+    const catLabel = catCard ? catCard.querySelector('.category-name').textContent.trim() : '';
+
+    const customCat  = (customCatInput && customCatInput.value.trim()) || '';
+    const displayCat = catVal === 'other' ? customCat : catLabel;
+
+    const brand    = (document.getElementById('id_brand') || {}).value || '';
+    const subtype  = subtypeSelect ? subtypeSelect.value : '';
+    const size     = sizeHidden ? sizeHidden.value : '';
+    const colorVal = colorSelect ? colorSelect.value : '';
+
+    const parts = [brand, subtype, displayCat, size ? `size ${size}` : '', colorVal]
+      .map(p => p.trim()).filter(Boolean);
+
+    if (parts.length) {
+      descPreview.textContent = `Auto: "${parts.join(', ')}"`;
+    } else {
+      descPreview.textContent = '';
+    }
+  }
+
+  // Wire brand input to preview
+  const brandInput = document.getElementById('id_brand');
+  if (brandInput) brandInput.addEventListener('input', updateDescriptionPreview);
+  if (descInput)  descInput.addEventListener('input', updateDescriptionPreview);
+
+  // ── Barcode workflow ───────────────────────────────────────────────
   function toggleBarcodeField() {
     const hasBarcodeYes = document.querySelector('input[name="has_barcode"][value="yes"]');
     const barcodeField = document.getElementById('barcode-field');
     const barcodeInput = document.getElementById('barcode-input');
-    
     if (hasBarcodeYes && hasBarcodeYes.checked) {
       barcodeField.style.display = 'block';
       if (barcodeInput) barcodeInput.required = true;
     } else {
       barcodeField.style.display = 'none';
-      if (barcodeInput) {
-        barcodeInput.required = false;
-        barcodeInput.value = '';
-      }
+      if (barcodeInput) { barcodeInput.required = false; barcodeInput.value = ''; }
     }
   }
 
   const barcodeRadios = document.querySelectorAll('input[name="has_barcode"]');
-  barcodeRadios.forEach(radio => {
-    radio.addEventListener('change', toggleBarcodeField);
-  });
+  barcodeRadios.forEach(radio => radio.addEventListener('change', toggleBarcodeField));
   toggleBarcodeField();
   
   // Smart Pricing Feedback

@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Reports · {{ business.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+.bt-wrap { max-width: 1100px; margin: 0 auto; padding: 20px 14px; }
+.kpi-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 14px; margin-bottom: 24px; }
+.kpi-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 16px 18px; box-shadow: 0 1px 4px rgba(15,23,42,.06); }
+.kpi-label { font-size: .7rem; text-transform: uppercase; letter-spacing: .07em; color: #64748b; font-weight: 700; margin-bottom: 6px; }
+.kpi-value { font-size: 1.4rem; font-weight: 900; color: #0f172a; line-height: 1.1; }
+.kpi-sub { font-size: .72rem; color: #94a3b8; margin-top: 3px; }
+.kpi-card.accent-green { border-left: 3px solid #22c55e; }
+.kpi-card.accent-blue  { border-left: 3px solid #3b82f6; }
+.kpi-card.accent-amber { border-left: 3px solid #f59e0b; }
+.kpi-card.accent-red   { border-left: 3px solid #ef4444; }
+.kpi-card.accent-teal  { border-left: 3px solid #14b8a6; }
+.section-head { font-size: .8rem; text-transform: uppercase; letter-spacing: .07em; font-weight: 800; color: #475569; margin: 24px 0 12px; }
+.data-table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+.data-table th { text-align: left; padding: 8px 12px; font-size: .72rem; text-transform: uppercase; letter-spacing: .05em; color: #64748b; border-bottom: 2px solid #e2e8f0; }
+.data-table td { padding: 10px 12px; border-bottom: 1px solid #f1f5f9; }
+.data-table tr:last-child td { border-bottom: none; }
+.data-table tr:hover td { background: #f8fafc; }
+.filter-bar { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px 18px; margin-bottom: 20px; display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; }
+.empty-state { text-align: center; padding: 40px 20px; color: #94a3b8; }
+.empty-state h3 { font-size: .95rem; font-weight: 700; color: #64748b; margin-bottom: 6px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="bt-wrap">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px;">
+    <div>
+      <h1 style="font-size:1.4rem;font-weight:900;margin:0 0 4px;color:#0f172a;">Reports</h1>
+      <p style="color:#64748b;font-size:.85rem;margin:0;">{{ business.name }} &middot; Butchery</p>
+    </div>
+    <a href="{% url 'butchery:dashboard' %}" style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border:1px solid #e2e8f0;border-radius:9px;background:#fff;font-size:.85rem;font-weight:600;text-decoration:none;color:#374151;">
+      <i class="bi bi-arrow-left"></i> Dashboard
+    </a>
+  </div>
+
+  <!-- Date Filter -->
+  <form method="get" class="filter-bar">
+    <div>
+      <label style="font-size:.75rem;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:4px;display:block;">From</label>
+      <input type="date" name="from" value="{{ date_from|date:'Y-m-d' }}" style="padding:7px 10px;border:1px solid #d1d5db;border-radius:8px;font-size:.85rem;">
+    </div>
+    <div>
+      <label style="font-size:.75rem;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:4px;display:block;">To</label>
+      <input type="date" name="to" value="{{ date_to|date:'Y-m-d' }}" style="padding:7px 10px;border:1px solid #d1d5db;border-radius:8px;font-size:.85rem;">
+    </div>
+    <button type="submit" style="padding:8px 16px;background:#10b981;color:#fff;border:none;border-radius:8px;font-size:.85rem;font-weight:700;cursor:pointer;"><i class="bi bi-funnel"></i> Filter</button>
+  </form>
+
+  <!-- KPI Summary -->
+  <div class="kpi-grid">
+    <div class="kpi-card accent-green">
+      <div class="kpi-label">Revenue</div>
+      <div class="kpi-value">MWK {{ total_revenue|floatformat:0|intcomma }}</div>
+      <div class="kpi-sub">{{ total_count }} transactions</div>
+    </div>
+    <div class="kpi-card accent-blue">
+      <div class="kpi-label">Gross Profit</div>
+      <div class="kpi-value">MWK {{ total_profit|floatformat:0|intcomma }}</div>
+      <div class="kpi-sub">{{ margin_pct|floatformat:1 }}% margin</div>
+    </div>
+    <div class="kpi-card accent-amber">
+      <div class="kpi-label">Expenses</div>
+      <div class="kpi-value">MWK {{ total_expenses|floatformat:0|intcomma }}</div>
+      <div class="kpi-sub">Operating costs</div>
+    </div>
+    <div class="kpi-card {% if net_profit >= 0 %}accent-teal{% else %}accent-red{% endif %}">
+      <div class="kpi-label">Net Profit</div>
+      <div class="kpi-value">MWK {{ net_profit|floatformat:0|intcomma }}</div>
+      <div class="kpi-sub">After expenses</div>
+    </div>
+    <div class="kpi-card accent-teal">
+      <div class="kpi-label">Total Intake</div>
+      <div class="kpi-value">{{ total_intake_kg|floatformat:1 }} kg</div>
+      <div class="kpi-sub">MWK {{ total_intake_cost|floatformat:0|intcomma }} cost</div>
+    </div>
+    <div class="kpi-card accent-blue">
+      <div class="kpi-label">Month Revenue</div>
+      <div class="kpi-value">MWK {{ month_revenue|floatformat:0|intcomma }}</div>
+      <div class="kpi-sub">MWK {{ month_profit|floatformat:0|intcomma }} profit</div>
+    </div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+    <!-- Top Cuts -->
+    <div style="background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:18px;box-shadow:0 1px 4px rgba(15,23,42,.05);">
+      <div class="section-head" style="margin-top:0;">Top Selling Cuts</div>
+      {% if top_cuts %}
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Cut</th>
+            <th style="text-align:right;">Revenue</th>
+            <th style="text-align:right;">Profit</th>
+            <th style="text-align:right;">Qty</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for c in top_cuts %}
+          <tr>
+            <td>
+              <div style="font-weight:600;">{{ c.product__name }}</div>
+              <div style="font-size:.72rem;color:#94a3b8;">{{ meat_type_labels|default:''|default:c.product__meat_type }}</div>
+            </td>
+            <td style="text-align:right;font-weight:700;">MWK {{ c.revenue|floatformat:0|intcomma }}</td>
+            <td style="text-align:right;color:{% if c.profit > 0 %}#16a34a{% else %}#ef4444{% endif %};">MWK {{ c.profit|floatformat:0|intcomma }}</td>
+            <td style="text-align:right;color:#64748b;">{{ c.qty|floatformat:2 }} {{ c.product__unit }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <div class="empty-state"><i class="bi bi-bar-chart" style="font-size:2rem;display:block;margin-bottom:8px;"></i><h3>No sales data yet</h3></div>
+      {% endif %}
+    </div>
+
+    <!-- By Meat Type -->
+    <div style="background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:18px;box-shadow:0 1px 4px rgba(15,23,42,.05);">
+      <div class="section-head" style="margin-top:0;">Sales by Meat Type</div>
+      {% if by_meat_type %}
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Type</th>
+            <th style="text-align:right;">Revenue</th>
+            <th style="text-align:right;">Profit</th>
+            <th style="text-align:right;">Sales</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for mt in by_meat_type %}
+          <tr>
+            <td style="font-weight:600;">{{ mt.product__meat_type|capfirst }}</td>
+            <td style="text-align:right;font-weight:700;">MWK {{ mt.revenue|floatformat:0|intcomma }}</td>
+            <td style="text-align:right;color:{% if mt.profit > 0 %}#16a34a{% else %}#ef4444{% endif %};">MWK {{ mt.profit|floatformat:0|intcomma }}</td>
+            <td style="text-align:right;color:#64748b;">{{ mt.count }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <div class="empty-state"><i class="bi bi-grid" style="font-size:2rem;display:block;margin-bottom:8px;"></i><h3>No data yet</h3></div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

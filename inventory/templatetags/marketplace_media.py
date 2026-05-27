@@ -28,3 +28,13 @@ def marketplace_placeholder(vertical):
 @register.filter
 def safe_media_url(field_file):
     return safe_field_url(field_file)
+
+
+@register.filter
+def replace(value, arg):
+    """Replace occurrences in a string. Usage: {{ value|replace:"old,new" }}"""
+    try:
+        old, new = arg.split(",", 1)
+        return str(value).replace(old, new)
+    except (ValueError, AttributeError):
+        return value

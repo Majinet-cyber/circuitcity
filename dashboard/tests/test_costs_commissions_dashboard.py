@@ -70,9 +70,9 @@ class TestCostsCommissionsDashboard(TestCase):
             sold_at=timezone.now(),
         )
 
-        # Create sale record
+        # Create sale record (Sale.sold_at is DateField, use localdate())
         Sale.objects.create(
-            item=item, location=self.location, agent=self.agent, price=Decimal("1500.00"), sold_at=timezone.now()
+            item=item, location=self.location, agent=self.agent, price=Decimal("1500.00"), sold_at=timezone.localdate()
         )
 
         # Add commission (100 MK)
@@ -128,7 +128,7 @@ class TestCostsCommissionsDashboard(TestCase):
             )
 
             Sale.objects.create(
-                item=item, location=self.location, agent=self.agent, price=Decimal("1500.00"), sold_at=timezone.now()
+                item=item, location=self.location, agent=self.agent, price=Decimal("1500.00"), sold_at=timezone.localdate()
             )
 
         # Add commissions (50 MK each)
@@ -198,7 +198,7 @@ class TestCostsCommissionsDashboard(TestCase):
         )
 
         Sale.objects.create(
-            item=item, location=self.location, agent=self.agent, price=Decimal("1000.00"), sold_at=timezone.now()
+            item=item, location=self.location, agent=self.agent, price=Decimal("1000.00"), sold_at=timezone.localdate()
         )
 
         # Add commission (50 MK)
@@ -266,7 +266,7 @@ class TestCostsCommissionsDashboard(TestCase):
         )
 
         Sale.objects.create(
-            item=item, location=self.location, agent=self.agent, price=Decimal("1500.00"), sold_at=timezone.now()
+            item=item, location=self.location, agent=self.agent, price=Decimal("1500.00"), sold_at=timezone.localdate()
         )
 
         # Use MTD helper
@@ -292,7 +292,7 @@ class TestCostsCommissionsDashboard(TestCase):
         )
 
         Sale.objects.create(
-            item=item, location=self.location, agent=self.agent, price=Decimal("1500.00"), sold_at=timezone.now()
+            item=item, location=self.location, agent=self.agent, price=Decimal("1500.00"), sold_at=timezone.localdate()
         )
 
         # Use today helper
@@ -319,7 +319,7 @@ class TestCostsCommissionsDashboard(TestCase):
         )
 
         Sale.objects.create(
-            item=item, location=self.location, agent=self.agent, price=Decimal("1000.00"), sold_at=timezone.now()
+            item=item, location=self.location, agent=self.agent, price=Decimal("1000.00"), sold_at=timezone.localdate()
         )
 
         # Large commission

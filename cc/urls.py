@@ -702,6 +702,12 @@ urlpatterns += [
     path("cement/", include_or_raise("inventory.urls_cement", "cement")),
     # Mobile Money vertical
     path("mobile-money/", include_or_raise("inventory.urls_mobilemoney", "mobilemoney")),
+    # Mixed Retail vertical
+    path("mixed-retail/", include_or_raise("inventory.urls_mixed_retail", "mixed_retail")),
+    # Consultancy & Services vertical
+    path("consultancy/", include_or_raise("inventory.urls_consultancy", "consultancy")),
+    # Butchery vertical
+    path("butchery/", include_or_raise("inventory.urls_butchery", "butchery")),
     # IoT monitoring
     path("iot/", include_or_raise("inventory.urls_iot", "iot")),
     # Car Dealer vertical

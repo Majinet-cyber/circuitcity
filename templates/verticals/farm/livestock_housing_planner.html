@@ -1,0 +1,155 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Housing Planner — {{ batch.name }}{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+
+  <!-- Breadcrumb -->
+  <nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb small">
+      <li class="breadcrumb-item"><a href="{% url 'verticals:farm_dashboard' %}">Farm</a></li>
+      <li class="breadcrumb-item"><a href="{% url 'verticals:farm_livestock_list' %}">Livestock</a></li>
+      <li class="breadcrumb-item"><a href="{% url 'verticals:farm_livestock_detail' batch_id=batch.pk %}">{{ batch.name }}</a></li>
+      <li class="breadcrumb-item active">Housing Planner</li>
+    </ol>
+  </nav>
+
+  <div class="d-flex align-items-center gap-2 mb-4">
+    <span class="fs-2">🏗️</span>
+    <div>
+      <h1 class="h3 mb-0">Housing Planner</h1>
+      <p class="text-muted mb-0 small">{{ batch.name }} · {{ batch.count_current }} animals</p>
+    </div>
+  </div>
+
+  <div class="row g-4">
+
+    <!-- Plan Summary -->
+    <div class="col-md-6">
+      {% if plan %}
+      <div class="card border-0 shadow-sm mb-3">
+        <div class="card-header bg-success text-white">
+          <h6 class="mb-0"><i class="bi bi-house-fill me-2"></i>Space Requirements</h6>
+        </div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-6">
+              <div class="text-muted small">Required Floor Space</div>
+              <div class="h5 fw-bold text-primary">{{ plan.floor_space_sqm|floatformat:1 }} m²</div>
+            </div>
+            <div class="col-6">
+              <div class="text-muted small">Animals</div>
+              <div class="h5 fw-bold">{{ plan.animal_count }}</div>
+            </div>
+            <div class="col-6">
+              <div class="text-muted small">Space per Animal</div>
+              <div class="h5 fw-bold">{{ plan.sqm_per_animal|floatformat:2 }} m²</div>
+            </div>
+            <div class="col-6">
+              <div class="text-muted small">Housing Type</div>
+              <div class="h5 fw-bold">{{ plan.housing_type|title }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {% if plan.feed_storage_recommendation %}
+      <div class="card border-0 shadow-sm mb-3">
+        <div class="card-header bg-warning text-dark">
+          <h6 class="mb-0"><i class="bi bi-box-seam me-2"></i>Feed Storage</h6>
+        </div>
+        <div class="card-body">
+          <p class="mb-0">{{ plan.feed_storage_recommendation }}</p>
+        </div>
+      </div>
+      {% endif %}
+
+      {% if plan.ventilation_recommendation %}
+      <div class="card border-0 shadow-sm mb-3">
+        <div class="card-header">
+          <h6 class="mb-0"><i class="bi bi-wind me-2"></i>Ventilation</h6>
+        </div>
+        <div class="card-body">
+          <p class="mb-0">{{ plan.ventilation_recommendation }}</p>
+        </div>
+      </div>
+      {% endif %}
+
+      {% else %}
+      <div class="card border-0 shadow-sm mb-3">
+        <div class="card-body text-center py-4">
+          <div class="display-5 mb-3">📐</div>
+          <h6>Plan generated automatically</h6>
+          <p class="text-muted small">Based on {{ batch.animal_type|title }} with {{ batch.count_current }} animals.</p>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Checklists -->
+    <div class="col-md-6">
+      {% if plan %}
+
+      {% if plan.layout_checklist %}
+      <div class="card border-0 shadow-sm mb-3">
+        <div class="card-header">
+          <h6 class="mb-0"><i class="bi bi-list-check me-2"></i>Layout Checklist</h6>
+        </div>
+        <div class="card-body">
+          <ul class="list-unstyled mb-0">
+            {% for item in plan.layout_checklist %}
+            <li class="d-flex align-items-start gap-2 mb-2">
+              <span class="text-success mt-1"><i class="bi bi-check-circle-fill"></i></span>
+              <span class="small">{{ item }}</span>
+            </li>
+            {% endfor %}
+          </ul>
+        </div>
+      </div>
+      {% endif %}
+
+      {% if plan.hygiene_checklist %}
+      <div class="card border-0 shadow-sm mb-3">
+        <div class="card-header bg-info bg-opacity-10">
+          <h6 class="mb-0"><i class="bi bi-shield-check me-2"></i>Hygiene & Biosecurity</h6>
+        </div>
+        <div class="card-body">
+          <ul class="list-unstyled mb-0">
+            {% for item in plan.hygiene_checklist %}
+            <li class="d-flex align-items-start gap-2 mb-2">
+              <span class="text-info mt-1"><i class="bi bi-check-circle-fill"></i></span>
+              <span class="small">{{ item }}</span>
+            </li>
+            {% endfor %}
+          </ul>
+        </div>
+      </div>
+      {% endif %}
+
+      {% endif %}
+
+      <!-- 3D Preview Placeholder -->
+      <div class="card border-0 shadow-sm bg-dark text-white">
+        <div class="card-body text-center py-5">
+          <div class="display-4 mb-3">🏗️</div>
+          <h5>3D Housing Preview</h5>
+          <p class="text-white-50 small mb-3">
+            Interactive 3D housing visualizer coming soon.<br>
+            Powered by Three.js / WebGL.
+          </p>
+          <span class="badge bg-secondary px-3 py-2">Coming Soon</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="mt-3">
+    <a href="{% url 'verticals:farm_livestock_detail' batch_id=batch.pk %}" class="btn btn-outline-secondary">
+      <i class="bi bi-arrow-left me-1"></i>Back to Batch
+    </a>
+  </div>
+
+</div>
+{% endblock %}
