@@ -1,0 +1,46 @@
+{% extends "base/base.html" %}
+{% load static %}
+
+{% block page_title %}Payment History — {{ contract.contract_number }}{% endblock %}
+
+{% block content %}
+<div class="page-back-row">
+  <a href="{% url 'portal_contract' contract.contract_number %}" class="back-link">
+    <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+    Back
+  </a>
+  <span class="page-label">Payment History</span>
+</div>
+
+<div class="glass-card review-card mb-8">
+  <div class="review-row"><span>Contract</span><strong>{{ contract.contract_number }}</strong></div>
+  <div class="review-row"><span>PayG</span><strong>{{ contract.payg_number }}</strong></div>
+  <div class="review-row"><span>Total Paid</span><strong>MWK {{ contract.amount_paid|floatformat:0 }}</strong></div>
+</div>
+
+{% if transactions %}
+  {% for tx in transactions %}
+  <div class="tx-row {% if tx.status == 'paid' %}tx-row--credit{% else %}tx-row--debit{% endif %}">
+    <div class="tx-row__left">
+      <div class="tx-row__type">
+        {% if tx.status == 'paid' %}Payment{% elif tx.status == 'failed' %}Failed Payment{% else %}{{ tx.get_status_display }}{% endif %}
+      </div>
+      <div class="tx-row__meta">{{ tx.masked_phone }} · {{ tx.get_provider_display }}</div>
+      <div class="tx-row__date">
+        {{ tx.paid_at|date:"d M Y, H:i"|default:tx.created_at|date:"d M Y, H:i" }}
+      </div>
+    </div>
+    <div class="tx-row__amount {% if tx.status == 'paid' %}text-green{% else %}text-red{% endif %}">
+      {% if tx.status == 'paid' %}+{% endif %}MWK {{ tx.amount|floatformat:0 }}
+    </div>
+  </div>
+  {% endfor %}
+{% else %}
+  <div class="empty-state">
+    <div class="empty-state__icon">
+      <svg viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2"/></svg>
+    </div>
+    <p>No payments recorded yet.</p>
+  </div>
+{% endif %}
+{% endblock %}

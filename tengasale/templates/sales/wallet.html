@@ -1,0 +1,131 @@
+{% extends "base/base.html" %}
+{% load static %}
+
+{% block page_title %}Wallet & Earnings{% endblock %}
+
+{% block content %}
+<div class="page-back-row">
+  <a href="{% url 'sales_home' %}" class="back-link">
+    <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+    Back
+  </a>
+  <span class="page-label">Wallet</span>
+</div>
+
+{# Wallet Balance Card #}
+<div class="wallet-balance-card">
+  <div class="wallet-balance-card__label">Wallet Balance</div>
+  <div class="wallet-balance-card__amount">
+    <span class="wallet-currency">MWK</span>
+    <span class="wallet-amount">{{ wallet.balance|floatformat:2 }}</span>
+  </div>
+  <div class="wallet-balance-card__stats">
+    <div class="wallet-stat">
+      <span class="wallet-stat__label">Total Earned</span>
+      <span class="wallet-stat__value">MWK {{ wallet.total_earned|floatformat:0 }}</span>
+    </div>
+    <div class="wallet-stat">
+      <span class="wallet-stat__label">Total Paid Out</span>
+      <span class="wallet-stat__value">MWK {{ wallet.total_paid|floatformat:0 }}</span>
+    </div>
+  </div>
+</div>
+
+{# Tabs #}
+<div x-data="{ tab: '{{ active_tab }}' }">
+  <div class="tab-bar">
+    <button
+      class="tab-item"
+      x-bind:class="{ 'tab-item--active': tab === 'earnings' }"
+      x-on:click="tab = 'earnings'"
+    >Earnings</button>
+    <button
+      class="tab-item"
+      x-bind:class="{ 'tab-item--active': tab === 'payouts' }"
+      x-on:click="tab = 'payouts'"
+    >Payouts</button>
+    <button
+      class="tab-item"
+      x-bind:class="{ 'tab-item--active': tab === 'request' }"
+      x-on:click="tab = 'request'"
+    >Request Payout</button>
+  </div>
+
+  {# Earnings Tab #}
+  <div x-show="tab === 'earnings'">
+    {% if transaction_rows %}
+      {% for row in transaction_rows %}
+        <div class="tx-row {% if row.is_credit %}tx-row--credit{% else %}tx-row--debit{% endif %}">
+          <div class="tx-row__left">
+            <div class="tx-row__type">{{ row.type_label }}</div>
+            {% if row.contract_number %}
+              <div class="tx-row__meta">{{ row.contract_number }}</div>
+            {% endif %}
+            <div class="tx-row__date">{{ row.created_at|date:"d M Y, H:i" }}</div>
+          </div>
+          <div class="tx-row__amount {% if row.is_credit %}text-green{% else %}text-red{% endif %}">
+            {% if row.is_credit %}+{% else %}−{% endif %}MWK {{ row.amount|floatformat:2 }}
+          </div>
+        </div>
+      {% endfor %}
+    {% else %}
+      <div class="empty-state">
+        <div class="empty-state__icon">
+          <svg viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2"/></svg>
+        </div>
+        <p>No transactions yet.</p>
+      </div>
+    {% endif %}
+  </div>
+
+  {# Payouts Tab #}
+  <div x-show="tab === 'payouts'" x-cloak>
+    {% with payout_rows=transaction_rows|dictsortreversed:"created_at" %}
+      {% for row in payout_rows %}
+        {% if "Payout" in row.type_label %}
+          <div class="tx-row tx-row--debit">
+            <div class="tx-row__left">
+              <div class="tx-row__type">{{ row.type_label }}</div>
+              <div class="tx-row__date">{{ row.created_at|date:"d M Y, H:i" }}</div>
+            </div>
+            <div class="tx-row__amount text-red">−MWK {{ row.amount|floatformat:2 }}</div>
+          </div>
+        {% endif %}
+      {% empty %}
+        <div class="empty-state"><p>No payouts yet.</p></div>
+      {% endfor %}
+    {% endwith %}
+  </div>
+
+  {# Request Payout Tab #}
+  <div x-show="tab === 'request'" x-cloak>
+    <div class="glass-card mt-8">
+      <div class="review-card__title">Request Payout</div>
+      <p class="section-description">Payouts are processed within 2 business days.</p>
+      <form method="post" action="#">
+        {% csrf_token %}
+        <div class="field-group">
+          <label class="field-label">Amount (MWK)</label>
+          <input type="number" name="amount" class="input" min="500" max="{{ wallet.balance|floatformat:0 }}" placeholder="Enter amount" required>
+        </div>
+        <div class="field-group">
+          <label class="field-label">Mobile Money Number</label>
+          <div class="phone-input-row">
+            <span class="phone-prefix">+265</span>
+            <input type="tel" name="phone" class="input" maxlength="9" pattern="\d{9}" placeholder="9 digits" required>
+          </div>
+        </div>
+        <div class="field-group">
+          <label class="field-label">Network Provider</label>
+          <select name="provider" class="select" required>
+            <option value="">— Select —</option>
+            <option value="airtel">Airtel Money</option>
+            <option value="tnm">TNM Mpamba</option>
+          </select>
+        </div>
+        <button type="submit" class="btn-primary btn-full mt-8">Request Payout</button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

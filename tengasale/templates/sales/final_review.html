@@ -1,0 +1,128 @@
+{% extends "base/base.html" %}
+{% load static %}
+
+{% block page_title %}Final Review — {{ app.application_number }}{% endblock %}
+
+{% block content %}
+<div
+  x-data="{ showReject: false }"
+>
+
+<div class="page-back-row">
+  <a href="{% url 'sales_income_check' app.id %}" class="back-link">
+    <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+    Back
+  </a>
+  <span class="page-label">Final Review</span>
+</div>
+
+{% include "sales/_step_bar.html" with step=step total_steps=total_steps %}
+
+{# Completeness Score Ring #}
+<div class="completeness-row">
+  <div class="completeness-ring" style="--pct: {{ score }}">
+    <svg viewBox="0 0 36 36" class="completeness-svg">
+      <circle class="completeness-bg" cx="18" cy="18" r="15.9"/>
+      <circle
+        class="completeness-fill {{ score_class }}"
+        cx="18" cy="18" r="15.9"
+        stroke-dasharray="{{ score }}, 100"
+      />
+    </svg>
+    <div class="completeness-label">{{ score }}%</div>
+  </div>
+  <div class="completeness-text">
+    <strong>Completeness Score</strong>
+    <p>{{ score }}% of checklist completed</p>
+    {% if score < 80 %}
+      <p class="text-orange">Some checklist items are incomplete.</p>
+    {% endif %}
+  </div>
+</div>
+
+{# Full Application Summary #}
+<div class="glass-card review-card mb-8">
+  <div class="review-card__title">Customer</div>
+  <div class="review-row"><span>Name</span><strong>{{ app.customer_name }}</strong></div>
+  <div class="review-row"><span>Phone</span><strong>+265 {{ app.customer_phone }}</strong></div>
+  <div class="review-row"><span>National ID</span><strong>{{ app.national_id }}</strong></div>
+  <div class="review-row"><span>District</span><strong>{{ app.district }}</strong></div>
+</div>
+
+{% if app.deal %}
+<div class="glass-card review-card mb-8">
+  <div class="review-card__title">Deal</div>
+  <div class="review-row"><span>Device</span><strong>{{ app.deal }}</strong></div>
+  <div class="review-row"><span>Cash Price</span><strong>MWK {{ app.selected_cash_price|floatformat:0 }}</strong></div>
+  <div class="review-row"><span>Deposit</span><strong>MWK {{ app.calculated_deposit_amount|floatformat:0 }}</strong></div>
+  <div class="review-row"><span>Daily Price</span><strong>MWK {{ app.calculated_daily_payment|floatformat:2 }}</strong></div>
+  <div class="review-row"><span>30-Day Price</span><strong>MWK {{ app.calculated_monthly_payment|floatformat:0 }}</strong></div>
+  <div class="review-row"><span>Total Contract</span><strong>MWK {{ app.calculated_total_loan|floatformat:0 }}</strong></div>
+</div>
+{% endif %}
+
+<div class="glass-card review-card mb-8">
+  <div class="review-card__title">Checklist Summary</div>
+  {% with r=review %}
+  <div class="check-row"><span class="check-icon {% if r.summary_clear %}check-yes{% elif r.summary_clear == False %}check-no{% endif %}"></span><span>Summary clear</span></div>
+  <div class="check-row"><span class="check-icon {% if r.identity_signature_matches %}check-yes{% elif r.identity_signature_matches == False %}check-no{% endif %}"></span><span>Signature matches</span></div>
+  <div class="check-row"><span class="check-icon {% if r.identity_info_matches %}check-yes{% elif r.identity_info_matches == False %}check-no{% endif %}"></span><span>ID info matches</span></div>
+  <div class="check-row"><span class="check-icon {% if r.location_neighbour_spoken %}check-yes{% elif r.location_neighbour_spoken == False %}check-no{% endif %}"></span><span>Neighbour spoken</span></div>
+  <div class="check-row"><span class="check-icon {% if r.location_confirmed %}check-yes{% elif r.location_confirmed == False %}check-no{% endif %}"></span><span>Location confirmed</span></div>
+  <div class="check-row"><span class="check-icon {% if r.customer_spoken %}check-yes{% elif r.customer_spoken == False %}check-no{% endif %}"></span><span>Customer called</span></div>
+  <div class="check-row"><span class="check-icon {% if r.income_confirmed %}check-yes{% elif r.income_confirmed == False %}check-no{% endif %}"></span><span>Income confirmed</span></div>
+  {% endwith %}
+</div>
+
+{# Decision Form #}
+<form method="post" x-show="!showReject">
+  {% csrf_token %}
+  <div class="glass-card mb-8">
+    <label class="review-card__title" for="id_comment">Underwriter Comment</label>
+    <textarea name="manager_comment" id="id_comment" class="textarea" rows="3" placeholder="Add notes…">{{ review.comment }}</textarea>
+  </div>
+  <div class="decision-row">
+    <button type="submit" name="decision" value="approve" class="btn-approve btn-big">
+      <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+      APPROVE
+    </button>
+    <button type="button" class="btn-reject btn-big" x-on:click="showReject = true">
+      <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      REJECT
+    </button>
+  </div>
+  <button type="submit" name="decision" value="request_correction" class="btn-secondary btn-full mt-8">
+    Send Back for Corrections
+  </button>
+</form>
+
+{# Reject Panel #}
+<div x-show="showReject" x-cloak>
+  <form method="post">
+    {% csrf_token %}
+    <div class="glass-card">
+      <div class="review-card__title text-red">Reject Application</div>
+      <label class="field-label">Rejection Reason <span class="required">*</span></label>
+      <select name="reject_reason" class="select" required>
+        <option value="">— Select a reason —</option>
+        <option value="KYC failed — image quality poor">KYC failed — image quality poor</option>
+        <option value="KYC failed — identity mismatch">KYC failed — identity mismatch</option>
+        <option value="Income insufficient">Income insufficient</option>
+        <option value="Location unverifiable">Location unverifiable</option>
+        <option value="Customer not reachable">Customer not reachable</option>
+        <option value="Customer refused call">Customer refused call</option>
+        <option value="Suspicious application">Suspicious application</option>
+        <option value="Other">Other</option>
+      </select>
+      <label class="field-label mt-8">Additional Notes</label>
+      <textarea name="manager_comment" class="textarea" rows="3" placeholder="Optional additional notes…"></textarea>
+    </div>
+    <div class="decision-row mt-16">
+      <button type="submit" name="decision" value="reject" class="btn-reject btn-big">Confirm Reject</button>
+      <button type="button" class="btn-secondary" x-on:click="showReject = false">Cancel</button>
+    </div>
+  </form>
+</div>
+
+</div>
+{% endblock %}

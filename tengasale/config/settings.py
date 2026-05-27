@@ -51,7 +51,11 @@ INSTALLED_APPS = [
     "rewards",
     "approvals",
     "contracts",
+    "financing",
     "dashboard",
+    "sales",
+    "portal",
+    "website",
 ]
 
 MIDDLEWARE = [
@@ -143,6 +147,35 @@ EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 
 TENGASALE_WHATSAPP_NUMBER = os.environ.get("TENGASALE_WHATSAPP_NUMBER", "+265883596135")
 TENGASALE_WHATSAPP_LINK = f"https://wa.me/{''.join(char for char in TENGASALE_WHATSAPP_NUMBER if char.isdigit())}"
+
+TRUSTONIC_API_KEY = os.environ.get("TRUSTONIC_API_KEY", "")
+TRUSTONIC_API_URL = os.environ.get("TRUSTONIC_API_URL", "")
+UPYA_API_KEY = os.environ.get("UPYA_API_KEY", "")
+UPYA_API_URL = os.environ.get("UPYA_API_URL", "")
+PAYMENT_PROVIDER_API_KEY = os.environ.get("PAYMENT_PROVIDER_API_KEY", "")
+PAYMENT_PROVIDER_API_URL = os.environ.get("PAYMENT_PROVIDER_API_URL", "")
+SMS_PROVIDER_API_KEY = os.environ.get("SMS_PROVIDER_API_KEY", "")
+SMS_PROVIDER_API_URL = os.environ.get("SMS_PROVIDER_API_URL", "")
+
+# Payment providers
+MOCK_PAYMENTS = os.environ.get("MOCK_PAYMENTS", "true").lower() == "true"
+PAYCHANGU_PUBLIC_KEY = os.environ.get("PAYCHANGU_PUBLIC_KEY", "")
+PAYCHANGU_SECRET_KEY = os.environ.get("PAYCHANGU_SECRET_KEY", "")
+PAYCHANGU_WEBHOOK_SECRET = os.environ.get("PAYCHANGU_WEBHOOK_SECRET", "")
+AIRTEL_MONEY_CLIENT_ID = os.environ.get("AIRTEL_MONEY_CLIENT_ID", "")
+AIRTEL_MONEY_CLIENT_SECRET = os.environ.get("AIRTEL_MONEY_CLIENT_SECRET", "")
+TNM_MPAMBA_API_KEY = os.environ.get("TNM_MPAMBA_API_KEY", "")
+PAYTRIGGER_API_KEY = os.environ.get("PAYTRIGGER_API_KEY", "")
+
+# Device locking integration flags
+MOCK_DEVICE_LOCKING = os.environ.get("MOCK_DEVICE_LOCKING", "true").lower() == "true"
+ENABLE_KNOX = os.environ.get("ENABLE_KNOX", "false").lower() == "true"
+ENABLE_NUOVOPAY = os.environ.get("ENABLE_NUOVOPAY", "false").lower() == "true"
+ENABLE_UPYA = os.environ.get("ENABLE_UPYA", "false").lower() == "true"
+ENABLE_PAYTRIGGER = os.environ.get("ENABLE_PAYTRIGGER", "false").lower() == "true"
+ENABLE_PAYCHANGU = os.environ.get("ENABLE_PAYCHANGU", "false").lower() == "true"
+
+APP_VERSION = "1.0.0"
 
 if "test" in sys.argv:
     PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]

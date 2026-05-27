@@ -1,0 +1,208 @@
+{% extends "base/base.html" %}
+{% load static %}
+
+{% block content %}
+<div
+  x-data="salesHome({
+    cooldownRemaining: {{ cooldown_remaining }},
+    canClaim: {{ can_claim|yesno:'true,false' }},
+    pollInterval: 30000
+  })"
+  x-init="init()"
+>
+
+  {# ── Greeting ── #}
+  <div class="greeting-row">
+    <div>
+      <p class="greeting">Hi, {{ request.user.first_name|default:request.user.username }} 🇲🇼</p>
+      <p class="greeting-sub">Welcome back to TengaSale</p>
+    </div>
+    <div class="country-flag-pill">
+      <span>Malawi</span>
+    </div>
+  </div>
+
+  {# ── Claim Button ── #}
+  <div class="claim-section">
+    {% if can_claim %}
+      <form method="post" action="{% url 'sales_claim_next' %}">
+        {% csrf_token %}
+        <button
+          type="submit"
+          class="btn-claim"
+          x-bind:disabled="!canClaim || cooldownRemaining > 0"
+        >
+          CLAIM NEXT
+        </button>
+      </form>
+    {% else %}
+      <div x-show="cooldownRemaining > 0">
+        <button class="btn-claim btn-claim--disabled" disabled>
+          NEXT CLAIM IN <span x-text="formatCountdown(cooldownRemaining)">{{ cooldown_remaining }}s</span>
+        </button>
+      </div>
+      <div x-show="cooldownRemaining <= 0 && !canClaim">
+        {% if pending_count == 0 %}
+          <button class="btn-claim btn-claim--empty" disabled>NO APPLICATIONS IN QUEUE</button>
+        {% else %}
+          <button class="btn-claim btn-claim--disabled" disabled>MAX ACTIVE REACHED ({{ active_count }}/{{ max_active }})</button>
+        {% endif %}
+      </div>
+    {% endif %}
+  </div>
+
+  {# ── Toast / Snackbar ── #}
+  <div class="toast" x-show="toast" x-transition x-text="toastMsg" x-cloak></div>
+
+  {# ── My Active Card ── #}
+  <a href="{% url 'sales_applications' %}" class="glass-card active-card">
+    <div class="active-card__label">MY ACTIVE</div>
+    <div class="active-card__count">
+      <span class="active-card__num" x-text="activeCount">{{ active_count }}</span>
+      <span class="active-card__sep">/</span>
+      <span class="active-card__max">{{ max_active }}</span>
+    </div>
+    <div class="active-card__bar">
+      <div
+        class="active-card__bar-fill"
+        style="width: {% widthratio active_count max_active 100 %}%"
+      ></div>
+    </div>
+    <p class="active-card__hint">Tap to view your active applications</p>
+  </a>
+
+  {# ── Active Application Quick List ── #}
+  {% if active_apps %}
+    <div class="section-header">Active Applications</div>
+    {% for app in active_apps %}
+      <a href="{% url 'sales_review_summary' app.id %}" class="app-row-card">
+        <div class="app-row-card__left">
+          <div class="app-row-card__name">{{ app.customer_name|default:"—" }}</div>
+          <div class="app-row-card__meta">{{ app.application_number }}</div>
+        </div>
+        <div class="app-row-card__right">
+          <span class="status-badge status-badge--review">Under Review</span>
+          <svg class="chevron-right" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
+        </div>
+      </a>
+    {% endfor %}
+  {% endif %}
+
+  {# ── Stats Row ── #}
+  <div class="section-header">Applications</div>
+  <div class="stats-grid">
+    <a href="{% url 'sales_applications' %}?tab=active" class="stat-card">
+      <div class="stat-card__num">{{ active_count }}</div>
+      <div class="stat-card__label">Active</div>
+    </a>
+    <a href="{% url 'sales_applications' %}?tab=completed" class="stat-card">
+      <div class="stat-card__num">{{ completed_count }}</div>
+      <div class="stat-card__label">Completed</div>
+    </a>
+    <a href="{% url 'sales_applications' %}?tab=queue" class="stat-card stat-card--pending">
+      <div class="stat-card__num" x-text="pendingCount">{{ pending_count }}</div>
+      <div class="stat-card__label">In Queue</div>
+    </a>
+  </div>
+
+  {# ── Tools Section ── #}
+  <div class="section-header">Tools</div>
+  <div class="tool-grid">
+    <a href="{% url 'sales_wallet' %}" class="tool-card">
+      <div class="tool-card__icon tool-card__icon--orange">
+        <svg viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/></svg>
+      </div>
+      <span>Earnings</span>
+      {% if wallet.balance %}
+        <small class="tool-card__sub">MWK {{ wallet.balance|floatformat:0 }}</small>
+      {% endif %}
+    </a>
+    <a href="{% url 'sales_queue_rules' %}" class="tool-card">
+      <div class="tool-card__icon tool-card__icon--blue">
+        <svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+      </div>
+      <span>Queue Rules</span>
+    </a>
+    <a href="{% url 'payments_home' %}" class="tool-card">
+      <div class="tool-card__icon tool-card__icon--green">
+        <svg viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+      </div>
+      <span>Payments</span>
+    </a>
+    <a href="{% url 'sales_applications' %}?tab=completed" class="tool-card">
+      <div class="tool-card__icon">
+        <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+      </div>
+      <span>Reviewed</span>
+    </a>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function salesHome({ cooldownRemaining, canClaim, pollInterval }) {
+  return {
+    cooldownRemaining,
+    canClaim,
+    activeCount: {{ active_count }},
+    pendingCount: {{ pending_count }},
+    toast: false,
+    toastMsg: "",
+    _timer: null,
+    _pollTimer: null,
+
+    init() {
+      if (this.cooldownRemaining > 0) this.startCountdown();
+      this.startPolling(pollInterval);
+    },
+
+    startCountdown() {
+      this._timer = setInterval(() => {
+        this.cooldownRemaining = Math.max(0, this.cooldownRemaining - 1);
+        if (this.cooldownRemaining <= 0) {
+          clearInterval(this._timer);
+        }
+      }, 1000);
+    },
+
+    formatCountdown(s) {
+      const m = Math.floor(s / 60);
+      const sec = s % 60;
+      return m > 0
+        ? `${m}M ${String(sec).padStart(2, "0")}S`
+        : `${sec}S`;
+    },
+
+    startPolling(interval) {
+      let lastActivity = Date.now();
+      document.addEventListener("mousemove", () => { lastActivity = Date.now(); });
+      document.addEventListener("touchstart", () => { lastActivity = Date.now(); });
+
+      this._pollTimer = setInterval(async () => {
+        const inactive = (Date.now() - lastActivity) / 1000 / 60;
+        if (inactive > 15) return;
+        try {
+          const res = await fetch("{% url 'sales_queue_status' %}");
+          const data = await res.json();
+          this.activeCount = data.active_count;
+          this.pendingCount = data.pending_count;
+          this.canClaim = data.can_claim;
+          if (data.cooldown_remaining > 0 && this.cooldownRemaining <= 0) {
+            this.cooldownRemaining = data.cooldown_remaining;
+            this.startCountdown();
+          }
+        } catch (e) {}
+      }, interval);
+    },
+
+    showToast(msg) {
+      this.toastMsg = msg;
+      this.toast = true;
+      setTimeout(() => { this.toast = false; }, 3500);
+    },
+  };
+}
+</script>
+{% endblock %}

@@ -1,0 +1,50 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Django
+*.sqlite3
+tengasale/db.sqlite3
+tengasale/media/
+tengasale/.env
+*.log
+local_settings.py
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Build / distribution
+dist/
+build/
+*.egg-info/
+.eggs/
+
+# Node (if used for tooling)
+node_modules/
+npm-debug.log*
+
+# Coverage
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Secrets
+.env
+.env.*
+!.env.example

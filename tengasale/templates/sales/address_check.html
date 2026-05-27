@@ -1,0 +1,44 @@
+{% extends "base/base.html" %}
+{% load static %}
+
+{% block page_title %}Address Check — {{ app.application_number }}{% endblock %}
+
+{% block content %}
+<div class="page-back-row">
+  <a href="{% url 'sales_identity_check' app.id %}" class="back-link">
+    <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+    Back
+  </a>
+  <span class="page-label">Address Check</span>
+</div>
+
+{% include "sales/_step_bar.html" with step=step total_steps=total_steps %}
+
+<div class="glass-card review-card mb-16">
+  <div class="review-card__title">Location Details</div>
+  <div class="review-row"><span>Region</span><strong>{{ app.region|default:"—" }}</strong></div>
+  <div class="review-row"><span>District</span><strong>{{ app.district|default:"—" }}</strong></div>
+  <div class="review-row"><span>T/A</span><strong>{{ app.traditional_authority|default:"—" }}</strong></div>
+  <div class="review-row"><span>Precise Location</span><strong>{{ app.precise_location|default:"—" }}</strong></div>
+  {% if app.gps_coordinates %}
+    <div class="review-row"><span>GPS</span><strong>{{ app.gps_coordinates }}</strong></div>
+  {% endif %}
+</div>
+
+{% if app.map_screenshot %}
+  <div class="map-preview mb-16">
+    <img src="{{ app.map_screenshot.url }}" alt="Location map" loading="lazy" class="map-img">
+  </div>
+{% endif %}
+
+<form method="post">
+  {% csrf_token %}
+  <div class="glass-card">
+    <div class="review-card__title">Address Verification</div>
+    {% include "sales/_yes_no.html" with field_name="location_neighbour_spoken" label="Did you speak to the neighbour?" current_value=review.location_neighbour_spoken %}
+    {% include "sales/_yes_no.html" with field_name="location_confirmed" label="Did the neighbour confirm the applicant's home location?" current_value=review.location_confirmed %}
+    {% include "sales/_yes_no.html" with field_name="location_traceable" label="Would you be able to locate the customer if they defaulted on payment?" current_value=review.location_traceable %}
+  </div>
+  <button type="submit" class="btn-primary btn-full mt-16">Continue to Customer Call →</button>
+</form>
+{% endblock %}

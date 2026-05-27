@@ -2,11 +2,17 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import path, include
+from django.views.generic import TemplateView
 from earnings.views import payments_home
 
 urlpatterns = [
     path("admin/", admin.site.urls),
 
+    # New clean app routing
+    path("sales/", include("sales.urls")),
+    path("pay/", include("portal.urls")),
+
+    # Public website (must be last to not swallow other routes)
     path("", include("dashboard.urls")),
     path("accounts/", include("accounts.urls")),
     path("applications/", include("applications.urls")),
@@ -16,6 +22,14 @@ urlpatterns = [
     path("tengasale/underwriter/", include("approvals.urls")),
     path("approvals/", include("approvals.legacy_urls")),
     path("contracts/", include("contracts.urls")),
+    path("", include("financing.urls")),
+    path("api/tengasale/", include("financing.api_urls")),
+
+    # Public website (after all app routes so /admin/, /sales/, /pay/ etc. take priority)
+    path("site/", include("website.urls")),
+
+    # PWA offline fallback
+    path("offline/", TemplateView.as_view(template_name="offline.html"), name="offline"),
 ]
 
 if settings.DEBUG:

@@ -1,0 +1,24 @@
+{% comment %}
+Usage: {% include "sales/_yes_no.html" with field_name="identity_signature_matches" label="Does the signature match?" current_value=review.identity_signature_matches %}
+{% endcomment %}
+<div
+  class="yes-no-field"
+  x-data="{ val: '{{ current_value|yesno:'yes,no,' }}' }"
+>
+  <label class="yes-no-label">{{ label }}</label>
+  <div class="yes-no-buttons">
+    <button
+      type="button"
+      class="btn-yn btn-yn--yes"
+      x-bind:class="{ 'btn-yn--active': val === 'yes' }"
+      x-on:click="val = 'yes'"
+    >Yes</button>
+    <button
+      type="button"
+      class="btn-yn btn-yn--no"
+      x-bind:class="{ 'btn-yn--active': val === 'no' }"
+      x-on:click="val = 'no'"
+    >No</button>
+  </div>
+  <input type="hidden" name="{{ field_name }}" x-bind:value="val">
+</div>

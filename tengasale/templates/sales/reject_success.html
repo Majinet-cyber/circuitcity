@@ -1,0 +1,19 @@
+{% extends "base/base.html" %}
+{% load static %}
+
+{% block page_title %}Application Rejected{% endblock %}
+
+{% block content %}
+<div class="success-screen">
+  <div class="success-icon success-icon--reject">
+    <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+  </div>
+  <h2 class="success-heading">Application Rejected</h2>
+  <p class="success-body">
+    Application <strong>{{ app.application_number }}</strong> for
+    <strong>{{ app.customer_name }}</strong> has been rejected.
+  </p>
+  <p class="success-sub">The merchant has been notified.</p>
+  <a href="{% url 'sales_home' %}" class="btn-primary btn-full mt-24">Back to Home</a>
+</div>
+{% endblock %}

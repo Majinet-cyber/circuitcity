@@ -1,0 +1,58 @@
+{% extends "base/base.html" %}
+{% load static %}
+
+{% block page_title %}Applications{% endblock %}
+
+{% block content %}
+<div class="page-back-row">
+  <a href="{% url 'sales_home' %}" class="back-link">
+    <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+    Back
+  </a>
+  <span class="page-label">Applications</span>
+</div>
+
+<div class="tab-bar">
+  <a href="?tab=active" class="tab-item {% if tab == 'active' %}tab-item--active{% endif %}">Active</a>
+  <a href="?tab=completed" class="tab-item {% if tab == 'completed' %}tab-item--active{% endif %}">Completed</a>
+  <a href="?tab=rejected" class="tab-item {% if tab == 'rejected' %}tab-item--active{% endif %}">Rejected</a>
+  <a href="?tab=queue" class="tab-item {% if tab == 'queue' %}tab-item--active{% endif %}">Queue</a>
+</div>
+
+{% if apps %}
+  {% for app in apps %}
+    <a
+      href="{% url 'sales_review_summary' app.id %}"
+      class="app-row-card"
+    >
+      <div class="app-row-card__left">
+        <div class="app-row-card__name">{{ app.customer_name|default:"—" }}</div>
+        <div class="app-row-card__meta">
+          {{ app.application_number }}
+          {% if app.deal %} · {{ app.deal.brand.name }} {{ app.deal.model_name }}{% endif %}
+        </div>
+        <div class="app-row-card__date">{{ app.submitted_at|date:"d M Y"|default:"Not submitted" }}</div>
+      </div>
+      <div class="app-row-card__right">
+        <span class="status-badge
+          {% if app.status == 'approved' %}status-badge--approved
+          {% elif app.status == 'rejected' %}status-badge--rejected
+          {% elif app.status == 'under_review' %}status-badge--review
+          {% else %}status-badge--pending{% endif %}
+        ">{{ app.get_status_display }}</span>
+        <svg class="chevron-right" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
+      </div>
+    </a>
+  {% endfor %}
+{% else %}
+  <div class="empty-state">
+    <div class="empty-state__icon">
+      <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+    </div>
+    <p>No applications here yet.</p>
+    {% if tab == 'queue' %}
+      <p class="empty-sub">The queue is clear — check back soon.</p>
+    {% endif %}
+  </div>
+{% endif %}
+{% endblock %}

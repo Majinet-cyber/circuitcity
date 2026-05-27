@@ -1,0 +1,83 @@
+{% extends "base/base.html" %}
+{% load static %}
+
+{% block page_title %}Summary Review — {{ app.application_number }}{% endblock %}
+
+{% block content %}
+<div class="page-back-row">
+  <a href="{% url 'sales_home' %}" class="back-link">
+    <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+    Back
+  </a>
+  <span class="page-label">Review Application</span>
+</div>
+
+{% include "sales/_step_bar.html" with step=step total_steps=total_steps %}
+
+<div class="review-app-number">{{ app.application_number }}</div>
+
+{# Customer Summary Card #}
+<div class="glass-card review-card">
+  <div class="review-card__title">Customer</div>
+  <div class="review-row"><span>Name</span><strong>{{ app.customer_name|default:"—" }}</strong></div>
+  <div class="review-row"><span>Phone</span><strong>{{ app.customer_phone|default:"—" }}</strong></div>
+  <div class="review-row"><span>National ID</span><strong>{{ app.national_id|default:"—" }}</strong></div>
+  <div class="review-row"><span>District</span><strong>{{ app.district|default:"—" }}</strong></div>
+  <div class="review-row"><span>Occupation</span><strong>{{ app.occupation|default:"—" }}</strong></div>
+  <div class="review-row"><span>Income Band</span><strong>{{ app.income_band|default:"—" }}</strong></div>
+</div>
+
+{# KYC Images #}
+<div class="glass-card review-card">
+  <div class="review-card__title">KYC Images</div>
+  <div class="kyc-images-row">
+    {% if app.customer_face_image %}
+      <div class="kyc-img-card">
+        <img src="{{ app.customer_face_image.url }}" alt="Customer selfie" loading="lazy">
+        <span>Selfie</span>
+      </div>
+    {% else %}
+      <div class="kyc-img-card kyc-img-card--missing"><span>No Selfie</span></div>
+    {% endif %}
+    {% if app.id_front_image %}
+      <div class="kyc-img-card">
+        <img src="{{ app.id_front_image.url }}" alt="ID front" loading="lazy">
+        <span>ID Front</span>
+      </div>
+    {% else %}
+      <div class="kyc-img-card kyc-img-card--missing"><span>No ID Front</span></div>
+    {% endif %}
+    {% if app.id_back_image %}
+      <div class="kyc-img-card">
+        <img src="{{ app.id_back_image.url }}" alt="ID back" loading="lazy">
+        <span>ID Back</span>
+      </div>
+    {% else %}
+      <div class="kyc-img-card kyc-img-card--missing"><span>No ID Back</span></div>
+    {% endif %}
+  </div>
+</div>
+
+{# Deal Summary Card #}
+{% if app.deal %}
+<div class="glass-card review-card">
+  <div class="review-card__title">Deal</div>
+  <div class="review-row"><span>Device</span><strong>{{ app.deal }}</strong></div>
+  <div class="review-row"><span>Cash Price</span><strong>MWK {{ app.selected_cash_price|floatformat:0 }}</strong></div>
+  <div class="review-row"><span>Deposit</span><strong>MWK {{ app.calculated_deposit_amount|floatformat:0 }}</strong></div>
+  <div class="review-row"><span>Daily Repayment</span><strong>MWK {{ app.calculated_daily_payment|floatformat:2 }}</strong></div>
+  <div class="review-row"><span>Monthly (30-day)</span><strong>MWK {{ app.calculated_monthly_payment|floatformat:0 }}</strong></div>
+  <div class="review-row"><span>Total Contract</span><strong>MWK {{ app.calculated_total_loan|floatformat:0 }}</strong></div>
+</div>
+{% endif %}
+
+{# Summary Clear Toggle #}
+<form method="post">
+  {% csrf_token %}
+  <div class="glass-card">
+    <div class="review-card__title">Summary Check</div>
+    {% include "sales/_yes_no.html" with field_name="summary_clear" label="Is all summary information clear and correct?" current_value=review.summary_clear %}
+  </div>
+  <button type="submit" class="btn-primary btn-full mt-16">Continue to Identity Check →</button>
+</form>
+{% endblock %}

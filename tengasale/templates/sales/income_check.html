@@ -1,0 +1,43 @@
+{% extends "base/base.html" %}
+{% load static %}
+
+{% block page_title %}Income Check — {{ app.application_number }}{% endblock %}
+
+{% block content %}
+<div class="page-back-row">
+  <a href="{% url 'sales_customer_call' app.id %}" class="back-link">
+    <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+    Back
+  </a>
+  <span class="page-label">Income Check</span>
+</div>
+
+{% include "sales/_step_bar.html" with step=step total_steps=total_steps %}
+
+<div class="glass-card review-card mb-16">
+  <div class="review-card__title">Income Details</div>
+  <div class="review-row"><span>Occupation</span><strong>{{ app.occupation|default:"—" }}</strong></div>
+  <div class="review-row"><span>Income Band</span><strong>{{ app.income_band|default:"—" }}</strong></div>
+  <div class="review-row"><span>Monthly Income</span><strong>MWK {{ monthly_income|floatformat:0 }}</strong></div>
+  <div class="review-row"><span>Monthly Repayment</span><strong>MWK {{ monthly_payment|floatformat:0 }}</strong></div>
+  <div class="review-row"><span>Income Multiple</span>
+    <strong class="{% if income_multiple >= 10 %}text-green{% elif income_multiple >= 5 %}text-orange{% else %}text-red{% endif %}">
+      {{ income_multiple }}x
+    </strong>
+  </div>
+  <div class="review-row"><span>Recommended Minimum Income</span><strong>MWK {{ recommended_income|floatformat:0 }}</strong></div>
+</div>
+
+<form method="post">
+  {% csrf_token %}
+  <div class="glass-card">
+    <div class="review-card__title">Income Verification</div>
+    {% include "sales/_yes_no.html" with field_name="income_understood" label="Did you understand the customer's income source?" current_value=review.income_understood %}
+    {% include "sales/_yes_no.html" with field_name="income_contact_spoken" label="Did you speak to the income contact / employer?" current_value=review.income_contact_spoken %}
+    {% include "sales/_yes_no.html" with field_name="income_confirmed" label="Was the customer's income confirmed?" current_value=review.income_confirmed %}
+    {% include "sales/_yes_no.html" with field_name="income_source_dependable" label="Is the income source dependable?" current_value=review.income_source_dependable %}
+    {% include "sales/_yes_no.html" with field_name="income_contact_confident" label="Are you confident in the income contact?" current_value=review.income_contact_confident %}
+  </div>
+  <button type="submit" class="btn-primary btn-full mt-16">Continue to Final Review →</button>
+</form>
+{% endblock %}

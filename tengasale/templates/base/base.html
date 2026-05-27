@@ -3,9 +3,20 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>TengaSale | Endless Possibilities</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block page_title %}TengaSale | Endless Possibilities{% endblock %}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#ff6a00">
+    <meta name="description" content="TengaSale — Endless Possibilities. Smartphone financing made simple for Malawi.">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="TengaSale">
+    <link rel="manifest" href="{% static 'manifest.webmanifest' %}">
+    <link rel="icon" type="image/png" href="{% static 'images/icon-192.png' %}" sizes="192x192">
+    <link rel="apple-touch-icon" href="{% static 'images/icon-192.png' %}">
     <link rel="stylesheet" href="{% static 'css/style.css' %}">
+    {% block extra_head %}{% endblock %}
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js"></script>
 </head>
 <body>
 
@@ -13,11 +24,15 @@
     <header class="topbar app-topbar">
         <div class="brand-left">
             <a href="{% url 'home' %}" class="brand-lockup" aria-label="TengaSale home">
-                <span class="ts-logo">T</span>
-                <span class="brand-copy">
-                    <span class="brand-title">TengaSale</span>
-                    <span class="brand-tagline">Endless Possibilities</span>
-                </span>
+                {% if tengasale_logo_exists %}
+                    <img src="{% static 'images/TENGASALEe.png' %}" alt="TengaSale" class="ts-logo-img" height="42">
+                {% else %}
+                    <span class="ts-logo">T</span>
+                    <span class="brand-copy">
+                        <span class="brand-title">TengaSale</span>
+                        <span class="brand-tagline">Endless Possibilities</span>
+                    </span>
+                {% endif %}
             </a>
         </div>
 
@@ -87,5 +102,13 @@
     </footer>
 </div>
 
+{% block extra_scripts %}{% endblock %}
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/static/sw.js').catch(() => {});
+    });
+  }
+</script>
 </body>
 </html>

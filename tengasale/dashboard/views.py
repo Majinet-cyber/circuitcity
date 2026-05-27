@@ -4,6 +4,7 @@ from django.contrib.auth.views import redirect_to_login
 from django.contrib import messages
 from django.db.models import Sum
 from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
 from accounts.decorators import hq_required, merchant_required
 from accounts.forms import HQUserForm
 from accounts.utils import primary_role, role_redirect_url
@@ -11,6 +12,7 @@ from core.business_hours import business_hours_context
 from applications.models import FinancingApplication
 from commissions.models import Commission
 from contracts.models import Contract
+from financing.models import Device, DeviceCommand, FinancingContract, PaymentRecord
 from rewards.models import SpinWallet
 
 MAX_ACTIVE_UNDERWRITER_REVIEWS = 5
@@ -47,11 +49,56 @@ def merchant_dashboard_context(user):
         or 0
     )
     spin_wallet, _ = SpinWallet.objects.get_or_create(user=user)
+    month_start = timezone.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    merchant_contracts = FinancingContract.objects.filter(created_by=user)
+    pending_payments = PaymentRecord.objects.select_related("customer", "contract", "contract__device").filter(
+        contract__created_by=user,
+        verification_status=PaymentRecord.STATUS_PENDING,
+    )
+    recent_contracts = merchant_contracts.select_related("customer", "device").order_by("-created_at")[:5]
+    overdue_customers = merchant_contracts.select_related("customer", "device").filter(
+        status__in=[
+            FinancingContract.STATUS_OVERDUE,
+            FinancingContract.STATUS_LOCKED,
+            FinancingContract.STATUS_DEFAULTED,
+        ]
+    )[:5]
+    command_history = DeviceCommand.objects.select_related("device", "contract", "contract__customer").filter(
+        contract__created_by=user
+    )[:5]
 
     return {
         "active_count": active_count,
         "earnings_total": earnings_total,
         "spin_wallet": spin_wallet,
+        "device_financing_stats": {
+            "total_financed_devices": Device.objects.filter(financing_contract__created_by=user).count(),
+            "active_contracts": merchant_contracts.filter(status=FinancingContract.STATUS_ACTIVE).count(),
+            "overdue_contracts": merchant_contracts.filter(status=FinancingContract.STATUS_OVERDUE).count(),
+            "locked_devices": Device.objects.filter(
+                financing_contract__created_by=user,
+                status=Device.STATUS_LOCKED,
+            ).count(),
+            "payments_pending_verification": pending_payments.count(),
+            "payments_verified_this_month": PaymentRecord.objects.filter(
+                contract__created_by=user,
+                verification_status=PaymentRecord.STATUS_VERIFIED,
+                verified_at__gte=month_start,
+            ).count(),
+            "expected_monthly_collections": (
+                merchant_contracts.filter(status=FinancingContract.STATUS_ACTIVE).aggregate(
+                    total=Sum("monthly_payment_amount")
+                )["total"]
+                or 0
+            ),
+            "default_risk_count": merchant_contracts.filter(
+                status__in=[FinancingContract.STATUS_OVERDUE, FinancingContract.STATUS_LOCKED]
+            ).count(),
+        },
+        "recent_financing_contracts": recent_contracts,
+        "overdue_financing_customers": overdue_customers,
+        "pending_financing_payments": pending_payments[:5],
+        "device_command_history": command_history,
         **business_hours_context(),
     }
 

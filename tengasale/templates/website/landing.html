@@ -1,0 +1,274 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>TengaSale — Endless Possibilities</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#ff6a00">
+  <meta name="description" content="TengaSale helps customers access quality smartphones through simple instalment plans, merchant support, and secure repayment tracking.">
+  <link rel="manifest" href="{% static 'manifest.webmanifest' %}">
+  <link rel="stylesheet" href="{% static 'css/style.css' %}">
+  <link rel="stylesheet" href="{% static 'css/website.css' %}">
+</head>
+<body class="website-body">
+
+<!-- Nav -->
+<nav class="site-nav">
+  <div class="site-nav__inner">
+    <a href="{% url 'website_landing' %}" class="site-nav__brand">
+      <span class="ts-logo">T</span>
+      <span class="brand-copy">
+        <span class="brand-title">TengaSale</span>
+        <span class="brand-tagline">Endless Possibilities</span>
+      </span>
+    </a>
+    <div class="site-nav__actions">
+      <a href="{% url 'portal_search' %}" class="site-nav__btn site-nav__btn--primary">Make Payment</a>
+      <a href="{% url 'login' %}" class="site-nav__btn">Merchant Login</a>
+    </div>
+  </div>
+</nav>
+
+<!-- Hero -->
+<section class="hero">
+  <div class="hero__inner">
+    <div class="hero__badge">Malawi's #1 Phone Financing Platform</div>
+    <h1 class="hero__headline">
+      Phones on<br><span class="hero__headline--accent">Flexible Instalments</span>
+    </h1>
+    <p class="hero__sub">
+      TengaSale helps customers access quality smartphones through simple instalment plans,
+      merchant support, and secure repayment tracking.
+    </p>
+    <div class="hero__ctas">
+      <a href="{% url 'portal_search' %}" class="btn-hero-primary">Make Payment</a>
+      <a href="{% url 'login' %}" class="btn-hero-secondary">Become a Merchant</a>
+    </div>
+  </div>
+  <div class="hero__graphic">
+    <div class="hero__phone-mock">
+      <div class="hero__phone-screen">
+        <div class="hero__phone-status"></div>
+        <div class="hero__phone-card">
+          <div class="hero__phone-label">Active Contract</div>
+          <div class="hero__phone-amount">MWK 45,000</div>
+          <div class="hero__phone-bar"><div class="hero__phone-fill" style="width:62%"></div></div>
+          <div class="hero__phone-sub">62% paid · 138 days left</div>
+        </div>
+        <div class="hero__phone-pay">PAY MWK 1,500</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- How It Works -->
+<section class="site-section" id="how-it-works">
+  <div class="site-section__inner">
+    <h2 class="site-section__heading">How It Works</h2>
+    <p class="site-section__sub">Six simple steps from application to ownership</p>
+    <div class="steps-grid">
+      <div class="step-card">
+        <div class="step-card__num">1</div>
+        <div class="step-card__icon">📱</div>
+        <div class="step-card__title">Choose Phone</div>
+        <div class="step-card__body">Browse available models and pick the right device for your budget</div>
+      </div>
+      <div class="step-card">
+        <div class="step-card__num">2</div>
+        <div class="step-card__icon">🏪</div>
+        <div class="step-card__title">Apply In-Store</div>
+        <div class="step-card__body">Visit a TengaSale merchant and complete your application with a sales rep</div>
+      </div>
+      <div class="step-card">
+        <div class="step-card__num">3</div>
+        <div class="step-card__icon">🪪</div>
+        <div class="step-card__title">Verify Identity</div>
+        <div class="step-card__body">Quick KYC check using your National ID and selfie</div>
+      </div>
+      <div class="step-card">
+        <div class="step-card__num">4</div>
+        <div class="step-card__icon">💰</div>
+        <div class="step-card__title">Pay Deposit</div>
+        <div class="step-card__body">Pay a small deposit and walk out with your new phone today</div>
+      </div>
+      <div class="step-card">
+        <div class="step-card__num">5</div>
+        <div class="step-card__icon">📲</div>
+        <div class="step-card__title">Use &amp; Repay</div>
+        <div class="step-card__body">Use your phone and repay daily or monthly via mobile money</div>
+      </div>
+      <div class="step-card">
+        <div class="step-card__num">6</div>
+        <div class="step-card__icon">🎉</div>
+        <div class="step-card__title">Pay Early, Save More</div>
+        <div class="step-card__body">Settle early and get discounts — the sooner you pay, the less you owe</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Why TengaSale -->
+<section class="site-section site-section--alt" id="why">
+  <div class="site-section__inner">
+    <h2 class="site-section__heading">Why TengaSale</h2>
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="feature-card__icon">⚡</div>
+        <div class="feature-card__title">Simple Approval Flow</div>
+        <div class="feature-card__body">Fast, step-by-step underwriting designed for busy shops</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-card__icon">📱</div>
+        <div class="feature-card__title">Mobile Money Payments</div>
+        <div class="feature-card__body">Airtel Money and TNM Mpamba — pay from anywhere</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-card__icon">🏪</div>
+        <div class="feature-card__title">Merchant Dashboard</div>
+        <div class="feature-card__body">Track sales, commissions, and customer status in one place</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-card__icon">📄</div>
+        <div class="feature-card__title">Contract Tracking</div>
+        <div class="feature-card__body">Every payment recorded, every contract monitored</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-card__icon">🔒</div>
+        <div class="feature-card__title">Locking Integration Ready</div>
+        <div class="feature-card__body">Knox, NuovoPay, and Upya integration readiness built in</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-card__icon">🌍</div>
+        <div class="feature-card__title">Malawi-First, Africa-Ready</div>
+        <div class="feature-card__body">Built for Malawi, designed to scale across Africa</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Merchant Section -->
+<section class="site-section" id="merchants">
+  <div class="site-section__inner">
+    <h2 class="site-section__heading">For Merchants</h2>
+    <p class="site-section__sub">
+      Sell more phones without building your own credit system. TengaSale handles the
+      financing, underwriting, contract management, and repayment tracking.
+    </p>
+    <div class="merchant-cards">
+      <div class="merchant-card">
+        <div class="merchant-card__label">Sales Today</div>
+        <div class="merchant-card__value">12</div>
+      </div>
+      <div class="merchant-card">
+        <div class="merchant-card__label">Active Contracts</div>
+        <div class="merchant-card__value">248</div>
+      </div>
+      <div class="merchant-card merchant-card--orange">
+        <div class="merchant-card__label">Wallet Balance</div>
+        <div class="merchant-card__value">MWK 124K</div>
+      </div>
+      <div class="merchant-card">
+        <div class="merchant-card__label">Pending Applications</div>
+        <div class="merchant-card__value">3</div>
+      </div>
+    </div>
+    <a href="{% url 'login' %}" class="btn-hero-primary mt-site">Join as Merchant</a>
+  </div>
+</section>
+
+<!-- Customer Section -->
+<section class="site-section site-section--alt" id="customers">
+  <div class="site-section__inner">
+    <h2 class="site-section__heading">For Customers</h2>
+    <p class="site-section__sub">
+      View your contract, track how much you've paid, make payments, and never miss
+      a payment date. Pay early to save money.
+    </p>
+    <div class="customer-portal-preview">
+      <div class="glass-card" style="max-width:360px;margin:0 auto;">
+        <div style="font-size:12px;color:var(--muted);font-weight:700;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:8px;">Contract Progress</div>
+        <div style="font-size:28px;font-weight:900;margin-bottom:4px;">MWK 28,000 <span style="font-size:16px;font-weight:400;color:var(--muted)">/ 45,000</span></div>
+        <div style="height:10px;border-radius:999px;background:var(--border);overflow:hidden;margin-bottom:12px;">
+          <div style="height:100%;width:62%;background:var(--orange);border-radius:999px;"></div>
+        </div>
+        <div style="font-size:13px;color:var(--muted);">138 days remaining · Daily: MWK 326</div>
+      </div>
+    </div>
+    <a href="{% url 'portal_search' %}" class="btn-hero-primary mt-site">Pay Contract</a>
+  </div>
+</section>
+
+<!-- Integrations -->
+<section class="site-section" id="integrations">
+  <div class="site-section__inner">
+    <h2 class="site-section__heading">Integration Ready</h2>
+    <p class="site-section__sub">TengaSale is built to connect with leading African fintech and device management platforms.</p>
+    <div class="integrations-grid">
+      <div class="integration-card">
+        <div class="integration-card__name">Upya</div>
+        <span class="integration-badge integration-badge--ready">Ready for Integration</span>
+      </div>
+      <div class="integration-card">
+        <div class="integration-card__name">PayTrigger</div>
+        <span class="integration-badge integration-badge--ready">Ready for Integration</span>
+      </div>
+      <div class="integration-card">
+        <div class="integration-card__name">Samsung Knox</div>
+        <span class="integration-badge integration-badge--ready">Ready for Integration</span>
+      </div>
+      <div class="integration-card">
+        <div class="integration-card__name">NuovoPay</div>
+        <span class="integration-badge integration-badge--ready">Ready for Integration</span>
+      </div>
+      <div class="integration-card">
+        <div class="integration-card__name">PayChangu</div>
+        <span class="integration-badge integration-badge--ready">Ready for Integration</span>
+      </div>
+      <div class="integration-card">
+        <div class="integration-card__name">Mobile Money</div>
+        <span class="integration-badge integration-badge--active">Airtel &amp; TNM</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Trust -->
+<section class="site-section site-section--alt" id="trust">
+  <div class="site-section__inner">
+    <h2 class="site-section__heading">Trust &amp; Compliance</h2>
+    <div class="trust-grid">
+      <div class="trust-item"><span>🪪</span><span>KYC Verification</span></div>
+      <div class="trust-item"><span>📄</span><span>Contract Records</span></div>
+      <div class="trust-item"><span>💳</span><span>Payment History</span></div>
+      <div class="trust-item"><span>📱</span><span>Device Management Ready</span></div>
+      <div class="trust-item"><span>📋</span><span>Audit Logs</span></div>
+      <div class="trust-item"><span>🔐</span><span>Secure Data Handling</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- Footer -->
+<footer class="site-footer">
+  <div class="site-footer__inner">
+    <div class="site-footer__brand">
+      <span class="ts-logo" style="width:36px;height:36px;font-size:22px;">T</span>
+      <span class="brand-copy">
+        <span class="brand-title" style="font-size:17px;">TengaSale</span>
+        <span class="brand-tagline">Endless Possibilities</span>
+      </span>
+    </div>
+    <div class="site-footer__links">
+      <a href="#">Terms of Service</a>
+      <a href="#">Privacy Policy</a>
+      <a href="{% url 'portal_support' %}">Support</a>
+      <a href="{% url 'login' %}">Merchant Signup</a>
+    </div>
+    <div class="site-footer__copy">
+      &copy; 2026 TengaSale &mdash; <a href="mailto:support@tengasale.africa">support@tengasale.africa</a>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>

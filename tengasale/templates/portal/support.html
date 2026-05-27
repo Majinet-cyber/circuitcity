@@ -1,0 +1,27 @@
+{% extends "base/base.html" %}
+
+{% block page_title %}Support | TengaSale{% endblock %}
+
+{% block content %}
+<div class="page-back-row">
+  <a href="{% url 'portal_search' %}" class="back-link">
+    <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+    Back
+  </a>
+  <span class="page-label">Support</span>
+</div>
+<div class="glass-card portal-support-card">
+  <div class="portal-support-card__title">Need Help?</div>
+  <a href="https://wa.me/265883596135" target="_blank" rel="noopener" class="portal-support-link portal-support-link--whatsapp">
+    <svg viewBox="0 0 24 24"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.46 1.33 4.96L2.05 22l5.25-1.38a9.93 9.93 0 0 0 4.74 1.21h.01c5.46 0 9.91-4.45 9.91-9.91A9.86 9.86 0 0 0 19.05 4.9 9.85 9.85 0 0 0 12.04 2Z"/></svg>
+    WhatsApp Support
+  </a>
+  <a href="tel:+265883596135" class="portal-support-link">
+    <svg viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2A19.79 19.79 0 0 1 3.07 5.18 2 2 0 0 1 5.07 3h3a2 2 0 0 1 2 1.72A12.08 12.08 0 0 0 10.72 7a2 2 0 0 1-.45 2L9.09 10.09A16 16 0 0 0 13.91 14.91l1.06-1.06a2 2 0 0 1 2-.45 12.08 12.08 0 0 0 2.28.65A2 2 0 0 1 21 16.92Z"/></svg>
+    Call Support
+  </a>
+  <p style="font-size:13px;color:var(--muted);margin-top:16px;">
+    Email: <a href="mailto:support@tengasale.africa">support@tengasale.africa</a>
+  </p>
+</div>
+{% endblock %}

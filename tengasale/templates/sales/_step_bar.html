@@ -1,0 +1,21 @@
+{% comment %}
+Inclusion tag: {% include "sales/_step_bar.html" with step=2 total_steps=6 %}
+{% endcomment %}
+{% with step_labels="Summary,Identity,Address,Customer Call,Income,Review" %}
+<div class="step-bar">
+  {% for i in "123456" %}
+    {% with forloop.counter as n %}
+      <div class="step-dot {% if n < step %}step-dot--done{% elif n == step %}step-dot--active{% endif %}">
+        {% if n < step %}
+          <svg viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        {% else %}
+          {{ n }}
+        {% endif %}
+      </div>
+      {% if not forloop.last %}
+        <div class="step-line {% if n < step %}step-line--done{% endif %}"></div>
+      {% endif %}
+    {% endwith %}
+  {% endfor %}
+</div>
+{% endwith %}

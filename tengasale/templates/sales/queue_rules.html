@@ -1,0 +1,100 @@
+{% extends "base/base.html" %}
+{% load static %}
+
+{% block page_title %}Queue Rules{% endblock %}
+
+{% block content %}
+<div class="page-back-row">
+  <a href="{% url 'sales_home' %}" class="back-link">
+    <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+    Back
+  </a>
+  <span class="page-label">Queue Rules</span>
+</div>
+
+<p class="section-description">How the TengaSale application queue works for sales reps.</p>
+
+<div class="glass-card queue-rule-card">
+  <div class="queue-rule-card__icon queue-rule-card__icon--orange">
+    <svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+  </div>
+  <div>
+    <div class="queue-rule-card__title">How Claiming Works</div>
+    <div class="queue-rule-card__body">
+      Applications submitted by merchants are placed in a queue ordered by submission time.
+      Press <strong>CLAIM NEXT</strong> to take the oldest unclaimed application. Once claimed,
+      it becomes yours to review through all the checklist steps and reach a decision.
+    </div>
+  </div>
+</div>
+
+<div class="glass-card queue-rule-card">
+  <div class="queue-rule-card__icon queue-rule-card__icon--blue">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+  </div>
+  <div>
+    <div class="queue-rule-card__title">Cooldown Period</div>
+    <div class="queue-rule-card__body">
+      After claiming an application, you must wait <strong>{{ rule.cooldown_minutes }} minute{{ rule.cooldown_minutes|pluralize }}</strong>
+      before you can claim another. This prevents one rep from claiming all available applications at once.
+    </div>
+  </div>
+</div>
+
+<div class="glass-card queue-rule-card">
+  <div class="queue-rule-card__icon queue-rule-card__icon--orange">
+    <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+  </div>
+  <div>
+    <div class="queue-rule-card__title">Application Limit</div>
+    <div class="queue-rule-card__body">
+      You can have a maximum of <strong>{{ rule.max_active_applications }}</strong> active applications at any time.
+      Complete a review before claiming more. Applications waiting for customer corrections for more than
+      <strong>{{ rule.waiting_edit_grace_minutes }} minutes</strong> do not count toward this limit.
+    </div>
+  </div>
+</div>
+
+<div class="glass-card queue-rule-card">
+  <div class="queue-rule-card__icon queue-rule-card__icon--green">
+    <svg viewBox="0 0 24 24"><path d="M1 6v16l7-4 8 4 7-4V2l-7 4-8-4-7 4z"/><path d="M8 2v16"/><path d="M16 6v16"/></svg>
+  </div>
+  <div>
+    <div class="queue-rule-card__title">Home Page Polling</div>
+    <div class="queue-rule-card__body">
+      Your home page automatically checks the queue every <strong>{{ rule.polling_interval_seconds }} seconds</strong>
+      to update the queue count and your claim button status.
+      After <strong>{{ rule.inactive_pause_minutes }} minutes</strong> of inactivity, polling pauses to save battery.
+    </div>
+  </div>
+</div>
+
+<div class="glass-card queue-rule-card">
+  <div class="queue-rule-card__icon">
+    <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+  </div>
+  <div>
+    <div class="queue-rule-card__title">Customer Edits</div>
+    <div class="queue-rule-card__body">
+      If corrections are sent back to the merchant, the application pauses. If the merchant does not
+      resubmit within <strong>{{ rule.waiting_edit_grace_minutes }} minutes</strong>, it stops counting
+      toward your active limit while you wait.
+    </div>
+  </div>
+</div>
+
+<div class="glass-card queue-rule-card">
+  <div class="queue-rule-card__icon queue-rule-card__icon--orange">
+    <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+  </div>
+  <div>
+    <div class="queue-rule-card__title">Approval Responsibility</div>
+    <div class="queue-rule-card__body">
+      Once you claim an application, you are responsible for reviewing it thoroughly and making
+      a fair approval or rejection decision. Approvals create a binding contract for the customer.
+      Only approve applications that genuinely pass all checks.
+    </div>
+  </div>
+</div>
+
+{% endblock %}

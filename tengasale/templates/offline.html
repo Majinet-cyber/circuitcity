@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>You are offline | TengaSale</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#ff6a00">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: #f5f6f8;
+      font-family: Inter, system-ui, -apple-system, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 24px;
+    }
+    .card {
+      background: #fff;
+      border-radius: 24px;
+      padding: 40px 32px;
+      max-width: 380px;
+      width: 100%;
+      text-align: center;
+      box-shadow: 0 16px 36px rgba(17,17,17,0.08);
+    }
+    .icon {
+      width: 80px; height: 80px;
+      background: rgba(255,106,0,0.1);
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      margin: 0 auto 20px;
+    }
+    .icon svg { width: 40px; height: 40px; stroke: #ff6a00; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .brand { display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 28px; }
+    .ts-logo { width: 42px; height: 42px; border-radius: 14px; background: #ff6a00; color: #111; font-size: 26px; font-weight: 900; display: grid; place-items: center; }
+    .brand-title { font-size: 19px; font-weight: 900; }
+    .brand-tagline { font-size: 12px; color: #7a828c; font-weight: 650; display: block; }
+    h1 { font-size: 22px; font-weight: 900; margin: 0 0 10px; }
+    p { font-size: 15px; color: #3a3f45; margin: 0 0 24px; line-height: 1.5; }
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 100%; height: 56px;
+      background: #ff6a00; color: #fff;
+      border: none; border-radius: 16px;
+      font-size: 16px; font-weight: 800;
+      cursor: pointer; text-decoration: none;
+      transition: background 0.15s;
+    }
+    .btn:hover { background: #df5600; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="brand">
+      <div class="ts-logo">T</div>
+      <div>
+        <span class="brand-title">TengaSale</span>
+        <span class="brand-tagline">Endless Possibilities</span>
+      </div>
+    </div>
+    <div class="icon">
+      <svg viewBox="0 0 24 24">
+        <path d="M1 6l6 6-6 6"/><path d="M23 6l-6 6 6 6"/><line x1="12" y1="4" x2="12" y2="20"/>
+      </svg>
+    </div>
+    <h1>You are offline</h1>
+    <p>Please check your internet connection and try again.</p>
+    <button class="btn" onclick="window.location.reload()">Try Again</button>
+  </div>
+</body>
+</html>

@@ -1,0 +1,246 @@
+{% extends "base/base.html" %}
+{% load static %}
+
+{% block page_title %}Contract {{ contract.contract_number }} | TengaSale{% endblock %}
+
+{% block content %}
+<div class="page-back-row">
+  <a href="{% url 'portal_search' %}" class="back-link">
+    <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+    Back
+  </a>
+  <span class="page-label">My Contract</span>
+</div>
+
+{# Device Warning if near lock #}
+{% if lock_warning and lock_warning.days <= 3 %}
+<div class="alert alert-error">
+  <span class="error-mark" aria-hidden="true">!</span>
+  <span>
+    To prevent your device from locking on {{ lock_warning.date|date:"d M Y" }},
+    pay MWK {{ lock_warning.amount|floatformat:0 }}.
+  </span>
+</div>
+{% endif %}
+
+{# Contract Progress Card #}
+<div class="glass-card portal-contract-card">
+  <div class="portal-contract-card__row">
+    <div>
+      <div class="portal-contract-card__label">Contract Number</div>
+      <div class="portal-contract-card__value">{{ contract.contract_number }}</div>
+    </div>
+    <div class="portal-contract-card__badge portal-status-badge--{{ contract.status }}">
+      {{ contract.get_status_display }}
+    </div>
+  </div>
+
+  <div class="portal-contract-card__row mt-8">
+    <div>
+      <div class="portal-contract-card__label">PayG Number</div>
+      <div style="font-size:14px;font-weight:600;">{{ contract.payg_number }}</div>
+    </div>
+    <div>
+      <div class="portal-contract-card__label">Device</div>
+      <div style="font-size:14px;font-weight:600;">{{ contract.device_model|default:"—" }}</div>
+    </div>
+  </div>
+
+  {# Progress bar #}
+  <div class="portal-progress-row mt-16">
+    <div class="portal-progress-bar">
+      <div
+        class="portal-progress-fill {% if contract.progress_percent >= 80 %}portal-progress-fill--green{% else %}portal-progress-fill--orange{% endif %}"
+        style="width: {{ contract.progress_percent }}%"
+      ></div>
+    </div>
+    <div class="portal-progress-labels">
+      <span>MWK {{ contract.amount_paid|floatformat:0 }} paid</span>
+      <span>{{ contract.progress_percent }}%</span>
+      <span>MWK {{ contract.total_amount|floatformat:0 }} total</span>
+    </div>
+  </div>
+
+  <div class="portal-stats-row mt-12">
+    <div class="portal-stat">
+      <div class="portal-stat__label">Remaining</div>
+      <div class="portal-stat__value">MWK {{ remaining|floatformat:0 }}</div>
+    </div>
+    <div class="portal-stat">
+      <div class="portal-stat__label">Daily Price</div>
+      <div class="portal-stat__value">MWK {{ contract.daily_price|floatformat:2 }}</div>
+    </div>
+    <div class="portal-stat">
+      <div class="portal-stat__label">30-Day Price</div>
+      <div class="portal-stat__value">MWK {{ contract.thirty_day_price|floatformat:0 }}</div>
+    </div>
+  </div>
+
+  {% if contract.due_date %}
+  <div class="portal-stats-row mt-8">
+    <div class="portal-stat">
+      <div class="portal-stat__label">Start Date</div>
+      <div class="portal-stat__value">{{ contract.start_date|date:"d M Y" }}</div>
+    </div>
+    <div class="portal-stat">
+      <div class="portal-stat__label">Due Date</div>
+      <div class="portal-stat__value">{{ contract.due_date|date:"d M Y" }}</div>
+    </div>
+    {% if contract.lock_date %}
+    <div class="portal-stat">
+      <div class="portal-stat__label">Lock Date</div>
+      <div class="portal-stat__value {% if contract.lock_date <= today %}text-red{% endif %}">
+        {{ contract.lock_date|date:"d M Y" }}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+
+{# Pay Early, Pay Less #}
+{% if contract.status != 'completed' and early_options %}
+<div class="section-header">Pay early, pay less</div>
+<div class="early-options-grid">
+  {% for opt in early_options %}
+  <div class="early-option-card {% if opt.discount_percent > 0 %}early-option-card--highlight{% endif %}">
+    <div class="early-option-card__term">{{ opt.term_months }} months</div>
+    {% if opt.discount_percent > 0 %}
+      <div class="early-option-card__badge">{{ opt.discount_percent }}% off</div>
+    {% endif %}
+    <div class="early-option-card__total">MWK {{ opt.total_cost|floatformat:0 }}</div>
+    <div class="early-option-card__sub">Pay MWK {{ opt.remaining_to_pay|floatformat:0 }} now</div>
+    <div class="early-option-card__sub">Daily: MWK {{ opt.daily_price|floatformat:2 }}</div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{# Payment Form #}
+{% if contract.status != 'completed' %}
+<div class="section-header">Make Payment</div>
+<div
+  x-data="paymentForm({ contractDailyPrice: {{ contract.daily_price|default:0 }}, contractThirtyDayPrice: {{ contract.thirty_day_price|default:0 }}, remaining: {{ remaining }} })"
+  class="glass-card"
+>
+  <form method="post" action="{% url 'portal_payment' contract.contract_number %}">
+    {% csrf_token %}
+
+    <div class="field-group">
+      <label class="field-label">Mobile Money Number (+265)</label>
+      <div class="phone-input-row">
+        <span class="phone-prefix">+265</span>
+        <input
+          type="tel"
+          name="phone"
+          class="input"
+          maxlength="9"
+          pattern="\d{9}"
+          placeholder="8X XXX XXXX"
+          required
+          x-model="phone"
+        >
+      </div>
+    </div>
+
+    <div class="field-group">
+      <label class="field-label">Network Provider</label>
+      <select name="provider" class="select" required x-model="provider">
+        <option value="">— Select —</option>
+        {% for value, label in providers %}
+          <option value="{{ value }}">{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="field-group">
+      <label class="field-label">Amount</label>
+      <div class="quick-amounts">
+        <button type="button" class="quick-amount-btn" x-on:click="setAmount(dailyPrice)">
+          1 Day<br><small x-text="'MWK ' + dailyPrice.toFixed(0)"></small>
+        </button>
+        <button type="button" class="quick-amount-btn" x-on:click="setAmount(dailyPrice * 7)">
+          7 Days<br><small x-text="'MWK ' + (dailyPrice * 7).toFixed(0)"></small>
+        </button>
+        <button type="button" class="quick-amount-btn" x-on:click="setAmount(thirtyDayPrice)">
+          30 Days<br><small x-text="'MWK ' + thirtyDayPrice.toFixed(0)"></small>
+        </button>
+        <button type="button" class="quick-amount-btn" x-on:click="setAmount(remaining)">
+          Full<br><small x-text="'MWK ' + remaining.toFixed(0)"></small>
+        </button>
+      </div>
+      <input
+        type="number"
+        name="amount"
+        class="input mt-8"
+        min="100"
+        step="1"
+        placeholder="Or enter custom amount"
+        x-model="amount"
+        required
+      >
+    </div>
+
+    <button
+      type="submit"
+      class="btn-claim mt-8"
+      x-bind:disabled="!amount || !provider || !phone"
+    >
+      PAY MWK <span x-text="amount ? Number(amount).toFixed(0) : '0'">0</span>
+    </button>
+  </form>
+</div>
+{% else %}
+<div class="glass-card" style="text-align:center;padding:32px 20px;">
+  <div style="font-size:48px;margin-bottom:12px;">🎉</div>
+  <h3 style="margin:0 0 8px;font-size:20px;">Contract Fully Paid!</h3>
+  <p style="color:var(--muted);font-size:14px;">Congratulations! Your contract is complete.</p>
+</div>
+{% endif %}
+
+{# Recent Payments #}
+{% if recent_transactions %}
+<div class="section-header">Recent Payments</div>
+{% for tx in recent_transactions %}
+<div class="tx-row tx-row--credit">
+  <div class="tx-row__left">
+    <div class="tx-row__type">Payment</div>
+    <div class="tx-row__meta">{{ tx.masked_phone }} · {{ tx.get_provider_display }}</div>
+    <div class="tx-row__date">{{ tx.paid_at|date:"d M Y, H:i"|default:tx.created_at|date:"d M Y" }}</div>
+  </div>
+  <div class="tx-row__amount text-green">+MWK {{ tx.amount|floatformat:0 }}</div>
+</div>
+{% endfor %}
+<div style="text-align:center;margin-top:8px;">
+  <a href="{% url 'portal_history' contract.contract_number %}" class="back-link">View full history →</a>
+</div>
+{% endif %}
+
+{# Support #}
+<div class="glass-card portal-support-card mt-8">
+  <div class="portal-support-card__title">Need Help?</div>
+  <a href="{{ tengasale_whatsapp_link }}" target="_blank" rel="noopener" class="portal-support-link portal-support-link--whatsapp">
+    <svg viewBox="0 0 24 24"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.46 1.33 4.96L2.05 22l5.25-1.38a9.93 9.93 0 0 0 4.74 1.21h.01c5.46 0 9.91-4.45 9.91-9.91A9.86 9.86 0 0 0 19.05 4.9 9.85 9.85 0 0 0 12.04 2Z"/></svg>
+    WhatsApp Support
+  </a>
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function paymentForm({ contractDailyPrice, contractThirtyDayPrice, remaining }) {
+  return {
+    dailyPrice: contractDailyPrice,
+    thirtyDayPrice: contractThirtyDayPrice,
+    remaining,
+    amount: "",
+    phone: "",
+    provider: "",
+    setAmount(val) {
+      this.amount = Math.min(Math.round(val * 100) / 100, this.remaining).toFixed(0);
+    },
+  };
+}
+</script>
+{% endblock %}
