@@ -564,6 +564,8 @@ def sell(request):
 
     departments = get_departments_for_business(business)
 
+    total_products = RetailProduct.objects.filter(business=business, is_active=True).count()
+
     ctx = {
         "business": business,
         "active_tab": "sell",
@@ -571,6 +573,8 @@ def sell(request):
         "departments": departments,
         "payment_methods": RetailPaymentMethod.choices,
         "today": timezone.localdate(),
+        "has_any_products": total_products > 0,
+        "has_stocked_products": products.count() > 0,
     }
     return render(request, "verticals/mixed_retail/sell.html", ctx)
 

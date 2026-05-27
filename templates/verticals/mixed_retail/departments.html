@@ -239,6 +239,17 @@
         {% endif %}
       </div>
       <div class="dept-card-footer">
+        {% if item.is_enabled %}
+        <a href="{% url 'mixed_retail:product_add' %}?dept={{ item.dept.id }}"
+           style="display:block;width:100%;margin-bottom:7px;padding:8px 16px;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;border-radius:8px;font-size:.82rem;font-weight:700;text-align:center;text-decoration:none;">
+          <i class="bi bi-lightning-charge"></i> Add Products
+        </a>
+        {% else %}
+        <a href="#" onclick="previewTemplates({{ item.dept.id }}, '{{ item.dept.name|escapejs }}')"
+           style="display:block;width:100%;margin-bottom:7px;padding:8px 16px;background:#f8fafc;color:#64748b;border:1px solid #e2e8f0;border-radius:8px;font-size:.82rem;font-weight:700;text-align:center;text-decoration:none;">
+          <i class="bi bi-eye"></i> View Templates
+        </a>
+        {% endif %}
         <form method="post">
           {% csrf_token %}
           <input type="hidden" name="action" value="toggle">
@@ -361,5 +372,67 @@ function selectIcon(el) {
   el.classList.add('selected');
   document.getElementById('selected-icon').value = el.dataset.icon;
 }
+
+const TEMPLATES_API = "{% url 'mixed_retail:api_product_templates' %}";
+
+function previewTemplates(deptId, deptName) {
+  const modal = document.getElementById('tpl-modal');
+  const title = document.getElementById('tpl-modal-title');
+  const body  = document.getElementById('tpl-modal-body');
+  const addBtn = document.getElementById('tpl-modal-add-btn');
+
+  title.textContent = deptName + ' — Product Templates';
+  body.innerHTML = '<div style="text-align:center;padding:20px;color:#64748b;"><i class="bi bi-hourglass-split"></i> Loading…</div>';
+  addBtn.style.display = 'none';
+  modal.style.display = 'flex';
+
+  fetch(`${TEMPLATES_API}?dept_id=${deptId}`)
+    .then(r => r.json())
+    .then(data => {
+      const tpls = data.templates || [];
+      if (tpls.length === 0) {
+        body.innerHTML = '<p style="color:#64748b;font-size:.85rem;">No templates for this department. <br>Enable the department and create custom products.</p>';
+      } else {
+        let html = `<p style="font-size:.8rem;color:#64748b;margin-bottom:12px;">${tpls.length} quick-start templates available. Enable this department to use them.</p>`;
+        html += '<div style="display:flex;flex-wrap:wrap;gap:7px;">';
+        tpls.forEach(t => {
+          html += `<span style="padding:5px 12px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:99px;font-size:.8rem;font-weight:600;color:#374151;">${escHtml(t.name)}<span style="font-size:.68rem;color:#94a3b8;margin-left:4px;">${escHtml(t.unit)}</span></span>`;
+        });
+        html += '</div>';
+        body.innerHTML = html;
+      }
+    }).catch(() => {
+      body.innerHTML = '<p style="color:#ef4444;font-size:.85rem;">Could not load templates.</p>';
+    });
+
+  modal.style.display = 'flex';
+}
+
+function closeModal() {
+  document.getElementById('tpl-modal').style.display = 'none';
+}
+
+function escHtml(str) {
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
 </script>
+
+<!-- Template Preview Modal -->
+<div id="tpl-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;align-items:center;justify-content:center;padding:16px;">
+  <div style="background:#fff;border-radius:16px;width:100%;max-width:560px;max-height:80vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.2);">
+    <div style="padding:18px 20px;border-bottom:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:center;">
+      <div id="tpl-modal-title" style="font-size:1rem;font-weight:800;color:#0f172a;"></div>
+      <button onclick="closeModal()" style="background:none;border:none;font-size:1.2rem;cursor:pointer;color:#64748b;padding:2px 6px;">×</button>
+    </div>
+    <div id="tpl-modal-body" style="padding:18px 20px;overflow-y:auto;flex:1;"></div>
+    <div style="padding:14px 20px;border-top:1px solid #f1f5f9;">
+      <a id="tpl-modal-add-btn" href="#" style="display:none;padding:10px 20px;background:#f97316;color:#fff;border-radius:8px;font-weight:700;text-decoration:none;font-size:.9rem;">
+        <i class="bi bi-plus-circle"></i> Add Products from this Department
+      </a>
+      <p style="font-size:.78rem;color:#64748b;margin:6px 0 0;">Enable this department to use these templates when adding products.</p>
+    </div>
+  </div>
+</div>
 {% endblock %}

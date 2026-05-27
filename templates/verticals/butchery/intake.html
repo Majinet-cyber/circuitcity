@@ -1,23 +1,61 @@
 {% extends "base.html" %}
 {% load humanize %}
 
-{% block title %}Intake · {{ business.name }}{% endblock %}
+{% block title %}Intake / Stock In · {{ business.name }}{% endblock %}
 
 {% block extra_css %}
 <style>
-.bt-wrap { max-width: 1100px; margin: 0 auto; padding: 20px 14px; }
-.form-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 24px; box-shadow: 0 1px 4px rgba(15,23,42,.06); margin-bottom: 24px; }
-.form-label { display: block; font-size: .78rem; font-weight: 700; color: #374151; margin-bottom: 5px; text-transform: uppercase; letter-spacing: .05em; }
-.form-input { width: 100%; padding: 9px 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: .9rem; box-sizing: border-box; }
-.form-input:focus { outline: none; border-color: #10b981; box-shadow: 0 0 0 3px rgba(16,185,129,.1); }
-.section-head { font-size: .8rem; text-transform: uppercase; letter-spacing: .07em; font-weight: 800; color: #475569; margin: 20px 0 12px; }
-.intake-table { width: 100%; border-collapse: collapse; font-size: .85rem; }
-.intake-table th { text-align: left; padding: 8px 12px; font-size: .72rem; text-transform: uppercase; letter-spacing: .05em; color: #64748b; border-bottom: 2px solid #e2e8f0; }
-.intake-table td { padding: 10px 12px; border-bottom: 1px solid #f1f5f9; }
+.bt-wrap { max-width: 1100px; margin: 0 auto; padding: 16px 14px; }
+
+.form-card {
+  background: #fff; border: 1px solid #e2e8f0; border-radius: 16px;
+  padding: 22px 24px; box-shadow: 0 1px 6px rgba(15,23,42,.06); margin-bottom: 22px;
+}
+.form-card h2 { font-size: .95rem; font-weight: 800; color: #0f172a; margin: 0 0 16px; }
+.form-label { display: block; font-size: .75rem; font-weight: 700; color: #374151; margin-bottom: 4px; text-transform: uppercase; letter-spacing: .05em; }
+.form-input {
+  width: 100%; padding: 9px 12px; border: 1px solid #d1d5db; border-radius: 8px;
+  font-size: .9rem; box-sizing: border-box; font-family: inherit; background: #fafafa;
+}
+.form-input:focus { outline: none; border-color: #10b981; box-shadow: 0 0 0 3px rgba(16,185,129,.08); background: #fff; }
+
+.section-head { font-size: .78rem; text-transform: uppercase; letter-spacing: .07em; font-weight: 800; color: #475569; margin: 22px 0 10px; display: flex; align-items: center; gap: 8px; }
+.section-head::before { content:''; display:block; width:3px; height:13px; background:#10b981; border-radius:2px; }
+
+/* Live cost/kg indicator */
+.cost-kg-display {
+  background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 10px;
+  padding: 12px 16px; margin-top: 14px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+}
+.cost-kg-val { font-size: 1.3rem; font-weight: 900; color: #059669; }
+.cost-kg-label { font-size: .78rem; color: #166534; font-weight: 600; }
+
+/* Month summary */
+.month-summary { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px,1fr)); gap: 10px; margin-bottom: 20px; }
+.ms-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px 14px; box-shadow: 0 1px 3px rgba(15,23,42,.04); }
+.ms-label { font-size: .68rem; text-transform: uppercase; letter-spacing: .06em; color: #64748b; font-weight: 700; margin-bottom: 4px; }
+.ms-val { font-size: 1.2rem; font-weight: 900; color: #0f172a; }
+
+/* Intake table */
+.intake-table { width: 100%; border-collapse: collapse; font-size: .83rem; }
+.intake-table th { text-align: left; padding: 8px 10px; font-size: .7rem; text-transform: uppercase; letter-spacing: .05em; color: #64748b; border-bottom: 2px solid #e2e8f0; font-weight: 700; }
+.intake-table td { padding: 9px 10px; border-bottom: 1px solid #f1f5f9; }
 .intake-table tr:last-child td { border-bottom: none; }
 .intake-table tr:hover td { background: #f8fafc; }
-.empty-state { text-align: center; padding: 40px 20px; color: #94a3b8; }
-.empty-state h3 { font-size: .95rem; font-weight: 700; color: #64748b; margin-bottom: 6px; }
+
+/* Alloc grid */
+.alloc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px,1fr)); gap: 10px; margin-bottom: 14px; }
+.alloc-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px 14px; }
+.alloc-card .ac-name { font-weight: 700; font-size: .88rem; color: #0f172a; margin-bottom: 3px; }
+.alloc-card .ac-meta { font-size: .72rem; color: #64748b; margin-bottom: 8px; }
+.alloc-card input { width: 100%; padding: 7px 10px; border: 1px solid #d1d5db; border-radius: 7px; font-size: .88rem; box-sizing: border-box; }
+.alloc-card input:focus { outline: none; border-color: #10b981; }
+
+@media (max-width: 640px) {
+  .form-grid { grid-template-columns: 1fr 1fr !important; }
+  .month-summary { grid-template-columns: 1fr 1fr; }
+  .tbl-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+}
 </style>
 {% endblock %}
 
@@ -25,44 +63,57 @@
 <div class="bt-wrap">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px;">
     <div>
-      <h1 style="font-size:1.4rem;font-weight:900;margin:0 0 4px;color:#0f172a;">Intake / Stock In</h1>
-      <p style="color:#64748b;font-size:.85rem;margin:0;">{{ business.name }} &middot; Record carcass or bulk meat intake</p>
+      <h1 style="font-size:1.2rem;font-weight:900;margin:0 0 4px;color:#0f172a;">Intake / Stock In</h1>
+      <p style="color:#64748b;font-size:.82rem;margin:0;">{{ business.name }} &middot; Record carcass or bulk meat from supplier</p>
     </div>
-    <a href="{% url 'butchery:dashboard' %}" style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border:1px solid #e2e8f0;border-radius:9px;background:#fff;font-size:.85rem;font-weight:600;text-decoration:none;color:#374151;">
-      <i class="bi bi-arrow-left"></i> Dashboard
-    </a>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <a href="{% url 'butchery:processing' %}" style="padding:8px 16px;border:1px solid #e2e8f0;background:#f8fafc;color:#374151;border-radius:9px;font-size:.83rem;font-weight:700;text-decoration:none;"><i class="bi bi-scissors"></i> Processing</a>
+      <a href="{% url 'butchery:dashboard' %}" style="padding:8px 16px;border:1px solid #e2e8f0;background:#f8fafc;color:#374151;border-radius:9px;font-size:.83rem;font-weight:700;text-decoration:none;"><i class="bi bi-arrow-left"></i> Dashboard</a>
+    </div>
   </div>
 
-  {% if messages %}
-  {% for msg in messages %}
-  <div style="padding:10px 14px;border-radius:8px;margin-bottom:12px;background:{% if msg.tags == 'error' %}#fee2e2{% else %}#dcfce7{% endif %};color:{% if msg.tags == 'error' %}#991b1b{% else %}#166534{% endif %};font-size:.85rem;border:1px solid {% if msg.tags == 'error' %}#fca5a5{% else %}#86efac{% endif %};">{{ msg }}</div>
-  {% endfor %}
-  {% endif %}
+  <!-- Month Summary -->
+  <div class="month-summary">
+    <div class="ms-card">
+      <div class="ms-label">Month Intake (kg)</div>
+      <div class="ms-val">{{ month_intake_kg|floatformat:1 }} kg</div>
+    </div>
+    <div class="ms-card">
+      <div class="ms-label">Month Intake Cost</div>
+      <div class="ms-val">MWK {{ month_intake_cost|floatformat:0|intcomma }}</div>
+    </div>
+    <div class="ms-card">
+      <div class="ms-label">Intake Records</div>
+      <div class="ms-val">{{ intakes|length }}</div>
+    </div>
+  </div>
 
   <!-- Record New Intake -->
   <div class="form-card">
-    <h2 style="font-size:1rem;font-weight:800;color:#0f172a;margin:0 0 16px;">Record New Intake</h2>
-    <form method="post">
+    <h2>Record New Intake</h2>
+    <form method="post" id="intake-form">
       {% csrf_token %}
       <input type="hidden" name="action" value="record_intake">
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:14px;">
+      <div class="form-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(175px,1fr));gap:14px;">
         <div>
           <label class="form-label">Date</label>
-          <input type="date" name="intake_date" class="form-input" value="{{ today|date:'Y-m-d' }}">
+          <input type="date" name="intake_date" class="form-input" value="{{ today|date:'Y-m-d' }}" max="{{ today|date:'Y-m-d' }}">
         </div>
         <div>
           <label class="form-label">Meat Type *</label>
           <select name="meat_type" class="form-input">
-            {% for val, label in meat_types %}<option value="{{ val }}">{{ label }}</option>{% endfor %}
+            {% for val, lbl in meat_types %}<option value="{{ val }}">{{ lbl }}</option>{% endfor %}
           </select>
         </div>
         <div>
           <label class="form-label">Weight (kg) *</label>
-          <input type="number" name="intake_weight_kg" class="form-input" step="0.001" min="0.001" placeholder="e.g. 50.5" required>
+          <input type="number" inputmode="decimal" name="intake_weight_kg" class="form-input" id="id-weight"
+            step="0.001" min="0.001" placeholder="e.g. 50.500" required oninput="calcCostPerKg()">
         </div>
         <div>
           <label class="form-label">Total Cost (MWK) *</label>
-          <input type="number" name="total_cost" class="form-input" step="0.01" min="0" placeholder="e.g. 85000" required>
+          <input type="number" inputmode="decimal" name="total_cost" class="form-input" id="id-cost"
+            step="0.01" min="0" placeholder="e.g. 85,000" required oninput="calcCostPerKg()">
         </div>
         <div>
           <label class="form-label">Supplier Name</label>
@@ -72,11 +123,32 @@
           <label class="form-label">Batch Reference</label>
           <input type="text" name="batch_ref" class="form-input" placeholder="e.g. BTH-001">
         </div>
+        <div>
+          <label class="form-label">Storage Location</label>
+          <input type="text" name="storage_location" class="form-input" placeholder="e.g. Cold Room A">
+        </div>
+        <div>
+          <label class="form-label">Description</label>
+          <input type="text" name="description" class="form-input" placeholder="e.g. 1 whole pork carcass">
+        </div>
       </div>
-      <div style="margin-top:14px;">
-        <label class="form-label">Description / Notes</label>
-        <input type="text" name="description" class="form-input" placeholder="e.g. 1 whole beef carcass, well-conditioned">
+      <div style="margin-top:12px;">
+        <label class="form-label">Notes</label>
+        <textarea name="notes" class="form-input" rows="2" style="resize:vertical;" placeholder="Additional notes..."></textarea>
       </div>
+
+      <!-- Live cost per kg -->
+      <div class="cost-kg-display" id="cost-kg-display" style="display:none;">
+        <div>
+          <div class="cost-kg-label">Cost per kg</div>
+          <div class="cost-kg-val" id="cost-kg-val">—</div>
+        </div>
+        <div style="color:#64748b;font-size:.8rem;">
+          Weight: <strong id="cpkg-weight">—</strong> kg &nbsp;&middot;&nbsp;
+          Total: <strong id="cpkg-total">—</strong> MWK
+        </div>
+      </div>
+
       <button type="submit" style="margin-top:16px;padding:10px 24px;background:#10b981;color:#fff;border:none;border-radius:9px;font-size:.9rem;font-weight:700;cursor:pointer;">
         <i class="bi bi-save"></i> Record Intake
       </button>
@@ -86,26 +158,26 @@
   <!-- Allocate Stock to Cuts -->
   {% if intakes and products %}
   <div class="form-card">
-    <h2 style="font-size:1rem;font-weight:800;color:#0f172a;margin:0 0 6px;">Allocate Intake to Cuts (Optional)</h2>
-    <p style="color:#64748b;font-size:.83rem;margin:0 0 16px;">Select an intake batch and assign quantities to your named cuts. This updates stock automatically.</p>
+    <h2>Allocate Intake to Cuts</h2>
+    <p style="color:#64748b;font-size:.82rem;margin:0 0 16px;">Select an intake batch and assign kg to named cuts. This updates stock automatically and sets cost price from intake.</p>
     <form method="post">
       {% csrf_token %}
       <input type="hidden" name="action" value="allocate">
       <div style="margin-bottom:14px;">
-        <label class="form-label">Select Intake Batch</label>
-        <select name="intake_id" class="form-input" style="max-width:400px;">
+        <label class="form-label">Select Intake Batch *</label>
+        <select name="intake_id" class="form-input" style="max-width:480px;">
           {% for i in intakes %}
-          <option value="{{ i.id }}">{{ i.intake_date|date:"d M Y" }} — {{ i.get_meat_type_display }} {{ i.intake_weight_kg }}kg (MWK {{ i.total_cost|floatformat:0|intcomma }})</option>
+          <option value="{{ i.id }}">{{ i.intake_date|date:"d M Y" }} — {{ i.get_meat_type_display }} {{ i.intake_weight_kg }}kg — MWK {{ i.cost_per_kg|floatformat:2 }}/kg</option>
           {% endfor %}
         </select>
       </div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;margin-bottom:14px;">
+      <div class="alloc-grid">
         {% for p in products %}
-        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px;">
-          <div style="font-weight:700;font-size:.88rem;color:#0f172a;margin-bottom:4px;">{{ p.name }}</div>
-          <div style="font-size:.75rem;color:#64748b;margin-bottom:8px;">{{ p.get_meat_type_display }} · Stock: {{ p.stock_quantity|floatformat:2 }} {{ p.unit }}</div>
+        <div class="alloc-card">
+          <div class="ac-name">{{ p.name }}</div>
+          <div class="ac-meta">{{ p.get_category_display }} · Stock: {{ p.stock_quantity|floatformat:2 }} {{ p.get_unit_display }}</div>
           <input type="hidden" name="product_id" value="{{ p.id }}">
-          <input type="number" name="alloc_kg" step="0.001" min="0" value="0" placeholder="kg to allocate" style="width:100%;padding:7px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:.85rem;box-sizing:border-box;">
+          <input type="number" inputmode="decimal" name="alloc_kg" step="0.001" min="0" value="0" placeholder="kg to allocate">
         </div>
         {% endfor %}
       </div>
@@ -120,41 +192,65 @@
   <div class="section-head">Intake History</div>
   {% if intakes %}
   <div style="background:#fff;border:1px solid #e2e8f0;border-radius:14px;overflow:hidden;box-shadow:0 1px 4px rgba(15,23,42,.05);">
-    <table class="intake-table">
-      <thead>
-        <tr>
-          <th>Date</th>
-          <th>Meat Type</th>
-          <th>Supplier</th>
-          <th>Batch Ref</th>
-          <th style="text-align:right;">Weight (kg)</th>
-          <th style="text-align:right;">Total Cost</th>
-          <th style="text-align:right;">Cost/kg</th>
-          <th>Notes</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for i in intakes %}
-        <tr>
-          <td style="font-weight:600;">{{ i.intake_date|date:"d M Y" }}</td>
-          <td>{{ i.get_meat_type_display }}</td>
-          <td>{{ i.supplier_name|default:"—" }}</td>
-          <td style="font-family:monospace;font-size:.8rem;">{{ i.batch_ref|default:"—" }}</td>
-          <td style="text-align:right;font-weight:700;">{{ i.intake_weight_kg|floatformat:2 }}</td>
-          <td style="text-align:right;">MWK {{ i.total_cost|floatformat:0|intcomma }}</td>
-          <td style="text-align:right;color:#64748b;">MWK {{ i.cost_per_kg|floatformat:2 }}</td>
-          <td style="color:#64748b;font-size:.8rem;">{{ i.description|truncatewords:6|default:"—" }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+    <div class="tbl-wrap" style="overflow-x:auto;-webkit-overflow-scrolling:touch;">
+      <table class="intake-table">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Meat Type</th>
+            <th>Supplier</th>
+            <th>Ref</th>
+            <th style="text-align:right;">Weight</th>
+            <th style="text-align:right;">Total Cost</th>
+            <th style="text-align:right;">Cost/kg</th>
+            <th>Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for i in intakes %}
+          <tr>
+            <td style="font-weight:700;color:#0f172a;white-space:nowrap;">{{ i.intake_date|date:"d M Y" }}</td>
+            <td>
+              <span style="background:#f0fdf4;color:#166534;padding:2px 8px;border-radius:99px;font-size:.72rem;font-weight:700;">{{ i.get_meat_type_display }}</span>
+            </td>
+            <td style="color:#475569;">{{ i.supplier_name|default:"—" }}</td>
+            <td style="font-family:monospace;font-size:.78rem;color:#64748b;">{{ i.batch_ref|default:"—" }}</td>
+            <td style="text-align:right;font-weight:700;">{{ i.intake_weight_kg|floatformat:2 }} kg</td>
+            <td style="text-align:right;color:#0f172a;font-weight:600;">MWK {{ i.total_cost|floatformat:0|intcomma }}</td>
+            <td style="text-align:right;color:#059669;font-weight:700;">MWK {{ i.cost_per_kg|floatformat:2 }}</td>
+            <td style="color:#94a3b8;font-size:.8rem;">{{ i.description|truncatewords:6|default:"—" }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
   </div>
   {% else %}
-  <div class="empty-state">
-    <i class="bi bi-truck" style="font-size:3rem;display:block;margin-bottom:12px;opacity:.4;"></i>
-    <h3>No intake recorded yet</h3>
-    <p style="font-size:.85rem;">Use the form above to record your first carcass or bulk meat purchase.</p>
+  <div style="text-align:center;padding:48px 20px;background:#fff;border:1px solid #e2e8f0;border-radius:14px;">
+    <i class="bi bi-truck" style="font-size:2.5rem;color:#d1d5db;display:block;margin-bottom:12px;"></i>
+    <h3 style="font-size:.95rem;font-weight:700;color:#64748b;margin:0 0 6px;">No intake recorded yet</h3>
+    <p style="font-size:.83rem;color:#94a3b8;">Use the form above to record your first carcass or bulk meat purchase.</p>
   </div>
   {% endif %}
+
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function calcCostPerKg() {
+  var weight = parseFloat(document.getElementById('id-weight').value) || 0;
+  var cost = parseFloat(document.getElementById('id-cost').value) || 0;
+  var display = document.getElementById('cost-kg-display');
+  if (weight > 0 && cost > 0) {
+    var cpkg = cost / weight;
+    document.getElementById('cost-kg-val').textContent = 'MWK ' + cpkg.toLocaleString('en', {minimumFractionDigits:2, maximumFractionDigits:2});
+    document.getElementById('cpkg-weight').textContent = weight.toFixed(2);
+    document.getElementById('cpkg-total').textContent = cost.toLocaleString('en', {minimumFractionDigits:0, maximumFractionDigits:0});
+    display.style.display = 'flex';
+  } else {
+    display.style.display = 'none';
+  }
+}
+</script>
 {% endblock %}

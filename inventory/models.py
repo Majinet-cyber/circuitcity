@@ -197,14 +197,19 @@ except Exception:
 # Re-export Butchery models for syncdb table creation
 try:
     from .models_butchery import (  # noqa: F401
+        ButcheryCategory,
         ButcheryProduct,
         ButcheryIntake,
         ButcheryIntakeAllocation,
+        ButcheryProcessingBatch,
+        ButcheryProcessingLine,
+        ButcheryDailyLedger,
         ButcherySale,
         ButcheryExpense,
     )
 except Exception:
-    ButcheryProduct = ButcheryIntake = ButcheryIntakeAllocation = None
+    ButcheryCategory = ButcheryProduct = ButcheryIntake = ButcheryIntakeAllocation = None
+    ButcheryProcessingBatch = ButcheryProcessingLine = ButcheryDailyLedger = None
     ButcherySale = ButcheryExpense = None
 
 

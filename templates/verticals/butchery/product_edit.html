@@ -22,7 +22,13 @@
         <label style="display:block;font-size:.78rem;font-weight:700;color:#374151;margin-bottom:5px;text-transform:uppercase;letter-spacing:.05em;">Name *</label>
         <input type="text" name="name" required value="{{ product.name }}" style="width:100%;padding:9px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:.9rem;box-sizing:border-box;">
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+        <div>
+          <label style="display:block;font-size:.78rem;font-weight:700;color:#374151;margin-bottom:5px;text-transform:uppercase;letter-spacing:.05em;">Category</label>
+          <select name="category" style="width:100%;padding:9px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:.9rem;">
+            {% for val, label in categories %}<option value="{{ val }}" {% if val == product.category %}selected{% endif %}>{{ label }}</option>{% endfor %}
+          </select>
+        </div>
         <div>
           <label style="display:block;font-size:.78rem;font-weight:700;color:#374151;margin-bottom:5px;text-transform:uppercase;letter-spacing:.05em;">Meat Type</label>
           <select name="meat_type" style="width:100%;padding:9px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:.9rem;">
@@ -33,6 +39,15 @@
           <label style="display:block;font-size:.78rem;font-weight:700;color:#374151;margin-bottom:5px;text-transform:uppercase;letter-spacing:.05em;">Unit</label>
           <select name="unit" style="width:100%;padding:9px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:.9rem;">
             {% for val, label in unit_choices %}<option value="{{ val }}" {% if val == product.unit %}selected{% endif %}>{{ label }}</option>{% endfor %}
+          </select>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div>
+          <label style="display:block;font-size:.78rem;font-weight:700;color:#374151;margin-bottom:5px;text-transform:uppercase;letter-spacing:.05em;">Active</label>
+          <select name="is_active" style="width:100%;padding:9px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:.9rem;">
+            <option value="1" {% if product.is_active %}selected{% endif %}>Active</option>
+            <option value="0" {% if not product.is_active %}selected{% endif %}>Inactive</option>
           </select>
         </div>
       </div>

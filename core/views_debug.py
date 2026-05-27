@@ -22,8 +22,21 @@ def app_version_view(request: HttpRequest) -> JsonResponse:
     """
     Return the current app version as JSON.
     Public endpoint - no authentication required.
+    Used by PWA / service worker / Android wrapper for version checks.
     """
-    return JsonResponse({"version": getattr(settings, "APP_VERSION", "1.1.0")})
+    import datetime
+    import os
+
+    environment = "production" if not settings.DEBUG else "development"
+    build = getattr(settings, "BUILD_ID", os.environ.get("BUILD_ID", "local-dev"))
+    version = getattr(settings, "APP_VERSION", "1.1.0")
+
+    return JsonResponse({
+        "version": version,
+        "build": build,
+        "environment": environment,
+        "timestamp": datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+    })
 
 
 @login_required

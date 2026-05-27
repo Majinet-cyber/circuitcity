@@ -1,0 +1,472 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Daily Sales Recorder · {{ business.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+.ds-wrap { max-width: 1000px; margin: 0 auto; padding: 16px 14px; }
+
+/* Header bar */
+.ds-header {
+  background: #fff; border: 1px solid #e2e8f0; border-radius: 14px;
+  padding: 16px 20px; margin-bottom: 18px;
+  box-shadow: 0 1px 4px rgba(15,23,42,.05);
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;
+}
+.ds-header h1 { font-size: 1.1rem; font-weight: 900; margin: 0; color: #0f172a; }
+.ds-header .ds-sub { font-size: .8rem; color: #64748b; margin: 3px 0 0; }
+
+/* Date picker bar */
+.date-bar {
+  background: #fff; border: 1px solid #e2e8f0; border-radius: 12px;
+  padding: 12px 16px; margin-bottom: 18px;
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  box-shadow: 0 1px 3px rgba(15,23,42,.04);
+}
+.date-bar label { font-size: .8rem; font-weight: 700; color: #374151; }
+.date-bar input[type=date] {
+  padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 8px;
+  font-size: .9rem; font-weight: 600; color: #0f172a; background: #f8fafc;
+}
+.date-bar .nav-btn {
+  width: 32px; height: 32px; border-radius: 8px; border: 1px solid #e2e8f0;
+  background: #f8fafc; display: grid; place-items: center; cursor: pointer;
+  text-decoration: none; color: #475569; font-size: .9rem;
+}
+.date-bar .nav-btn:hover { background: #f0fdf4; border-color: #86efac; color: #15803d; }
+
+/* Ledger status banner */
+.ledger-banner {
+  padding: 10px 16px; border-radius: 10px; margin-bottom: 16px;
+  display: flex; align-items: center; gap: 10px; font-size: .85rem; font-weight: 600;
+}
+.ledger-banner.locked { background: #dcfce7; border: 1px solid #86efac; color: #166534; }
+.ledger-banner.draft { background: #fef3c7; border: 1px solid #fde68a; color: #92400e; }
+.ledger-banner.none { background: #f8fafc; border: 1px solid #e2e8f0; color: #64748b; }
+
+/* Day summary bar */
+.day-summary {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 10px; margin-bottom: 18px;
+}
+.ds-metric {
+  background: #fff; border: 1px solid #e2e8f0; border-radius: 12px;
+  padding: 12px 14px; box-shadow: 0 1px 3px rgba(15,23,42,.04);
+}
+.ds-metric-label { font-size: .68rem; text-transform: uppercase; letter-spacing: .06em; color: #64748b; font-weight: 700; margin-bottom: 4px; }
+.ds-metric-value { font-size: 1.2rem; font-weight: 900; color: #0f172a; }
+
+/* Category section */
+.cat-section { margin-bottom: 20px; }
+.cat-title {
+  font-size: .75rem; text-transform: uppercase; letter-spacing: .08em; font-weight: 800;
+  color: #475569; margin-bottom: 10px; display: flex; align-items: center; gap: 8px;
+}
+.cat-title::before { content: ''; display: block; width: 3px; height: 12px; background: #10b981; border-radius: 2px; }
+.cat-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; }
+
+/* Sales item card */
+.sale-card {
+  background: #fff; border: 1px solid #e2e8f0; border-radius: 12px;
+  padding: 14px 16px; box-shadow: 0 1px 3px rgba(15,23,42,.04);
+  transition: box-shadow .15s ease;
+}
+.sale-card:focus-within { box-shadow: 0 0 0 2px #10b981; border-color: #10b981; }
+.sale-card.has-value { border-left: 3px solid #10b981; }
+.sale-card .product-name { font-size: .88rem; font-weight: 800; color: #0f172a; margin-bottom: 2px; }
+.sale-card .product-meta { font-size: .72rem; color: #64748b; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
+.sale-card .unit-badge { background: #f0fdf4; color: #166534; padding: 2px 7px; border-radius: 99px; font-weight: 700; font-size: .68rem; }
+.sale-card .price-badge { background: #eff6ff; color: #1d4ed8; padding: 2px 7px; border-radius: 99px; font-weight: 700; font-size: .68rem; }
+
+.sale-card .input-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.sale-card label.input-label { font-size: .7rem; font-weight: 700; color: #374151; display: block; margin-bottom: 3px; }
+.sale-card input.sale-input {
+  width: 100%; padding: 9px 10px; border: 1px solid #d1d5db; border-radius: 8px;
+  font-size: .9rem; font-weight: 700; color: #0f172a; background: #fafafa;
+  box-sizing: border-box;
+}
+.sale-card input.sale-input:focus { outline: none; border-color: #10b981; background: #fff; }
+.sale-card .calc-qty {
+  font-size: .82rem; color: #059669; font-weight: 700;
+  min-height: 20px; margin-top: 6px; display: flex; align-items: center; gap: 4px;
+}
+.sale-card .calc-qty.warning { color: #d97706; }
+.sale-card .stock-info { font-size: .72rem; color: #94a3b8; margin-top: 4px; }
+
+/* Notes field */
+.notes-input {
+  width: 100%; padding: 6px 8px; border: 1px solid #e2e8f0; border-radius: 7px;
+  font-size: .8rem; color: #374151; background: #fafafa; box-sizing: border-box; margin-top: 6px;
+}
+.notes-input:focus { outline: none; border-color: #10b981; }
+
+/* Action bar */
+.action-bar {
+  background: #fff; border: 1px solid #e2e8f0; border-radius: 14px;
+  padding: 16px 20px; margin-top: 24px;
+  box-shadow: 0 2px 8px rgba(15,23,42,.08);
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;
+}
+.total-display { }
+.total-display .total-label { font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; color: #64748b; font-weight: 700; }
+.total-display .total-value { font-size: 1.5rem; font-weight: 900; color: #059669; }
+.action-buttons { display: flex; gap: 10px; flex-wrap: wrap; }
+.btn-draft {
+  padding: 10px 20px; background: #fff; border: 1.5px solid #10b981; color: #10b981;
+  border-radius: 10px; font-size: .88rem; font-weight: 700; cursor: pointer;
+}
+.btn-draft:hover { background: #f0fdf4; }
+.btn-lock {
+  padding: 10px 22px; background: #10b981; border: none; color: #fff;
+  border-radius: 10px; font-size: .88rem; font-weight: 700; cursor: pointer;
+}
+.btn-lock:hover { background: #059669; }
+
+/* Ledger history */
+.ledger-history { margin-top: 28px; }
+.ledger-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 8px; }
+.ledger-day {
+  background: #fff; border: 1px solid #e2e8f0; border-radius: 10px;
+  padding: 8px 10px; text-align: center; text-decoration: none;
+  font-size: .78rem; font-weight: 700; color: #374151;
+  transition: all .12s ease;
+}
+.ledger-day:hover { background: #f0fdf4; border-color: #86efac; color: #15803d; }
+.ledger-day .ld-date { font-size: .72rem; color: #64748b; font-weight: 600; }
+.ledger-day.locked { background: #dcfce7; border-color: #86efac; color: #166534; }
+.ledger-day.draft { background: #fef3c7; border-color: #fde68a; color: #92400e; }
+
+@media (max-width: 600px) {
+  .cat-cards { grid-template-columns: 1fr; }
+  .day-summary { grid-template-columns: 1fr 1fr; }
+  .action-bar { flex-direction: column; align-items: stretch; }
+  .action-buttons { flex-direction: column; }
+  .btn-draft, .btn-lock { text-align: center; }
+  .ds-header { flex-direction: column; align-items: flex-start; }
+  .input-row { grid-template-columns: 1fr !important; }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="ds-wrap">
+
+  <!-- Header -->
+  <div class="ds-header">
+    <div>
+      <h1>Record Daily Sales</h1>
+      <div class="ds-sub">Enter MWK sales per product — quantities are calculated automatically.</div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <a href="{% url 'butchery:dashboard' %}" style="padding:8px 16px;border:1px solid #e2e8f0;background:#f8fafc;color:#374151;border-radius:9px;font-size:.82rem;font-weight:700;text-decoration:none;">
+        <i class="bi bi-speedometer2"></i> Dashboard
+      </a>
+      <a href="{% url 'butchery:sales' %}" style="padding:8px 16px;border:1px solid #e2e8f0;background:#f8fafc;color:#374151;border-radius:9px;font-size:.82rem;font-weight:700;text-decoration:none;">
+        <i class="bi bi-receipt"></i> Sales History
+      </a>
+    </div>
+  </div>
+
+  <!-- Date Bar -->
+  {% with prev_date=sale_date|date:"Y-m-d" %}
+  <div class="date-bar">
+    <label for="id_sale_date">Sales Date:</label>
+    <a href="?date={{ sale_date|date:'Y-m-d' }}" class="nav-btn" id="prev-day-btn" title="Previous day"><i class="bi bi-chevron-left"></i></a>
+    <input type="date" id="id_sale_date" value="{{ sale_date|date:'Y-m-d' }}" max="{{ today|date:'Y-m-d' }}"
+           style="font-family:inherit;" onchange="window.location='?date='+this.value">
+    <a href="?date={{ sale_date|date:'Y-m-d' }}" class="nav-btn" id="next-day-btn" title="Next day"><i class="bi bi-chevron-right"></i></a>
+    <span style="font-size:.82rem;color:#64748b;font-weight:600;">{{ sale_date|date:"l, d F Y" }}</span>
+    {% if sale_date == today %}
+    <span style="background:#dcfce7;color:#166534;padding:3px 10px;border-radius:99px;font-size:.72rem;font-weight:700;">Today</span>
+    {% endif %}
+  </div>
+  {% endwith %}
+
+  <!-- Ledger status -->
+  {% if ledger %}
+    {% if ledger.is_locked %}
+    <div class="ledger-banner locked">
+      <i class="bi bi-lock-fill"></i>
+      <span>Ledger for {{ sale_date|date:"d M Y" }} is <strong>Locked</strong>. Sales are finalised.</span>
+      <form method="post" style="margin-left:auto;">
+        {% csrf_token %}
+        <input type="hidden" name="sale_date" value="{{ sale_date|date:'Y-m-d' }}">
+        <button type="submit" name="action" value="unlock"
+          style="padding:5px 14px;background:#fff;border:1px solid #86efac;color:#166534;border-radius:8px;font-size:.78rem;font-weight:700;cursor:pointer;">
+          <i class="bi bi-unlock"></i> Unlock
+        </button>
+      </form>
+    </div>
+    {% else %}
+    <div class="ledger-banner draft">
+      <i class="bi bi-pencil"></i>
+      <span>Ledger for {{ sale_date|date:"d M Y" }} is a <strong>Draft</strong>. Save &amp; Lock to finalise.</span>
+    </div>
+    {% endif %}
+  {% else %}
+  <div class="ledger-banner none">
+    <i class="bi bi-circle"></i>
+    <span>No entries saved for {{ sale_date|date:"d M Y" }} yet.</span>
+  </div>
+  {% endif %}
+
+  <!-- Day Summary -->
+  <div class="day-summary">
+    <div class="ds-metric">
+      <div class="ds-metric-label">Today's Revenue</div>
+      <div class="ds-metric-value" id="summary-revenue">MWK {{ date_revenue|floatformat:0|intcomma }}</div>
+    </div>
+    <div class="ds-metric">
+      <div class="ds-metric-label">Gross Profit</div>
+      <div class="ds-metric-value" style="color:#059669;">MWK {{ date_profit|floatformat:0|intcomma }}</div>
+    </div>
+    <div class="ds-metric">
+      <div class="ds-metric-label">KG Sold</div>
+      <div class="ds-metric-value">{{ date_kg|floatformat:2 }} kg</div>
+    </div>
+    <div class="ds-metric">
+      <div class="ds-metric-label">Entries Saved</div>
+      <div class="ds-metric-value">{% if date_revenue > 0 %}Yes{% else %}No{% endif %}</div>
+    </div>
+  </div>
+
+  <!-- Sales Form -->
+  {% if not ledger or not ledger.is_locked %}
+  <form method="post" id="sales-form">
+    {% csrf_token %}
+    <input type="hidden" name="sale_date" value="{{ sale_date|date:'Y-m-d' }}">
+
+    <!-- Payment method -->
+    <div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+      <label style="font-size:.8rem;font-weight:700;color:#374151;">Payment Method:</label>
+      <select name="payment_method" style="padding:7px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:.88rem;font-weight:600;color:#0f172a;background:#fafafa;">
+        {% for val, label in payment_methods %}
+        <option value="{{ val }}"{% if val == 'cash' %} selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    {% if category_groups %}
+
+      {% for cat_name, entries in category_groups.items %}
+      {% if entries %}
+      <div class="cat-section">
+        <div class="cat-title">{{ cat_name }}</div>
+        <div class="cat-cards">
+          {% for entry in entries %}
+          {% with p=entry.product %}
+          <div class="sale-card {% if entry.mwk_sales %}has-value{% endif %}" id="card-{{ p.pk }}">
+            <div class="product-name">{{ p.name }}</div>
+            <div class="product-meta">
+              <span class="unit-badge">{{ p.get_unit_display }}</span>
+              {% if p.selling_price > 0 %}
+              <span class="price-badge">MWK {{ p.selling_price|floatformat:0|intcomma }}/{{ p.get_unit_display }}</span>
+              {% else %}
+              <span style="font-size:.68rem;color:#dc2626;font-weight:700;">No price set</span>
+              {% endif %}
+              {% if p.stock_quantity > 0 %}
+              <span style="font-size:.68rem;color:#64748b;">Stock: {{ p.stock_quantity|floatformat:2 }}</span>
+              {% elif p.is_out_of_stock %}
+              <span style="font-size:.68rem;color:#dc2626;font-weight:700;">Out of stock</span>
+              {% endif %}
+            </div>
+
+            <input type="hidden" name="product_id" value="{{ p.pk }}">
+
+            <div class="input-row">
+              <div>
+                <label class="input-label">Price / {{ p.get_unit_display }} (MWK)</label>
+                <input type="number" inputmode="decimal" name="unit_price"
+                  class="sale-input price-input"
+                  value="{{ p.selling_price|floatformat:2 }}"
+                  min="0" step="any"
+                  data-product="{{ p.pk }}"
+                  placeholder="0"
+                  {% if ledger and ledger.is_locked %}readonly{% endif %}>
+              </div>
+              <div>
+                <label class="input-label">MWK Sales Amount</label>
+                <input type="number" inputmode="decimal" name="mwk_sales"
+                  class="sale-input mwk-input"
+                  value="{% if entry.mwk_sales %}{{ entry.mwk_sales|floatformat:2 }}{% endif %}"
+                  min="0" step="any"
+                  data-product="{{ p.pk }}"
+                  placeholder="0.00"
+                  {% if ledger and ledger.is_locked %}readonly{% endif %}>
+              </div>
+            </div>
+
+            <div class="calc-qty" id="qty-{{ p.pk }}">
+              {% if entry.qty_calc %}
+              <i class="bi bi-check-circle-fill" style="font-size:.8rem;"></i>
+              {{ entry.qty_calc|floatformat:3 }} {{ p.get_unit_display }}
+              {% else %}
+              <span style="color:#d1d5db;">Enter MWK amount to calculate quantity</span>
+              {% endif %}
+            </div>
+
+            <input type="text" inputmode="text" name="line_notes"
+              class="notes-input" placeholder="Notes (optional)"
+              {% if ledger and ledger.is_locked %}readonly{% endif %}>
+          </div>
+          {% endwith %}
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+      {% endfor %}
+
+    {% else %}
+    <div style="text-align:center;padding:48px 20px;background:#fff;border:1px solid #e2e8f0;border-radius:14px;">
+      <i class="bi bi-box-seam" style="font-size:2.5rem;color:#d1d5db;display:block;margin-bottom:12px;"></i>
+      <h3 style="font-size:1rem;font-weight:800;color:#64748b;margin-bottom:8px;">No Products / Cuts Added</h3>
+      <p style="color:#94a3b8;font-size:.88rem;max-width:360px;margin:0 auto 16px;">
+        Add your butchery cuts to start recording daily sales. Products like Pork Braai, Chicken, Sausage, Drinks, etc.
+      </p>
+      <a href="{% url 'butchery:product_add' %}" style="display:inline-flex;align-items:center;gap:8px;padding:10px 22px;background:#10b981;color:#fff;border-radius:10px;font-size:.9rem;font-weight:700;text-decoration:none;">
+        <i class="bi bi-plus-lg"></i> Add Products
+      </a>
+    </div>
+    {% endif %}
+
+    <!-- Action bar -->
+    {% if category_groups %}
+    <div class="action-bar">
+      <div class="total-display">
+        <div class="total-label">Day's Estimated Income</div>
+        <div class="total-value" id="live-total">MWK 0</div>
+        <div style="font-size:.72rem;color:#94a3b8;margin-top:2px;" id="live-kg">0.00 kg sold</div>
+      </div>
+      <div class="action-buttons">
+        <button type="submit" name="action" value="save_draft" class="btn-draft">
+          <i class="bi bi-floppy"></i> Save Draft
+        </button>
+        <button type="submit" name="action" value="save_lock" class="btn-lock"
+          onclick="return confirm('Lock ledger for {{ sale_date|date:\'d M Y\' }}? This finalises the day\'s records.')">
+          <i class="bi bi-lock"></i> Save &amp; Lock Ledger Day
+        </button>
+      </div>
+    </div>
+    {% endif %}
+
+  </form>
+  {% else %}
+  <!-- Locked view - show summary only -->
+  <div style="background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:20px;margin-top:4px;">
+    <div style="font-size:.82rem;font-weight:800;color:#0f172a;margin-bottom:14px;">Sales Summary — {{ sale_date|date:"d F Y" }}</div>
+    {% for cat_name, entries in category_groups.items %}
+    {% if entries %}
+    <div style="margin-bottom:14px;">
+      <div style="font-size:.72rem;text-transform:uppercase;letter-spacing:.07em;font-weight:800;color:#64748b;margin-bottom:8px;">{{ cat_name }}</div>
+      {% for entry in entries %}
+      {% if entry.mwk_sales %}
+      <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f1f5f9;font-size:.85rem;">
+        <span style="font-weight:600;">{{ entry.product.name }}</span>
+        <span style="color:#059669;font-weight:700;">MWK {{ entry.mwk_sales|floatformat:0|intcomma }}</span>
+        <span style="color:#64748b;">{{ entry.qty_calc|floatformat:3 }} {{ entry.product.get_unit_display }}</span>
+      </div>
+      {% endif %}
+      {% endfor %}
+    </div>
+    {% endif %}
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <!-- Ledger History -->
+  {% if ledger_history %}
+  <div class="ledger-history">
+    <div style="font-size:.78rem;text-transform:uppercase;letter-spacing:.07em;font-weight:800;color:#475569;margin-bottom:12px;">Month Ledger Status</div>
+    <div class="ledger-grid">
+      {% for lh in ledger_history %}
+      <a href="?date={{ lh.date|date:'Y-m-d' }}"
+         class="ledger-day {% if lh.is_locked %}locked{% else %}draft{% endif %}">
+        <div>{{ lh.date|date:"d M" }}</div>
+        <div class="ld-date">{% if lh.is_locked %}Locked{% else %}Draft{% endif %}</div>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function(){
+  // Live calculation: MWK amount / price = quantity
+  function calcCard(card) {
+    var mwkInput = card.querySelector('.mwk-input');
+    var priceInput = card.querySelector('.price-input');
+    var qtyDisplay = card.querySelector('.calc-qty');
+    var pid = mwkInput ? mwkInput.dataset.product : null;
+    if (!mwkInput || !priceInput || !qtyDisplay) return 0;
+
+    var mwk = parseFloat(mwkInput.value) || 0;
+    var price = parseFloat(priceInput.value) || 0;
+
+    if (mwk > 0 && price > 0) {
+      var qty = mwk / price;
+      qtyDisplay.innerHTML = '<i class="bi bi-check-circle-fill" style="font-size:.8rem;"></i> ' + qty.toFixed(3) + ' ' + (card.querySelector('.unit-badge') ? card.querySelector('.unit-badge').textContent : '');
+      qtyDisplay.className = 'calc-qty';
+      card.classList.add('has-value');
+      return mwk;
+    } else if (mwk > 0) {
+      qtyDisplay.innerHTML = '<span style="color:#d97706;">Set price to calculate quantity</span>';
+      qtyDisplay.className = 'calc-qty warning';
+      card.classList.add('has-value');
+      return mwk;
+    } else {
+      qtyDisplay.innerHTML = '<span style="color:#d1d5db;">Enter MWK amount to calculate quantity</span>';
+      qtyDisplay.className = 'calc-qty';
+      card.classList.remove('has-value');
+      return 0;
+    }
+  }
+
+  function updateTotals() {
+    var cards = document.querySelectorAll('.sale-card');
+    var total = 0;
+    cards.forEach(function(card) { total += calcCard(card); });
+    var el = document.getElementById('live-total');
+    if (el) el.textContent = 'MWK ' + total.toLocaleString('en', {minimumFractionDigits:0, maximumFractionDigits:0});
+  }
+
+  // Attach listeners
+  document.querySelectorAll('.mwk-input, .price-input').forEach(function(input) {
+    input.addEventListener('input', updateTotals);
+  });
+
+  // Initialize on load
+  updateTotals();
+
+  // Previous/Next day nav
+  var dateInput = document.getElementById('id_sale_date');
+  if (dateInput) {
+    var prevBtn = document.getElementById('prev-day-btn');
+    var nextBtn = document.getElementById('next-day-btn');
+    if (prevBtn) {
+      prevBtn.addEventListener('click', function(e) {
+        e.preventDefault();
+        var d = new Date(dateInput.value);
+        d.setDate(d.getDate() - 1);
+        window.location = '?date=' + d.toISOString().slice(0,10);
+      });
+    }
+    if (nextBtn) {
+      nextBtn.addEventListener('click', function(e) {
+        e.preventDefault();
+        var d = new Date(dateInput.value);
+        d.setDate(d.getDate() + 1);
+        var today = new Date();
+        if (d <= today) {
+          window.location = '?date=' + d.toISOString().slice(0,10);
+        }
+      });
+    }
+  }
+})();
+</script>
+{% endblock %}

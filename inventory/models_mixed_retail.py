@@ -141,6 +141,7 @@ class RetailProduct(models.Model):
         ("roll", "Roll"),
         ("set", "Set"),
         ("m", "Metres"),
+        ("service", "Service"),
         ("other", "Other"),
     ]
 

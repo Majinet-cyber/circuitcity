@@ -23,7 +23,7 @@
 .tag { display: inline-block; padding: 2px 8px; border-radius: 99px; font-size: .7rem; font-weight: 600; background: #f1f5f9; color: #475569; }
 .dept-filter-bar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
 .dept-btn { padding: 6px 12px; border-radius: 99px; font-size: .78rem; font-weight: 600; border: 1px solid #e2e8f0; background: #fff; color: #475569; text-decoration: none; cursor: pointer; }
-.dept-btn.active, .dept-btn:hover { background: #2563eb; border-color: #2563eb; color: #fff; }
+.dept-btn.active, .dept-btn:hover { background: #10b981; border-color: #10b981; color: #fff; }
 </style>
 {% endblock %}
 
@@ -95,11 +95,11 @@
         <div class="prod-price">MWK {{ product.selling_price|floatformat:0|intcomma }}</div>
         <div class="prod-stock {% if product.is_out_of_stock %}out{% elif product.id in low_stock_ids %}low{% else %}ok{% endif %}">
           {% if product.is_out_of_stock %}
-            ⚠ Out of stock
+            <i class="bi bi-exclamation-triangle-fill"></i> Out of stock
           {% elif product.id in low_stock_ids %}
-            ⚠ Low: {{ product.stock_quantity|floatformat:0 }} {{ product.unit }}
+            <i class="bi bi-exclamation-circle"></i> Low: {{ product.stock_quantity|floatformat:0 }} {{ product.unit }}
           {% else %}
-            ✓ {{ product.stock_quantity|floatformat:0 }} {{ product.unit }}
+            <i class="bi bi-check-circle-fill"></i> {{ product.stock_quantity|floatformat:0 }} {{ product.unit }}
           {% endif %}
         </div>
       </div>
@@ -107,11 +107,53 @@
     {% endfor %}
   </div>
   {% else %}
-  <div style="text-align:center;padding:40px;color:#94a3b8;">
-    <i class="bi bi-box-seam" style="font-size:2.5rem;display:block;margin-bottom:12px;"></i>
-    <p style="font-size:1.1rem;font-weight:600;color:#475569;">No products yet</p>
-    <a href="{% url 'mixed_retail:product_add' %}" style="display:inline-block;margin-top:12px;padding:10px 20px;background:#2563eb;color:#fff;border-radius:8px;text-decoration:none;font-weight:700;">Add First Product</a>
+  {% if search or dept_id or cat_id %}
+  <!-- Filtered empty: no match -->
+  <div style="text-align:center;padding:40px 20px;background:#fff;border:1px solid #e2e8f0;border-radius:14px;">
+    <i class="bi bi-search" style="font-size:2rem;color:#94a3b8;display:block;margin-bottom:10px;"></i>
+    <p style="font-size:1rem;font-weight:700;color:#475569;margin:0 0 6px;">No products match your filter</p>
+    <p style="font-size:.85rem;color:#94a3b8;margin:0 0 16px;">Try a different search or filter, or add a new product.</p>
+    <a href="{% url 'mixed_retail:products' %}" style="margin-right:8px;padding:8px 16px;background:#f1f5f9;color:#374151;border-radius:8px;text-decoration:none;font-weight:700;font-size:.85rem;">Clear Filter</a>
+    <a href="{% url 'mixed_retail:product_add' %}" style="padding:8px 16px;background:#f97316;color:#fff;border-radius:8px;text-decoration:none;font-weight:700;font-size:.85rem;">Add Product</a>
   </div>
+  {% else %}
+  <!-- True empty: no products at all -->
+  <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:36px 20px;text-align:center;">
+    <i class="bi bi-box-seam" style="font-size:2.5rem;color:#10b981;display:block;margin-bottom:12px;"></i>
+    <h3 style="font-size:1.1rem;font-weight:800;color:#0f172a;margin:0 0 6px;">No products yet</h3>
+    <p style="font-size:.85rem;color:#64748b;margin:0 0 24px;">Your inventory is empty. Add products to start selling.</p>
+    <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;">
+      <a href="{% url 'mixed_retail:product_add' %}" style="padding:10px 22px;background:#f97316;color:#fff;border-radius:8px;text-decoration:none;font-weight:700;font-size:.9rem;display:flex;align-items:center;gap:6px;">
+        <i class="bi bi-plus-circle"></i> Add Product
+      </a>
+      <a href="{% url 'mixed_retail:departments' %}" style="padding:10px 22px;background:#f1f5f9;color:#374151;border:1px solid #e2e8f0;border-radius:8px;text-decoration:none;font-weight:700;font-size:.9rem;display:flex;align-items:center;gap:6px;">
+        <i class="bi bi-grid-3x3-gap"></i> Manage Departments
+      </a>
+    </div>
+    <div style="margin-top:28px;display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;text-align:left;">
+      <div style="background:#f8fafc;border-radius:10px;padding:14px 16px;">
+        <div style="width:30px;height:30px;background:#d1fae5;border-radius:8px;display:flex;align-items:center;justify-content:center;margin-bottom:8px;"><i class="bi bi-grid-3x3-gap" style="color:#059669;"></i></div>
+        <div style="font-size:.82rem;font-weight:700;color:#0f172a;margin-bottom:3px;">Enable Departments</div>
+        <div style="font-size:.72rem;color:#64748b;">Choose what your shop sells</div>
+      </div>
+      <div style="background:#f8fafc;border-radius:10px;padding:14px 16px;">
+        <div style="width:30px;height:30px;background:#dbeafe;border-radius:8px;display:flex;align-items:center;justify-content:center;margin-bottom:8px;"><i class="bi bi-plus-square" style="color:#1d4ed8;"></i></div>
+        <div style="font-size:.82rem;font-weight:700;color:#0f172a;margin-bottom:3px;">Add Products</div>
+        <div style="font-size:.72rem;color:#64748b;">Use templates or add custom</div>
+      </div>
+      <div style="background:#f8fafc;border-radius:10px;padding:14px 16px;">
+        <div style="width:30px;height:30px;background:#fef3c7;border-radius:8px;display:flex;align-items:center;justify-content:center;margin-bottom:8px;"><i class="bi bi-upc-scan" style="color:#d97706;"></i></div>
+        <div style="font-size:.82rem;font-weight:700;color:#0f172a;margin-bottom:3px;">Stock In</div>
+        <div style="font-size:.72rem;color:#64748b;">Record opening stock quantities</div>
+      </div>
+      <div style="background:#f8fafc;border-radius:10px;padding:14px 16px;">
+        <div style="width:30px;height:30px;background:#fce7f3;border-radius:8px;display:flex;align-items:center;justify-content:center;margin-bottom:8px;"><i class="bi bi-cart-plus" style="color:#be185d;"></i></div>
+        <div style="font-size:.82rem;font-weight:700;color:#0f172a;margin-bottom:3px;">Start Selling</div>
+        <div style="font-size:.72rem;color:#64748b;">Use Quick Sell for fast checkout</div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
   {% endif %}
 </div>
 {% endblock %}
