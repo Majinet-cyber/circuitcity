@@ -1,134 +1,226 @@
-{% extends "base/base.html" %}
-{% load ts_filters %}
+{% extends "portal/base_portal.html" %}
 
-{% block page_title %}Tech Support{% endblock %}
+{% block page_title %}Support &amp; System Health{% endblock %}
 
 {% block topbar %}{% include "support/_topbar.html" %}{% endblock %}
 
 {% block content %}
-<div class="hq-page-wrap">
+<div class="portal-shell hq-page-wrap">
 
-  <div class="hq-page-hdr">
+  <div class="portal-header hq-page-hdr">
     <div>
-      <h1 class="hq-page-title">Tech Support</h1>
-      <p class="hq-page-sub">Tickets, bug events, and system health.</p>
+      <h1 class="portal-header__title hq-page-title">Support &amp; System Health</h1>
+      <p class="portal-header__sub hq-page-sub">Track tickets, failed events, bugs, and operational incidents before they affect customers.</p>
     </div>
     <a href="{% url 'ticket_create' %}" class="hq-action-btn">
-      + New Ticket
-    </a>
-  </div>
-
-  <!-- KPI row -->
-  <div class="hq-kpi-row">
-    <div class="hq-kpi-card">
-      <div class="hq-kpi-val" style="color:#ff6a00">{{ open_tickets }}</div>
-      <div class="hq-kpi-lbl">Open Tickets</div>
-    </div>
-    <div class="hq-kpi-card">
-      <div class="hq-kpi-val" style="color:#dc2626">{{ critical_tickets }}</div>
-      <div class="hq-kpi-lbl">Critical Tickets</div>
-    </div>
-    <div class="hq-kpi-card">
-      <div class="hq-kpi-val" style="color:#2563eb">{{ my_tickets }}</div>
-      <div class="hq-kpi-lbl">Assigned to Me</div>
-    </div>
-    <div class="hq-kpi-card">
-      <div class="hq-kpi-val" style="color:#dc2626">{{ critical_bugs }}</div>
-      <div class="hq-kpi-lbl">Critical Bugs</div>
-    </div>
-    <div class="hq-kpi-card">
-      <div class="hq-kpi-val" style="color:#d97706">{{ new_bugs }}</div>
-      <div class="hq-kpi-lbl">New Bug Events</div>
-    </div>
-  </div>
-
-  <!-- Quick links -->
-  <div class="hq-quick-row" style="margin-bottom:24px">
-    <a href="{% url 'ticket_list' %}" class="hq-quick-card">
-      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="2"/></svg>
-      All Tickets
-    </a>
-    <a href="{% url 'bug_monitor' %}" class="hq-quick-card">
-      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-      Bug Monitor
-    </a>
-    <a href="{% url 'ticket_create' %}" class="hq-quick-card">
-      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
       New Ticket
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
     </a>
   </div>
 
-  <!-- Recent tickets -->
-  <div class="hq-section" style="margin-bottom:28px">
-    <div class="hq-section-hdr">
-      <h2 class="hq-section-title">Recent Tickets</h2>
-      <a href="{% url 'ticket_list' %}" class="hq-section-link">View all →</a>
+  <p class="portal-section-label">Key metrics</p>
+  <div class="portal-kpi-grid hq-kpi-row">
+    <a href="{% url 'ticket_list' %}?status=open" class="portal-kpi-card kpi-orange">
+      <div class="portal-kpi-card__head"><div class="portal-kpi-card__icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div></div>
+      <div class="portal-kpi-card__val">{{ open_tickets }}</div>
+      <div class="portal-kpi-card__label">Open Tickets</div>
+      <div class="portal-kpi-card__hint">Needs attention</div>
+    </a>
+    <a href="{% url 'ticket_list' %}?priority=critical" class="portal-kpi-card kpi-red">
+      <div class="portal-kpi-card__head"><div class="portal-kpi-card__icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div></div>
+      <div class="portal-kpi-card__val">{{ critical_tickets }}</div>
+      <div class="portal-kpi-card__label">Critical Tickets</div>
+      <div class="portal-kpi-card__hint">Highest priority queue</div>
+    </a>
+    <a href="{% url 'ticket_list' %}" class="portal-kpi-card kpi-blue">
+      <div class="portal-kpi-card__head"><div class="portal-kpi-card__icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div></div>
+      <div class="portal-kpi-card__val">{{ my_tickets }}</div>
+      <div class="portal-kpi-card__label">Assigned to Me</div>
+      <div class="portal-kpi-card__hint">Your active workload</div>
+    </a>
+    <a href="{% url 'bug_monitor' %}?status=new" class="portal-kpi-card kpi-amber">
+      <div class="portal-kpi-card__head"><div class="portal-kpi-card__icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div></div>
+      <div class="portal-kpi-card__val">{{ new_bugs }}</div>
+      <div class="portal-kpi-card__label">New Bug Events</div>
+      <div class="portal-kpi-card__hint">Unreviewed system errors</div>
+    </a>
+    <a href="{% url 'bug_monitor' %}?severity=critical" class="portal-kpi-card kpi-red">
+      <div class="portal-kpi-card__head"><div class="portal-kpi-card__icon"><svg viewBox="0 0 24 24" aria-hidden="true"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></div></div>
+      <div class="portal-kpi-card__val">{{ critical_bugs }}</div>
+      <div class="portal-kpi-card__label">Critical Bugs</div>
+      <div class="portal-kpi-card__hint">Immediate investigation</div>
+    </a>
+    <a href="{% url 'bug_monitor' %}?source=payment" class="portal-kpi-card kpi-purple">
+      <div class="portal-kpi-card__head"><div class="portal-kpi-card__icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg></div></div>
+      <div class="portal-kpi-card__val">{{ failed_payments }}</div>
+      <div class="portal-kpi-card__label">Failed Payments Today</div>
+      <div class="portal-kpi-card__hint">Payment pipeline errors</div>
+    </a>
+    <a href="{% url 'bug_monitor' %}?source=device_lock" class="portal-kpi-card kpi-cyan">
+      <div class="portal-kpi-card__head"><div class="portal-kpi-card__icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div></div>
+      <div class="portal-kpi-card__val">{{ failed_locks }}</div>
+      <div class="portal-kpi-card__label">Failed Lock Events</div>
+      <div class="portal-kpi-card__hint">Device lock failures</div>
+    </a>
+    <div class="portal-kpi-card kpi-indigo">
+      <div class="portal-kpi-card__head"><div class="portal-kpi-card__icon"><svg viewBox="0 0 24 24" aria-hidden="true"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div></div>
+      <div class="portal-kpi-card__val">{{ unmatched_payments }}</div>
+      <div class="portal-kpi-card__label">Unmatched Payments</div>
+      <div class="portal-kpi-card__hint">Reconciliation needed</div>
     </div>
+  </div>
+
+  <p class="portal-section-label">Quick actions</p>
+  <div class="portal-action-grid hq-quick-row">
+    <a href="{% url 'ticket_create' %}" class="portal-action-card hq-quick-card">
+      <div class="portal-action-card__icon"><svg viewBox="0 0 24 24" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></div>
+      <div class="portal-action-card__body"><p class="portal-action-card__title">Create Ticket</p><p class="portal-action-card__desc">Log a new support issue</p></div>
+    </a>
+    <a href="{% url 'ticket_list' %}" class="portal-action-card hq-quick-card">
+      <div class="portal-action-card__icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="2"/></svg></div>
+      <div class="portal-action-card__body"><p class="portal-action-card__title">View All Tickets</p><p class="portal-action-card__desc">Full ticket queue</p></div>
+    </a>
+    <a href="{% url 'bug_monitor' %}" class="portal-action-card hq-quick-card">
+      <div class="portal-action-card__icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div>
+      <div class="portal-action-card__body"><p class="portal-action-card__title">Open Bug Monitor</p><p class="portal-action-card__desc">System error dashboard</p></div>
+    </a>
+    <a href="{% url 'bug_monitor' %}?source=payment" class="portal-action-card hq-quick-card">
+      <div class="portal-action-card__icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg></div>
+      <div class="portal-action-card__body"><p class="portal-action-card__title">Failed Payment Events</p><p class="portal-action-card__desc">Payment processing errors</p></div>
+    </a>
+    <a href="{% url 'bug_monitor' %}?source=device_lock" class="portal-action-card hq-quick-card">
+      <div class="portal-action-card__icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>
+      <div class="portal-action-card__body"><p class="portal-action-card__title">Device Lock Issues</p><p class="portal-action-card__desc">Lock/unlock failures</p></div>
+    </a>
+    <a href="{% url 'bug_monitor' %}?source=webhook" class="portal-action-card hq-quick-card">
+      <div class="portal-action-card__icon"><svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg></div>
+      <div class="portal-action-card__body"><p class="portal-action-card__title">Webhook Failures</p><p class="portal-action-card__desc">Integration delivery errors</p></div>
+    </a>
+    <a href="{% url 'bug_monitor' %}?source=sms" class="portal-action-card hq-quick-card">
+      <div class="portal-action-card__icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
+      <div class="portal-action-card__body"><p class="portal-action-card__title">SMS / Email Failures</p><p class="portal-action-card__desc">Notification delivery issues</p></div>
+    </a>
+    <a href="{% url 'ticket_list' %}?status=escalated" class="portal-action-card hq-quick-card">
+      <div class="portal-action-card__icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+      <div class="portal-action-card__body"><p class="portal-action-card__title">Escalated Issues</p><p class="portal-action-card__desc">Tickets sent to HQ</p></div>
+    </a>
+  </div>
+
+  <p class="portal-section-label">System health pulse</p>
+  <div class="portal-health-grid">
+    {% for item in health_pulse %}
+    <div class="portal-health-card">
+      <div class="portal-health-card__label">{{ item.label }}</div>
+      <div class="portal-health-card__status portal-health-card__status--{{ item.level }}">{{ item.level_label }}</div>
+      <div class="portal-health-card__meta">
+        {{ item.count }} recent failure{{ item.count|pluralize }}
+        {% if item.last_seen %} · Last {{ item.last_seen|timesince }} ago{% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="portal-table-card hq-section portal-table-card--mobile-cards">
+    <div class="portal-table-card__hdr hq-section-hdr">
+      <h2 class="portal-table-card__title hq-section-title">Recent Tickets</h2>
+      <a href="{% url 'ticket_list' %}" class="portal-table-card__link hq-section-link">View all</a>
+    </div>
+    {% if recent_tickets %}
     <div class="hq-table-wrap">
       <table class="hq-table">
         <thead>
-          <tr><th>#</th><th>Title</th><th>Category</th><th>Priority</th><th>Status</th><th>Created by</th><th>Assigned</th><th>Created</th><th></th></tr>
+          <tr>
+            <th>Ticket #</th><th>Title</th><th>Category</th><th>Priority</th><th>Status</th>
+            <th>Created by</th><th>Assigned</th><th>Created</th><th>Action</th>
+          </tr>
         </thead>
         <tbody>
           {% for ticket in recent_tickets %}
           <tr>
-            <td class="hq-td-muted">{{ ticket.ticket_number }}</td>
-            <td><strong>{{ ticket.title|truncatechars:50 }}</strong></td>
-            <td>{{ ticket.get_category_display }}</td>
-            <td>
-              <span class="hq-badge {% if ticket.priority == 'critical' %}hq-badge--red{% elif ticket.priority == 'high' %}hq-badge--orange{% elif ticket.priority == 'medium' %}hq-badge--yellow{% else %}hq-badge--gray{% endif %}">
-                {{ ticket.get_priority_display }}
-              </span>
+            <td data-label="Ticket #" class="hq-td-muted">{{ ticket.ticket_number }}</td>
+            <td data-label="Title"><strong>{{ ticket.title|truncatechars:45 }}</strong></td>
+            <td data-label="Category">{{ ticket.get_category_display }}</td>
+            <td data-label="Priority">{% include "portal/_priority_badge.html" with priority=ticket.priority label=ticket.get_priority_display %}</td>
+            <td data-label="Status">{% include "portal/_status_badge.html" with status=ticket.status label=ticket.get_status_display %}</td>
+            <td data-label="Created by" class="hq-td-muted">{{ ticket.created_by.username|default:"—" }}</td>
+            <td data-label="Assigned" class="hq-td-muted">{{ ticket.assigned_to.username|default:"—" }}</td>
+            <td data-label="Created" class="hq-td-muted">{{ ticket.created_at|date:"d M" }}</td>
+            <td data-label="Action">
+              <div class="portal-inline-actions">
+                <a href="{% url 'ticket_detail' ticket.id %}" class="hq-btn hq-btn--ghost hq-btn--sm">View</a>
+                <form method="post" action="{% url 'ticket_assign_me' ticket.id %}">
+                  {% csrf_token %}
+                  <button type="submit" class="hq-btn hq-btn--ghost hq-btn--sm">Assign me</button>
+                </form>
+                {% if ticket.status != 'in_progress' and ticket.status != 'resolved' and ticket.status != 'closed' %}
+                <form method="post" action="{% url 'ticket_status' ticket.id %}">
+                  {% csrf_token %}
+                  <input type="hidden" name="status" value="in_progress">
+                  <button type="submit" class="hq-btn hq-btn--ghost hq-btn--sm">Progress</button>
+                </form>
+                <form method="post" action="{% url 'ticket_escalate' ticket.id %}">
+                  {% csrf_token %}
+                  <button type="submit" class="hq-btn hq-btn--ghost hq-btn--sm">Escalate</button>
+                </form>
+                {% endif %}
+              </div>
             </td>
-            <td>
-              <span class="hq-badge {% if ticket.status == 'open' %}hq-badge--orange{% elif ticket.status == 'resolved' or ticket.status == 'closed' %}hq-badge--green{% else %}hq-badge--gray{% endif %}">
-                {{ ticket.get_status_display }}
-              </span>
-            </td>
-            <td class="hq-td-muted">{{ ticket.created_by.username|default:"—" }}</td>
-            <td class="hq-td-muted">{{ ticket.assigned_to.username|default:"—" }}</td>
-            <td class="hq-td-muted">{{ ticket.created_at|date:"d M" }}</td>
-            <td><a href="{% url 'ticket_detail' ticket.id %}" class="hq-table-link">View →</a></td>
           </tr>
-          {% empty %}
-          <tr><td colspan="9" class="hq-td-empty">No tickets yet.</td></tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
+    {% else %}
+    <div class="empty-state">
+      <div class="empty-state__icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
+      <h3 class="empty-state__title">No tickets yet</h3>
+      <p class="empty-state__text">When merchants, underwriters, or staff report issues, they will appear here.</p>
+      <a href="{% url 'ticket_create' %}" class="hq-btn hq-btn--primary">New Ticket</a>
+    </div>
+    {% endif %}
   </div>
 
-  <!-- Recent bugs -->
-  <div class="hq-section">
-    <div class="hq-section-hdr">
-      <h2 class="hq-section-title">Recent Bug Events</h2>
-      <a href="{% url 'bug_monitor' %}" class="hq-section-link">View all →</a>
+  <div class="portal-table-card hq-section portal-table-card--mobile-cards">
+    <div class="portal-table-card__hdr hq-section-hdr">
+      <h2 class="portal-table-card__title hq-section-title">Recent Bug Events</h2>
+      <a href="{% url 'bug_monitor' %}" class="portal-table-card__link hq-section-link">View all</a>
     </div>
+    {% if recent_bugs %}
     <div class="hq-table-wrap">
       <table class="hq-table">
         <thead>
-          <tr><th>Source</th><th>Severity</th><th>Message</th><th>Count</th><th>Last seen</th><th></th></tr>
+          <tr><th>Source</th><th>Severity</th><th>Message</th><th>Count</th><th>Last Seen</th><th>Status</th><th>Actions</th></tr>
         </thead>
         <tbody>
           {% for bug in recent_bugs %}
           <tr>
-            <td>{{ bug.get_source_display }}</td>
-            <td>
-              <span class="hq-badge {% if bug.severity == 'critical' %}hq-badge--red{% elif bug.severity == 'high' %}hq-badge--orange{% elif bug.severity == 'medium' %}hq-badge--yellow{% else %}hq-badge--gray{% endif %}">
-                {{ bug.get_severity_display }}
-              </span>
+            <td data-label="Source">{{ bug.get_source_display }}</td>
+            <td data-label="Severity">{% include "portal/_priority_badge.html" with priority=bug.severity label=bug.get_severity_display %}</td>
+            <td data-label="Message">{{ bug.message|truncatechars:55 }}</td>
+            <td data-label="Count" class="hq-td-muted">{{ bug.occurrence_count }}</td>
+            <td data-label="Last Seen" class="hq-td-muted">{{ bug.last_seen_at|date:"d M H:i" }}</td>
+            <td data-label="Status">{% include "portal/_status_badge.html" with status=bug.status label=bug.get_status_display %}</td>
+            <td data-label="Actions">
+              <div class="portal-inline-actions">
+                <a href="{% url 'bug_detail' bug.id %}" class="hq-btn hq-btn--ghost hq-btn--sm">View</a>
+                <form method="post" action="{% url 'bug_to_ticket' bug.id %}">
+                  {% csrf_token %}
+                  <button type="submit" class="hq-btn hq-btn--ghost hq-btn--sm">Ticket</button>
+                </form>
+              </div>
             </td>
-            <td>{{ bug.message|truncatechars:60 }}</td>
-            <td class="hq-td-muted">{{ bug.occurrence_count }}</td>
-            <td class="hq-td-muted">{{ bug.last_seen_at|date:"d M H:i" }}</td>
-            <td><a href="{% url 'bug_detail' bug.id %}" class="hq-table-link">View →</a></td>
           </tr>
-          {% empty %}
-          <tr><td colspan="6" class="hq-td-empty">No bug events.</td></tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
+    {% else %}
+    <div class="empty-state">
+      <div class="empty-state__icon"><svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></div>
+      <h3 class="empty-state__title">No bug events detected</h3>
+      <p class="empty-state__text">System health is clean.</p>
+    </div>
+    {% endif %}
   </div>
 
 </div>

@@ -1,24 +1,23 @@
-{% extends "base/base.html" %}
+{% extends "portal/base_portal.html" %}
 
 {% block page_title %}Bug Monitor{% endblock %}
 
 {% block topbar %}{% include "support/_topbar.html" %}{% endblock %}
 
 {% block content %}
-<div class="hq-page-wrap">
+<div class="portal-shell hq-page-wrap">
 
-  <div class="hq-page-hdr">
+  <div class="portal-header hq-page-hdr">
     <div>
       <a href="{% url 'support_dashboard' %}" class="hq-back-link">← Dashboard</a>
-      <h1 class="hq-page-title">Bug Monitor</h1>
-      <p class="hq-page-sub">
-        <span class="hq-badge hq-badge--red">{{ critical_count }} critical</span>
-        <span class="hq-badge hq-badge--orange" style="margin-left:6px">{{ new_count }} new</span>
+      <h1 class="portal-header__title hq-page-title">Bug Monitor</h1>
+      <p class="portal-header__sub hq-page-sub">
+        <span class="status-badge status-badge--red">{{ critical_count }} critical</span>
+        <span class="status-badge status-badge--orange">{{ new_count }} new</span>
       </p>
     </div>
   </div>
 
-  <!-- Filters -->
   <form method="get" class="hq-filter-row" style="margin-bottom:20px">
     <select name="severity" class="hq-select hq-select--sm">
       <option value="">All Severities</option>
@@ -36,36 +35,36 @@
     <a href="{% url 'bug_monitor' %}" class="hq-btn hq-btn--ghost hq-btn--sm">Clear</a>
   </form>
 
-  <div class="hq-table-wrap">
-    <table class="hq-table">
-      <thead>
-        <tr><th>ID</th><th>Source</th><th>Severity</th><th>Status</th><th>Message</th><th>Occurrences</th><th>Last Seen</th><th></th></tr>
-      </thead>
-      <tbody>
-        {% for bug in bugs %}
-        <tr>
-          <td class="hq-td-muted">#{{ bug.id }}</td>
-          <td>{{ bug.get_source_display }}</td>
-          <td>
-            <span class="hq-badge {% if bug.severity == 'critical' %}hq-badge--red{% elif bug.severity == 'high' %}hq-badge--orange{% elif bug.severity == 'medium' %}hq-badge--yellow{% else %}hq-badge--gray{% endif %}">
-              {{ bug.get_severity_display }}
-            </span>
-          </td>
-          <td>
-            <span class="hq-badge {% if bug.status == 'new' %}hq-badge--orange{% elif bug.status == 'fixed' %}hq-badge--green{% elif bug.status == 'escalated' %}hq-badge--red{% else %}hq-badge--gray{% endif %}">
-              {{ bug.get_status_display }}
-            </span>
-          </td>
-          <td style="max-width:320px">{{ bug.message|truncatechars:80 }}</td>
-          <td class="hq-td-muted">{{ bug.occurrence_count }}</td>
-          <td class="hq-td-muted">{{ bug.last_seen_at|date:"d M H:i" }}</td>
-          <td><a href="{% url 'bug_detail' bug.id %}" class="hq-table-link">View →</a></td>
-        </tr>
-        {% empty %}
-        <tr><td colspan="8" class="hq-td-empty">No bug events match your filters.</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
+  <div class="portal-table-card hq-section portal-table-card--mobile-cards">
+    {% if bugs %}
+    <div class="hq-table-wrap">
+      <table class="hq-table">
+        <thead>
+          <tr><th>ID</th><th>Source</th><th>Severity</th><th>Status</th><th>Message</th><th>Occurrences</th><th>Last Seen</th><th></th></tr>
+        </thead>
+        <tbody>
+          {% for bug in bugs %}
+          <tr>
+            <td data-label="ID" class="hq-td-muted">#{{ bug.id }}</td>
+            <td data-label="Source">{{ bug.get_source_display }}</td>
+            <td data-label="Severity">{% include "portal/_priority_badge.html" with priority=bug.severity label=bug.get_severity_display %}</td>
+            <td data-label="Status">{% include "portal/_status_badge.html" with status=bug.status label=bug.get_status_display %}</td>
+            <td data-label="Message" style="max-width:320px">{{ bug.message|truncatechars:80 }}</td>
+            <td data-label="Occurrences" class="hq-td-muted">{{ bug.occurrence_count }}</td>
+            <td data-label="Last Seen" class="hq-td-muted">{{ bug.last_seen_at|date:"d M H:i" }}</td>
+            <td data-label=""><a href="{% url 'bug_detail' bug.id %}" class="hq-btn hq-btn--ghost hq-btn--sm">View</a></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+      <div class="empty-state__icon"><svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></div>
+      <h3 class="empty-state__title">No bug events detected</h3>
+      <p class="empty-state__text">System health is clean, or no events match your filters.</p>
+    </div>
+    {% endif %}
   </div>
 
 </div>

@@ -1,21 +1,20 @@
-{% extends "base/base.html" %}
+{% extends "portal/base_portal.html" %}
 
 {% block page_title %}Support Tickets{% endblock %}
 
 {% block topbar %}{% include "support/_topbar.html" %}{% endblock %}
 
 {% block content %}
-<div class="hq-page-wrap">
+<div class="portal-shell hq-page-wrap">
 
-  <div class="hq-page-hdr">
+  <div class="portal-header hq-page-hdr">
     <div>
       <a href="{% url 'support_dashboard' %}" class="hq-back-link">← Dashboard</a>
-      <h1 class="hq-page-title">Support Tickets</h1>
+      <h1 class="portal-header__title hq-page-title">Support Tickets</h1>
     </div>
-    <a href="{% url 'ticket_create' %}" class="hq-action-btn">+ New Ticket</a>
+    <a href="{% url 'ticket_create' %}" class="hq-action-btn">New Ticket</a>
   </div>
 
-  <!-- Filters -->
   <form method="get" class="hq-filter-row" style="margin-bottom:20px">
     <select name="status" class="hq-select hq-select--sm">
       <option value="">All Statuses</option>
@@ -33,43 +32,44 @@
     <a href="{% url 'ticket_list' %}" class="hq-btn hq-btn--ghost hq-btn--sm">Clear</a>
   </form>
 
-  <div class="hq-table-wrap">
-    <table class="hq-table">
-      <thead>
-        <tr>
-          <th>#</th><th>Title</th><th>Category</th><th>Priority</th><th>Status</th>
-          {% if can_manage %}<th>Created by</th><th>Assigned</th>{% endif %}
-          <th>Created</th><th></th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for ticket in tickets %}
-        <tr>
-          <td class="hq-td-muted">{{ ticket.ticket_number }}</td>
-          <td><strong>{{ ticket.title|truncatechars:55 }}</strong></td>
-          <td>{{ ticket.get_category_display }}</td>
-          <td>
-            <span class="hq-badge {% if ticket.priority == 'critical' %}hq-badge--red{% elif ticket.priority == 'high' %}hq-badge--orange{% elif ticket.priority == 'medium' %}hq-badge--yellow{% else %}hq-badge--gray{% endif %}">
-              {{ ticket.get_priority_display }}
-            </span>
-          </td>
-          <td>
-            <span class="hq-badge {% if ticket.status == 'open' %}hq-badge--orange{% elif ticket.status == 'resolved' or ticket.status == 'closed' %}hq-badge--green{% else %}hq-badge--gray{% endif %}">
-              {{ ticket.get_status_display }}
-            </span>
-          </td>
-          {% if can_manage %}
-          <td class="hq-td-muted">{{ ticket.created_by.username|default:"—" }}</td>
-          <td class="hq-td-muted">{{ ticket.assigned_to.username|default:"—" }}</td>
-          {% endif %}
-          <td class="hq-td-muted">{{ ticket.created_at|date:"d M Y" }}</td>
-          <td><a href="{% url 'ticket_detail' ticket.id %}" class="hq-table-link">View →</a></td>
-        </tr>
-        {% empty %}
-        <tr><td colspan="9" class="hq-td-empty">No tickets found.</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
+  <div class="portal-table-card hq-section portal-table-card--mobile-cards">
+    {% if tickets %}
+    <div class="hq-table-wrap">
+      <table class="hq-table">
+        <thead>
+          <tr>
+            <th>#</th><th>Title</th><th>Category</th><th>Priority</th><th>Status</th>
+            {% if can_manage %}<th>Created by</th><th>Assigned</th>{% endif %}
+            <th>Created</th><th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for ticket in tickets %}
+          <tr>
+            <td data-label="#" class="hq-td-muted">{{ ticket.ticket_number }}</td>
+            <td data-label="Title"><strong>{{ ticket.title|truncatechars:55 }}</strong></td>
+            <td data-label="Category">{{ ticket.get_category_display }}</td>
+            <td data-label="Priority">{% include "portal/_priority_badge.html" with priority=ticket.priority label=ticket.get_priority_display %}</td>
+            <td data-label="Status">{% include "portal/_status_badge.html" with status=ticket.status label=ticket.get_status_display %}</td>
+            {% if can_manage %}
+            <td data-label="Created by" class="hq-td-muted">{{ ticket.created_by.username|default:"—" }}</td>
+            <td data-label="Assigned" class="hq-td-muted">{{ ticket.assigned_to.username|default:"—" }}</td>
+            {% endif %}
+            <td data-label="Created" class="hq-td-muted">{{ ticket.created_at|date:"d M Y" }}</td>
+            <td data-label=""><a href="{% url 'ticket_detail' ticket.id %}" class="hq-btn hq-btn--ghost hq-btn--sm">View</a></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+      <div class="empty-state__icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
+      <h3 class="empty-state__title">No tickets found</h3>
+      <p class="empty-state__text">Try adjusting filters or create a new ticket.</p>
+      <a href="{% url 'ticket_create' %}" class="hq-btn hq-btn--primary">New Ticket</a>
+    </div>
+    {% endif %}
   </div>
 
 </div>

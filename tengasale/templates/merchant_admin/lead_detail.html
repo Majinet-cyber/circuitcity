@@ -1,28 +1,37 @@
-{% extends "base/base.html" %}
-{% load ts_filters %}
+{% extends "portal/base_portal.html" %}
 
 {% block page_title %}Lead: {{ lead.business_name }}{% endblock %}
 
 {% block topbar %}{% include "merchant_admin/_topbar.html" %}{% endblock %}
 
 {% block content %}
-<div class="hq-page-wrap">
+<div class="portal-shell hq-page-wrap">
 
-  <div class="hq-page-hdr">
+  <div class="portal-header hq-page-hdr">
     <div>
       <a href="{% url 'ma_leads' %}" class="hq-back-link">← Leads</a>
-      <h1 class="hq-page-title">{{ lead.business_name }}</h1>
-      <p class="hq-page-sub">{{ lead.owner_full_name }} · {{ lead.district }}
-        <span class="hq-badge
-          {% if lead.status == 'new' %}hq-badge--orange
-          {% elif lead.status == 'approved' %}hq-badge--green
-          {% elif lead.status == 'rejected' %}hq-badge--red
-          {% elif lead.status == 'awaiting_hq' %}hq-badge--yellow
-          {% else %}hq-badge--gray{% endif %}" style="margin-left:10px">
-          {{ lead.get_status_display }}
-        </span>
+      <h1 class="portal-header__title hq-page-title">{{ lead.business_name }}</h1>
+      <p class="portal-header__sub hq-page-sub">
+        {{ lead.owner_full_name }} · {{ lead.district }}
+        {% include "portal/_status_badge.html" with status=lead.status label=lead.get_status_display %}
       </p>
     </div>
+  </div>
+
+  <div class="quick-action-row">
+    <a href="#kyc" class="hq-btn hq-btn--ghost hq-btn--sm">Start KYC</a>
+    <a href="#kyc" class="hq-btn hq-btn--ghost hq-btn--sm">Upload Documents</a>
+    <form method="post" action="{% url 'ma_recommend' lead.id %}" style="display:inline">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="approve">
+      <button type="submit" class="hq-btn hq-btn--green hq-btn--sm">Recommend Approval</button>
+    </form>
+    <form method="post" action="{% url 'ma_recommend' lead.id %}" style="display:inline">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="escalate">
+      <button type="submit" class="hq-btn hq-btn--yellow hq-btn--sm">Escalate to HQ</button>
+    </form>
+    <button type="button" class="hq-btn hq-btn--ghost hq-btn--sm" onclick="document.getElementById('ticket-form').scrollIntoView({behavior:'smooth'})">Create Ticket</button>
   </div>
 
   <!-- Lead summary -->
@@ -80,8 +89,41 @@
     </form>
   </div>
 
+  <!-- Internal note -->
+  <div class="portal-table-card hq-card" style="margin-bottom:20px">
+    <div class="hq-card-hdr"><h3>Add Internal Note</h3></div>
+    <form method="post" action="{% url 'ma_lead_note' lead.id %}">
+      {% csrf_token %}
+      <div class="hq-form-field">
+        <textarea name="note" class="hq-textarea" rows="2" placeholder="Staff-only note (not visible to merchant)"></textarea>
+      </div>
+      <div class="hq-form-actions">
+        <button type="submit" class="hq-btn hq-btn--primary hq-btn--sm">Save Note</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Create ticket -->
+  <div class="portal-table-card hq-card" id="ticket-form" style="margin-bottom:20px">
+    <div class="hq-card-hdr"><h3>Create Support Ticket</h3></div>
+    <form method="post" action="{% url 'ma_lead_ticket' lead.id %}">
+      {% csrf_token %}
+      <div class="hq-form-field">
+        <label class="hq-form-label">Title</label>
+        <input type="text" name="title" class="hq-input" value="Merchant lead: {{ lead.business_name }}">
+      </div>
+      <div class="hq-form-field">
+        <label class="hq-form-label">Description</label>
+        <textarea name="description" class="hq-textarea" rows="3">Support ticket for merchant lead #{{ lead.pk }} — {{ lead.business_name }}</textarea>
+      </div>
+      <div class="hq-form-actions">
+        <button type="submit" class="hq-btn hq-btn--primary hq-btn--sm">Create Ticket</button>
+      </div>
+    </form>
+  </div>
+
   <!-- KYC Form -->
-  <div class="hq-card" style="margin-bottom:20px">
+  <div class="portal-table-card hq-card" id="kyc" style="margin-bottom:20px">
     <div class="hq-card-hdr"><h3>KYC Details</h3></div>
     <form method="post" action="{% url 'ma_lead_kyc' lead.id %}" enctype="multipart/form-data">
       {% csrf_token %}
@@ -183,7 +225,7 @@
   </div>
 
   <!-- Verification Checklist -->
-  <div class="hq-card" style="margin-bottom:20px">
+  <div class="portal-table-card hq-card" id="checklist" style="margin-bottom:20px">
     <div class="hq-card-hdr"><h3>Verification Checklist <span class="hq-kpi-sub">{{ checklist.checks_passed }} checks</span></h3></div>
     <form method="post" action="{% url 'ma_checklist' lead.id %}">
       {% csrf_token %}
@@ -273,22 +315,26 @@
   </div>
 
   <!-- Recommendation actions -->
-  <div class="hq-card" style="margin-bottom:40px">
+  <div class="portal-table-card hq-card" style="margin-bottom:40px">
     <div class="hq-card-hdr"><h3>Recommendation</h3></div>
-    <p style="color:var(--hq-muted);font-size:13px;margin-bottom:16px">
+    <p style="color:var(--hq-muted);font-size:13px;margin:0 16px 16px;padding-top:16px">
       Current recommendation: <strong>{{ checklist.get_recommendation_display }}</strong>
-      {% if require_hq %} &nbsp;·&nbsp; HQ final approval required{% endif %}
+      {% if require_hq %} · HQ final approval required{% endif %}
     </p>
-    <div style="display:flex;gap:12px;flex-wrap:wrap">
+    <div class="hq-form-actions" style="padding:0 16px 16px">
       <form method="post" action="{% url 'ma_recommend' lead.id %}">
         {% csrf_token %}
         <input type="hidden" name="action" value="approve">
         <button type="submit" class="hq-btn hq-btn--green">Recommend Approval</button>
       </form>
-      <form method="post" action="{% url 'ma_recommend' lead.id %}">
+      <form method="post" action="{% url 'ma_recommend' lead.id %}" style="flex:1;min-width:240px">
         {% csrf_token %}
         <input type="hidden" name="action" value="reject">
-        <button type="submit" class="hq-btn hq-btn--red">Recommend Rejection</button>
+        <div class="hq-form-field">
+          <label class="hq-form-label">Reject with reason</label>
+          <textarea name="reason" class="hq-textarea" rows="2" placeholder="Required for rejection"></textarea>
+        </div>
+        <button type="submit" class="hq-btn hq-btn--red hq-btn--sm" style="margin-top:8px">Reject Lead</button>
       </form>
       <form method="post" action="{% url 'ma_recommend' lead.id %}">
         {% csrf_token %}

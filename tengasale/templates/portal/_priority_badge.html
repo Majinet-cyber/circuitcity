@@ -1,0 +1,9 @@
+{% if priority == 'critical' %}
+<span class="priority-badge priority-badge--critical">{{ label|default:priority }}</span>
+{% elif priority == 'high' %}
+<span class="priority-badge priority-badge--high">{{ label|default:priority }}</span>
+{% elif priority == 'medium' %}
+<span class="priority-badge priority-badge--medium">{{ label|default:priority }}</span>
+{% else %}
+<span class="priority-badge priority-badge--low">{{ label|default:priority }}</span>
+{% endif %}

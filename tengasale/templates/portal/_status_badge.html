@@ -1,0 +1,14 @@
+{% load static %}
+{% if status == 'new' or status == 'open' %}
+<span class="status-badge status-badge--orange">{{ label|default:status }}</span>
+{% elif status == 'approved' or status == 'resolved' or status == 'closed' %}
+<span class="status-badge status-badge--green">{{ label|default:status }}</span>
+{% elif status == 'rejected' %}
+<span class="status-badge status-badge--red">{{ label|default:status }}</span>
+{% elif status == 'awaiting_hq' or status == 'kyc_pending' or status == 'documents_pending' or status == 'site_visit_needed' or status == 'assigned' or status == 'in_progress' or status == 'escalated' %}
+<span class="status-badge status-badge--yellow">{{ label|default:status }}</span>
+{% elif status == 'contacted' or status == 'qualified' %}
+<span class="status-badge status-badge--blue">{{ label|default:status }}</span>
+{% else %}
+<span class="status-badge status-badge--gray">{{ label|default:status }}</span>
+{% endif %}

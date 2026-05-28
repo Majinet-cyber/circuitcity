@@ -1,0 +1,77 @@
+{% extends "portal/base_portal.html" %}
+
+{% block page_title %}New Merchant Lead{% endblock %}
+
+{% block topbar %}{% include "merchant_admin/_topbar.html" %}{% endblock %}
+
+{% block content %}
+<div class="portal-shell hq-page-wrap" style="max-width:760px">
+
+  <div class="portal-header hq-page-hdr">
+    <div>
+      <a href="{% url 'ma_leads' %}" class="hq-back-link">← Leads</a>
+      <h1 class="portal-header__title hq-page-title">Create Manual Lead</h1>
+      <p class="portal-header__sub hq-page-sub">Add a merchant partner discovered offline or referred by staff.</p>
+    </div>
+  </div>
+
+  <div class="portal-table-card hq-card">
+    <form method="post">
+      {% csrf_token %}
+      <div class="hq-form-row">
+        <div class="hq-form-field">
+          <label class="hq-form-label">Business / Shop Name <span class="hq-required">*</span></label>
+          <input type="text" name="business_name" class="hq-input" required>
+        </div>
+        <div class="hq-form-field">
+          <label class="hq-form-label">Owner Full Name <span class="hq-required">*</span></label>
+          <input type="text" name="owner_full_name" class="hq-input" required>
+        </div>
+      </div>
+      <div class="hq-form-row">
+        <div class="hq-form-field">
+          <label class="hq-form-label">Phone <span class="hq-required">*</span></label>
+          <input type="text" name="phone" class="hq-input" placeholder="+265..." required>
+        </div>
+        <div class="hq-form-field">
+          <label class="hq-form-label">WhatsApp</label>
+          <input type="text" name="whatsapp_phone" class="hq-input">
+        </div>
+      </div>
+      <div class="hq-form-row">
+        <div class="hq-form-field">
+          <label class="hq-form-label">Email</label>
+          <input type="email" name="email" class="hq-input">
+        </div>
+        <div class="hq-form-field">
+          <label class="hq-form-label">Business Type</label>
+          <select name="business_type" class="hq-select">
+            {% for val, label in business_type_choices %}
+            <option value="{{ val }}">{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <div class="hq-form-row">
+        <div class="hq-form-field">
+          <label class="hq-form-label">District <span class="hq-required">*</span></label>
+          <input type="text" name="district" class="hq-input" required>
+        </div>
+        <div class="hq-form-field">
+          <label class="hq-form-label">Area / Trading Centre</label>
+          <input type="text" name="area" class="hq-input">
+        </div>
+      </div>
+      <div class="hq-form-field">
+        <label class="hq-form-label">Notes</label>
+        <textarea name="message" class="hq-textarea" rows="3" placeholder="How did you find this merchant? Any initial observations?"></textarea>
+      </div>
+      <div class="hq-form-actions">
+        <button type="submit" class="hq-btn hq-btn--primary">Create Lead</button>
+        <a href="{% url 'ma_leads' %}" class="hq-btn hq-btn--ghost">Cancel</a>
+      </div>
+    </form>
+  </div>
+
+</div>
+{% endblock %}

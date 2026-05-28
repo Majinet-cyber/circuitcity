@@ -1114,3 +1114,151 @@ class MerchantAdminLeadFlowTests(TestCase):
         )
         self.lead.refresh_from_db()
         self.assertEqual(self.lead.status, "awaiting_hq")
+
+
+class MerchantAdminPortalPolishTests(TestCase):
+    """Extended merchant admin portal workflow tests."""
+
+    def setUp(self):
+        call_command("seed_roles")
+        User = get_user_model()
+        self.ma_user = User.objects.create_user(username="ma_polish", password="pass")
+        assign_role(self.ma_user, "merchant_admin")
+        from website.models import MerchantLead
+        self.lead = MerchantLead.objects.create(
+            business_name="Polish Shop",
+            owner_full_name="Grace Phiri",
+            phone="+265881111111",
+            district="Blantyre",
+            business_type="phone_shop",
+        )
+
+    def test_ma_dashboard_loads(self):
+        self.client.login(username="ma_polish", password="pass")
+        response = self.client.get(reverse("ma_dashboard"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Merchant Administration")
+        self.assertContains(response, "Action center")
+
+    def test_ma_can_create_manual_lead(self):
+        self.client.login(username="ma_polish", password="pass")
+        response = self.client.post(reverse("ma_lead_create"), {
+            "business_name": "Manual Shop",
+            "owner_full_name": "John Doe",
+            "phone": "+265882222222",
+            "district": "Zomba",
+            "business_type": "phone_shop",
+        })
+        from website.models import MerchantLead
+        lead = MerchantLead.objects.get(business_name="Manual Shop")
+        self.assertRedirects(response, reverse("ma_lead_detail", kwargs={"lead_id": lead.pk}))
+
+    def test_reject_requires_reason(self):
+        self.client.login(username="ma_polish", password="pass")
+        self.client.post(
+            reverse("ma_recommend", kwargs={"lead_id": self.lead.pk}),
+            {"action": "reject"},
+            follow=True,
+        )
+        self.lead.refresh_from_db()
+        self.assertNotEqual(self.lead.status, "rejected")
+
+    def test_reject_with_reason_works(self):
+        self.client.login(username="ma_polish", password="pass")
+        self.client.post(
+            reverse("ma_recommend", kwargs={"lead_id": self.lead.pk}),
+            {"action": "reject", "reason": "Incomplete documents"},
+        )
+        self.lead.refresh_from_db()
+        self.assertEqual(self.lead.status, "rejected")
+
+    def test_create_ticket_from_lead(self):
+        self.client.login(username="ma_polish", password="pass")
+        response = self.client.post(
+            reverse("ma_lead_ticket", kwargs={"lead_id": self.lead.pk}),
+            {"title": "Lead issue", "description": "Need help with onboarding"},
+        )
+        from support.models import SupportTicket
+        ticket = SupportTicket.objects.get(related_merchant=self.lead)
+        self.assertEqual(ticket.title, "Lead issue")
+        self.assertRedirects(response, reverse("ticket_detail", kwargs={"ticket_id": ticket.pk}))
+
+
+class TechSupportPortalPolishTests(TestCase):
+    """Extended tech support portal workflow tests."""
+
+    def setUp(self):
+        call_command("seed_roles")
+        User = get_user_model()
+        self.ts_user = User.objects.create_user(username="ts_polish", password="pass")
+        self.merchant = User.objects.create_user(username="ts_merchant", password="pass")
+        assign_role(self.ts_user, "tech_support")
+        assign_role(self.merchant, "merchant")
+        from support.models import SupportTicket, BugEvent
+        self.ticket = SupportTicket.objects.create(
+            title="Broken payment",
+            description="Payment failed",
+            created_by=self.merchant,
+        )
+        self.bug = BugEvent.record(
+            source=BugEvent.SRC_PAYMENT,
+            message="Webhook timeout",
+            metadata={"amount": 1000},
+        )
+
+    def test_support_dashboard_loads(self):
+        self.client.login(username="ts_polish", password="pass")
+        response = self.client.get(reverse("support_dashboard"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Support &amp; System Health")
+        self.assertContains(response, "System health pulse")
+
+    def test_assign_ticket_to_me(self):
+        self.client.login(username="ts_polish", password="pass")
+        self.client.post(reverse("ticket_assign_me", kwargs={"ticket_id": self.ticket.pk}))
+        self.ticket.refresh_from_db()
+        self.assertEqual(self.ticket.assigned_to, self.ts_user)
+        self.assertEqual(self.ticket.status, "assigned")
+
+    def test_resolve_ticket_requires_note(self):
+        self.client.login(username="ts_polish", password="pass")
+        self.client.post(reverse("ticket_resolve", kwargs={"ticket_id": self.ticket.pk}), {})
+        self.ticket.refresh_from_db()
+        self.assertNotEqual(self.ticket.status, "resolved")
+
+    def test_resolve_ticket_with_note(self):
+        self.client.login(username="ts_polish", password="pass")
+        self.client.post(
+            reverse("ticket_resolve", kwargs={"ticket_id": self.ticket.pk}),
+            {"resolution_note": "Fixed webhook config"},
+        )
+        self.ticket.refresh_from_db()
+        self.assertEqual(self.ticket.status, "resolved")
+
+    def test_convert_bug_to_ticket(self):
+        self.client.login(username="ts_polish", password="pass")
+        response = self.client.post(reverse("bug_to_ticket", kwargs={"bug_id": self.bug.pk}))
+        from support.models import SupportTicket
+        self.assertEqual(SupportTicket.objects.count(), 2)
+        new_ticket = SupportTicket.objects.order_by("-id").first()
+        self.assertRedirects(response, reverse("ticket_detail", kwargs={"ticket_id": new_ticket.pk}))
+
+    def test_mark_bug_fixed(self):
+        self.client.login(username="ts_polish", password="pass")
+        self.client.post(
+            reverse("bug_resolve", kwargs={"bug_id": self.bug.pk}),
+            {"resolution_note": "Increased timeout"},
+        )
+        self.bug.refresh_from_db()
+        self.assertEqual(self.bug.status, "fixed")
+
+    def test_ignore_bug_requires_reason(self):
+        self.client.login(username="ts_polish", password="pass")
+        self.client.post(reverse("bug_ignore", kwargs={"bug_id": self.bug.pk}), {})
+        self.bug.refresh_from_db()
+        self.assertNotEqual(self.bug.status, "ignored")
+
+    def test_merchant_cannot_access_bug_monitor(self):
+        self.client.login(username="ts_merchant", password="pass")
+        response = self.client.get(reverse("bug_monitor"))
+        self.assertEqual(response.status_code, 403)

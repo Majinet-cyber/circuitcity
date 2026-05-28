@@ -1,134 +1,231 @@
-{% extends "base/base.html" %}
-{% load ts_filters %}
+{% extends "portal/base_portal.html" %}
 
-{% block page_title %}Merchant Admin{% endblock %}
+{% block page_title %}Merchant Administration{% endblock %}
 
-{% block topbar %}
-<header class="topbar hq-topbar">
-  <div class="hq-topbar-left">
-    <a href="{% url 'ma_dashboard' %}" class="hq-brand-link" aria-label="Merchant Admin Home">
-      <span class="hq-brand-logo" aria-hidden="true">T</span>
-      <span class="hq-brand-name">TengaSale <span class="hq-brand-role">Merchant Admin</span></span>
-    </a>
-  </div>
-  <div class="hq-topbar-right">
-    <span class="hq-country-pill" title="Operating country: Malawi">
-      <svg viewBox="0 0 20 14" width="18" height="13" xmlns="http://www.w3.org/2000/svg" style="border-radius:2px;flex-shrink:0;" aria-hidden="true">
-        <rect width="20" height="14" fill="#339E35"/>
-        <rect width="20" height="9.33" fill="#CE1126"/>
-        <rect width="20" height="4.67" fill="#000000"/>
-        <g transform="translate(10,4.9)">
-          <circle r="2.4" fill="#000000"/><circle r="1.9" fill="#CE1126"/>
-          <line x1="0" y1="-3.2" x2="0" y2="-4.2" stroke="#000" stroke-width="0.6" stroke-linecap="round"/>
-          <line x1="2.26" y1="-2.26" x2="2.97" y2="-2.97" stroke="#000" stroke-width="0.6" stroke-linecap="round"/>
-          <line x1="3.2" y1="0" x2="4.2" y2="0" stroke="#000" stroke-width="0.6" stroke-linecap="round"/>
-          <line x1="-2.26" y1="-2.26" x2="-2.97" y2="-2.97" stroke="#000" stroke-width="0.6" stroke-linecap="round"/>
-          <line x1="-3.2" y1="0" x2="-4.2" y2="0" stroke="#000" stroke-width="0.6" stroke-linecap="round"/>
-        </g>
-      </svg>
-      Malawi
-    </span>
-    {% if request.user.is_authenticated %}
-      <a href="{% url 'ticket_create' %}" class="hq-icon-btn" title="Report Issue">
-        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-      </a>
-      <a href="{% url 'logout' %}" class="hq-icon-btn" title="Sign out">
-        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-      </a>
-    {% endif %}
-  </div>
-</header>
-{% endblock topbar %}
+{% block topbar %}{% include "merchant_admin/_topbar.html" %}{% endblock %}
 
 {% block content %}
-<div class="hq-page-wrap">
+<div class="portal-shell hq-page-wrap">
 
-  <div class="hq-page-hdr">
+  <div class="portal-header hq-page-hdr">
     <div>
-      <h1 class="hq-page-title">Merchant Administration</h1>
-      <p class="hq-page-sub">Onboard, verify, and support TengaSale merchants.</p>
+      <h1 class="portal-header__title hq-page-title">Merchant Administration</h1>
+      <p class="portal-header__sub hq-page-sub">Onboard, verify, and support TengaSale merchant partners.</p>
     </div>
-    <a href="{% url 'ma_leads' %}" class="hq-action-btn">
-      View All Leads
-      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+    <a href="{% url 'ma_lead_create' %}" class="hq-action-btn">
+      New Merchant Lead
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
     </a>
   </div>
 
-  <!-- KPI row -->
-  <div class="hq-kpi-row">
-    <div class="hq-kpi-card">
-      <div class="hq-kpi-val" style="color:#ff6a00">{{ new_leads }}</div>
-      <div class="hq-kpi-lbl">New Leads</div>
-    </div>
-    <div class="hq-kpi-card">
-      <div class="hq-kpi-val" style="color:#2563eb">{{ kyc_pending }}</div>
-      <div class="hq-kpi-lbl">KYC Pending</div>
-    </div>
-    <div class="hq-kpi-card">
-      <div class="hq-kpi-val" style="color:#7c3aed">{{ docs_pending }}</div>
-      <div class="hq-kpi-lbl">Docs Pending</div>
-    </div>
-    <div class="hq-kpi-card">
-      <div class="hq-kpi-val" style="color:#0891b2">{{ site_visit }}</div>
-      <div class="hq-kpi-lbl">Site Visit Needed</div>
-    </div>
-    <div class="hq-kpi-card">
-      <div class="hq-kpi-val" style="color:#d97706">{{ awaiting_hq }}</div>
-      <div class="hq-kpi-lbl">Awaiting HQ</div>
-    </div>
-    <div class="hq-kpi-card">
-      <div class="hq-kpi-val" style="color:#16a34a">{{ approved_month }}</div>
-      <div class="hq-kpi-lbl">Approved This Month</div>
-    </div>
-    <div class="hq-kpi-card">
-      <div class="hq-kpi-val" style="color:#dc2626">{{ rejected_month }}</div>
-      <div class="hq-kpi-lbl">Rejected This Month</div>
-    </div>
+  <div class="portal-status-strip">
+    {% if is_business_hours %}
+    <span class="portal-status-pill portal-status-pill--open">Business hours · Open now</span>
+    {% else %}
+    <span class="portal-status-pill portal-status-pill--closed">Business hours · Closed</span>
+    {% endif %}
+    {% if require_hq %}
+    <span class="portal-status-pill portal-status-pill--warn">HQ final approval required</span>
+    {% endif %}
+    <span class="portal-status-pill portal-status-pill--info">{{ leads_today }} lead{{ leads_today|pluralize }} today</span>
+    <span class="portal-status-pill">{{ pending_actions }} pending action{{ pending_actions|pluralize }}</span>
   </div>
 
-  <!-- Recent leads -->
-  <div class="hq-section">
-    <div class="hq-section-hdr">
-      <h2 class="hq-section-title">Recent Leads</h2>
-      <a href="{% url 'ma_leads' %}" class="hq-section-link">View all →</a>
+  <p class="portal-section-label">Key metrics</p>
+  <div class="portal-kpi-grid hq-kpi-row">
+    <a href="{% url 'ma_leads' %}?status=new" class="portal-kpi-card kpi-orange">
+      <div class="portal-kpi-card__head">
+        <div class="portal-kpi-card__icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg></div>
+      </div>
+      <div class="portal-kpi-card__val hq-kpi-val">{{ new_leads }}</div>
+      <div class="portal-kpi-card__label">New Leads</div>
+      <div class="portal-kpi-card__hint">Awaiting first contact</div>
+    </a>
+    <a href="{% url 'ma_leads' %}?status=kyc_pending" class="portal-kpi-card kpi-blue">
+      <div class="portal-kpi-card__head">
+        <div class="portal-kpi-card__icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></div>
+      </div>
+      <div class="portal-kpi-card__val">{{ kyc_pending }}</div>
+      <div class="portal-kpi-card__label">KYC Pending</div>
+      <div class="portal-kpi-card__hint">Identity &amp; shop details</div>
+    </a>
+    <a href="{% url 'ma_leads' %}?status=documents_pending" class="portal-kpi-card kpi-purple">
+      <div class="portal-kpi-card__head">
+        <div class="portal-kpi-card__icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg></div>
+      </div>
+      <div class="portal-kpi-card__val">{{ docs_pending }}</div>
+      <div class="portal-kpi-card__label">Documents Pending</div>
+      <div class="portal-kpi-card__hint">Certificates &amp; photos</div>
+    </a>
+    <a href="{% url 'ma_leads' %}?status=site_visit_needed" class="portal-kpi-card kpi-cyan">
+      <div class="portal-kpi-card__head">
+        <div class="portal-kpi-card__icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></div>
+      </div>
+      <div class="portal-kpi-card__val">{{ site_visit }}</div>
+      <div class="portal-kpi-card__label">Site Visit Needed</div>
+      <div class="portal-kpi-card__hint">Physical verification</div>
+    </a>
+    <a href="{% url 'ma_leads' %}?status=awaiting_hq" class="portal-kpi-card kpi-amber">
+      <div class="portal-kpi-card__head">
+        <div class="portal-kpi-card__icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
+      </div>
+      <div class="portal-kpi-card__val">{{ awaiting_hq }}</div>
+      <div class="portal-kpi-card__label">Awaiting HQ Approval</div>
+      <div class="portal-kpi-card__hint">Final sign-off queue</div>
+    </a>
+    <div class="portal-kpi-card kpi-green">
+      <div class="portal-kpi-card__head">
+        <div class="portal-kpi-card__icon"><svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></div>
+      </div>
+      <div class="portal-kpi-card__val">{{ approved_month }}</div>
+      <div class="portal-kpi-card__label">Approved This Month</div>
+      <div class="portal-kpi-card__hint">Successfully onboarded</div>
     </div>
+    <div class="portal-kpi-card kpi-red">
+      <div class="portal-kpi-card__head">
+        <div class="portal-kpi-card__icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg></div>
+      </div>
+      <div class="portal-kpi-card__val">{{ rejected_month }}</div>
+      <div class="portal-kpi-card__label">Rejected This Month</div>
+      <div class="portal-kpi-card__hint">Did not pass verification</div>
+    </div>
+    <a href="{% url 'ticket_list' %}?category=merchant_onboarding" class="portal-kpi-card kpi-indigo">
+      <div class="portal-kpi-card__head">
+        <div class="portal-kpi-card__icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
+      </div>
+      <div class="portal-kpi-card__val">{{ my_tickets }}</div>
+      <div class="portal-kpi-card__label">Tickets Assigned to Me</div>
+      <div class="portal-kpi-card__hint">Open merchant support</div>
+    </a>
+  </div>
+
+  <p class="portal-section-label">Merchant onboarding pipeline</p>
+  <div class="portal-pipeline">
+    {% for stage in pipeline %}
+    {% if not forloop.first %}<span class="portal-pipeline__arrow" aria-hidden="true">→</span>{% endif %}
+    <a href="{% url 'ma_leads' %}?status={{ stage.key }}" class="portal-pipeline__stage{% if stage.count %} portal-pipeline__stage--active{% endif %}">
+      <div class="portal-pipeline__count">{{ stage.count }}</div>
+      <div class="portal-pipeline__label">{{ stage.label }}</div>
+    </a>
+    {% endfor %}
+  </div>
+
+  <p class="portal-section-label">Action center</p>
+  <div class="portal-action-grid hq-quick-row">
+    <a href="{% url 'ma_leads' %}?status=new" class="portal-action-card hq-quick-card">
+      <div class="portal-action-card__icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg></div>
+      <div class="portal-action-card__body">
+        <p class="portal-action-card__title">Review New Leads</p>
+        <p class="portal-action-card__desc">{{ new_leads }} waiting for first response</p>
+      </div>
+    </a>
+    <a href="{% url 'ma_leads' %}?status=documents_pending" class="portal-action-card hq-quick-card">
+      <div class="portal-action-card__icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div>
+      <div class="portal-action-card__body">
+        <p class="portal-action-card__title">Verify Documents</p>
+        <p class="portal-action-card__desc">Check certificates and shop photos</p>
+      </div>
+    </a>
+    <a href="{% url 'ma_leads' %}?status=site_visit_needed" class="portal-action-card hq-quick-card">
+      <div class="portal-action-card__icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></div>
+      <div class="portal-action-card__body">
+        <p class="portal-action-card__title">Schedule Site Visit</p>
+        <p class="portal-action-card__desc">{{ site_visit }} shops need physical check</p>
+      </div>
+    </a>
+    <a href="{% url 'ma_leads' %}?status=awaiting_hq" class="portal-action-card hq-quick-card">
+      <div class="portal-action-card__icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+      <div class="portal-action-card__body">
+        <p class="portal-action-card__title">Awaiting HQ Approval</p>
+        <p class="portal-action-card__desc">{{ awaiting_hq }} recommended for HQ review</p>
+      </div>
+    </a>
+    <a href="{% url 'ticket_list' %}?category=merchant_onboarding" class="portal-action-card hq-quick-card">
+      <div class="portal-action-card__icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
+      <div class="portal-action-card__body">
+        <p class="portal-action-card__title">Merchant Support Tickets</p>
+        <p class="portal-action-card__desc">Onboarding issues reported by staff</p>
+      </div>
+    </a>
+    <a href="{% url 'ma_leads' %}?status=rejected" class="portal-action-card hq-quick-card">
+      <div class="portal-action-card__icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div>
+      <div class="portal-action-card__body">
+        <p class="portal-action-card__title">Merchant Risk Flags</p>
+        <p class="portal-action-card__desc">Rejected or suspended leads</p>
+      </div>
+    </a>
+  </div>
+
+  <div class="portal-table-card hq-section portal-table-card--mobile-cards">
+    <div class="portal-table-card__hdr hq-section-hdr">
+      <h2 class="portal-table-card__title hq-section-title">Recent Leads</h2>
+      <a href="{% url 'ma_leads' %}" class="portal-table-card__link hq-section-link">View all</a>
+    </div>
+    {% if recent_leads %}
     <div class="hq-table-wrap">
       <table class="hq-table">
         <thead>
           <tr>
-            <th>Business</th><th>Owner</th><th>District</th><th>Status</th><th>Created</th><th></th>
+            <th>Merchant / Shop</th>
+            <th>Owner</th>
+            <th>Location</th>
+            <th>Status</th>
+            <th>Created</th>
+            <th>Next Action</th>
+            <th>Actions</th>
           </tr>
         </thead>
         <tbody>
           {% for lead in recent_leads %}
           <tr>
-            <td><strong>{{ lead.business_name }}</strong></td>
-            <td>{{ lead.owner_full_name }}</td>
-            <td>{{ lead.district }}</td>
-            <td>
-              <span class="hq-badge
-                {% if lead.status == 'new' %}hq-badge--orange
-                {% elif lead.status == 'approved' %}hq-badge--green
-                {% elif lead.status == 'rejected' %}hq-badge--red
-                {% elif lead.status == 'awaiting_hq' %}hq-badge--yellow
-                {% else %}hq-badge--gray{% endif %}">
-                {{ lead.get_status_display }}
-              </span>
+            <td data-label="Merchant"><strong>{{ lead.business_name }}</strong></td>
+            <td data-label="Owner">{{ lead.owner_full_name }}</td>
+            <td data-label="Location">{{ lead.district }}{% if lead.area %}, {{ lead.area }}{% endif %}</td>
+            <td data-label="Status">{% include "portal/_status_badge.html" with status=lead.status label=lead.get_status_display %}</td>
+            <td data-label="Created" class="hq-td-muted">{{ lead.created_at|date:"d M Y" }}</td>
+            <td data-label="Next Action" class="hq-td-muted">
+              {% if lead.status == 'new' %}Contact lead
+              {% elif lead.status == 'contacted' %}Start KYC
+              {% elif lead.status == 'kyc_pending' %}Complete KYC
+              {% elif lead.status == 'documents_pending' %}Upload documents
+              {% elif lead.status == 'site_visit_needed' %}Schedule site visit
+              {% elif lead.status == 'awaiting_hq' %}Await HQ approval
+              {% elif lead.status == 'approved' %}Onboard merchant
+              {% else %}Review lead{% endif %}
             </td>
-            <td class="hq-td-muted">{{ lead.created_at|date:"d M Y" }}</td>
-            <td><a href="{% url 'ma_lead_detail' lead.id %}" class="hq-table-link">View →</a></td>
+            <td data-label="Actions">
+              <div class="portal-inline-actions">
+                <a href="{% url 'ma_lead_detail' lead.id %}" class="hq-btn hq-btn--ghost hq-btn--sm">View</a>
+                <a href="{% url 'ma_lead_detail' lead.id %}#kyc" class="hq-btn hq-btn--ghost hq-btn--sm">KYC</a>
+                {% if lead.status != 'awaiting_hq' and lead.status != 'approved' and lead.status != 'rejected' %}
+                <form method="post" action="{% url 'ma_recommend' lead.id %}">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="escalate">
+                  <button type="submit" class="hq-btn hq-btn--ghost hq-btn--sm">HQ</button>
+                </form>
+                {% endif %}
+              </div>
+            </td>
           </tr>
-          {% empty %}
-          <tr><td colspan="6" class="hq-td-empty">No merchant leads yet.</td></tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
+    {% else %}
+    <div class="empty-state">
+      <div class="empty-state__icon">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+      </div>
+      <h3 class="empty-state__title">No merchant leads yet</h3>
+      <p class="empty-state__text">New merchant signups from the public website will appear here.</p>
+      <a href="{% url 'ma_lead_create' %}" class="hq-btn hq-btn--primary">Create Manual Lead</a>
+    </div>
+    {% endif %}
   </div>
 
   {% if require_hq %}
   <div class="hq-info-banner">
-    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
     HQ approval is required before merchants are activated. You can recommend approval — HQ gives the final sign-off.
   </div>
   {% endif %}

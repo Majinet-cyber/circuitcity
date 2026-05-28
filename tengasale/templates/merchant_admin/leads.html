@@ -1,21 +1,21 @@
-{% extends "base/base.html" %}
-{% load ts_filters %}
+{% extends "portal/base_portal.html" %}
 
 {% block page_title %}Merchant Leads{% endblock %}
 
 {% block topbar %}{% include "merchant_admin/_topbar.html" %}{% endblock %}
 
 {% block content %}
-<div class="hq-page-wrap">
+<div class="portal-shell hq-page-wrap">
 
-  <div class="hq-page-hdr">
+  <div class="portal-header hq-page-hdr">
     <div>
       <a href="{% url 'ma_dashboard' %}" class="hq-back-link">← Dashboard</a>
-      <h1 class="hq-page-title">Merchant Leads</h1>
+      <h1 class="portal-header__title hq-page-title">Merchant Leads</h1>
+      <p class="portal-header__sub hq-page-sub">Browse and manage all merchant onboarding leads.</p>
     </div>
+    <a href="{% url 'ma_lead_create' %}" class="hq-action-btn">New Lead</a>
   </div>
 
-  <!-- Status filter tabs -->
   <div class="hq-tab-row">
     <a href="{% url 'ma_leads' %}" class="hq-tab {% if not status_filter %}hq-tab--active{% endif %}">All</a>
     {% for val, label in status_choices %}
@@ -23,41 +23,41 @@
     {% endfor %}
   </div>
 
-  <div class="hq-table-wrap">
-    <table class="hq-table">
-      <thead>
-        <tr>
-          <th>#</th><th>Business</th><th>Owner</th><th>Phone</th><th>District</th><th>Type</th><th>Status</th><th>Assigned</th><th>Created</th><th></th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for lead in leads %}
-        <tr>
-          <td class="hq-td-muted">{{ lead.id }}</td>
-          <td><strong>{{ lead.business_name }}</strong></td>
-          <td>{{ lead.owner_full_name }}</td>
-          <td>{{ lead.phone }}</td>
-          <td>{{ lead.district }}</td>
-          <td>{{ lead.get_business_type_display }}</td>
-          <td>
-            <span class="hq-badge
-              {% if lead.status == 'new' %}hq-badge--orange
-              {% elif lead.status == 'approved' %}hq-badge--green
-              {% elif lead.status == 'rejected' %}hq-badge--red
-              {% elif lead.status == 'awaiting_hq' %}hq-badge--yellow
-              {% else %}hq-badge--gray{% endif %}">
-              {{ lead.get_status_display }}
-            </span>
-          </td>
-          <td class="hq-td-muted">{{ lead.assigned_to.username|default:"—" }}</td>
-          <td class="hq-td-muted">{{ lead.created_at|date:"d M Y" }}</td>
-          <td><a href="{% url 'ma_lead_detail' lead.id %}" class="hq-table-link">Open →</a></td>
-        </tr>
-        {% empty %}
-        <tr><td colspan="10" class="hq-td-empty">No leads found{% if status_filter %} with status "{{ status_filter }}"{% endif %}.</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
+  <div class="portal-table-card hq-section portal-table-card--mobile-cards">
+    {% if leads %}
+    <div class="hq-table-wrap">
+      <table class="hq-table">
+        <thead>
+          <tr>
+            <th>#</th><th>Business</th><th>Owner</th><th>Phone</th><th>District</th><th>Type</th><th>Status</th><th>Assigned</th><th>Created</th><th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for lead in leads %}
+          <tr>
+            <td data-label="#" class="hq-td-muted">{{ lead.id }}</td>
+            <td data-label="Business"><strong>{{ lead.business_name }}</strong></td>
+            <td data-label="Owner">{{ lead.owner_full_name }}</td>
+            <td data-label="Phone">{{ lead.phone }}</td>
+            <td data-label="District">{{ lead.district }}</td>
+            <td data-label="Type">{{ lead.get_business_type_display }}</td>
+            <td data-label="Status">{% include "portal/_status_badge.html" with status=lead.status label=lead.get_status_display %}</td>
+            <td data-label="Assigned" class="hq-td-muted">{{ lead.assigned_to.username|default:"—" }}</td>
+            <td data-label="Created" class="hq-td-muted">{{ lead.created_at|date:"d M Y" }}</td>
+            <td data-label=""><a href="{% url 'ma_lead_detail' lead.id %}" class="hq-btn hq-btn--ghost hq-btn--sm">Open</a></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+      <div class="empty-state__icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg></div>
+      <h3 class="empty-state__title">No leads found</h3>
+      <p class="empty-state__text">{% if status_filter %}No leads match this status filter.{% else %}Create a manual lead to get started.{% endif %}</p>
+      <a href="{% url 'ma_lead_create' %}" class="hq-btn hq-btn--primary">Create Manual Lead</a>
+    </div>
+    {% endif %}
   </div>
 
 </div>
