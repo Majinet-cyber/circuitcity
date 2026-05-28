@@ -1,0 +1,173 @@
+{% extends "website/site_base.html" %}
+{% load static %}
+
+{% block site_title %}Privacy Policy — TengaSale{% endblock %}
+{% block site_description %}TengaSale Privacy Policy describing how we collect, use, store, and protect personal and financial data on the TengaSale platform.{% endblock %}
+
+{% block site_content %}
+
+<div class="legal-hero">
+  <div class="legal-hero__inner">
+    <div class="legal-hero__eyebrow">Legal</div>
+    <h1 class="legal-hero__title">Privacy Policy</h1>
+    <p class="legal-hero__updated">Last updated: May 2026</p>
+  </div>
+</div>
+
+<nav class="legal-nav" aria-label="Legal pages">
+  <div class="legal-nav__inner">
+    <a href="{% url 'website_terms' %}" class="legal-nav__link">Terms of Service</a>
+    <a href="{% url 'website_privacy' %}" class="legal-nav__link legal-nav__link--active">Privacy Policy</a>
+    <a href="{% url 'website_payment_terms' %}" class="legal-nav__link">Payment Terms</a>
+    <a href="{% url 'website_merchant_terms' %}" class="legal-nav__link">Merchant Terms</a>
+  </div>
+</nav>
+
+<div class="legal-body">
+
+  <h2>1. Introduction</h2>
+  <p>
+    TengaSale ("we", "us", "our") is committed to protecting the privacy of individuals
+    who use the TengaSale platform, including customers who apply for device financing and
+    merchants who operate through the platform. This Privacy Policy explains what personal
+    information we collect, how we use it, and your rights in relation to it.
+  </p>
+  <p>
+    By using the TengaSale platform, you agree to the collection and use of your information
+    as described in this policy. If you do not agree, you should not use the platform.
+  </p>
+
+  <h2>2. Information We Collect</h2>
+
+  <h3>From customers</h3>
+  <ul>
+    <li><strong>Identity information:</strong> Full name, National ID number, date of birth, and any other information provided during the KYC process.</li>
+    <li><strong>Contact information:</strong> Phone number, address, and any contact details provided during application.</li>
+    <li><strong>KYC documents:</strong> Copies of identity documents (National ID or equivalent) submitted as part of the application process.</li>
+    <li><strong>Contract information:</strong> Device details, contract number, financing terms, repayment schedule, and contract status.</li>
+    <li><strong>Payment records:</strong> Payment amounts, dates, provider references, and payment status for all transactions made under your contract.</li>
+    <li><strong>Device information:</strong> Device IMEI number, model, and status information where device management is enabled.</li>
+  </ul>
+
+  <h3>From merchants</h3>
+  <ul>
+    <li>Business name, registration details, and contact information.</li>
+    <li>Operational records including applications submitted, contracts created, and actions taken through the platform.</li>
+    <li>Login and access records including timestamps and IP addresses.</li>
+  </ul>
+
+  <h3>Automatically collected</h3>
+  <ul>
+    <li>Log data including IP addresses, browser type, pages visited, and timestamps when you access the platform.</li>
+    <li>Device information relevant to the payment portal session (browser, operating system).</li>
+  </ul>
+
+  <h2>3. KYC and Identity Information</h2>
+  <p>
+    KYC (Know Your Customer) information is collected to verify your identity as required
+    for financing operations. This includes your National ID number and copies of identity
+    documents. KYC information is:
+  </p>
+  <ul>
+    <li>Collected at the point of application by the merchant, on behalf of TengaSale;</li>
+    <li>Stored securely and linked to your financing contract record;</li>
+    <li>Used only for identity verification, contract management, and compliance purposes;</li>
+    <li>Not shared with third parties except as described in this policy.</li>
+  </ul>
+
+  <h2>4. Transaction and Payment Records</h2>
+  <p>
+    All payment transactions processed through the platform are recorded. This includes
+    the amount, date, provider reference, payment channel, and status of each transaction.
+    These records are maintained for:
+  </p>
+  <ul>
+    <li>Contract reconciliation and balance tracking;</li>
+    <li>Proof of payment in the event of disputes;</li>
+    <li>Audit and compliance purposes;</li>
+    <li>Operational reporting and platform oversight.</li>
+  </ul>
+
+  <h2>5. How We Use Your Information</h2>
+  <p>We use the information we collect for the following purposes:</p>
+  <ul>
+    <li>To process financing applications and make underwriting decisions;</li>
+    <li>To create, manage, and track financing contracts;</li>
+    <li>To process payments and reconcile contract balances;</li>
+    <li>To verify your identity and comply with KYC obligations;</li>
+    <li>To communicate with you about your contract, payments, or account status;</li>
+    <li>To support merchants in managing their customer portfolio;</li>
+    <li>To investigate disputes, fraud, or breach of contract;</li>
+    <li>To maintain audit logs and comply with applicable laws and regulations;</li>
+    <li>To operate, improve, and secure the platform.</li>
+  </ul>
+
+  <h2>6. Sharing of Information</h2>
+  <p>We may share your information in the following circumstances:</p>
+  <ul>
+    <li><strong>With merchants:</strong> Merchants who created your financing contract have access to your contract details and repayment status. This is necessary for them to support you and manage their portfolio.</li>
+    <li><strong>With payment providers:</strong> Your payment details are shared with mobile money providers (Airtel Money, TNM Mpamba) and payment gateways (PayChangu, PayTrigger) only as necessary to process your transactions.</li>
+    <li><strong>With device management providers:</strong> Where MDM or device locking services are enabled for your contract, relevant device and contract details may be shared with the applicable provider.</li>
+    <li><strong>For legal compliance:</strong> We may disclose information when required to do so by law, court order, or regulatory authority.</li>
+    <li><strong>In dispute resolution:</strong> We may share relevant records with legal or mediation bodies in the context of a dispute.</li>
+  </ul>
+  <p>
+    We do not sell or rent your personal information to third parties for marketing purposes.
+  </p>
+
+  <h2>7. Data Retention and Security</h2>
+  <p>
+    We retain personal and contract information for the duration of your contract and for
+    a minimum of five (5) years following the completion or termination of the contract,
+    or as otherwise required by applicable Malawi law or regulation.
+  </p>
+  <p>
+    We implement appropriate technical and organisational measures to protect your information
+    against unauthorised access, alteration, disclosure, or destruction. These include:
+  </p>
+  <ul>
+    <li>Encrypted storage and transmission of sensitive data;</li>
+    <li>Role-based access controls limiting data access to authorised users only;</li>
+    <li>Audit logging of all data access and modification events;</li>
+    <li>Regular review of access permissions and security configurations.</li>
+  </ul>
+  <p>
+    No method of electronic storage or transmission is completely secure. While we strive
+    to use commercially acceptable means to protect your information, we cannot guarantee
+    absolute security.
+  </p>
+
+  <h2>8. Your Rights</h2>
+  <p>
+    You have the right to request access to the personal information we hold about you.
+    You may also request correction of inaccurate information or, in certain circumstances,
+    deletion of your data — subject to our legal and contractual obligations to retain records.
+  </p>
+  <p>
+    To make a data request, contact us at <a href="mailto:support@tengasale.africa">support@tengasale.africa</a>.
+    We will respond to requests within a reasonable timeframe.
+  </p>
+
+  <h2>9. Cookies and Tracking</h2>
+  <p>
+    The TengaSale platform may use session cookies to maintain your login state and manage
+    platform functionality. We do not use cookies for third-party advertising or tracking.
+    The payment portal does not cache sensitive contract data in the browser.
+  </p>
+
+  <h2>10. Changes to This Policy</h2>
+  <p>
+    We may update this Privacy Policy from time to time. Changes will be published on this
+    page with an updated date. Your continued use of the platform after changes are posted
+    constitutes your acceptance of the revised policy.
+  </p>
+
+  <h2>11. Contact Information</h2>
+  <p>
+    For privacy-related queries, contact TengaSale at:<br>
+    <a href="mailto:support@tengasale.africa">support@tengasale.africa</a>
+  </p>
+
+</div>
+
+{% endblock %}

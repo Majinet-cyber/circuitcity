@@ -175,6 +175,18 @@ ENABLE_UPYA = os.environ.get("ENABLE_UPYA", "false").lower() == "true"
 ENABLE_PAYTRIGGER = os.environ.get("ENABLE_PAYTRIGGER", "false").lower() == "true"
 ENABLE_PAYCHANGU = os.environ.get("ENABLE_PAYCHANGU", "false").lower() == "true"
 
+# Knox MDM
+KNOX_API_KEY = os.environ.get("KNOX_API_KEY", "")
+KNOX_API_URL = os.environ.get("KNOX_API_URL", "https://api.samsungknox.com")
+
+# NuovoPay MDM
+NUOVOPAY_API_KEY = os.environ.get("NUOVOPAY_API_KEY", "")
+NUOVOPAY_API_URL = os.environ.get("NUOVOPAY_API_URL", "https://api.nuovopay.com")
+
+# File upload security
+MAX_UPLOAD_SIZE_MB = int(os.environ.get("MAX_UPLOAD_SIZE_MB", "5"))
+ALLOWED_KYC_MIME_TYPES = ["image/jpeg", "image/png", "image/webp", "application/pdf"]
+
 APP_VERSION = "1.0.0"
 
 if "test" in sys.argv:

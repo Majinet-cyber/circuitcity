@@ -1,0 +1,40 @@
+{% extends "base/base.html" %}
+
+{% block content %}
+
+<a href="{% url 'financing_pending_payments' %}" class="back-link">BACK</a>
+<h1 class="greeting">Verify payment</h1>
+
+<section class="stat-card">
+    <span>{{ payment.customer.full_name }}</span>
+    <strong>MWK {{ payment.amount|floatformat:0 }}</strong>
+    <p>{{ payment.get_payment_method_display }} | {{ payment.transaction_reference|default:"No reference" }}</p>
+</section>
+
+<section class="card">
+    <h2>Payment details</h2>
+    <div class="detail-list">
+        <span>Contract</span><strong>#{{ payment.contract.id }}</strong>
+        <span>Device</span><strong>{{ payment.contract.device.brand }} {{ payment.contract.device.model }}</strong>
+        <span>IMEI</span><strong>{{ payment.contract.device.masked_imei }}</strong>
+        <span>Status</span><strong>{{ payment.get_verification_status_display }}</strong>
+    </div>
+    {% if payment.proof_upload %}
+        <a class="btn btn-outline" href="{{ payment.proof_upload.url }}">VIEW PROOF</a>
+    {% endif %}
+</section>
+
+{% if payment.verification_status == "pending" %}
+    <form method="post" action="{% url 'financing_approve_payment' payment.id %}" class="action-form">
+        {% csrf_token %}
+        <button class="btn" type="submit">APPROVE PAYMENT</button>
+    </form>
+    <form method="post" action="{% url 'financing_reject_payment' payment.id %}" class="card action-form">
+        {% csrf_token %}
+        <h2>Reject payment</h2>
+        {{ reject_form.rejection_reason }}
+        <button class="btn btn-danger" type="submit">REJECT PAYMENT</button>
+    </form>
+{% endif %}
+
+{% endblock %}

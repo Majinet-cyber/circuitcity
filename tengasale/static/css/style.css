@@ -1,6 +1,24 @@
 :root {
+    /* ?? TengaSale design tokens ?? */
     --orange: #ff6a00;
     --orange-dark: #df5600;
+    --orange-soft: rgba(255, 106, 0, 0.10);
+
+    /* --ts-* aliases for cross-app consistency */
+    --ts-orange: #ff6a00;
+    --ts-orange-dark: #df5600;
+    --ts-orange-soft: rgba(255, 106, 0, 0.10);
+    --ts-black: #111111;
+    --ts-white: #ffffff;
+    --ts-bg: #f5f6f8;
+    --ts-muted: #7a828c;
+    --ts-border: #e4e7eb;
+    --ts-success: #168a45;
+    --ts-danger: #d93025;
+    --ts-warning: #ff6a00;
+    --ts-info: #0277bd;
+
+    /* Legacy / app-wide tokens */
     --black: #111111;
     --ink-soft: #3a3f45;
     --blue-gray: #60758a;
@@ -2291,7 +2309,7 @@ textarea:focus {
 }
 
 /* ============================================================
-   SALES APP COMPONENTS — Phase 1
+   SALES APP COMPONENTS ? Phase 1
    ============================================================ */
 
 /* Greeting */
@@ -3304,7 +3322,7 @@ textarea:focus {
 [x-cloak] { display: none !important; }
 
 /* ============================================================
-   PORTAL COMPONENTS — Phase 2
+   PORTAL COMPONENTS ? Phase 2
    ============================================================ */
 
 /* Contract Card */
@@ -3486,4 +3504,194 @@ textarea:focus {
     width: auto;
     display: block;
     object-fit: contain;
+}
+
+/* ============================================================
+   PORTAL SUPPORT CARD
+   Lives here (style.css) so portal pages can use it.
+   website.css duplicates these rules for the public site.
+   ============================================================ */
+
+.portal-support-card {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.portal-support-card__title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    margin-bottom: 2px;
+}
+
+.portal-support-card__desc {
+    font-size: 13px;
+    color: var(--ink-soft);
+    line-height: 1.5;
+    margin: 0 0 4px;
+}
+
+.portal-support-link {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 13px 14px;
+    background: var(--app-bg);
+    border-radius: 12px;
+    font-size: 14px;
+    font-weight: 700;
+    text-decoration: none;
+    color: var(--black);
+    border: 1.5px solid var(--border);
+    transition: background 0.12s, border-color 0.12s;
+    min-height: 48px;
+}
+
+.portal-support-link:hover {
+    background: var(--border);
+    border-color: var(--muted);
+}
+
+/* Hard cap: ALL SVGs inside support links must be icon-sized */
+.portal-support-link svg {
+    width: 18px !important;
+    height: 18px !important;
+    min-width: 18px;
+    min-height: 18px;
+    max-width: 18px;
+    max-height: 18px;
+    flex-shrink: 0;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.portal-support-link--whatsapp {
+    color: #168a45;
+    border-color: rgba(22, 138, 69, 0.2);
+    background: rgba(22, 138, 69, 0.05);
+}
+
+.portal-support-link--whatsapp:hover {
+    background: rgba(22, 138, 69, 0.10);
+    border-color: rgba(22, 138, 69, 0.5);
+}
+
+/* WhatsApp icon is a filled SVG, not stroked */
+.portal-support-link--whatsapp svg {
+    stroke: none;
+    fill: #168a45;
+}
+
+/* ============================================================
+   MOBILE-FIRST RESPONSIVE ? Phase 6
+   Audited at 360px, 390px, 414px, 768px
+   ============================================================ */
+
+/* Ensure the app shell never causes horizontal overflow */
+.app-shell {
+    overflow-x: hidden;
+}
+
+/* Tables should scroll horizontally on small screens */
+.table-scroll-x {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+table {
+    min-width: 100%;
+}
+
+/* Stack table rows on very small screens */
+@media (max-width: 480px) {
+    .stacked-table thead {
+        display: none;
+    }
+
+    .stacked-table tr {
+        display: block;
+        border: 1.5px solid var(--border);
+        border-radius: 16px;
+        padding: 12px 14px;
+        margin-bottom: 10px;
+        background: var(--surface);
+    }
+
+    .stacked-table td {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border: none;
+        padding: 5px 0;
+        font-size: 14px;
+    }
+
+    .stacked-table td::before {
+        content: attr(data-label);
+        font-size: 11px;
+        font-weight: 700;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        flex-shrink: 0;
+        margin-right: 12px;
+    }
+}
+
+/* Improve button touch targets on mobile */
+@media (max-width: 520px) {
+    .btn, .submit-btn {
+        min-height: 48px;
+        font-size: 16px;
+    }
+
+    /* Prevent topbar text from overflowing */
+    .topbar {
+        min-height: 64px;
+        padding: 10px 14px;
+    }
+
+    .brand-title {
+        font-size: 17px;
+    }
+
+    /* Cards full-width */
+    .review-card,
+    .application-card,
+    .wallet-card {
+        border-radius: 16px;
+    }
+
+    /* Reduce oversized headings */
+    .page-title {
+        font-size: 18px;
+    }
+
+    /* Portal quick-amount buttons ? 2 cols on very small screens */
+    .quick-amounts {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    /* Early settlement options ? single column */
+    .early-options-grid {
+        grid-template-columns: 1fr !important;
+    }
+}
+
+/* Landscape / 768px tweaks */
+@media (min-width: 768px) {
+    .app-shell {
+        max-width: 760px;
+    }
+}
+
+/* Prevent footer/version text from overlapping content */
+.app-footer-version {
+    padding-bottom: env(safe-area-inset-bottom, 16px);
 }

@@ -1,46 +1,55 @@
-{% extends "base/base.html" %}
+{% extends "sales/base.html" %}
 {% load static %}
 
 {% block page_title %}Customer Call — {{ app.application_number }}{% endblock %}
 
 {% block content %}
-<div class="page-back-row">
-  <a href="{% url 'sales_address_check' app.id %}" class="back-link">
-    <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
-    Back
-  </a>
-  <span class="page-label">Customer Call</span>
-</div>
+<div class="sales-main">
 
-{% include "sales/_step_bar.html" with step=step total_steps=total_steps %}
-
-<div class="section-description">
-  Call the customer and verify they understand their contract obligations.
-</div>
-
-<div class="glass-card review-card mb-8">
-  <div class="review-row"><span>Customer</span><strong>{{ app.customer_name }}</strong></div>
-  <div class="review-row"><span>Phone</span><strong>+265 {{ app.customer_phone }}</strong></div>
-  {% if app.deal %}
-    <div class="review-row"><span>Daily Price</span><strong>MWK {{ app.calculated_daily_payment|floatformat:2 }}</strong></div>
-    <div class="review-row"><span>30-Day Price</span><strong>MWK {{ app.calculated_monthly_payment|floatformat:0 }}</strong></div>
-    <div class="review-row"><span>Total Contract</span><strong>MWK {{ app.calculated_total_loan|floatformat:0 }}</strong></div>
-  {% endif %}
-</div>
-
-<form method="post">
-  {% csrf_token %}
-  <div class="glass-card">
-    <div class="review-card__title">Call Checklist</div>
-    {% include "sales/_yes_no.html" with field_name="customer_spoken" label="Did you speak to the customer?" current_value=review.customer_spoken %}
-    {% include "sales/_yes_no.html" with field_name="customer_intro_done" label="Did you introduce TengaSale and explain the financing?" current_value=review.customer_intro_done %}
-    {% include "sales/_yes_no.html" with field_name="customer_confirmed_application" label="Did the customer confirm they applied for themselves?" current_value=review.customer_confirmed_application %}
-    {% include "sales/_yes_no.html" with field_name="customer_confirmed_device" label="Did the customer confirm the chosen device?" current_value=review.customer_confirmed_device %}
-    {% include "sales/_yes_no.html" with field_name="customer_confirmed_deposit" label="Did the customer understand and confirm the deposit amount?" current_value=review.customer_confirmed_deposit %}
-    {% include "sales/_yes_no.html" with field_name="customer_confirmed_repayment" label="Did the customer understand the daily/monthly repayment?" current_value=review.customer_confirmed_repayment %}
-    {% include "sales/_yes_no.html" with field_name="customer_understands_direct_payment" label="Did the customer understand payments must be made directly to TengaSale?" current_value=review.customer_understands_direct_payment %}
-    {% include "sales/_yes_no.html" with field_name="customer_understands_nonpayment" label="Did the customer understand the device may lock if payments are missed?" current_value=review.customer_understands_nonpayment %}
+  <div class="ts-back-row">
+    <a href="{% url 'sales_address_check' app.id %}" class="ts-back-btn">
+      <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+      Back
+    </a>
   </div>
-  <button type="submit" class="btn-primary btn-full mt-16">Continue to Income Check →</button>
-</form>
+
+  {% include "sales/_step_bar.html" with step=step total_steps=total_steps %}
+
+  <p class="ts-section-desc">Call the customer and verify they understand their TengaSale contract obligations.</p>
+
+  <div class="ts-review-card ts-mb-8">
+    <div class="ts-review-row"><span>Customer</span><strong>{{ app.customer_name }}</strong></div>
+    <div class="ts-review-row"><span>Phone</span><strong>+265 {{ app.customer_phone }}</strong></div>
+    {% if app.deal %}
+      <div class="ts-review-row"><span>Daily Price</span><strong>MWK {{ app.calculated_daily_payment|floatformat:2 }}</strong></div>
+      <div class="ts-review-row"><span>30-Day Price</span><strong>MWK {{ app.calculated_monthly_payment|floatformat:0 }}</strong></div>
+      <div class="ts-review-row"><span>Total Contract</span><strong>MWK {{ app.calculated_total_loan|floatformat:0 }}</strong></div>
+    {% endif %}
+  </div>
+
+  <div class="ts-call-script ts-mb-8">
+    <div class="ts-call-script__label">Suggested Introduction</div>
+    <p class="ts-call-script__text">
+      "Hi {{ app.customer_name }}, I am {{ request.user.get_full_name|default:request.user.username }} from TengaSale.
+      I am reviewing your phone-financing application and confirming that you understand your TengaSale contract."
+    </p>
+  </div>
+
+  <form method="post">
+    {% csrf_token %}
+    <div class="ts-review-card">
+      <div class="ts-review-card__title">Call Checklist</div>
+      {% include "sales/_yes_no.html" with field_name="customer_spoken" label="Did you speak to the customer?" current_value=review.customer_spoken %}
+      {% include "sales/_yes_no.html" with field_name="customer_intro_done" label="Did you introduce TengaSale and explain the financing?" current_value=review.customer_intro_done %}
+      {% include "sales/_yes_no.html" with field_name="customer_confirmed_application" label="Did the customer confirm they applied for themselves?" current_value=review.customer_confirmed_application %}
+      {% include "sales/_yes_no.html" with field_name="customer_confirmed_device" label="Did the customer confirm the chosen device?" current_value=review.customer_confirmed_device %}
+      {% include "sales/_yes_no.html" with field_name="customer_confirmed_deposit" label="Did the customer understand and confirm the deposit amount?" current_value=review.customer_confirmed_deposit %}
+      {% include "sales/_yes_no.html" with field_name="customer_confirmed_repayment" label="Did the customer understand the daily/monthly repayment?" current_value=review.customer_confirmed_repayment %}
+      {% include "sales/_yes_no.html" with field_name="customer_understands_direct_payment" label="Did the customer understand payments must be made directly to TengaSale?" current_value=review.customer_understands_direct_payment %}
+      {% include "sales/_yes_no.html" with field_name="customer_understands_nonpayment" label="Did the customer understand the device may lock if payments are missed?" current_value=review.customer_understands_nonpayment %}
+    </div>
+    <button type="submit" class="ts-btn-primary ts-btn-full ts-mt-16">Continue to Income Check →</button>
+  </form>
+
+</div>
 {% endblock %}

@@ -83,24 +83,30 @@ class AuditLog(models.Model):
 
     ACTION_APPROVE = "approve"
     ACTION_REJECT = "reject"
+    ACTION_PAYMENT = "payment"
     ACTION_PAYMENT_STATUS = "payment_status_change"
     ACTION_DEVICE_LOCK = "device_lock"
     ACTION_DEVICE_UNLOCK = "device_unlock"
+    ACTION_DEVICE_ENROLL = "device_enroll"
     ACTION_KYC_CHANGE = "kyc_change"
     ACTION_CONTRACT_CREATE = "contract_create"
     ACTION_CLAIM = "claim_application"
     ACTION_PAYOUT = "payout_request"
+    ACTION_WEBHOOK = "webhook_received"
 
     ACTION_CHOICES = [
         (ACTION_APPROVE, "Application Approved"),
         (ACTION_REJECT, "Application Rejected"),
+        (ACTION_PAYMENT, "Payment Applied"),
         (ACTION_PAYMENT_STATUS, "Payment Status Changed"),
         (ACTION_DEVICE_LOCK, "Device Locked"),
         (ACTION_DEVICE_UNLOCK, "Device Unlocked"),
+        (ACTION_DEVICE_ENROLL, "Device Enrolled"),
         (ACTION_KYC_CHANGE, "KYC Document Changed"),
         (ACTION_CONTRACT_CREATE, "Contract Created"),
         (ACTION_CLAIM, "Application Claimed"),
         (ACTION_PAYOUT, "Payout Requested"),
+        (ACTION_WEBHOOK, "Webhook Received"),
     ]
 
     user = models.ForeignKey(

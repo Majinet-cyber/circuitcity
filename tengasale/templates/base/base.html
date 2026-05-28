@@ -14,25 +14,24 @@
     <link rel="manifest" href="{% static 'manifest.webmanifest' %}">
     <link rel="icon" type="image/png" href="{% static 'images/icon-192.png' %}" sizes="192x192">
     <link rel="apple-touch-icon" href="{% static 'images/icon-192.png' %}">
-    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=1.0.2">
+    <link rel="stylesheet" href="{% static 'css/tengasale.css' %}?v=1.0.2">
     {% block extra_head %}{% endblock %}
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js"></script>
 </head>
 <body>
 
 <div class="app-shell">
+    {% block topbar %}
     <header class="topbar app-topbar">
         <div class="brand-left">
             <a href="{% url 'home' %}" class="brand-lockup" aria-label="TengaSale home">
-                {% if tengasale_logo_exists %}
-                    <img src="{% static 'images/TENGASALEe.png' %}" alt="TengaSale" class="ts-logo-img" height="42">
-                {% else %}
-                    <span class="ts-logo">T</span>
-                    <span class="brand-copy">
-                        <span class="brand-title">TengaSale</span>
-                        <span class="brand-tagline">Endless Possibilities</span>
-                    </span>
-                {% endif %}
+                <img
+                    src="{% if tengasale_logo_full_url %}{{ tengasale_logo_full_url }}{% else %}{% static 'images/brand/tengasale-logo-full.png' %}{% endif %}"
+                    alt="TengaSale"
+                    class="ts-logo-img"
+                    style="max-height:38px;max-width:140px;object-fit:contain;"
+                >
             </a>
         </div>
 
@@ -78,6 +77,7 @@
             </div>
         {% endif %}
     </header>
+    {% endblock topbar %}
 
     <main class="content">
         {% if messages %}
@@ -96,10 +96,12 @@
         {% block content %}{% endblock %}
     </main>
 
+    {% block page_footer %}
     <footer class="footer">
         <span>v1.0.0</span>
         <span>&copy; TengaSale</span>
     </footer>
+    {% endblock page_footer %}
 </div>
 
 {% block extra_scripts %}{% endblock %}

@@ -1,6 +1,8 @@
 {% extends "base/base.html" %}
+{% load static %}
 
 {% block content %}
+<link rel="stylesheet" href="{% static 'css/tengasale.css' %}">
 
 <a href="{% url 'choose_device' app.id %}" class="soft-back">
     <span class="soft-back-icon">&larr;</span>
@@ -17,7 +19,7 @@
     {% csrf_token %}
     {{ form.non_field_errors }}
 
-    <section class="kyc-section" data-kyc-section data-existing="{% if app.customer_face_image %}true{% else %}false{% endif %}">
+    <section class="kyc-section{% if 'customer_face_image' in app.correction_fields %} has-correction{% endif %}" data-kyc-section data-existing="{% if app.customer_face_image %}true{% else %}false{% endif %}">
         <div class="kyc-section-header">
             <div>
                 <h2>Customer Face</h2>
@@ -51,7 +53,7 @@
         </div>
     </section>
 
-    <section class="kyc-section" data-kyc-section data-existing="{% if app.id_front_image %}true{% else %}false{% endif %}">
+    <section class="kyc-section{% if 'id_front_image' in app.correction_fields %} has-correction{% endif %}" data-kyc-section data-existing="{% if app.id_front_image %}true{% else %}false{% endif %}">
         <div class="kyc-section-header">
             <div>
                 <h2>ID Front</h2>
@@ -85,7 +87,7 @@
         </div>
     </section>
 
-    <section class="kyc-section" data-kyc-section data-existing="{% if app.id_back_image %}true{% else %}false{% endif %}">
+    <section class="kyc-section{% if 'id_back_image' in app.correction_fields %} has-correction{% endif %}" data-kyc-section data-existing="{% if app.id_back_image %}true{% else %}false{% endif %}">
         <div class="kyc-section-header">
             <div>
                 <h2>ID Back</h2>

@@ -39,6 +39,107 @@
     + NEW APPLICATION
 </a>
 
+<section class="card">
+    <div class="section-title-row">
+        <h2>Device financing</h2>
+        <a href="{% url 'financing_dashboard' %}" class="text-link">Open</a>
+    </div>
+    <div class="metric-grid compact-metrics">
+        <div>
+            <span>Total financed devices</span>
+            <strong>{{ device_financing_stats.total_financed_devices }}</strong>
+        </div>
+        <div>
+            <span>Active contracts</span>
+            <strong>{{ device_financing_stats.active_contracts }}</strong>
+        </div>
+        <div>
+            <span>Overdue contracts</span>
+            <strong>{{ device_financing_stats.overdue_contracts }}</strong>
+        </div>
+        <div>
+            <span>Locked devices</span>
+            <strong>{{ device_financing_stats.locked_devices }}</strong>
+        </div>
+        <div>
+            <span>Pending verification</span>
+            <strong>{{ device_financing_stats.payments_pending_verification }}</strong>
+        </div>
+        <div>
+            <span>Verified this month</span>
+            <strong>{{ device_financing_stats.payments_verified_this_month }}</strong>
+        </div>
+        <div>
+            <span>Expected monthly collections</span>
+            <strong>MWK {{ device_financing_stats.expected_monthly_collections|floatformat:0 }}</strong>
+        </div>
+        <div>
+            <span>Default risk count</span>
+            <strong>{{ device_financing_stats.default_risk_count }}</strong>
+        </div>
+    </div>
+</section>
+
+<section class="card">
+    <h2>Recent contracts</h2>
+    {% for contract in recent_financing_contracts %}
+        <div class="mini-table-row">
+            <div>
+                <strong>{{ contract.customer.full_name }}</strong>
+                <small>{{ contract.device.brand }} {{ contract.device.model }} | {{ contract.get_status_display }}</small>
+            </div>
+            <span>MWK {{ contract.monthly_payment_amount|floatformat:0 }}</span>
+        </div>
+    {% empty %}
+        <p class="text-muted">No financed devices yet.</p>
+    {% endfor %}
+</section>
+
+<section class="card">
+    <h2>Pending payment verifications</h2>
+    {% for payment in pending_financing_payments %}
+        <a href="{% url 'financing_payment_detail' payment.id %}" class="mini-table-row link-row">
+            <div>
+                <strong>{{ payment.customer.full_name }}</strong>
+                <small>{{ payment.contract.device.masked_imei }} | {{ payment.get_payment_method_display }}</small>
+            </div>
+            <span>MWK {{ payment.amount|floatformat:0 }}</span>
+        </a>
+    {% empty %}
+        <p class="text-muted">No pending payment proofs.</p>
+    {% endfor %}
+</section>
+
+<section class="card">
+    <h2>Overdue customers</h2>
+    {% for contract in overdue_financing_customers %}
+        <div class="mini-table-row">
+            <div>
+                <strong>{{ contract.customer.full_name }}</strong>
+                <small>{{ contract.customer.phone_number }} | {{ contract.get_status_display }}</small>
+            </div>
+            <span>{{ contract.next_due_date|date:"M d" }}</span>
+        </div>
+    {% empty %}
+        <p class="text-muted">No overdue financing customers.</p>
+    {% endfor %}
+</section>
+
+<section class="card">
+    <h2>Device command history</h2>
+    {% for command in device_command_history %}
+        <div class="mini-table-row">
+            <div>
+                <strong>{{ command.get_command_type_display }}</strong>
+                <small>{{ command.device.masked_imei }} | {{ command.provider }}</small>
+            </div>
+            <span>{{ command.get_status_display }}</span>
+        </div>
+    {% empty %}
+        <p class="text-muted">No device commands issued.</p>
+    {% endfor %}
+</section>
+
 <section class="menu-list" aria-labelledby="applications-title">
     <h2 id="applications-title">Applications</h2>
 

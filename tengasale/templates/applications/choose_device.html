@@ -1,6 +1,8 @@
 {% extends "base/base.html" %}
+{% load static %}
 
 {% block content %}
+<link rel="stylesheet" href="{% static 'css/tengasale.css' %}">
 
 <a href="{% url 'edit_customer_details' app.id %}" class="soft-back">
     <span class="soft-back-icon">&larr;</span>
@@ -21,7 +23,7 @@
         <input type="hidden" name="deal_id" id="selected-deal-id">
         <input type="hidden" name="selected_cash_price" id="selected-cash-price">
 
-        <section class="selection-section">
+        <section class="selection-section{% if 'selected_deal' in app.correction_fields %} has-correction{% endif %}">
             <h2>Choose brand</h2>
             <div class="brand-card-grid" role="list">
                 {% for brand_name in brand_names %}
@@ -44,7 +46,7 @@
             <div class="spec-card-grid" id="spec-options"></div>
         </section>
 
-        <section class="selection-section" data-offer-section hidden>
+        <section class="selection-section{% if 'selected_cash_price' in app.correction_fields or 'calculated_deposit_amount' in app.correction_fields %} has-correction{% endif %}" data-offer-section hidden>
             <h2>Your selected offer</h2>
 
             <article class="deal-card selected-offer-card">

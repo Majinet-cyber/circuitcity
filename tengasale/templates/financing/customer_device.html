@@ -1,0 +1,54 @@
+{% extends "base/base.html" %}
+
+{% block content %}
+
+{# Web-based customer portal pending native Android / MDM lock-screen integration. #}
+<section class="phone-control-hero">
+    <span class="page-kicker">TengaSale financed phone</span>
+    <h1>{{ device.brand }} {{ device.model }}</h1>
+    <p>{{ contract.customer.full_name }}</p>
+</section>
+
+<section class="card phone-status-card">
+    <div class="detail-list">
+        <span>Lock Date</span><strong>{{ contract.lock_date|date:"M d, Y"|default:"Not scheduled" }}</strong>
+        <span>Due Date</span><strong>{{ contract.next_due_date|date:"M d, Y" }}</strong>
+        <span>Amount Due</span><strong>MWK {{ contract.amount_due|floatformat:0 }}</strong>
+        <span>Payment Status</span><strong>{{ next_schedule.get_status_display|default:"No balance" }}</strong>
+    </div>
+</section>
+
+<section class="card">
+    <a class="btn" href="{% url 'financing_submit_payment' contract.id %}">PAY NOW</a>
+    <a class="btn btn-outline" href="{{ tengasale_whatsapp_link }}">OTHER PAYMENT METHOD</a>
+    <a class="btn btn-blue" href="{% url 'financing_submit_payment' contract.id %}">I HAVE PAID</a>
+</section>
+
+<section class="card">
+    <h2>Enter PIN Unlock</h2>
+    <p class="text-muted">PIN authorization is internal for now. Native unlock provider integration is pending.</p>
+    <form method="post" action="{% url 'customer_unlock_pin' contract.id %}" class="pin-form">
+        {% csrf_token %}
+        <input name="token" maxlength="20" placeholder="Unlock PIN" required>
+        <button class="btn" type="submit">TAP TO UNLOCK</button>
+    </form>
+    {% if latest_token %}
+        <p class="text-muted">Latest authorization: {{ latest_token.get_status_display }} until {{ latest_token.valid_until|date:"M d, H:i" }}</p>
+    {% endif %}
+</section>
+
+<section class="card">
+    <div class="phone-placeholder-grid">
+        <button type="button">Wi-Fi</button>
+        <button type="button">Mobile Data</button>
+        <button type="button">Apps</button>
+        <button type="button" onclick="window.location.reload()">Refresh</button>
+    </div>
+    <a class="btn btn-outline" href="{{ tengasale_whatsapp_link }}">SUPPORT</a>
+</section>
+
+<section class="phone-footer-code">
+    Device code: {{ device.id }} | IMEI {{ device.masked_imei }}
+</section>
+
+{% endblock %}

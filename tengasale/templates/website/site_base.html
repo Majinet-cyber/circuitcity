@@ -1,0 +1,130 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>{% block site_title %}TengaSale — Smartphone Financing for Malawi{% endblock %}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#ff6a00">
+  <meta name="description" content="{% block site_description %}TengaSale provides structured smartphone financing for Malawi — connecting customers, merchants, and repayment infrastructure in one platform.{% endblock %}">
+  <link rel="manifest" href="{% static 'manifest.webmanifest' %}">
+  <link rel="icon" type="image/png" href="{% static 'images/icon-192.png' %}" sizes="192x192">
+  <!-- Inter font -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{% static 'css/website.css' %}?v=1.2">
+  {% block site_head %}{% endblock %}
+</head>
+<body class="site-body">
+
+<!-- Navigation -->
+<nav class="sitenav" role="navigation" aria-label="Main navigation">
+  <div class="sitenav__inner">
+    <!-- Brand / Logo -->
+    <a href="{% url 'website_landing' %}" class="sitenav__brand" aria-label="TengaSale home">
+      <img
+        src="{% static 'images/brand/tengasale-logo-full.svg' %}"
+        alt="TengaSale"
+        class="site-logo-img"
+        width="200"
+        height="44"
+        onerror="this.style.display='none';this.nextElementSibling.style.display='flex';"
+      >
+      <span class="sitenav__logo-fallback" style="display:none;" aria-hidden="true">
+        <span class="sitenav__logo-mark">T</span>
+        <span class="sitenav__logo-name">TengaSale</span>
+      </span>
+    </a>
+
+    <!-- Desktop nav links -->
+    <div class="sitenav__links" role="list">
+      <a href="#how-it-works" class="sitenav__link" role="listitem">How It Works</a>
+      <a href="#for-merchants" class="sitenav__link" role="listitem">Merchants</a>
+      <a href="#payment-channels" class="sitenav__link" role="listitem">Payments</a>
+      <a href="#faq" class="sitenav__link" role="listitem">FAQ</a>
+      <a href="mailto:support@tengasale.africa" class="sitenav__link" role="listitem">Contact</a>
+    </div>
+
+    <!-- Desktop CTA buttons -->
+    <div class="sitenav__actions">
+      <a href="{% url 'portal_search' %}" class="sitenav__cta sitenav__cta--primary">Make Payment</a>
+      <a href="{% url 'login' %}" class="sitenav__cta sitenav__cta--ghost">Merchant Login</a>
+    </div>
+
+    <!-- Mobile menu toggle -->
+    <button class="sitenav__burger" aria-label="Toggle menu" onclick="this.closest('.sitenav').classList.toggle('sitenav--open')">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+        <line x1="3" y1="6" x2="21" y2="6"/>
+        <line x1="3" y1="12" x2="21" y2="12"/>
+        <line x1="3" y1="18" x2="21" y2="18"/>
+      </svg>
+    </button>
+  </div>
+
+  <!-- Mobile dropdown -->
+  <div class="sitenav__mobile">
+    <a href="#how-it-works" class="sitenav__mobile-link" onclick="this.closest('.sitenav').classList.remove('sitenav--open')">How It Works</a>
+    <a href="#for-merchants" class="sitenav__mobile-link" onclick="this.closest('.sitenav').classList.remove('sitenav--open')">For Merchants</a>
+    <a href="#payment-channels" class="sitenav__mobile-link" onclick="this.closest('.sitenav').classList.remove('sitenav--open')">Payments</a>
+    <a href="#faq" class="sitenav__mobile-link" onclick="this.closest('.sitenav').classList.remove('sitenav--open')">FAQ</a>
+    <a href="{% url 'portal_search' %}" class="sitenav__mobile-link sitenav__mobile-link--cta">Make Payment</a>
+    <a href="{% url 'login' %}" class="sitenav__mobile-link">Merchant Login</a>
+  </div>
+</nav>
+
+<!-- Page content -->
+<main>
+  {% block site_content %}{% endblock %}
+</main>
+
+<!-- Footer — light mode -->
+<footer class="sitefooter">
+  <div class="sitefooter__inner">
+
+    <div class="sitefooter__brand">
+      <span class="sitefooter__logo" aria-hidden="true">T</span>
+      <div class="sitefooter__brand-text">
+        <span class="sitefooter__brand-name">TengaSale</span>
+        <span class="sitefooter__brand-tagline">Smartphone Financing for Malawi</span>
+      </div>
+      <p class="sitefooter__brand-desc">
+        Structured phone financing connecting customers, merchants,
+        and repayment infrastructure across Malawi.
+      </p>
+    </div>
+
+    <div class="sitefooter__col">
+      <div class="sitefooter__col-heading">Platform</div>
+      <a href="{% url 'portal_search' %}" class="sitefooter__link">Make a Payment</a>
+      <a href="{% url 'login' %}" class="sitefooter__link">Merchant Login</a>
+      <a href="#how-it-works" class="sitefooter__link">How It Works</a>
+      <a href="#for-merchants" class="sitefooter__link">For Merchants</a>
+      <a href="#faq" class="sitefooter__link">FAQ</a>
+    </div>
+
+    <div class="sitefooter__col">
+      <div class="sitefooter__col-heading">Legal</div>
+      <a href="{% url 'website_terms' %}" class="sitefooter__link">Terms of Service</a>
+      <a href="{% url 'website_privacy' %}" class="sitefooter__link">Privacy Policy</a>
+      <a href="{% url 'website_payment_terms' %}" class="sitefooter__link">Payment Terms</a>
+      <a href="{% url 'website_merchant_terms' %}" class="sitefooter__link">Merchant Terms</a>
+    </div>
+
+    <div class="sitefooter__col">
+      <div class="sitefooter__col-heading">Support</div>
+      <a href="mailto:support@tengasale.africa" class="sitefooter__link">support@tengasale.africa</a>
+      <a href="{% url 'portal_support' %}" class="sitefooter__link">Help &amp; Support</a>
+      <a href="#" class="sitefooter__link">Contact Us</a>
+    </div>
+
+  </div>
+
+  <div class="sitefooter__bottom">
+    <span>&copy; 2026 TengaSale. All rights reserved.</span>
+    <span>Malawi</span>
+  </div>
+</footer>
+
+</body>
+</html>

@@ -2,7 +2,7 @@
   "name": "TengaSale",
   "short_name": "TengaSale",
   "description": "TengaSale — Endless Possibilities. Smartphone financing made simple.",
-  "start_url": "/sales/",
+  "start_url": "/pay/",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
@@ -20,22 +20,7 @@
       "src": "/static/images/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "/static/images/icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "maskable"
-    }
-  ],
-  "screenshots": [
-    {
-      "src": "/static/images/screenshot-mobile.png",
-      "sizes": "390x844",
-      "type": "image/png",
-      "form_factor": "narrow",
-      "label": "TengaSale Sales App"
+      "purpose": "any maskable"
     }
   ],
   "categories": ["finance", "business"],
@@ -48,7 +33,7 @@
       "description": "Pay your TengaSale contract"
     },
     {
-      "name": "Claim Application",
+      "name": "Sales Queue",
       "url": "/sales/",
       "description": "Review and claim the next application"
     }

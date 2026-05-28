@@ -94,6 +94,44 @@ class PaymentContract(models.Model):
     # Status
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_ACTIVE)
 
+    # Device locking (for PayG / MDM integration)
+    LOCK_PROVIDER_NONE = ""
+    LOCK_PROVIDER_MOCK = "mock"
+    LOCK_PROVIDER_KNOX = "knox"
+    LOCK_PROVIDER_NUOVOPAY = "nuovopay"
+    LOCK_PROVIDER_UPYA = "upya"
+
+    LOCK_STATUS_UNKNOWN = "unknown"
+    LOCK_STATUS_UNLOCKED = "unlocked"
+    LOCK_STATUS_LOCKED = "locked"
+    LOCK_STATUS_PENDING = "pending"
+
+    ENROLLMENT_NONE = "none"
+    ENROLLMENT_PENDING = "pending"
+    ENROLLMENT_ENROLLED = "enrolled"
+    ENROLLMENT_FAILED = "failed"
+
+    device_lock_provider = models.CharField(
+        max_length=30, blank=True, default="",
+        help_text="MDM/lock provider: mock, knox, nuovopay, upya, or empty for none",
+    )
+    device_lock_status = models.CharField(
+        max_length=20, blank=True, default=LOCK_STATUS_UNKNOWN,
+        help_text="Current lock state: unknown, unlocked, locked, pending",
+    )
+    device_enrollment_status = models.CharField(
+        max_length=20, blank=True, default=ENROLLMENT_NONE,
+        help_text="MDM enrollment state: none, pending, enrolled, failed",
+    )
+    last_lock_sync_at = models.DateTimeField(
+        null=True, blank=True,
+        help_text="Last time lock status was synced with provider",
+    )
+    last_lock_error = models.CharField(
+        max_length=255, blank=True, default="",
+        help_text="Last error message from lock provider",
+    )
+
     # Pricing config
     early_settlement_3m_discount = models.DecimalField(
         max_digits=5, decimal_places=2, default=25,

@@ -8,4 +8,10 @@ urlpatterns = [
     path("contract/<str:contract_number>/", views.portal_contract, name="portal_contract"),
     path("contract/<str:contract_number>/payment/", views.portal_payment, name="portal_payment"),
     path("contract/<str:contract_number>/history/", views.portal_history, name="portal_history"),
+
+    # Webhook receiver endpoints — protected placeholders
+    path("webhooks/paychangu/", views.webhook_paychangu, name="webhook_paychangu"),
+    path("webhooks/paytrigger/", views.webhook_paytrigger, name="webhook_paytrigger"),
+    path("webhooks/airtel/", views.webhook_airtel, name="webhook_airtel"),
+    path("webhooks/tnm/", views.webhook_tnm, name="webhook_tnm"),
 ]

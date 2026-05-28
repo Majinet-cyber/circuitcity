@@ -1,0 +1,22 @@
+{% extends "base/base.html" %}
+
+{% block content %}
+
+<a href="{% url 'financing_dashboard' %}" class="back-link">BACK</a>
+<h1 class="greeting">Commands</h1>
+
+<section class="card">
+    {% for command in commands %}
+        <div class="mini-table-row">
+            <div>
+                <strong>{{ command.get_command_type_display }}</strong>
+                <small>{{ command.device.masked_imei }} | {{ command.provider }} | {{ command.created_at|date:"M d, H:i" }}</small>
+            </div>
+            <span>{{ command.get_status_display }}</span>
+        </div>
+    {% empty %}
+        <p class="text-muted">No command history yet.</p>
+    {% endfor %}
+</section>
+
+{% endblock %}

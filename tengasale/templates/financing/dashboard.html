@@ -1,0 +1,111 @@
+{% extends "base/base.html" %}
+
+{% block content %}
+
+<div class="page-title-row">
+    <div>
+        <span class="page-kicker">Device financing</span>
+        <h1 class="greeting">Loan control room</h1>
+    </div>
+</div>
+
+<section class="menu-list">
+    <h2>Actions</h2>
+    <a href="{% url 'financing_customers' %}" class="menu-row">
+        <span class="left">
+            <span class="menu-icon icon-tools">C</span>
+            <span class="menu-row-copy">
+                <span>Customers</span>
+                <small>Create customer records for financed devices.</small>
+            </span>
+        </span>
+        <span class="arrow" aria-hidden="true">></span>
+    </a>
+    <a href="{% url 'financing_devices' %}" class="menu-row">
+        <span class="left">
+            <span class="menu-icon icon-active">D</span>
+            <span class="menu-row-copy">
+                <span>Devices</span>
+                <small>Register IMEIs and stock status.</small>
+            </span>
+        </span>
+        <span class="arrow" aria-hidden="true">></span>
+    </a>
+    <a href="{% url 'financing_contracts' %}" class="menu-row">
+        <span class="left">
+            <span class="menu-icon icon-money">L</span>
+            <span class="menu-row-copy">
+                <span>Contracts</span>
+                <small>Create repayment schedules and device assignments.</small>
+            </span>
+        </span>
+        <span class="arrow" aria-hidden="true">></span>
+    </a>
+    <a href="{% url 'financing_pending_payments' %}" class="menu-row">
+        <span class="left">
+            <span class="menu-icon icon-payments">P</span>
+            <span class="menu-row-copy">
+                <span>Pending Payments</span>
+                <small>Approve or reject manual payment proofs.</small>
+            </span>
+        </span>
+        <span class="arrow" aria-hidden="true">></span>
+    </a>
+    <a href="{% url 'financing_command_history' %}" class="menu-row">
+        <span class="left">
+            <span class="menu-icon icon-tools">C</span>
+            <span class="menu-row-copy">
+                <span>Device Commands</span>
+                <small>View mock lock, unlock, and status requests.</small>
+            </span>
+        </span>
+        <span class="arrow" aria-hidden="true">></span>
+    </a>
+</section>
+
+<section class="card">
+    <h2>Recent contracts</h2>
+    {% for contract in contracts %}
+        <div class="mini-table-row">
+            <div>
+                <strong>{{ contract.customer.full_name }}</strong>
+                <small>{{ contract.device.brand }} {{ contract.device.model }} | {{ contract.get_status_display }}</small>
+            </div>
+            <span>MWK {{ contract.monthly_payment_amount|floatformat:0 }}</span>
+        </div>
+    {% empty %}
+        <p class="text-muted">No financing contracts yet.</p>
+    {% endfor %}
+</section>
+
+<section class="card">
+    <h2>Pending payment verifications</h2>
+    {% for payment in pending_payments %}
+        <a href="{% url 'financing_payment_detail' payment.id %}" class="mini-table-row link-row">
+            <div>
+                <strong>{{ payment.customer.full_name }}</strong>
+                <small>{{ payment.get_payment_method_display }} | {{ payment.transaction_reference|default:"No reference" }}</small>
+            </div>
+            <span>MWK {{ payment.amount|floatformat:0 }}</span>
+        </a>
+    {% empty %}
+        <p class="text-muted">No pending payments.</p>
+    {% endfor %}
+</section>
+
+<section class="card">
+    <h2>Device command history</h2>
+    {% for command in commands %}
+        <div class="mini-table-row">
+            <div>
+                <strong>{{ command.get_command_type_display }}</strong>
+                <small>{{ command.device.masked_imei }} | {{ command.get_status_display }}</small>
+            </div>
+            <span>{{ command.provider }}</span>
+        </div>
+    {% empty %}
+        <p class="text-muted">No device commands yet.</p>
+    {% endfor %}
+</section>
+
+{% endblock %}

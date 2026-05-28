@@ -1,4 +1,4 @@
-"""Website views — stubs; fully implemented in Phase 3."""
+"""Website views — public-facing pages for /site/."""
 from django.shortcuts import render
 
 
@@ -22,13 +22,25 @@ def customers(request):
     return render(request, "website/landing.html", {"section": "customers"})
 
 
-def integrations(request):
-    return render(request, "website/landing.html", {"section": "integrations"})
-
-
 def faq(request):
     return render(request, "website/landing.html", {"section": "faq"})
 
 
 def contact(request):
     return render(request, "website/landing.html", {"section": "contact"})
+
+
+def terms(request):
+    return render(request, "website/terms.html", {})
+
+
+def privacy(request):
+    return render(request, "website/privacy.html", {})
+
+
+def payment_terms(request):
+    return render(request, "website/payment_terms.html", {})
+
+
+def merchant_terms(request):
+    return render(request, "website/merchant_terms.html", {})

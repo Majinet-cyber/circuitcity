@@ -7,7 +7,10 @@ urlpatterns = [
     path("how-it-works/", views.how_it_works, name="website_how_it_works"),
     path("merchants/", views.merchants, name="website_merchants"),
     path("customers/", views.customers, name="website_customers"),
-    path("integrations/", views.integrations, name="website_integrations"),
     path("faq/", views.faq, name="website_faq"),
     path("contact/", views.contact, name="website_contact"),
+    path("terms/", views.terms, name="website_terms"),
+    path("privacy/", views.privacy, name="website_privacy"),
+    path("payment-terms/", views.payment_terms, name="website_payment_terms"),
+    path("merchant-terms/", views.merchant_terms, name="website_merchant_terms"),
 ]

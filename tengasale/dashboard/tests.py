@@ -42,7 +42,9 @@ class HomePageTests(TestCase):
 
         response = self.client.get("/")
 
-        self.assertRedirects(response, reverse("underwriter_dashboard"))
+        # The root redirects to underwriter_dashboard (/tengasale/underwriter/)
+        # which itself redirects to /sales/ — just verify first hop, don't fetch target
+        self.assertRedirects(response, reverse("underwriter_dashboard"), fetch_redirect_response=False)
 
     def test_root_redirects_hq_to_hq_portal(self):
         self.create_user("hq", "HQ")
@@ -191,7 +193,8 @@ class HomePageTests(TestCase):
         self.client.login(username="hq-normal", password="test-pass-123")
 
         merchant_response = self.client.get(reverse("merchant_dashboard"))
-        underwriter_response = self.client.get(reverse("underwriter_dashboard"))
+        # underwriter_dashboard → /sales/ (via redirect) → 403 for non-underwriter; follow chain
+        underwriter_response = self.client.get(reverse("underwriter_dashboard"), follow=True)
         preview_response = self.client.get(reverse("hq_merchant_preview"))
 
         self.assert_role_forbidden(merchant_response)

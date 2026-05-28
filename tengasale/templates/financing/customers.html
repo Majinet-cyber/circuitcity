@@ -1,0 +1,32 @@
+{% extends "base/base.html" %}
+
+{% block content %}
+
+<a href="{% url 'financing_dashboard' %}" class="back-link">BACK</a>
+<h1 class="greeting">Customers</h1>
+
+<section class="card">
+    <h2>Create customer</h2>
+    <form method="post" class="stacked-form">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button class="btn" type="submit">SAVE CUSTOMER</button>
+    </form>
+</section>
+
+<section class="card">
+    <h2>Recent customers</h2>
+    {% for customer in customers %}
+        <div class="mini-table-row">
+            <div>
+                <strong>{{ customer.full_name }}</strong>
+                <small>{{ customer.phone_number }} | {{ customer.customer_id_number }}</small>
+            </div>
+            <span>{{ customer.created_at|date:"M d" }}</span>
+        </div>
+    {% empty %}
+        <p class="text-muted">No customers yet.</p>
+    {% endfor %}
+</section>
+
+{% endblock %}

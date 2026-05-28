@@ -2,18 +2,147 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <title>TengaSale Login</title>
+    <title>TengaSale — Sign In</title>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#ff6a00">
     <link rel="stylesheet" href="{% static 'css/style.css' %}">
+    <style>
+        .auth-shell {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: var(--app-bg, #f5f6f8);
+            padding: 24px 16px 40px;
+        }
+        .auth-brand {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-bottom: 32px;
+            gap: 10px;
+        }
+        .auth-brand .ts-logo-login {
+            max-width: 220px;
+            max-height: 80px;
+            object-fit: contain;
+            display: block;
+        }
+        .auth-brand .auth-tagline {
+            font-size: 1rem;
+            color: var(--muted, #7a828c);
+            letter-spacing: 0.04em;
+            margin: 0;
+        }
+        .auth-card {
+            width: 100%;
+            max-width: 420px;
+            background: #fff;
+            border-radius: 20px;
+            box-shadow: 0 16px 36px rgba(17,17,17,0.10);
+            padding: 32px 28px 28px;
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+        }
+        .auth-card label {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--black, #111);
+            margin-bottom: 4px;
+            display: block;
+        }
+        .auth-card input[type=text],
+        .auth-card input[type=password] {
+            width: 100%;
+            padding: 13px 14px;
+            border: 1.5px solid var(--border, #e4e7eb);
+            border-radius: 10px;
+            font-size: 1rem;
+            outline: none;
+            transition: border-color .15s;
+            background: var(--app-bg, #f5f6f8);
+            box-sizing: border-box;
+        }
+        .auth-card input:focus {
+            border-color: var(--orange, #ff6a00);
+        }
+        .password-field {
+            position: relative;
+        }
+        .password-field input {
+            padding-right: 48px;
+        }
+        .password-toggle {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 4px;
+            color: var(--muted, #7a828c);
+        }
+        .password-toggle svg {
+            width: 20px;
+            height: 20px;
+            fill: none;
+            stroke: currentColor;
+            stroke-width: 2;
+        }
+        .primary-button {
+            width: 100%;
+            padding: 15px;
+            background: var(--orange, #ff6a00);
+            color: #fff;
+            font-size: 1rem;
+            font-weight: 700;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            letter-spacing: 0.03em;
+            transition: background .15s;
+        }
+        .primary-button:hover {
+            background: var(--orange-dark, #df5600);
+        }
+        .auth-link {
+            text-align: center;
+            font-size: 0.88rem;
+            color: var(--orange, #ff6a00);
+            text-decoration: none;
+        }
+        .auth-link:hover { text-decoration: underline; }
+        .auth-footer {
+            margin-top: 28px;
+            font-size: 0.78rem;
+            color: var(--muted, #7a828c);
+            text-align: center;
+        }
+        .errorlist {
+            margin: 0;
+            padding: 10px 14px;
+            background: #fdeceb;
+            border-radius: 8px;
+            color: var(--red, #d93025);
+            font-size: 0.88rem;
+            list-style: none;
+        }
+    </style>
 </head>
-<body>
+<body style="margin:0;background:#dfe5eb;">
 
-<div class="app-shell auth-shell">
+<div class="auth-shell">
     <div class="auth-brand">
-        <div class="logo-mark">T</div>
-        <h1>Tenga<span>Sale</span></h1>
-        <p>Endless Possibilities</p>
+        <img
+            src="{% static 'images/brand/tengasale-logo-full.png' %}"
+            alt="TengaSale"
+            class="ts-logo-login"
+        >
+        <p class="auth-tagline">Endless Possibilities</p>
     </div>
 
     <form method="post" class="auth-card">
@@ -22,32 +151,44 @@
             <input type="hidden" name="next" value="{{ next }}">
         {% endif %}
 
-        {{ form.non_field_errors }}
+        {% if form.non_field_errors %}
+            <ul class="errorlist">
+                {% for error in form.non_field_errors %}
+                    <li>{{ error }}</li>
+                {% endfor %}
+            </ul>
+        {% endif %}
 
-        <label for="{{ form.username.id_for_label }}">Username</label>
-        {{ form.username }}
+        <div>
+            <label for="{{ form.username.id_for_label }}">Username</label>
+            {{ form.username }}
+        </div>
 
-        <label for="{{ form.password.id_for_label }}">Password</label>
-        <div class="password-field">
-            {{ form.password }}
-            <button
-                type="button"
-                class="password-toggle"
-                data-password-toggle
-                aria-label="Show password"
-                aria-controls="{{ form.password.id_for_label }}"
-            >
-                <svg class="password-toggle-eye" aria-hidden="true" viewBox="0 0 24 24">
-                    <path d="M2.1 12s3.6-6 9.9-6 9.9 6 9.9 6-3.6 6-9.9 6-9.9-6-9.9-6Z"></path>
-                    <circle cx="12" cy="12" r="3"></circle>
-                </svg>
-            </button>
+        <div>
+            <label for="{{ form.password.id_for_label }}">Password</label>
+            <div class="password-field">
+                {{ form.password }}
+                <button
+                    type="button"
+                    class="password-toggle"
+                    data-password-toggle
+                    aria-label="Show password"
+                    aria-controls="{{ form.password.id_for_label }}"
+                >
+                    <svg aria-hidden="true" viewBox="0 0 24 24">
+                        <path d="M2.1 12s3.6-6 9.9-6 9.9 6 9.9 6-3.6 6-9.9 6-9.9-6-9.9-6Z"></path>
+                        <circle cx="12" cy="12" r="3"></circle>
+                    </svg>
+                </button>
+            </div>
         </div>
 
         <button type="submit" class="primary-button">Sign In</button>
 
         <a href="{% url 'password_reset' %}" class="auth-link">Forgot password?</a>
     </form>
+
+    <p class="auth-footer">&copy; TengaSale &nbsp;·&nbsp; v1.0.0</p>
 </div>
 
 <script>
@@ -55,11 +196,7 @@
         button.addEventListener("click", () => {
             const field = button.closest(".password-field");
             const input = field ? field.querySelector("input") : null;
-
-            if (!input) {
-                return;
-            }
-
+            if (!input) return;
             const isHidden = input.type === "password";
             input.type = isHidden ? "text" : "password";
             button.setAttribute("aria-label", isHidden ? "Hide password" : "Show password");

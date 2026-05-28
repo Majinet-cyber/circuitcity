@@ -1,0 +1,32 @@
+{% extends "base/base.html" %}
+
+{% block content %}
+
+<a href="{% url 'financing_dashboard' %}" class="back-link">BACK</a>
+<h1 class="greeting">Contracts</h1>
+
+<section class="card">
+    <h2>Create financing contract</h2>
+    <form method="post" class="stacked-form">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button class="btn" type="submit">CREATE CONTRACT</button>
+    </form>
+</section>
+
+<section class="card">
+    <h2>Recent contracts</h2>
+    {% for contract in contracts %}
+        <div class="mini-table-row">
+            <div>
+                <strong>{{ contract.customer.full_name }}</strong>
+                <small>{{ contract.device.brand }} {{ contract.device.model }} | Due {{ contract.next_due_date|date:"M d" }}</small>
+            </div>
+            <span>{{ contract.get_status_display }}</span>
+        </div>
+    {% empty %}
+        <p class="text-muted">No contracts created.</p>
+    {% endfor %}
+</section>
+
+{% endblock %}

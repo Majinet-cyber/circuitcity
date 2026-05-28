@@ -31,7 +31,7 @@ from approvals.views import (
 from commissions.models import Commission
 from contracts.models import Contract
 from core.models import AuditLog, QueueRule
-from earnings.models import Wallet, WalletTransaction
+from earnings.models import ManagerPayout, MerchantPayout, Wallet, WalletTransaction
 
 
 # ---------------------------------------------------------------------------
@@ -113,6 +113,7 @@ def sales_home(request):
     wallet, _ = Wallet.objects.get_or_create(user=request.user)
 
     return render(request, "sales/home.html", {
+        "page_heading": "Home",
         "active_apps": active_apps[:5],
         "active_count": active_count,
         "max_active": rule.max_active_applications,
@@ -216,6 +217,7 @@ def sales_applications(request):
         tab = "active"
 
     return render(request, "sales/applications_list.html", {
+        "page_heading": "Applications",
         "apps": apps.select_related("deal", "created_by")[:50],
         "tab": tab,
     })
@@ -236,6 +238,7 @@ def sales_review_summary(request, app_id):
         review.save(update_fields=["summary_clear", "updated_at"])
         return redirect("sales_identity_check", app_id=app.id)
     return render(request, "sales/review_summary.html", {
+        "page_heading": "Review Application",
         "app": app, "review": review, "step": 1, "total_steps": 6,
         **correction_context(app),
     })
@@ -253,6 +256,7 @@ def sales_identity_check(request, app_id):
         review.save(update_fields=["identity_signature_matches", "identity_info_matches", "updated_at"])
         return redirect("sales_address_check", app_id=app.id)
     return render(request, "sales/identity_check.html", {
+        "page_heading": "Identity Check",
         "app": app, "review": review, "step": 2, "total_steps": 6,
         **correction_context(app),
     })
@@ -277,6 +281,7 @@ def sales_address_check(request, app_id):
         app.save(update_fields=["address_check_answers"])
         return redirect("sales_customer_call", app_id=app.id)
     return render(request, "sales/address_check.html", {
+        "page_heading": "Address Check",
         "app": app, "review": review, "step": 3, "total_steps": 6,
         **correction_context(app),
     })
@@ -304,6 +309,7 @@ def sales_customer_call(request, app_id):
         review.save(update_fields=[*call_fields, "updated_at"])
         return redirect("sales_income_check", app_id=app.id)
     return render(request, "sales/customer_call.html", {
+        "page_heading": "Customer Call",
         "app": app, "review": review, "step": 4, "total_steps": 6,
         **correction_context(app),
     })
@@ -332,6 +338,7 @@ def sales_income_check(request, app_id):
         review.save(update_fields=[*income_fields, "updated_at"])
         return redirect("sales_final_review", app_id=app.id)
     return render(request, "sales/income_check.html", {
+        "page_heading": "Income Check",
         "app": app,
         "review": review,
         "step": 5,
@@ -375,7 +382,7 @@ def sales_final_review(request, app_id):
             _audit(request.user, AuditLog.ACTION_REJECT, "FinancingApplication", app.id,
                    {"reason": reject_reason}, request)
             messages.error(request, "Application rejected.")
-            return render(request, "sales/reject_success.html", {"app": app})
+            return render(request, "sales/reject_success.html", {"app": app, "page_heading": "Rejected"})
 
         if decision == "request_correction":
             if not app.corrections.filter(resolved=False).exists() and not review.comment.strip():
@@ -391,6 +398,7 @@ def sales_final_review(request, app_id):
     score = review.completeness_score()
     score_class = "score-green" if score >= 80 else "score-orange" if score >= 50 else "score-red"
     return render(request, "sales/final_review.html", {
+        "page_heading": "Final Review",
         "app": app,
         "review": review,
         "score": score,
@@ -421,8 +429,8 @@ def sales_confirm_approve(request, app_id):
         process_application_approval(app, approved_by=request.user)
         _audit(request.user, AuditLog.ACTION_APPROVE, "FinancingApplication", app.id,
                {"application_number": app.application_number}, request)
-        return render(request, "sales/approve_success.html", {"app": app})
-    return render(request, "sales/confirm_approve.html", {"app": app})
+        return render(request, "sales/approve_success.html", {"app": app, "page_heading": "Approved"})
+    return render(request, "sales/confirm_approve.html", {"app": app, "page_heading": "Confirm Approve"})
 
 
 # ---------------------------------------------------------------------------
@@ -432,7 +440,7 @@ def sales_confirm_approve(request, app_id):
 @underwriter_required
 def sales_queue_rules(request):
     rule = _queue_rule()
-    return render(request, "sales/queue_rules.html", {"rule": rule})
+    return render(request, "sales/queue_rules.html", {"rule": rule, "page_heading": "Queue Rules"})
 
 
 # ---------------------------------------------------------------------------
@@ -445,13 +453,16 @@ def sales_wallet(request):
     transactions = wallet.transactions.all()[:50]
 
     tx_type_labels = {
-        "commission": "Payment Commission",
+        "commission_credit": "Commission Credit",
+        "commission": "Commission Credit",
         "manual_credit": "Manual Credit",
-        "payout": "Wallet Payout",
-        "wallet_payout": "Wallet Payout",
+        "payout": "Payout",
+        "wallet_payout": "Payout",
+        "payout_debit": "Payout",
         "tax": "WHT Deduction",
         "wht_deduction": "WHT Deduction",
         "arrears_deduction": "Arrears Deduction",
+        "adjustment": "Adjustment",
         "bonus": "Manual Credit",
         "spin_reward": "Spin Reward",
     }
@@ -465,10 +476,18 @@ def sales_wallet(request):
         }
         for tx in transactions
     ]
+
+    # Monthly payout records with WHT breakdown
+    payout_records = list(
+        ManagerPayout.objects.filter(wallet=wallet).order_by("-period_end")[:12]
+    )
+
     active_tab = request.GET.get("tab", "earnings")
 
     return render(request, "sales/wallet.html", {
+        "page_heading": "Wallet",
         "wallet": wallet,
         "transaction_rows": transaction_rows,
+        "payout_records": payout_records,
         "active_tab": active_tab,
     })

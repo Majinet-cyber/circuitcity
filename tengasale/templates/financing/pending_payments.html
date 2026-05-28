@@ -1,0 +1,22 @@
+{% extends "base/base.html" %}
+
+{% block content %}
+
+<a href="{% url 'financing_dashboard' %}" class="back-link">BACK</a>
+<h1 class="greeting">Pending payments</h1>
+
+<section class="card">
+    {% for payment in payments %}
+        <a href="{% url 'financing_payment_detail' payment.id %}" class="mini-table-row link-row">
+            <div>
+                <strong>{{ payment.customer.full_name }}</strong>
+                <small>{{ payment.contract.device.brand }} {{ payment.contract.device.model }} | {{ payment.created_at|date:"M d, H:i" }}</small>
+            </div>
+            <span>MWK {{ payment.amount|floatformat:0 }}</span>
+        </a>
+    {% empty %}
+        <p class="text-muted">There are no pending payment proofs.</p>
+    {% endfor %}
+</section>
+
+{% endblock %}

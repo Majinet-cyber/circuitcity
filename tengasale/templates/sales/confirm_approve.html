@@ -1,40 +1,43 @@
-{% extends "base/base.html" %}
+{% extends "sales/base.html" %}
 {% load static %}
 
 {% block page_title %}Confirm Approve — {{ app.application_number }}{% endblock %}
 
 {% block content %}
-<div class="page-back-row">
-  <a href="{% url 'sales_final_review' app.id %}" class="back-link">
-    <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
-    Back
-  </a>
-  <span class="page-label">Confirm Approve</span>
-</div>
+<div class="sales-main">
 
-<div class="confirm-screen">
-  <div class="confirm-icon confirm-icon--approve">
-    <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
-  </div>
-  <h2 class="confirm-heading">Confirm Approve</h2>
-  <p class="confirm-body">Are you sure you want to approve this application?</p>
-
-  <div class="glass-card review-card confirm-summary">
-    <div class="review-row"><span>Application</span><strong>{{ app.application_number }}</strong></div>
-    <div class="review-row"><span>Customer</span><strong>{{ app.customer_name }}</strong></div>
-    {% if app.deal %}
-      <div class="review-row"><span>Device</span><strong>{{ app.deal }}</strong></div>
-      <div class="review-row"><span>Total Contract</span><strong>MWK {{ app.calculated_total_loan|floatformat:0 }}</strong></div>
-    {% endif %}
+  <div class="ts-back-row">
+    <a href="{% url 'sales_final_review' app.id %}" class="ts-back-btn">
+      <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+      Back
+    </a>
   </div>
 
-  <form method="post">
-    {% csrf_token %}
-    <button type="submit" class="btn-approve btn-big btn-full">
+  <div class="ts-confirm-screen">
+    <div class="ts-confirm-icon ts-confirm-approve">
       <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
-      APPROVE
-    </button>
-  </form>
-  <a href="{% url 'sales_final_review' app.id %}" class="btn-secondary btn-full mt-8">Cancel</a>
+    </div>
+    <h2 class="ts-confirm-heading">Confirm Approve</h2>
+    <p class="ts-confirm-body">Are you sure you want to approve this application?</p>
+
+    <div class="ts-review-card ts-confirm-summary">
+      <div class="ts-review-row"><span>Application</span><strong>{{ app.application_number }}</strong></div>
+      <div class="ts-review-row"><span>Customer</span><strong>{{ app.customer_name }}</strong></div>
+      {% if app.deal %}
+        <div class="ts-review-row"><span>Device</span><strong>{{ app.deal }}</strong></div>
+        <div class="ts-review-row"><span>Total Contract</span><strong>MWK {{ app.calculated_total_loan|floatformat:0 }}</strong></div>
+      {% endif %}
+    </div>
+
+    <form method="post">
+      {% csrf_token %}
+      <button type="submit" class="ts-btn-approve ts-btn-big ts-btn-full ts-mt-16">
+        <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+        APPROVE
+      </button>
+    </form>
+    <a href="{% url 'sales_final_review' app.id %}" class="ts-btn-secondary ts-btn-full ts-mt-8">Cancel</a>
+  </div>
+
 </div>
 {% endblock %}

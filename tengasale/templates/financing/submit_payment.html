@@ -1,0 +1,17 @@
+{% extends "base/base.html" %}
+
+{% block content %}
+
+<a href="{% url 'customer_device_portal' contract.id %}" class="back-link">BACK</a>
+<h1 class="greeting">I have paid</h1>
+
+<section class="card">
+    <h2>Submit payment proof</h2>
+    <form method="post" enctype="multipart/form-data" class="stacked-form">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button class="btn" type="submit">SUBMIT FOR VERIFICATION</button>
+    </form>
+</section>
+
+{% endblock %}

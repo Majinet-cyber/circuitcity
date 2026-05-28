@@ -1,5 +1,8 @@
+from decimal import Decimal
+
 from django.conf import settings
 from django.db import models
+from django.utils import timezone
 
 
 class Wallet(models.Model):
@@ -7,18 +10,46 @@ class Wallet(models.Model):
     balance = models.DecimalField(max_digits=14, decimal_places=2, default=0)
     total_earned = models.DecimalField(max_digits=14, decimal_places=2, default=0)
     total_paid = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    total_wht_withheld = models.DecimalField(max_digits=14, decimal_places=2, default=0)
     status = models.CharField(max_length=30, default="active")
 
     def __str__(self):
         return f"{self.user.username} wallet"
 
+    @property
+    def available_balance(self):
+        return self.balance
+
+    @property
+    def pending_payout(self):
+        return self.managerpayouts.filter(status="pending").aggregate(
+            total=models.Sum("net_amount")
+        )["total"] or Decimal("0")
+
+    @property
+    def paid_this_month(self):
+        now = timezone.now()
+        return self.managerpayouts.filter(
+            status="paid",
+            paid_at__year=now.year,
+            paid_at__month=now.month,
+        ).aggregate(total=models.Sum("net_amount"))["total"] or Decimal("0")
+
 
 class WalletTransaction(models.Model):
     TYPE_CHOICES = [
+        ("commission_credit", "Commission Credit"),
         ("commission", "Payment Commission"),
         ("payout", "Wallet Payout"),
+        ("wallet_payout", "Wallet Payout"),
+        ("payout_debit", "Payout Debit"),
+        ("wht_deduction", "WHT Deduction"),
         ("tax", "Withholding Tax"),
+        ("arrears_deduction", "Arrears Deduction"),
+        ("adjustment", "Adjustment"),
         ("bonus", "Bonus"),
+        ("manual_credit", "Manual Credit"),
+        ("spin_reward", "Spin Reward"),
     ]
 
     wallet = models.ForeignKey(Wallet, on_delete=models.CASCADE, related_name="transactions")
@@ -33,3 +64,154 @@ class WalletTransaction(models.Model):
 
     def __str__(self):
         return f"{self.wallet.user.username} - {self.transaction_type} - {self.amount}"
+
+
+class ManagerPayout(models.Model):
+    """
+    Monthly payout record for manager / underwriter / agent.
+
+    Business rule:
+      - gross_amount = sum of commissions for the payout period
+      - wht_amount   = gross_amount * wht_rate  (default 20%)
+      - net_amount   = gross_amount - wht_amount
+    WHT (Withholding Tax) applies to ALL manager/agent commission payouts.
+    """
+
+    STATUS_PENDING = "pending"
+    STATUS_PROCESSING = "processing"
+    STATUS_PAID = "paid"
+    STATUS_FAILED = "failed"
+
+    STATUS_CHOICES = [
+        (STATUS_PENDING, "Pending"),
+        (STATUS_PROCESSING, "Processing"),
+        (STATUS_PAID, "Paid"),
+        (STATUS_FAILED, "Failed"),
+    ]
+
+    wallet = models.ForeignKey(
+        Wallet,
+        on_delete=models.CASCADE,
+        related_name="managerpayouts",
+    )
+    period_start = models.DateField()
+    period_end = models.DateField()
+
+    gross_amount = models.DecimalField(max_digits=14, decimal_places=2)
+    wht_rate = models.DecimalField(max_digits=5, decimal_places=4, default=Decimal("0.2000"))
+    wht_amount = models.DecimalField(max_digits=14, decimal_places=2, editable=False)
+    net_amount = models.DecimalField(max_digits=14, decimal_places=2, editable=False)
+
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING)
+    destination_phone = models.CharField(max_length=20, blank=True)
+    provider = models.CharField(max_length=40, blank=True)
+    reference = models.CharField(max_length=100, blank=True)
+    paid_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    notes = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ["-period_end"]
+        verbose_name = "Manager Payout"
+        verbose_name_plural = "Manager Payouts"
+
+    def save(self, *args, **kwargs):
+        self.wht_amount = (self.gross_amount * self.wht_rate).quantize(Decimal("0.01"))
+        self.net_amount = (self.gross_amount - self.wht_amount).quantize(Decimal("0.01"))
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return (
+            f"{self.wallet.user.username} | "
+            f"{self.period_start}–{self.period_end} | "
+            f"Gross {self.gross_amount} | Net {self.net_amount} | {self.status}"
+        )
+
+    def mark_paid(self, reference="", provider="", paid_at=None):
+        self.status = self.STATUS_PAID
+        self.reference = reference
+        self.provider = provider
+        self.paid_at = paid_at or timezone.now()
+        self.save(update_fields=["status", "reference", "provider", "paid_at", "updated_at"])
+        # Also update wallet totals
+        self.wallet.total_paid = (self.wallet.total_paid or Decimal("0")) + self.net_amount
+        self.wallet.total_wht_withheld = (
+            self.wallet.total_wht_withheld or Decimal("0")
+        ) + self.wht_amount
+        self.wallet.balance = max(
+            Decimal("0"),
+            (self.wallet.balance or Decimal("0")) - self.gross_amount,
+        )
+        self.wallet.save(update_fields=["total_paid", "total_wht_withheld", "balance"])
+
+
+class MerchantPayout(models.Model):
+    """
+    Payout to a merchant for the cash price of a device they sold on financing.
+
+    Business rule:
+      - Merchant receives the agreed cash price of the device.
+      - NO WHT deduction for merchants in this workflow.
+      - Payout is separate from manager/agent commission.
+    """
+
+    STATUS_PENDING = "pending"
+    STATUS_EXTERNAL_PROCESSING = "external_processing"
+    STATUS_PAID = "paid"
+    STATUS_FAILED = "failed"
+
+    STATUS_CHOICES = [
+        (STATUS_PENDING, "Pending"),
+        (STATUS_EXTERNAL_PROCESSING, "External Processing"),
+        (STATUS_PAID, "Paid"),
+        (STATUS_FAILED, "Failed"),
+    ]
+
+    merchant = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="merchant_payouts",
+    )
+    contract_number = models.CharField(max_length=100, blank=True)
+    device_description = models.CharField(max_length=200, blank=True)
+    cash_price = models.DecimalField(max_digits=14, decimal_places=2)
+    paid_amount = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal("0"))
+
+    status = models.CharField(max_length=30, choices=STATUS_CHOICES, default=STATUS_PENDING)
+    provider = models.CharField(max_length=40, blank=True)
+    reference = models.CharField(max_length=100, blank=True)
+    paid_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    notes = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Merchant Payout"
+        verbose_name_plural = "Merchant Payouts"
+
+    @property
+    def wht_amount(self):
+        return Decimal("0")
+
+    @property
+    def net_amount(self):
+        return self.cash_price
+
+    def __str__(self):
+        return (
+            f"Merchant {self.merchant.username} | "
+            f"Contract {self.contract_number} | "
+            f"Cash price {self.cash_price} | {self.status}"
+        )
+
+    def mark_paid(self, reference="", provider="", paid_at=None):
+        self.status = self.STATUS_PAID
+        self.reference = reference
+        self.provider = provider
+        self.paid_amount = self.cash_price
+        self.paid_at = paid_at or timezone.now()
+        self.save(
+            update_fields=["status", "reference", "provider", "paid_amount", "paid_at", "updated_at"]
+        )

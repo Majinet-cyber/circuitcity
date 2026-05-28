@@ -1,24 +1,57 @@
 """
 Customer Payment Portal views — /pay/
+
+Handles contract search, payment initiation, history, support,
+and webhook placeholder endpoints for payment providers.
 """
 
-from decimal import Decimal
+import json
+import logging
+from decimal import Decimal, InvalidOperation
 
 from django.contrib import messages
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
+from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
+from core.models import AuditLog
 from .models import PaymentContract, PaymentTransaction
 from .payment_providers import get_payment_provider
 from .services import (
     apply_payment_to_contract,
     calculate_early_settlement_options,
-    calculate_lock_date,
     calculate_remaining_amount,
     search_payment_contract,
 )
 
+logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Audit helper
+# ---------------------------------------------------------------------------
+
+def _portal_audit(action, obj_type="", obj_id="", detail=None, request=None):
+    """Write an AuditLog entry for portal actions (no user — public portal)."""
+    ip = None
+    if request:
+        x_forwarded = request.META.get("HTTP_X_FORWARDED_FOR")
+        ip = x_forwarded.split(",")[0].strip() if x_forwarded else request.META.get("REMOTE_ADDR")
+    AuditLog.objects.create(
+        user=None,
+        action=action,
+        object_type=obj_type,
+        object_id=str(obj_id),
+        detail=detail or {},
+        ip_address=ip,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Search
+# ---------------------------------------------------------------------------
 
 def portal_search(request):
     """Landing / search page."""
@@ -46,6 +79,10 @@ def portal_search_post(request):
     })
 
 
+# ---------------------------------------------------------------------------
+# Contract detail
+# ---------------------------------------------------------------------------
+
 def portal_contract(request, contract_number):
     """Contract detail page — shows balance, payment form, early settlement."""
     contract = get_object_or_404(PaymentContract, contract_number=contract_number)
@@ -55,12 +92,16 @@ def portal_contract(request, contract_number):
 
     # Warning lock date
     lock_warning = None
-    if contract.lock_date:
+    if contract.lock_date and contract.status != "completed":
         days_until_lock = (contract.lock_date - timezone.localdate()).days
         if days_until_lock <= 7:
             lock_warning = {
                 "date": contract.lock_date,
-                "amount": contract.daily_price * max(days_until_lock, 0) if contract.daily_price else remaining,
+                "amount": (
+                    contract.daily_price * max(days_until_lock, 0)
+                    if contract.daily_price
+                    else remaining
+                ),
                 "days": days_until_lock,
             }
 
@@ -81,24 +122,33 @@ def portal_contract(request, contract_number):
     })
 
 
+# ---------------------------------------------------------------------------
+# Payment initiation
+# ---------------------------------------------------------------------------
+
 @require_POST
 def portal_payment(request, contract_number):
-    """Initiate a payment."""
+    """Initiate a payment against a contract."""
     contract = get_object_or_404(PaymentContract, contract_number=contract_number)
 
     if contract.status == PaymentContract.STATUS_COMPLETED:
-        messages.info(request, "This contract is fully paid.")
+        messages.info(request, "This contract is fully paid — no further payments are needed.")
         return redirect("portal_contract", contract_number=contract_number)
 
-    # Parse form
+    # Parse form inputs
     provider_name = request.POST.get("provider", "mock")
     phone_raw = request.POST.get("phone", "").strip()
     amount_raw = request.POST.get("amount", "0").strip()
 
+    # Validate amount
     try:
         amount = Decimal(amount_raw)
-    except Exception:
-        messages.error(request, "Invalid amount.")
+    except (InvalidOperation, ValueError):
+        messages.error(request, "Invalid amount entered. Please try again.")
+        return redirect("portal_contract", contract_number=contract_number)
+
+    if amount <= Decimal("0"):
+        messages.error(request, "Payment amount must be greater than zero.")
         return redirect("portal_contract", contract_number=contract_number)
 
     if amount < Decimal("100"):
@@ -106,15 +156,20 @@ def portal_payment(request, contract_number):
         return redirect("portal_contract", contract_number=contract_number)
 
     remaining = calculate_remaining_amount(contract)
+    if remaining <= Decimal("0"):
+        messages.info(request, "This contract is fully paid.")
+        return redirect("portal_contract", contract_number=contract_number)
+
+    # Cap payment at remaining balance
     if amount > remaining:
         amount = remaining
 
-    # Build phone with +265 prefix
+    # Normalise phone number to +265 format
     phone = phone_raw.replace(" ", "")
     if not phone.startswith("+265") and not phone.startswith("265"):
         phone = f"+265{phone.lstrip('0')}"
 
-    # Create transaction
+    # Create pending transaction record
     tx = PaymentTransaction.objects.create(
         payment_contract=contract,
         provider=provider_name,
@@ -126,26 +181,51 @@ def portal_payment(request, contract_number):
 
     # Initiate with provider
     provider = get_payment_provider(provider_name)
-    result = provider.create_payment_intent(
-        amount=amount,
-        phone=phone,
-        reference=tx.internal_reference,
-        description=f"TengaSale contract {contract_number}",
-    )
+    try:
+        result = provider.create_payment_intent(
+            amount=amount,
+            phone=phone,
+            reference=tx.internal_reference,
+            description=f"TengaSale contract {contract_number}",
+        )
+    except Exception as exc:
+        logger.exception("Payment provider error for %s", tx.internal_reference)
+        tx.status = PaymentTransaction.STATUS_FAILED
+        tx.raw_response = {"error": str(exc)}
+        tx.save(update_fields=["status", "raw_response"])
+        messages.error(
+            request,
+            "Payment provider is temporarily unavailable. Please try again or contact support."
+        )
+        return redirect("portal_contract", contract_number=contract_number)
 
     tx.provider_reference = result.provider_reference
     tx.raw_response = result.raw
 
     if result.success:
-        # For mock provider: immediately mark as paid and apply to contract
-        if provider_name == "mock" or getattr(provider, "mode", "") == "mock":
+        # Mock provider and MOCK_PAYMENTS=true: immediately confirm payment
+        if getattr(provider, "mode", "") == "mock":
             tx.status = PaymentTransaction.STATUS_PAID
             tx.paid_at = timezone.now()
             tx.save(update_fields=["provider_reference", "status", "paid_at", "raw_response"])
-            apply_payment_to_contract(contract, amount)
+            apply_result = apply_payment_to_contract(contract, amount)
+            _portal_audit(
+                AuditLog.ACTION_PAYMENT,
+                "PaymentContract",
+                contract.id,
+                {
+                    "contract_number": contract_number,
+                    "amount": str(amount),
+                    "provider": provider_name,
+                    "reference": tx.internal_reference,
+                    "days_extended": apply_result.get("days_extended", 0),
+                    "new_status": apply_result.get("status", ""),
+                },
+                request,
+            )
             messages.success(
                 request,
-                f"Payment of MWK {amount:,.2f} applied successfully. [{tx.internal_reference}]"
+                f"Payment of MWK {amount:,.0f} applied successfully. Ref: {tx.internal_reference}"
             )
         else:
             tx.status = PaymentTransaction.STATUS_PROCESSING
@@ -156,10 +236,22 @@ def portal_payment(request, contract_number):
     else:
         tx.status = PaymentTransaction.STATUS_FAILED
         tx.save(update_fields=["provider_reference", "status", "raw_response"])
-        messages.error(request, f"Payment failed: {result.message}")
+        # Friendly error — do not expose raw provider error to customer
+        logger.warning(
+            "Payment failed for contract %s: %s",
+            contract_number, result.message
+        )
+        messages.error(
+            request,
+            "Payment provider is temporarily unavailable. Please try again or contact support."
+        )
 
     return redirect("portal_contract", contract_number=contract_number)
 
+
+# ---------------------------------------------------------------------------
+# Payment history
+# ---------------------------------------------------------------------------
 
 def portal_history(request, contract_number):
     """Payment history for a contract."""
@@ -171,5 +263,79 @@ def portal_history(request, contract_number):
     })
 
 
+# ---------------------------------------------------------------------------
+# Support
+# ---------------------------------------------------------------------------
+
 def portal_support(request):
     return render(request, "portal/support.html", {})
+
+
+# ---------------------------------------------------------------------------
+# Webhook placeholder endpoints
+# All return safe JSON and log to AuditLog.
+# CSRF exempt — providers send raw POST from their own servers.
+# ---------------------------------------------------------------------------
+
+@csrf_exempt
+def _webhook_handler(request, provider_name):
+    """Internal webhook handler — logs receipt and returns safe JSON."""
+    if request.method not in ("POST", "GET"):
+        return JsonResponse({"ok": False, "message": "Method not allowed."}, status=405)
+
+    # Parse body safely
+    raw_body = request.body
+    try:
+        payload = json.loads(raw_body) if raw_body else {}
+    except json.JSONDecodeError:
+        payload = {"raw": raw_body.decode("utf-8", errors="replace")[:500]}
+
+    # Log webhook receipt
+    try:
+        _portal_audit(
+            AuditLog.ACTION_WEBHOOK,
+            "Webhook",
+            provider_name,
+            {
+                "provider": provider_name,
+                "method": request.method,
+                "content_type": request.content_type,
+                "payload_keys": list(payload.keys()) if isinstance(payload, dict) else [],
+            },
+            request,
+        )
+    except Exception:
+        logger.exception("Failed to audit webhook for %s", provider_name)
+
+    logger.info("Webhook received from provider=%s", provider_name)
+
+    return JsonResponse({
+        "ok": True,
+        "received": True,
+        "provider": provider_name,
+        "message": f"Webhook acknowledged. Processing not yet implemented for {provider_name}.",
+    })
+
+
+@csrf_exempt
+def webhook_paychangu(request):
+    """PayChangu webhook endpoint."""
+    return _webhook_handler(request, "paychangu")
+
+
+@csrf_exempt
+def webhook_paytrigger(request):
+    """PayTrigger webhook endpoint."""
+    return _webhook_handler(request, "paytrigger")
+
+
+@csrf_exempt
+def webhook_airtel(request):
+    """Airtel Money webhook endpoint."""
+    return _webhook_handler(request, "airtel")
+
+
+@csrf_exempt
+def webhook_tnm(request):
+    """TNM Mpamba webhook endpoint."""
+    return _webhook_handler(request, "tnm")

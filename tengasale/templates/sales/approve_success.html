@@ -1,19 +1,21 @@
-{% extends "base/base.html" %}
+{% extends "sales/base.html" %}
 {% load static %}
 
-{% block page_title %}Application Approved{% endblock %}
+{% block page_title %}Application Approved — TengaSale{% endblock %}
 
 {% block content %}
-<div class="success-screen">
-  <div class="success-icon">
-    <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+<div class="sales-main">
+  <div class="ts-success-screen">
+    <div class="ts-success-icon">
+      <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+    </div>
+    <h2 class="ts-success-heading">Application Approved!</h2>
+    <p class="ts-success-body">
+      <strong>{{ app.customer_name }}</strong>'s application
+      <strong>{{ app.application_number }}</strong> has been approved.
+    </p>
+    <p class="ts-success-sub">The merchant will be notified to complete the contract, IMEI entry, and device setup.</p>
+    <a href="{% url 'sales_home' %}" class="ts-btn-primary ts-btn-full ts-mt-24">Back to Home</a>
   </div>
-  <h2 class="success-heading">Application Approved</h2>
-  <p class="success-body">
-    <strong>{{ app.customer_name }}</strong>'s application
-    <strong>{{ app.application_number }}</strong> has been approved.
-  </p>
-  <p class="success-sub">The merchant will be notified to complete the contract, IMEI entry, and device setup.</p>
-  <a href="{% url 'sales_home' %}" class="btn-primary btn-full mt-24">Back to Home</a>
 </div>
 {% endblock %}

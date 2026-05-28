@@ -31,11 +31,26 @@ class QueueRuleAdmin(admin.ModelAdmin):
 
 @admin.register(AuditLog)
 class AuditLogAdmin(admin.ModelAdmin):
-    list_display = ("action", "user", "object_type", "object_id", "ip_address", "timestamp")
+    list_display = (
+        "timestamp", "action_display", "user",
+        "object_type", "object_id", "ip_address",
+    )
     list_filter = ("action", "object_type", "timestamp")
-    search_fields = ("user__username", "object_id", "action")
-    readonly_fields = ("user", "action", "object_type", "object_id", "detail", "ip_address", "timestamp")
+    search_fields = (
+        "user__username", "object_id",
+        "object_type", "ip_address",
+        "detail",
+    )
+    readonly_fields = (
+        "user", "action", "object_type",
+        "object_id", "detail", "ip_address", "timestamp",
+    )
     ordering = ("-timestamp",)
+    date_hierarchy = "timestamp"
+
+    def action_display(self, obj):
+        return obj.get_action_display()
+    action_display.short_description = "Action"
 
     def has_add_permission(self, request):
         return False

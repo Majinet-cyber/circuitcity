@@ -1,0 +1,181 @@
+{% extends "website/site_base.html" %}
+{% load static %}
+
+{% block site_title %}Merchant Terms — TengaSale{% endblock %}
+{% block site_description %}TengaSale Merchant Terms governing the relationship, responsibilities, and operational conduct of merchants on the TengaSale financing platform.{% endblock %}
+
+{% block site_content %}
+
+<div class="legal-hero">
+  <div class="legal-hero__inner">
+    <div class="legal-hero__eyebrow">Legal</div>
+    <h1 class="legal-hero__title">Merchant Terms</h1>
+    <p class="legal-hero__updated">Last updated: May 2026</p>
+  </div>
+</div>
+
+<nav class="legal-nav" aria-label="Legal pages">
+  <div class="legal-nav__inner">
+    <a href="{% url 'website_terms' %}" class="legal-nav__link">Terms of Service</a>
+    <a href="{% url 'website_privacy' %}" class="legal-nav__link">Privacy Policy</a>
+    <a href="{% url 'website_payment_terms' %}" class="legal-nav__link">Payment Terms</a>
+    <a href="{% url 'website_merchant_terms' %}" class="legal-nav__link legal-nav__link--active">Merchant Terms</a>
+  </div>
+</nav>
+
+<div class="legal-body">
+
+  <h2>1. Introduction</h2>
+  <p>
+    These Merchant Terms ("Merchant Terms") govern the relationship between TengaSale and
+    merchants who have been granted access to the TengaSale platform to originate, manage,
+    and support device financing contracts. Merchant access to the platform constitutes
+    acceptance of these Merchant Terms, the general <a href="{% url 'website_terms' %}">Terms of Service</a>,
+    and all applicable policies.
+  </p>
+  <p>
+    TengaSale reserves the right to amend these Merchant Terms at any time. Updated terms
+    will be published on this page with an updated date. Continued use of the platform after
+    changes constitutes acceptance.
+  </p>
+
+  <h2>2. Merchant Onboarding</h2>
+  <p>
+    Access to the TengaSale merchant platform is granted following a formal onboarding process.
+    To become a TengaSale merchant, you must:
+  </p>
+  <ul>
+    <li>Submit a merchant registration request to TengaSale;</li>
+    <li>Provide business registration details, contact information, and operating address;</li>
+    <li>Complete any identity and business verification steps required by TengaSale;</li>
+    <li>Agree to these Merchant Terms and the general Terms of Service;</li>
+    <li>Receive written confirmation of merchant account activation from TengaSale.</li>
+  </ul>
+  <p>
+    TengaSale reserves the right to approve or decline any merchant application at its
+    sole discretion.
+  </p>
+
+  <h2>3. Platform Access and Use</h2>
+  <p>
+    Approved merchants receive access to the TengaSale merchant dashboard. This access is
+    personal and non-transferable. Merchants must:
+  </p>
+  <ul>
+    <li>Keep login credentials secure and not share access with unauthorised individuals;</li>
+    <li>Notify TengaSale immediately if access credentials are compromised;</li>
+    <li>Use the platform only for its intended purpose of originating and managing financing contracts;</li>
+    <li>Not attempt to access data belonging to other merchants or customers outside of their authorised scope;</li>
+    <li>Comply with all usage policies and technical guidelines issued by TengaSale from time to time.</li>
+  </ul>
+
+  <h2>4. Sales Conduct Expectations</h2>
+  <p>
+    Merchants are responsible for the conduct of all financing applications submitted through
+    the TengaSale platform. Merchants must:
+  </p>
+  <ul>
+    <li>Obtain the customer's informed consent before submitting an application on their behalf;</li>
+    <li>Accurately represent the product, price, deposit, and repayment terms to the customer prior to application;</li>
+    <li>Not misrepresent TengaSale's products, services, or approval likelihood to customers;</li>
+    <li>Not submit applications for fictitious or non-consenting customers;</li>
+    <li>Ensure the customer has access to their repayment schedule before the device is released;</li>
+    <li>Only release devices to customers after the deposit has been confirmed and the contract has been activated.</li>
+  </ul>
+
+  <h2>5. Customer Information Handling</h2>
+  <p>
+    Merchants are responsible for collecting and handling customer information in compliance
+    with applicable Malawi data protection obligations and TengaSale's <a href="{% url 'website_privacy' %}">Privacy Policy</a>.
+    Specifically, merchants must:
+  </p>
+  <ul>
+    <li>Collect and securely store copies of customer National IDs and any other KYC documents as required;</li>
+    <li>Not use customer information obtained through the TengaSale platform for any purpose other than administering the financing contract;</li>
+    <li>Not share customer information with third parties outside of the TengaSale platform without the customer's consent and TengaSale's knowledge;</li>
+    <li>Report any suspected data breach or unauthorised access to customer data to TengaSale promptly.</li>
+  </ul>
+
+  <h2>6. Commissions and Merchant Wallet</h2>
+  <p>
+    Merchants earn commissions on contracts they originate, in accordance with the commission
+    structure agreed during onboarding. Commission rates, payment timing, and wallet management
+    are governed by the individual merchant agreement.
+  </p>
+  <p>
+    Commissions are credited to the merchant's TengaSale wallet upon contract activation.
+    TengaSale reserves the right to reverse or withhold commission payments in cases of
+    fraudulent applications, policy violations, or merchant default.
+  </p>
+
+  <h2>7. Repayments and Records</h2>
+  <p>
+    Merchants have access to repayment status and contract progress for all contracts they
+    have originated. Merchants are expected to support their customers in understanding their
+    repayment obligations and using the payment portal.
+  </p>
+  <p>
+    Merchants must not instruct customers to make payments through channels outside of the
+    TengaSale platform without prior authorisation from TengaSale. All payments must be
+    processed and recorded through the platform to ensure contract integrity.
+  </p>
+
+  <h2>8. Merchant Obligations Upon Default</h2>
+  <p>
+    Where a customer defaults on a contract originated by a merchant, TengaSale may require
+    the merchant to assist in customer outreach, recovery efforts, or device collection,
+    subject to the terms of the individual merchant agreement.
+  </p>
+  <p>
+    Merchants who have provided guarantees or security for their portfolio are liable to the
+    extent specified in their individual merchant agreement.
+  </p>
+
+  <h2>9. Suspension and Termination</h2>
+  <p>
+    TengaSale reserves the right to suspend or terminate a merchant's platform access in
+    the following circumstances, among others:
+  </p>
+  <ul>
+    <li>Breach of these Merchant Terms or the general Terms of Service;</li>
+    <li>Fraudulent or deceptive conduct in the submission of financing applications;</li>
+    <li>Failure to comply with KYC or data protection obligations;</li>
+    <li>Excessive portfolio default rates as defined in the merchant agreement;</li>
+    <li>Non-payment of any amounts owed to TengaSale under the merchant agreement;</li>
+    <li>At TengaSale's discretion for any other reason with reasonable notice.</li>
+  </ul>
+  <p>
+    Upon termination, the merchant's access to the platform will be revoked. Existing contracts
+    originated by the merchant will continue to be managed by TengaSale. The merchant remains
+    liable for obligations incurred prior to termination.
+  </p>
+
+  <h2>10. Audit and Compliance</h2>
+  <p>
+    TengaSale maintains audit logs of all merchant actions on the platform. Merchants acknowledge
+    that their platform activity is logged and may be reviewed for compliance, dispute resolution,
+    and operational oversight purposes.
+  </p>
+  <p>
+    TengaSale may request documentation or information from merchants in connection with
+    regulatory inquiries, audits, or legal proceedings. Merchants agree to cooperate with
+    such requests within a reasonable timeframe.
+  </p>
+
+  <h2>11. Limitation of Liability</h2>
+  <p>
+    TengaSale is not liable for losses arising from a merchant's failure to comply with
+    these Merchant Terms, including losses resulting from fraudulent applications, incorrect
+    customer information, or unauthorised access resulting from inadequate credential security.
+  </p>
+
+  <h2>12. Contact</h2>
+  <p>
+    For merchant-related queries, onboarding requests, or compliance matters, contact
+    TengaSale at:<br>
+    <a href="mailto:support@tengasale.africa">support@tengasale.africa</a>
+  </p>
+
+</div>
+
+{% endblock %}

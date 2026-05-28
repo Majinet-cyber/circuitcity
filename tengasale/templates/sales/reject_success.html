@@ -1,19 +1,21 @@
-{% extends "base/base.html" %}
+{% extends "sales/base.html" %}
 {% load static %}
 
-{% block page_title %}Application Rejected{% endblock %}
+{% block page_title %}Application Rejected — TengaSale{% endblock %}
 
 {% block content %}
-<div class="success-screen">
-  <div class="success-icon success-icon--reject">
-    <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+<div class="sales-main">
+  <div class="ts-success-screen">
+    <div class="ts-success-icon ts-success-icon--reject">
+      <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </div>
+    <h2 class="ts-success-heading">Application Rejected</h2>
+    <p class="ts-success-body">
+      <strong>{{ app.customer_name }}</strong>'s application
+      <strong>{{ app.application_number }}</strong> has been rejected.
+    </p>
+    <p class="ts-success-sub">The merchant has been notified. The application will be archived.</p>
+    <a href="{% url 'sales_home' %}" class="ts-btn-primary ts-btn-full ts-mt-24">Back to Home</a>
   </div>
-  <h2 class="success-heading">Application Rejected</h2>
-  <p class="success-body">
-    Application <strong>{{ app.application_number }}</strong> for
-    <strong>{{ app.customer_name }}</strong> has been rejected.
-  </p>
-  <p class="success-sub">The merchant has been notified.</p>
-  <a href="{% url 'sales_home' %}" class="btn-primary btn-full mt-24">Back to Home</a>
 </div>
 {% endblock %}

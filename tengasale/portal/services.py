@@ -3,6 +3,10 @@ Portal business logic services.
 
 All pricing, payment allocation, and contract helper functions.
 These are pure functions where possible — easy to test.
+
+MWK rounding note:
+  Prices are stored with 2dp for precision but displayed rounded to the
+  nearest 1 MWK (use the mwk_round() helper for display/payment suggestions).
 """
 
 from decimal import ROUND_HALF_UP, Decimal
@@ -12,23 +16,34 @@ from django.utils import timezone
 
 
 # ---------------------------------------------------------------------------
+# MWK rounding helper
+# ---------------------------------------------------------------------------
+
+def mwk_round(amount: Decimal) -> Decimal:
+    """Round to nearest whole MWK (no decimals for display/payment suggestions)."""
+    if amount is None:
+        return Decimal("0")
+    return amount.quantize(Decimal("1"), rounding=ROUND_HALF_UP)
+
+
+# ---------------------------------------------------------------------------
 # Pricing helpers
 # ---------------------------------------------------------------------------
 
 def calculate_daily_price(total_amount: Decimal, term_months: int) -> Decimal:
-    """Daily price = total / (term_months * 30)."""
+    """Daily price = total / (term_months * 30), rounded to nearest 1 MWK."""
     if not total_amount or not term_months:
         return Decimal("0")
     daily = total_amount / Decimal(term_months * 30)
-    return daily.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    return daily.quantize(Decimal("1"), rounding=ROUND_HALF_UP)
 
 
 def calculate_thirty_day_price(total_amount: Decimal, term_months: int) -> Decimal:
-    """30-day price = total / term_months."""
+    """30-day price = total / term_months, rounded to nearest 1 MWK."""
     if not total_amount or not term_months:
         return Decimal("0")
     monthly = total_amount / Decimal(term_months)
-    return monthly.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    return monthly.quantize(Decimal("1"), rounding=ROUND_HALF_UP)
 
 
 def calculate_remaining_amount(contract) -> Decimal:
@@ -85,7 +100,7 @@ def calculate_early_settlement_options(contract) -> list[dict]:
     for term_months, discount_percent in settlement_configs:
         if discount_percent > 0:
             discounted_remaining = remaining * (1 - discount_percent / 100)
-            discounted_remaining = discounted_remaining.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+            discounted_remaining = discounted_remaining.quantize(Decimal("1"), rounding=ROUND_HALF_UP)
             total_cost = contract.amount_paid + discounted_remaining
         else:
             discounted_remaining = remaining
@@ -94,7 +109,7 @@ def calculate_early_settlement_options(contract) -> list[dict]:
         options.append({
             "term_months": term_months,
             "discount_percent": discount_percent,
-            "total_cost": total_cost.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP),
+            "total_cost": total_cost.quantize(Decimal("1"), rounding=ROUND_HALF_UP),
             "remaining_to_pay": discounted_remaining,
             "daily_price": calculate_daily_price(discounted_remaining, max(term_months, 1)),
             "thirty_day_price": calculate_thirty_day_price(discounted_remaining, max(term_months, 1)),
@@ -115,21 +130,65 @@ def apply_payment_to_contract(contract, amount: Decimal, db_save: bool = True) -
     1. First clears any arrears (overdue amount).
     2. Remaining payment extends active usage days.
 
+    Guards:
+    - Zero or negative amounts return without modifying the contract.
+    - Payments are capped at the remaining balance (no negative remaining).
+    - Completed contracts are not modified.
+    - Progress is always capped at 100%.
+
     Returns a dict with allocation details.
     """
-    if amount <= 0:
-        return {"applied": Decimal("0"), "arrears_cleared": Decimal("0"), "days_extended": 0}
+    if amount is None or amount <= Decimal("0"):
+        return {
+            "applied": Decimal("0"),
+            "arrears_cleared": Decimal("0"),
+            "days_extended": 0,
+            "error": "Payment amount must be greater than zero.",
+        }
+
+    if contract.status == "completed":
+        return {
+            "applied": Decimal("0"),
+            "arrears_cleared": Decimal("0"),
+            "days_extended": 0,
+            "error": "Contract is already completed.",
+        }
 
     remaining_before = calculate_remaining_amount(contract)
+
+    if remaining_before <= Decimal("0"):
+        contract.status = "completed"
+        if db_save:
+            contract.save(update_fields=["status"])
+        return {
+            "applied": Decimal("0"),
+            "arrears_cleared": Decimal("0"),
+            "days_extended": 0,
+            "error": "Contract is already fully paid.",
+        }
+
+    # Cap payment at remaining balance — no overpayment
     applied = min(amount, remaining_before)
+
+    # Determine arrears (amount that was already overdue)
+    arrears_cleared = Decimal("0")
+    if contract.due_date and contract.due_date < timezone.localdate():
+        overdue_days = (timezone.localdate() - contract.due_date).days
+        if contract.daily_price and contract.daily_price > 0:
+            arrears_amount = Decimal(overdue_days) * contract.daily_price
+            arrears_cleared = min(applied, arrears_amount)
 
     # Calculate days extended by this payment
     days_extended = 0
     if contract.daily_price and contract.daily_price > 0:
         days_extended = int(applied / contract.daily_price)
 
-    # Update contract
+    # Update contract financials
     contract.amount_paid += applied
+
+    # Safety: never exceed total_amount
+    if contract.amount_paid > contract.total_amount:
+        contract.amount_paid = contract.total_amount
 
     # Recalculate due date and lock date
     new_due = calculate_next_due_date(contract)
@@ -144,10 +203,14 @@ def apply_payment_to_contract(contract, amount: Decimal, db_save: bool = True) -
     else:
         contract.status = "active"
 
-    # Update pricing fields
+    # Recalculate pricing on remaining balance for next period
     remaining_after = calculate_remaining_amount(contract)
-    contract.daily_price = calculate_daily_price(remaining_after, max(contract.term_months, 1))
-    contract.thirty_day_price = calculate_thirty_day_price(remaining_after, max(contract.term_months, 1))
+    if remaining_after > Decimal("0") and contract.status != "completed":
+        contract.daily_price = calculate_daily_price(remaining_after, max(contract.term_months, 1))
+        contract.thirty_day_price = calculate_thirty_day_price(remaining_after, max(contract.term_months, 1))
+    elif contract.status == "completed":
+        contract.daily_price = Decimal("0")
+        contract.thirty_day_price = Decimal("0")
 
     if db_save:
         contract.save(update_fields=[
@@ -157,6 +220,7 @@ def apply_payment_to_contract(contract, amount: Decimal, db_save: bool = True) -
 
     return {
         "applied": applied,
+        "arrears_cleared": arrears_cleared,
         "days_extended": days_extended,
         "new_due_date": contract.due_date,
         "new_lock_date": contract.lock_date,

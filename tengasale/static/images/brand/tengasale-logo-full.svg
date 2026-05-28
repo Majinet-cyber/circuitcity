@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 236 48" width="236" height="48" role="img" aria-label="TengaSale">
+  <title>TengaSale</title>
+  <!-- Orange rounded icon mark -->
+  <rect x="0" y="4" width="40" height="40" rx="11" fill="#ff6a00"/>
+  <text x="20" y="30"
+        font-family="system-ui,-apple-system,'Segoe UI',sans-serif"
+        font-weight="900"
+        font-size="25"
+        fill="#ffffff"
+        text-anchor="middle"
+        dominant-baseline="auto">T</text>
+  <!-- Wordmark: "Tenga" dark + "Sale" orange -->
+  <text x="52" y="31"
+        font-family="system-ui,-apple-system,'Segoe UI',sans-serif"
+        font-weight="800"
+        font-size="20"
+        fill="#101418"
+        dominant-baseline="auto">Tenga</text>
+  <text x="128" y="31"
+        font-family="system-ui,-apple-system,'Segoe UI',sans-serif"
+        font-weight="800"
+        font-size="20"
+        fill="#ff6a00"
+        dominant-baseline="auto">Sale</text>
+</svg>

@@ -1,0 +1,198 @@
+{% extends "website/site_base.html" %}
+{% load static %}
+
+{% block site_title %}Terms of Service — TengaSale{% endblock %}
+{% block site_description %}TengaSale Terms of Service governing the use of the smartphone financing platform for customers and merchants in Malawi.{% endblock %}
+
+{% block site_content %}
+
+<div class="legal-hero">
+  <div class="legal-hero__inner">
+    <div class="legal-hero__eyebrow">Legal</div>
+    <h1 class="legal-hero__title">Terms of Service</h1>
+    <p class="legal-hero__updated">Last updated: May 2026</p>
+  </div>
+</div>
+
+<nav class="legal-nav" aria-label="Legal pages">
+  <div class="legal-nav__inner">
+    <a href="{% url 'website_terms' %}" class="legal-nav__link legal-nav__link--active">Terms of Service</a>
+    <a href="{% url 'website_privacy' %}" class="legal-nav__link">Privacy Policy</a>
+    <a href="{% url 'website_payment_terms' %}" class="legal-nav__link">Payment Terms</a>
+    <a href="{% url 'website_merchant_terms' %}" class="legal-nav__link">Merchant Terms</a>
+  </div>
+</nav>
+
+<div class="legal-body">
+
+  <h2>1. Introduction</h2>
+  <p>
+    These Terms of Service ("Terms") govern your access to and use of the TengaSale platform,
+    including the customer payment portal, merchant dashboard, and any associated services
+    (collectively, the "Platform"). By accessing or using the Platform, you agree to be bound
+    by these Terms.
+  </p>
+  <p>
+    TengaSale is a smartphone financing platform operating in Malawi. The Platform enables
+    merchants to offer device financing to customers through structured instalment contracts,
+    and enables customers to access, manage, and repay those contracts.
+  </p>
+  <p>
+    If you do not agree to these Terms, do not use the Platform.
+  </p>
+
+  <h2>2. Use of the Platform</h2>
+  <p>
+    You may use the Platform only for lawful purposes and in accordance with these Terms.
+    You agree not to use the Platform in any way that violates applicable Malawi law or
+    regulation, or that could damage, disable, or impair the Platform or interfere with
+    other users.
+  </p>
+  <p>You must not:</p>
+  <ul>
+    <li>Provide false, misleading, or fraudulent information at any point during the application or repayment process;</li>
+    <li>Attempt to circumvent KYC or identity verification procedures;</li>
+    <li>Use the Platform to facilitate money laundering, fraud, or any other unlawful financial activity;</li>
+    <li>Share access credentials with unauthorised third parties;</li>
+    <li>Attempt to access data or system areas for which you have not been granted authorisation.</li>
+  </ul>
+
+  <h2>3. Eligibility</h2>
+  <p>
+    To use the Platform as a customer, you must:
+  </p>
+  <ul>
+    <li>Be a resident of Malawi;</li>
+    <li>Hold a valid Malawi National ID;</li>
+    <li>Be at least 18 years of age;</li>
+    <li>Have a registered mobile money account (Airtel Money or TNM Mpamba) or an approved alternative payment method;</li>
+    <li>Meet any additional eligibility criteria applied by your merchant or TengaSale's underwriting process.</li>
+  </ul>
+  <p>
+    Merchants must be registered business entities or sole traders operating lawfully in Malawi
+    and must complete the TengaSale merchant onboarding process.
+  </p>
+
+  <h2>4. Repayment Obligations</h2>
+  <p>
+    When a financing contract is approved, you are obligated to make repayments in accordance
+    with the schedule issued at the time of contract creation. Repayments must be made by their
+    due dates using an approved payment channel.
+  </p>
+  <p>
+    Failure to meet scheduled repayments constitutes a default under your contract. TengaSale
+    and its merchant partners reserve the right to pursue outstanding balances through available
+    legal and contractual remedies, which may include restrictions on continued device use
+    where device management technology is enabled.
+  </p>
+  <p>
+    Early repayment is permitted and encouraged. Early settlement discounts are applied
+    automatically at the rates stated in your contract. See the <a href="{% url 'website_payment_terms' %}">Payment Terms</a>
+    for full details on repayment allocation and early settlement.
+  </p>
+
+  <h2>5. Customer Responsibilities</h2>
+  <p>As a customer, you are responsible for:</p>
+  <ul>
+    <li>Providing accurate and complete identity and contact information during the application process;</li>
+    <li>Maintaining your registered mobile money account and keeping it available for payment;</li>
+    <li>Keeping your contract number, PayG number, and access credentials secure;</li>
+    <li>Notifying your merchant or TengaSale promptly if you believe your contract has been compromised or if you are unable to make a scheduled payment;</li>
+    <li>Retaining proof of payment for all transactions made through the Platform;</li>
+    <li>Returning or surrendering the financed device if required under the terms of your contract upon default.</li>
+  </ul>
+
+  <h2>6. Merchant Responsibilities</h2>
+  <p>
+    Merchants are responsible for ensuring that customer applications submitted through the
+    Platform are accurate and complete. Merchants must not submit applications on behalf of
+    customers without the customer's informed consent.
+  </p>
+  <p>
+    Merchants are responsible for KYC document collection at the point of sale, including
+    obtaining and retaining copies of required identity documents in accordance with applicable
+    regulations. Merchants must maintain the confidentiality of customer data accessed through
+    the Platform.
+  </p>
+  <p>
+    Merchant access to the Platform is subject to the <a href="{% url 'website_merchant_terms' %}">Merchant Terms</a>,
+    which form part of these Terms by reference.
+  </p>
+
+  <h2>7. Payment Processing</h2>
+  <p>
+    Payments made through the Platform are processed via integrated mobile money providers
+    and payment gateways. TengaSale does not guarantee the real-time processing of payments
+    where delays are caused by the underlying payment provider, network issues, or mobile
+    money system outages.
+  </p>
+  <p>
+    Payments are allocated against your contract balance in accordance with the
+    <a href="{% url 'website_payment_terms' %}">Payment Terms</a>. If a payment is received but
+    not reflected in your contract within 24 hours, contact TengaSale support with your
+    payment reference.
+  </p>
+
+  <h2>8. Device-Related Controls</h2>
+  <p>
+    For contracts where device management controls are enabled, failure to maintain repayments
+    may result in restrictions being applied to the financed device's functionality. These
+    controls are disclosed at the time of application and form part of the contract terms.
+  </p>
+  <p>
+    Device controls will be lifted upon full payment of the outstanding contract balance.
+    TengaSale is not liable for losses arising from device restriction where such restrictions
+    have been applied in accordance with the terms of the contract.
+  </p>
+
+  <h2>9. Default and Collections</h2>
+  <p>
+    A contract is considered in default when payments are more than the number of days
+    overdue as specified in the individual contract terms. TengaSale and its merchant partners
+    reserve the right to pursue overdue amounts through the following measures, among others:
+  </p>
+  <ul>
+    <li>Communication with the customer via their registered contact details;</li>
+    <li>Escalation to the originating merchant for resolution support;</li>
+    <li>Referral to a collections agent or legal proceedings where other remedies have been exhausted;</li>
+    <li>Reporting of default to applicable credit reference systems where such reporting is applicable in Malawi.</li>
+  </ul>
+
+  <h2>10. Limitation of Liability</h2>
+  <p>
+    To the maximum extent permitted by Malawi law, TengaSale and its officers, directors,
+    and affiliates shall not be liable for any indirect, incidental, special, consequential,
+    or punitive damages arising from your use of the Platform.
+  </p>
+  <p>
+    TengaSale's total liability to you for any claim arising out of or related to these Terms
+    shall not exceed the total amount paid by you through the Platform in the 90 days preceding
+    the claim.
+  </p>
+
+  <h2>11. Changes to Terms and Service</h2>
+  <p>
+    TengaSale reserves the right to modify these Terms at any time. Changes will be posted
+    to this page with an updated date. Your continued use of the Platform after changes are
+    posted constitutes your acceptance of the revised Terms.
+  </p>
+  <p>
+    TengaSale also reserves the right to modify, suspend, or discontinue the Platform or any
+    part of it at any time, with or without notice.
+  </p>
+
+  <h2>12. Governing Law</h2>
+  <p>
+    These Terms are governed by the laws of the Republic of Malawi. Any disputes arising
+    under these Terms shall be subject to the exclusive jurisdiction of the courts of Malawi.
+  </p>
+
+  <h2>13. Contact Information</h2>
+  <p>
+    If you have questions about these Terms, contact TengaSale at:<br>
+    <a href="mailto:support@tengasale.africa">support@tengasale.africa</a>
+  </p>
+
+</div>
+
+{% endblock %}

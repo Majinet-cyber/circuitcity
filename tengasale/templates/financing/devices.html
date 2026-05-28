@@ -1,0 +1,32 @@
+{% extends "base/base.html" %}
+
+{% block content %}
+
+<a href="{% url 'financing_dashboard' %}" class="back-link">BACK</a>
+<h1 class="greeting">Devices</h1>
+
+<section class="card">
+    <h2>Register device</h2>
+    <form method="post" class="stacked-form">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button class="btn" type="submit">SAVE DEVICE</button>
+    </form>
+</section>
+
+<section class="card">
+    <h2>Device stock</h2>
+    {% for device in devices %}
+        <div class="mini-table-row">
+            <div>
+                <strong>{{ device.brand }} {{ device.model }}</strong>
+                <small>{{ device.masked_imei }} | {{ device.assigned_customer|default:"Unassigned" }}</small>
+            </div>
+            <span>{{ device.get_status_display }}</span>
+        </div>
+    {% empty %}
+        <p class="text-muted">No devices registered.</p>
+    {% endfor %}
+</section>
+
+{% endblock %}

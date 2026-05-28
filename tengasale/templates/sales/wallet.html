@@ -1,20 +1,20 @@
-{% extends "base/base.html" %}
+{% extends "sales/base.html" %}
 {% load static %}
 
-{% block page_title %}Wallet & Earnings{% endblock %}
+{% block page_title %}Wallet & Earnings — TengaSale{% endblock %}
 
 {% block content %}
-<div class="page-back-row">
-  <a href="{% url 'sales_home' %}" class="back-link">
+<div class="sales-main">
+<div class="ts-back-row">
+  <a href="{% url 'sales_home' %}" class="ts-back-btn">
     <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
     Back
   </a>
-  <span class="page-label">Wallet</span>
 </div>
 
-{# Wallet Balance Card #}
+{# ── Balance Card ── #}
 <div class="wallet-balance-card">
-  <div class="wallet-balance-card__label">Wallet Balance</div>
+  <div class="wallet-balance-card__label">Available Balance</div>
   <div class="wallet-balance-card__amount">
     <span class="wallet-currency">MWK</span>
     <span class="wallet-amount">{{ wallet.balance|floatformat:2 }}</span>
@@ -25,13 +25,17 @@
       <span class="wallet-stat__value">MWK {{ wallet.total_earned|floatformat:0 }}</span>
     </div>
     <div class="wallet-stat">
-      <span class="wallet-stat__label">Total Paid Out</span>
+      <span class="wallet-stat__label">Paid Out</span>
       <span class="wallet-stat__value">MWK {{ wallet.total_paid|floatformat:0 }}</span>
+    </div>
+    <div class="wallet-stat">
+      <span class="wallet-stat__label">WHT Withheld</span>
+      <span class="wallet-stat__value text-muted">MWK {{ wallet.total_wht_withheld|floatformat:0 }}</span>
     </div>
   </div>
 </div>
 
-{# Tabs #}
+{# ── Tabs ── #}
 <div x-data="{ tab: '{{ active_tab }}' }">
   <div class="tab-bar">
     <button
@@ -51,7 +55,7 @@
     >Request Payout</button>
   </div>
 
-  {# Earnings Tab #}
+  {# ── Earnings Tab ── #}
   <div x-show="tab === 'earnings'">
     {% if transaction_rows %}
       {% for row in transaction_rows %}
@@ -78,35 +82,81 @@
     {% endif %}
   </div>
 
-  {# Payouts Tab #}
+  {# ── Payouts Tab (WHT breakdown) ── #}
   <div x-show="tab === 'payouts'" x-cloak>
-    {% with payout_rows=transaction_rows|dictsortreversed:"created_at" %}
-      {% for row in payout_rows %}
-        {% if "Payout" in row.type_label %}
-          <div class="tx-row tx-row--debit">
-            <div class="tx-row__left">
-              <div class="tx-row__type">{{ row.type_label }}</div>
-              <div class="tx-row__date">{{ row.created_at|date:"d M Y, H:i" }}</div>
+    {% if payout_records %}
+      {% for payout in payout_records %}
+        <div class="glass-card payout-card mb-8">
+          <div class="payout-card__header">
+            <div>
+              <div class="payout-card__period">{{ payout.period_start|date:"d M Y" }} – {{ payout.period_end|date:"d M Y" }}</div>
+              <div class="payout-card__ref">{% if payout.reference %}Ref: {{ payout.reference }}{% endif %}</div>
             </div>
-            <div class="tx-row__amount text-red">−MWK {{ row.amount|floatformat:2 }}</div>
+            <span class="status-badge
+              {% if payout.status == 'paid' %}status-badge--approved
+              {% elif payout.status == 'processing' %}status-badge--review
+              {% elif payout.status == 'failed' %}status-badge--rejected
+              {% else %}status-badge--pending{% endif %}">
+              {{ payout.get_status_display }}
+            </span>
           </div>
-        {% endif %}
-      {% empty %}
-        <div class="empty-state"><p>No payouts yet.</p></div>
+
+          <div class="payout-breakdown">
+            <div class="payout-row">
+              <span>Gross Earnings</span>
+              <span class="text-green">MWK {{ payout.gross_amount|floatformat:2 }}</span>
+            </div>
+            <div class="payout-row">
+              <span>WHT ({{ payout.wht_rate|floatformat:0 }}%… actual {{ payout.wht_rate|floatformat:0 }}%)</span>
+              <span class="text-red">− MWK {{ payout.wht_amount|floatformat:2 }}</span>
+            </div>
+            <div class="payout-row payout-row--net">
+              <span><strong>Net Payable</strong></span>
+              <span><strong>MWK {{ payout.net_amount|floatformat:2 }}</strong></span>
+            </div>
+            {% if payout.destination_phone %}
+              <div class="payout-row">
+                <span>Destination</span>
+                <span>{{ payout.destination_phone }}{% if payout.provider %} ({{ payout.provider }}){% endif %}</span>
+              </div>
+            {% endif %}
+            {% if payout.paid_at %}
+              <div class="payout-row">
+                <span>Paid At</span>
+                <span>{{ payout.paid_at|date:"d M Y, H:i" }}</span>
+              </div>
+            {% endif %}
+          </div>
+        </div>
       {% endfor %}
-    {% endwith %}
+    {% else %}
+      <div class="empty-state"><p>No payout records yet.</p></div>
+    {% endif %}
   </div>
 
-  {# Request Payout Tab #}
+  {# ── Request Payout Tab ── #}
   <div x-show="tab === 'request'" x-cloak>
     <div class="glass-card mt-8">
       <div class="review-card__title">Request Payout</div>
-      <p class="section-description">Payouts are processed within 2 business days.</p>
+      <p class="section-description">
+        Payouts are processed within 2 business days.
+        20% Withholding Tax (WHT) will be deducted from your gross earnings.
+      </p>
+      <div class="payout-breakdown mb-12">
+        <div class="payout-row">
+          <span>Available Balance</span>
+          <span class="text-green">MWK {{ wallet.balance|floatformat:2 }}</span>
+        </div>
+        <div class="payout-row">
+          <span>WHT (20%)</span>
+          <span class="text-red">− MWK {{ wallet.balance|floatformat:2|add:"0" }}</span>
+        </div>
+      </div>
       <form method="post" action="#">
         {% csrf_token %}
         <div class="field-group">
           <label class="field-label">Amount (MWK)</label>
-          <input type="number" name="amount" class="input" min="500" max="{{ wallet.balance|floatformat:0 }}" placeholder="Enter amount" required>
+          <input type="number" name="amount" class="input" min="500" max="{{ wallet.balance|floatformat:0 }}" placeholder="Enter gross amount" required>
         </div>
         <div class="field-group">
           <label class="field-label">Mobile Money Number</label>
@@ -124,8 +174,22 @@
           </select>
         </div>
         <button type="submit" class="btn-primary btn-full mt-8">Request Payout</button>
+        <p class="section-description mt-8" style="font-size:0.8rem;">
+          Note: 20% WHT will be deducted. Net payout = gross × 80%.
+        </p>
       </form>
     </div>
   </div>
+</div>
+
+<style>
+.payout-card { padding: 16px; margin-bottom: 10px; }
+.payout-card__header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
+.payout-card__period { font-weight: 700; font-size: 0.95rem; }
+.payout-card__ref { font-size: 0.78rem; color: var(--muted); }
+.payout-breakdown { display: flex; flex-direction: column; gap: 6px; border-top: 1px solid var(--border); padding-top: 10px; }
+.payout-row { display: flex; justify-content: space-between; font-size: 0.88rem; }
+.payout-row--net { border-top: 1px solid var(--border); padding-top: 6px; margin-top: 2px; }
+</style>
 </div>
 {% endblock %}

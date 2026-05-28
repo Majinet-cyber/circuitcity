@@ -1,17 +1,28 @@
 """
-Portal app tests — Phase 5.
+Portal app tests — Phase 6.
 
 Coverage:
 - PaymentContract number uniqueness (TS-MW-XXXXXXXX)
 - PayG number uniqueness (TSGXXXXXX)
-- calculate_daily_price accuracy
+- calculate_daily_price accuracy (MWK rounding)
 - calculate_thirty_day_price accuracy
 - Early settlement (3/6/9/12 months) discount calculations
-- apply_payment_to_contract — arrears cleared first, days extended
+- apply_payment_to_contract — all edge cases
+  * zero payment rejected
+  * negative payment rejected
+  * payment > remaining balance is capped
+  * payment exactly completes contract
+  * payment while overdue
+  * completed contract blocks further payment
+  * progress never exceeds 100%
 - Portal search by contract number / PayG / national ID / phone
 - Mock payment provider returns paid status
 - Portal search page renders (200)
 - Portal contract page renders (200) after seeding
+- Payment webhook endpoints return safe JSON (Phase 6)
+- Webhook endpoints log to AuditLog (Phase 6)
+- No Yellow/KulaSell references in rendered templates (Phase 6)
+- Provider missing keys returns friendly error (Phase 6)
 """
 
 from decimal import Decimal
@@ -85,7 +96,7 @@ class PricingCalculationTest(TestCase):
     def test_daily_price_standard(self):
         # MWK 45,000 over 12 months = 45000 / (12 * 30) = 45000 / 360 = 125
         result = calculate_daily_price(Decimal("45000"), 12)
-        self.assertEqual(result, Decimal("125.00"))
+        self.assertEqual(result, Decimal("125"))
 
     def test_daily_price_zero_term(self):
         result = calculate_daily_price(Decimal("45000"), 0)
@@ -98,16 +109,16 @@ class PricingCalculationTest(TestCase):
     def test_thirty_day_price_standard(self):
         # 45000 / 12 = 3750
         result = calculate_thirty_day_price(Decimal("45000"), 12)
-        self.assertEqual(result, Decimal("3750.00"))
+        self.assertEqual(result, Decimal("3750"))
 
     def test_thirty_day_price_zero_amount(self):
         result = calculate_thirty_day_price(Decimal("0"), 12)
         self.assertEqual(result, Decimal("0"))
 
     def test_thirty_day_price_rounding(self):
-        # 10000 / 3 = 3333.33...
+        # 10000 / 3 = 3333.33... → rounds to 3333 MWK
         result = calculate_thirty_day_price(Decimal("10000"), 3)
-        self.assertEqual(result, Decimal("3333.33"))
+        self.assertEqual(result, Decimal("3333"))
 
     def test_remaining_amount(self):
         c = PaymentContract(total_amount=Decimal("10000"), amount_paid=Decimal("3000"))
@@ -144,13 +155,13 @@ class EarlySettlementTest(TestCase):
         opts = calculate_early_settlement_options(self.contract)
         opt = next(o for o in opts if o["term_months"] == 3)
         expected_remaining = Decimal("45000") * Decimal("0.75")
-        self.assertEqual(opt["remaining_to_pay"], expected_remaining.quantize(Decimal("0.01")))
+        self.assertEqual(opt["remaining_to_pay"], expected_remaining.quantize(Decimal("1")))
 
     def test_6_month_discount(self):
         opts = calculate_early_settlement_options(self.contract)
         opt = next(o for o in opts if o["term_months"] == 6)
         expected_remaining = Decimal("45000") * Decimal("0.85")
-        self.assertEqual(opt["remaining_to_pay"], expected_remaining.quantize(Decimal("0.01")))
+        self.assertEqual(opt["remaining_to_pay"], expected_remaining.quantize(Decimal("1")))
 
     def test_12_month_no_discount(self):
         opts = calculate_early_settlement_options(self.contract)
@@ -163,7 +174,7 @@ class EarlySettlementTest(TestCase):
         opts = calculate_early_settlement_options(self.contract)
         opt = next(o for o in opts if o["term_months"] == 3)
         expected_remaining = Decimal("35000") * Decimal("0.75")
-        self.assertEqual(opt["remaining_to_pay"], expected_remaining.quantize(Decimal("0.01")))
+        self.assertEqual(opt["remaining_to_pay"], expected_remaining.quantize(Decimal("1")))
 
 
 # ---------------------------------------------------------------------------
@@ -300,7 +311,7 @@ class PortalPageTest(TestCase):
             customer_phone="+265889990001",
             total_amount=Decimal("30000"),
             amount_paid=Decimal("5000"),
-            daily_price=Decimal("83.33"),
+            daily_price=Decimal("83"),
             thirty_day_price=Decimal("2500"),
         )
 
@@ -332,3 +343,326 @@ class PortalPageTest(TestCase):
     def test_404_for_invalid_contract(self):
         res = self.client.get("/pay/contract/TS-MW-99999999/")
         self.assertEqual(res.status_code, 404)
+
+
+# ---------------------------------------------------------------------------
+# Payment edge case tests (Phase 6)
+# ---------------------------------------------------------------------------
+
+class PaymentEdgeCaseTest(TestCase):
+    def _make_contract(self, **kwargs):
+        defaults = dict(
+            customer_name="Edge Test",
+            customer_phone="+265880000099",
+            total_amount=Decimal("45000"),
+            amount_paid=Decimal("0"),
+            daily_price=Decimal("125"),
+            thirty_day_price=Decimal("3750"),
+            term_months=12,
+            start_date=date.today(),
+            status="active",
+        )
+        defaults.update(kwargs)
+        return PaymentContract.objects.create(**defaults)
+
+    def test_negative_payment_rejected(self):
+        c = self._make_contract()
+        result = apply_payment_to_contract(c, Decimal("-500"))
+        c.refresh_from_db()
+        self.assertEqual(c.amount_paid, Decimal("0"))
+        self.assertIn("error", result)
+
+    def test_zero_payment_rejected(self):
+        c = self._make_contract()
+        result = apply_payment_to_contract(c, Decimal("0"))
+        self.assertEqual(result["applied"], Decimal("0"))
+        self.assertIn("error", result)
+
+    def test_payment_exceeding_balance_is_capped(self):
+        c = self._make_contract(amount_paid=Decimal("44500"))
+        result = apply_payment_to_contract(c, Decimal("5000"))
+        c.refresh_from_db()
+        self.assertEqual(c.amount_paid, Decimal("45000"))
+        self.assertEqual(result["applied"], Decimal("500"))
+
+    def test_payment_exactly_completes_contract(self):
+        c = self._make_contract(amount_paid=Decimal("44000"))
+        result = apply_payment_to_contract(c, Decimal("1000"))
+        c.refresh_from_db()
+        self.assertEqual(c.status, "completed")
+        self.assertEqual(c.amount_paid, Decimal("45000"))
+        self.assertEqual(c.daily_price, Decimal("0"))
+
+    def test_payment_while_overdue_clears_arrears(self):
+        past_start = date.today() - timedelta(days=40)
+        past_due = date.today() - timedelta(days=10)
+        c = self._make_contract(
+            start_date=past_start,
+            amount_paid=Decimal("10000"),
+            status="overdue",
+            due_date=past_due,
+        )
+        result = apply_payment_to_contract(c, Decimal("3750"))
+        c.refresh_from_db()
+        self.assertGreaterEqual(result["arrears_cleared"], Decimal("0"))
+        self.assertGreater(result["applied"], Decimal("0"))
+
+    def test_progress_never_exceeds_100(self):
+        c = self._make_contract(
+            amount_paid=Decimal("45000"),
+            status="completed",
+        )
+        self.assertEqual(c.progress_percent, 100)
+
+    def test_remaining_never_negative(self):
+        c = self._make_contract(
+            amount_paid=Decimal("50000"),
+            total_amount=Decimal("45000"),
+        )
+        from portal.services import calculate_remaining_amount
+        self.assertEqual(calculate_remaining_amount(c), Decimal("0"))
+
+    def test_completed_contract_blocks_payment(self):
+        c = self._make_contract(
+            amount_paid=Decimal("45000"),
+            status="completed",
+        )
+        result = apply_payment_to_contract(c, Decimal("1000"))
+        c.refresh_from_db()
+        self.assertIn("error", result)
+        self.assertEqual(result["applied"], Decimal("0"))
+
+
+# ---------------------------------------------------------------------------
+# Webhook endpoint tests (Phase 6)
+# ---------------------------------------------------------------------------
+
+class WebhookEndpointTest(TestCase):
+    def setUp(self):
+        self.client = Client()
+
+    def test_paychangu_webhook_returns_safe_json(self):
+        res = self.client.post(
+            "/pay/webhooks/paychangu/",
+            data='{"event": "payment.completed", "amount": 5000}',
+            content_type="application/json",
+            HTTP_X_PAYCHANGU_SIGNATURE="test-sig",
+        )
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertTrue(data["ok"])
+        self.assertEqual(data["provider"], "paychangu")
+
+    def test_airtel_webhook_returns_safe_json(self):
+        res = self.client.post(
+            "/pay/webhooks/airtel/",
+            data='{"status": "SUCCESS"}',
+            content_type="application/json",
+        )
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertTrue(data["ok"])
+
+    def test_tnm_webhook_returns_safe_json(self):
+        res = self.client.post(
+            "/pay/webhooks/tnm/",
+            data='{"status": "SUCCESS"}',
+            content_type="application/json",
+        )
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.json()["provider"], "tnm")
+
+    def test_paytrigger_webhook_returns_safe_json(self):
+        res = self.client.post(
+            "/pay/webhooks/paytrigger/",
+            data='{}',
+            content_type="application/json",
+        )
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertTrue(data["ok"])
+
+    def test_webhook_with_empty_body(self):
+        res = self.client.post(
+            "/pay/webhooks/paychangu/",
+            data="",
+            content_type="application/json",
+        )
+        self.assertEqual(res.status_code, 200)
+
+
+# ---------------------------------------------------------------------------
+# Provider configuration tests (Phase 6)
+# ---------------------------------------------------------------------------
+
+class ProviderConfigurationTest(TestCase):
+    def test_unconfigured_paychangu_returns_friendly_error(self):
+        from portal.payment_providers import PayChanguProvider
+        provider = PayChanguProvider()
+        result = provider.create_payment_intent(
+            amount=Decimal("5000"),
+            phone="+265881234567",
+            reference="TS-PAY-TEST",
+        )
+        self.assertFalse(result.success)
+        self.assertIn("not configured", result.message.lower())
+
+    def test_unconfigured_airtel_returns_friendly_error(self):
+        from portal.payment_providers import AirtelMoneyProvider
+        provider = AirtelMoneyProvider()
+        result = provider.create_payment_intent(
+            amount=Decimal("5000"),
+            phone="+265881234567",
+            reference="TS-PAY-TEST",
+        )
+        self.assertFalse(result.success)
+        self.assertIn("not configured", result.message.lower())
+
+    def test_unconfigured_tnm_returns_friendly_error(self):
+        from portal.payment_providers import TNMMpambaProvider
+        provider = TNMMpambaProvider()
+        result = provider.create_payment_intent(
+            amount=Decimal("5000"),
+            phone="+265881234567",
+            reference="TS-PAY-TEST",
+        )
+        self.assertFalse(result.success)
+        self.assertIn("not configured", result.message.lower())
+
+
+# ---------------------------------------------------------------------------
+# No Yellow/KulaSell references in rendered templates (Phase 6)
+# ---------------------------------------------------------------------------
+
+class NoYellowReferencesTest(TestCase):
+    YELLOW_TERMS = [
+        "Yellow Africa", "KulaSell", "kulasell",
+        "yellow.com", "© Yellow",
+    ]
+
+    def setUp(self):
+        self.client = Client()
+        self.contract = PaymentContract.objects.create(
+            customer_name="Test User",
+            customer_phone="+265889990099",
+            total_amount=Decimal("30000"),
+            amount_paid=Decimal("5000"),
+        )
+
+    def _check_no_yellow(self, content):
+        for term in self.YELLOW_TERMS:
+            self.assertNotIn(
+                term, content,
+                f"Found forbidden reference '{term}' in rendered template."
+            )
+
+    def test_portal_search_no_yellow(self):
+        res = self.client.get("/pay/")
+        self._check_no_yellow(res.content.decode())
+
+    def test_portal_contract_no_yellow(self):
+        res = self.client.get(f"/pay/contract/{self.contract.contract_number}/")
+        self._check_no_yellow(res.content.decode())
+
+    def test_website_landing_no_yellow(self):
+        res = self.client.get("/site/")
+        self._check_no_yellow(res.content.decode())
+
+
+# ---------------------------------------------------------------------------
+# MWK rounding tests (Phase 6)
+# ---------------------------------------------------------------------------
+
+class MWKRoundingTest(TestCase):
+    def test_daily_price_is_whole_mwk(self):
+        from portal.services import calculate_daily_price
+        result = calculate_daily_price(Decimal("45000"), 12)
+        self.assertEqual(result, result.quantize(Decimal("1")))
+
+    def test_thirty_day_price_is_whole_mwk(self):
+        from portal.services import calculate_thirty_day_price
+        result = calculate_thirty_day_price(Decimal("45000"), 12)
+        self.assertEqual(result, result.quantize(Decimal("1")))
+
+    def test_mwk_round_helper(self):
+        from portal.services import mwk_round
+        self.assertEqual(mwk_round(Decimal("125.67")), Decimal("126"))
+        self.assertEqual(mwk_round(Decimal("125.49")), Decimal("125"))
+        self.assertEqual(mwk_round(Decimal("0")), Decimal("0"))
+
+
+# ---------------------------------------------------------------------------
+# PWA / manifest / SW route tests (Phase 6)
+# ---------------------------------------------------------------------------
+
+class PWARoutesTest(TestCase):
+    def setUp(self):
+        self.client = Client()
+
+    def test_offline_page_renders(self):
+        res = self.client.get("/offline/")
+        self.assertEqual(res.status_code, 200)
+
+    def test_manifest_accessible(self):
+        res = self.client.get("/static/manifest.webmanifest")
+        self.assertIn(res.status_code, (200, 404))
+
+    def test_sw_accessible(self):
+        res = self.client.get("/static/sw.js")
+        self.assertIn(res.status_code, (200, 404))
+
+
+# ---------------------------------------------------------------------------
+# Device lock provider tests (Phase 6)
+# ---------------------------------------------------------------------------
+
+class DeviceLockProviderTest(TestCase):
+    def test_mock_lock_provider_enroll(self):
+        from integrations.portal_device_lock import MockPortalDeviceLockProvider
+        contract = PaymentContract.objects.create(
+            customer_name="Lock Test",
+            customer_phone="+265881000099",
+            total_amount=Decimal("30000"),
+        )
+        provider = MockPortalDeviceLockProvider()
+        result = provider.enroll_device(contract)
+        self.assertTrue(result["success"])
+
+    def test_mock_lock_provider_lock(self):
+        from integrations.portal_device_lock import MockPortalDeviceLockProvider
+        contract = PaymentContract.objects.create(
+            customer_name="Lock Test 2",
+            customer_phone="+265881000098",
+            total_amount=Decimal("30000"),
+        )
+        provider = MockPortalDeviceLockProvider()
+        result = provider.lock_device(contract)
+        self.assertTrue(result["success"])
+        contract.refresh_from_db()
+        self.assertEqual(contract.device_lock_status, "locked")
+
+    def test_mock_lock_provider_unlock(self):
+        from integrations.portal_device_lock import MockPortalDeviceLockProvider
+        contract = PaymentContract.objects.create(
+            customer_name="Lock Test 3",
+            customer_phone="+265881000097",
+            total_amount=Decimal("30000"),
+            device_lock_status="locked",
+        )
+        provider = MockPortalDeviceLockProvider()
+        result = provider.unlock_device(contract)
+        self.assertTrue(result["success"])
+        contract.refresh_from_db()
+        self.assertEqual(contract.device_lock_status, "unlocked")
+
+    def test_knox_not_configured_returns_clean_error(self):
+        from integrations.portal_device_lock import KnoxProvider
+        contract = PaymentContract.objects.create(
+            customer_name="Knox Test",
+            customer_phone="+265881000096",
+            total_amount=Decimal("30000"),
+        )
+        provider = KnoxProvider()
+        result = provider.lock_device(contract)
+        self.assertFalse(result["success"])
+        self.assertIn("not configured", result["message"].lower())

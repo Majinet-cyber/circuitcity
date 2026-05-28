@@ -1,6 +1,8 @@
 {% extends "base/base.html" %}
+{% load static %}
 
 {% block content %}
+<link rel="stylesheet" href="{% static 'css/tengasale.css' %}">
 
 <a href="{% url 'kyc_capture' app.id %}" class="soft-back">
     <span class="soft-back-icon">&larr;</span>
@@ -13,38 +15,38 @@
     {% csrf_token %}
     {{ form.non_field_errors }}
 
-    <div class="form-group">
+    <div class="form-group{% if 'region' in app.correction_fields %} has-correction{% endif %}">
         <label for="{{ form.region.id_for_label }}">Region</label>
         {{ form.region }}
         {{ form.region.errors }}
     </div>
 
-    <div class="form-group">
+    <div class="form-group{% if 'district' in app.correction_fields %} has-correction{% endif %}">
         <label for="{{ form.district.id_for_label }}">District</label>
         {{ form.district }}
         {{ form.district.errors }}
     </div>
 
-    <div class="form-group">
+    <div class="form-group{% if 'traditional_authority' in app.correction_fields %} has-correction{% endif %}">
         <label for="{{ form.traditional_authority.id_for_label }}">Traditional authority</label>
         {{ form.traditional_authority }}
         {{ form.traditional_authority.errors }}
     </div>
 
-    <div class="form-group">
+    <div class="form-group{% if 'precise_location' in app.correction_fields %} has-correction{% endif %}">
         <label for="{{ form.precise_location.id_for_label }}">Precise location</label>
         {{ form.precise_location }}
         {{ form.precise_location.errors }}
     </div>
 
-    <div class="form-group">
+    <div class="form-group{% if 'gps_coordinates' in app.correction_fields %} has-correction{% endif %}">
         <label for="{{ form.gps_coordinates.id_for_label }}">GPS coordinates if available</label>
         {{ form.gps_coordinates }}
         {{ form.gps_coordinates.errors }}
         <button type="button" class="btn btn-outline" data-location-button>USE CURRENT LOCATION</button>
     </div>
 
-    <div class="form-group">
+    <div class="form-group{% if 'map_screenshot' in app.correction_fields %} has-correction{% endif %}">
         <label for="{{ form.map_screenshot.id_for_label }}">Map screenshot</label>
         {% if app.map_screenshot %}
             <img class="upload-preview" src="{{ app.map_screenshot.url }}" alt="Map screenshot">
@@ -53,13 +55,13 @@
         {{ form.map_screenshot.errors }}
     </div>
 
-    <div class="form-group">
+    <div class="form-group{% if 'next_of_kin_1_name' in app.correction_fields %} has-correction{% endif %}">
         <label for="{{ form.next_of_kin_1_name.id_for_label }}">{{ form.next_of_kin_1_name.label }}</label>
         {{ form.next_of_kin_1_name }}
         {{ form.next_of_kin_1_name.errors }}
     </div>
 
-    <div class="form-group">
+    <div class="form-group{% if 'next_of_kin_1_phone' in app.correction_fields %} has-correction{% endif %}">
         <label for="{{ form.next_of_kin_1_phone.id_for_label }}">{{ form.next_of_kin_1_phone.label }}</label>
         <div class="phone-input">
             <span>+265</span>
@@ -68,7 +70,7 @@
         {{ form.next_of_kin_1_phone.errors }}
     </div>
 
-    <div class="form-group">
+    <div class="form-group{% if 'next_of_kin_1_relationship' in app.correction_fields %} has-correction{% endif %}">
         <label for="{{ form.next_of_kin_1_relationship.id_for_label }}">{{ form.next_of_kin_1_relationship.label }}</label>
         {{ form.next_of_kin_1_relationship }}
         {{ form.next_of_kin_1_relationship.errors }}

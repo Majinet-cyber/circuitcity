@@ -1,39 +1,60 @@
 /**
- * TengaSale Service Worker
- * Cache-first for static assets, network-first for HTML pages.
- * Offline fallback for navigation requests.
+ * TengaSale Service Worker — v1.0
+ *
+ * Caching strategy:
+ *   Static assets (CSS/JS/images): cache-first
+ *   HTML pages: network-first with offline fallback
+ *   Payment / contract pages: never cached (privacy-sensitive)
+ *   Admin / API / media: always skipped
  */
 
-const CACHE_NAME = "tengasale-v1";
-const STATIC_CACHE = "tengasale-static-v1";
+const CACHE_VERSION = "v1.0.2";
+const STATIC_CACHE = `tengasale-static-${CACHE_VERSION}`;
+const HTML_CACHE   = `tengasale-html-${CACHE_VERSION}`;
+const OFFLINE_URL  = "/offline/";
 
-// Static assets to precache
+// Static assets to precache at install
 const PRECACHE_ASSETS = [
   "/static/css/style.css",
   "/static/css/website.css",
+  "/static/css/tengasale.css",
   "/static/manifest.webmanifest",
+  OFFLINE_URL,
 ];
 
-// Offline fallback page (served for failed navigation requests)
-const OFFLINE_URL = "/offline/";
+// Paths that must NEVER be cached (private customer data)
+const NEVER_CACHE_PATHS = [
+  "/pay/contract/",
+  "/pay/webhooks/",
+  "/admin/",
+  "/api/",
+  "/media/",
+];
 
-// Install: precache static shell
+function shouldNeverCache(url) {
+  return NEVER_CACHE_PATHS.some((p) => url.pathname.startsWith(p));
+}
+
+// ── Install ────────────────────────────────────────────────────────────────
+
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(STATIC_CACHE).then((cache) => {
-      return cache.addAll(PRECACHE_ASSETS).catch(() => {});
-    })
+    caches.open(STATIC_CACHE).then((cache) =>
+      cache.addAll(PRECACHE_ASSETS).catch(() => {})
+    )
   );
   self.skipWaiting();
 });
 
-// Activate: clean up old caches
+// ── Activate ───────────────────────────────────────────────────────────────
+
 self.addEventListener("activate", (event) => {
+  const currentCaches = [STATIC_CACHE, HTML_CACHE];
   event.waitUntil(
     caches.keys().then((keys) =>
       Promise.all(
         keys
-          .filter((key) => key !== CACHE_NAME && key !== STATIC_CACHE)
+          .filter((key) => !currentCaches.includes(key))
           .map((key) => caches.delete(key))
       )
     )
@@ -41,7 +62,8 @@ self.addEventListener("activate", (event) => {
   self.clients.claim();
 });
 
-// Fetch strategy
+// ── Fetch ──────────────────────────────────────────────────────────────────
+
 self.addEventListener("fetch", (event) => {
   const { request } = event;
   const url = new URL(request.url);
@@ -49,16 +71,10 @@ self.addEventListener("fetch", (event) => {
   // Only handle same-origin requests
   if (url.origin !== self.location.origin) return;
 
-  // Skip Django admin, API endpoints, and media uploads
-  if (
-    url.pathname.startsWith("/admin/") ||
-    url.pathname.startsWith("/api/") ||
-    url.pathname.startsWith("/media/")
-  ) {
-    return;
-  }
+  // Never intercept sensitive paths — let them go straight to network
+  if (shouldNeverCache(url)) return;
 
-  // Cache-first for static assets (CSS, JS, images, fonts)
+  // Cache-first for static assets
   if (
     url.pathname.startsWith("/static/") ||
     request.destination === "image" ||
@@ -81,21 +97,24 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Network-first for HTML navigation — fall back to offline page
+  // Network-first for HTML navigation (public pages only)
   if (request.mode === "navigate" || request.headers.get("accept")?.includes("text/html")) {
     event.respondWith(
       fetch(request)
         .then((response) => {
-          // Cache successful HTML responses briefly
-          if (response.ok) {
+          // Only cache publicly-accessible pages (not /pay/contract/*)
+          if (response.ok && !shouldNeverCache(url)) {
             const clone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+            caches.open(HTML_CACHE).then((cache) => cache.put(request, clone));
           }
           return response;
         })
         .catch(() =>
           caches.match(request).then(
-            (cached) => cached || caches.match(OFFLINE_URL) || new Response("Offline", { status: 503 })
+            (cached) =>
+              cached ||
+              caches.match(OFFLINE_URL) ||
+              new Response("You are offline", { status: 503 })
           )
         )
     );

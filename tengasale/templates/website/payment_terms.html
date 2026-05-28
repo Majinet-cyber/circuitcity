@@ -1,0 +1,166 @@
+{% extends "website/site_base.html" %}
+{% load static %}
+
+{% block site_title %}Payment Terms — TengaSale{% endblock %}
+{% block site_description %}TengaSale Payment Terms detailing deposits, instalment schedules, early payment discounts, overdue handling, and supported payment channels.{% endblock %}
+
+{% block site_content %}
+
+<div class="legal-hero">
+  <div class="legal-hero__inner">
+    <div class="legal-hero__eyebrow">Legal</div>
+    <h1 class="legal-hero__title">Payment Terms</h1>
+    <p class="legal-hero__updated">Last updated: May 2026</p>
+  </div>
+</div>
+
+<nav class="legal-nav" aria-label="Legal pages">
+  <div class="legal-nav__inner">
+    <a href="{% url 'website_terms' %}" class="legal-nav__link">Terms of Service</a>
+    <a href="{% url 'website_privacy' %}" class="legal-nav__link">Privacy Policy</a>
+    <a href="{% url 'website_payment_terms' %}" class="legal-nav__link legal-nav__link--active">Payment Terms</a>
+    <a href="{% url 'website_merchant_terms' %}" class="legal-nav__link">Merchant Terms</a>
+  </div>
+</nav>
+
+<div class="legal-body">
+
+  <h2>1. Introduction</h2>
+  <p>
+    These Payment Terms govern all financial transactions made through the TengaSale platform,
+    including deposits, scheduled instalment payments, early settlements, and any payment
+    adjustments. These terms apply to all customers with an active financing contract and form
+    part of the <a href="{% url 'website_terms' %}">Terms of Service</a>.
+  </p>
+
+  <h2>2. Deposits</h2>
+  <p>
+    An initial deposit is required to activate a financing contract. The deposit amount is
+    calculated as a percentage of the total device price and is set at the time of application.
+    The deposit:
+  </p>
+  <ul>
+    <li>Must be paid in full before the device is released;</li>
+    <li>Is non-refundable once the device has been released to the customer;</li>
+    <li>Is credited to the contract balance and reduces the total financing amount;</li>
+    <li>Must be paid through an approved payment channel as specified in the application.</li>
+  </ul>
+
+  <h2>3. Instalment Schedules</h2>
+  <p>
+    Once a contract is activated, a repayment schedule is issued. The schedule specifies:
+  </p>
+  <ul>
+    <li>The total contract amount (device price less deposit);</li>
+    <li>The daily instalment amount;</li>
+    <li>The equivalent 30-day instalment amount;</li>
+    <li>The contract start date and expected completion date based on the repayment term;</li>
+    <li>The current balance, amount paid, and remaining balance as of any given date.</li>
+  </ul>
+  <p>
+    Instalments may be paid daily or on any preferred frequency, provided payments are
+    sufficient to prevent arrears accumulating beyond the contract tolerance period. All
+    amounts are denominated in Malawi Kwacha (MWK) and are rounded to the nearest whole unit.
+  </p>
+
+  <h2>4. Payment Allocation</h2>
+  <p>
+    Payments received are allocated to your contract in the following order:
+  </p>
+  <ol>
+    <li>Clearance of any accrued arrears first;</li>
+    <li>Reduction of the principal contract balance for remaining days;</li>
+    <li>Extension of the contract expiry date by the number of days covered by the payment.</li>
+  </ol>
+  <p>
+    Overpayments beyond the full remaining balance are not processed. The maximum payment
+    accepted at any time is the outstanding balance on your contract. Completed contracts
+    do not accept further payments.
+  </p>
+
+  <h2>5. Early Payment and Settlement</h2>
+  <p>
+    Customers are encouraged to pay ahead of schedule. Paying more than the daily minimum
+    extends your contract expiry date. Full early settlement is also available at any time.
+  </p>
+  <p>
+    When settling a contract early, an early settlement discount is applied to the remaining
+    balance. The discount rate is stated in your individual contract. To request an early
+    settlement calculation, use the early settlement option in the customer payment portal
+    or contact TengaSale support.
+  </p>
+  <p>
+    Early settlement discounts cannot be applied retroactively to payments already processed.
+  </p>
+
+  <h2>6. Overdue Payments</h2>
+  <p>
+    A contract is considered overdue when the accumulated unpaid amount exceeds the daily rate
+    beyond the number of days specified in the contract tolerance window. Overdue contracts:
+  </p>
+  <ul>
+    <li>Are flagged in the TengaSale system;</li>
+    <li>May be subject to merchant outreach and follow-up;</li>
+    <li>Remain payable and can be brought current at any time by paying the outstanding arrears;</li>
+    <li>May result in device restriction where MDM controls are enabled on the financed device.</li>
+  </ul>
+  <p>
+    Overdue status does not automatically close or cancel a contract. You may continue to
+    make payments against an overdue contract. Bring your balance current and your contract
+    status will update accordingly.
+  </p>
+
+  <h2>7. Supported Payment Channels</h2>
+  <p>
+    The following payment channels are supported for contract repayments:
+  </p>
+  <ul>
+    <li><strong>Airtel Money</strong> — Mobile money payments via Airtel Malawi;</li>
+    <li><strong>TNM Mpamba</strong> — Mobile money payments via TNM Malawi;</li>
+    <li><strong>PayChangu</strong> — Online payment gateway (where enabled for your contract);</li>
+    <li><strong>PayTrigger</strong> — Alternative payment gateway (where enabled for your contract).</li>
+  </ul>
+  <p>
+    Payment channel availability may vary by merchant configuration. If you are unable to
+    use a specific channel, contact your merchant or TengaSale support for alternatives.
+  </p>
+
+  <h2>8. Proof of Payment</h2>
+  <p>
+    After each successful payment, a transaction reference is generated and displayed in the
+    payment portal. You are advised to retain a record of all transaction references. If a
+    payment does not reflect on your contract within 24 hours, contact TengaSale support with
+    your reference number for investigation.
+  </p>
+  <p>
+    TengaSale is not responsible for payment delays caused by mobile money network outages
+    or third-party gateway failures. Payments are recorded against your contract once
+    confirmed by the payment provider.
+  </p>
+
+  <h2>9. Currency and Rounding</h2>
+  <p>
+    All contract amounts, instalment figures, and payment calculations are in Malawi Kwacha (MWK).
+    Calculated daily rates and 30-day instalment amounts are rounded to the nearest whole
+    Kwacha unit. Where rounding results in a minor discrepancy in the total repaid amount,
+    the final payment adjusts to the exact remaining balance.
+  </p>
+
+  <h2>10. Reconciliation</h2>
+  <p>
+    TengaSale maintains a complete record of all payment transactions. Contract balances are
+    updated upon confirmation of each payment by the payment provider. In the event of a
+    discrepancy between your payment records and the contract balance shown in the portal,
+    contact support at <a href="mailto:support@tengasale.africa">support@tengasale.africa</a>
+    with your contract number and payment references.
+  </p>
+
+  <h2>11. Contact for Payment Queries</h2>
+  <p>
+    For payment-related queries, contact TengaSale at:<br>
+    <a href="mailto:support@tengasale.africa">support@tengasale.africa</a>
+  </p>
+
+</div>
+
+{% endblock %}

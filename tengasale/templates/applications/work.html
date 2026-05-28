@@ -1,6 +1,8 @@
 {% extends "base/base.html" %}
+{% load static %}
 
 {% block content %}
+<link rel="stylesheet" href="{% static 'css/tengasale.css' %}">
 
 <a href="{% url 'location_details' app.id %}" class="soft-back">
     <span class="soft-back-icon">&larr;</span>
@@ -13,19 +15,19 @@
     {% csrf_token %}
     {{ form.non_field_errors }}
 
-    <div class="form-group">
+    <div class="form-group{% if 'work_description' in app.correction_fields %} has-correction{% endif %}">
         <label for="{{ form.work_description.id_for_label }}">{{ form.work_description.label }}</label>
         {{ form.work_description }}
         {{ form.work_description.errors }}
     </div>
 
-    <div class="form-group">
+    <div class="form-group{% if 'next_of_kin_2_name' in app.correction_fields %} has-correction{% endif %}">
         <label for="{{ form.next_of_kin_2_name.id_for_label }}">{{ form.next_of_kin_2_name.label }}</label>
         {{ form.next_of_kin_2_name }}
         {{ form.next_of_kin_2_name.errors }}
     </div>
 
-    <div class="form-group">
+    <div class="form-group{% if 'next_of_kin_2_phone' in app.correction_fields %} has-correction{% endif %}">
         <label for="{{ form.next_of_kin_2_phone.id_for_label }}">{{ form.next_of_kin_2_phone.label }}</label>
         <div class="phone-input">
             <span>+265</span>
@@ -34,25 +36,25 @@
         {{ form.next_of_kin_2_phone.errors }}
     </div>
 
-    <div class="form-group">
+    <div class="form-group{% if 'next_of_kin_2_relationship' in app.correction_fields %} has-correction{% endif %}">
         <label for="{{ form.next_of_kin_2_relationship.id_for_label }}">{{ form.next_of_kin_2_relationship.label }}</label>
         {{ form.next_of_kin_2_relationship }}
         {{ form.next_of_kin_2_relationship.errors }}
     </div>
 
-    <div class="form-group">
+    <div class="form-group{% if 'proof_of_income_type' in app.correction_fields %} has-correction{% endif %}">
         <label for="{{ form.proof_of_income_type.id_for_label }}">{{ form.proof_of_income_type.label }}</label>
         {{ form.proof_of_income_type }}
         {{ form.proof_of_income_type.errors }}
     </div>
 
-    <div class="form-group">
+    <div class="form-group{% if 'proof_contact_name' in app.correction_fields %} has-correction{% endif %}">
         <label for="{{ form.proof_contact_name.id_for_label }}">{{ form.proof_contact_name.label }}</label>
         {{ form.proof_contact_name }}
         {{ form.proof_contact_name.errors }}
     </div>
 
-    <div class="form-group">
+    <div class="form-group{% if 'proof_contact_phone' in app.correction_fields %} has-correction{% endif %}">
         <label for="{{ form.proof_contact_phone.id_for_label }}">{{ form.proof_contact_phone.label }}</label>
         <div class="phone-input">
             <span>+265</span>
@@ -61,13 +63,13 @@
         {{ form.proof_contact_phone.errors }}
     </div>
 
-    <div class="form-group">
+    <div class="form-group{% if 'proof_notes' in app.correction_fields %} has-correction{% endif %}">
         <label for="{{ form.proof_notes.id_for_label }}">Proof notes</label>
         {{ form.proof_notes }}
         {{ form.proof_notes.errors }}
     </div>
 
-    <div class="form-group">
+    <div class="form-group{% if 'proof_income_file' in app.correction_fields %} has-correction{% endif %}">
         <label for="{{ form.proof_income_file.id_for_label }}">Proof income file optional</label>
         {{ form.proof_income_file }}
         {{ form.proof_income_file.errors }}
