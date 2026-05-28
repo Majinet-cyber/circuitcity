@@ -1,0 +1,142 @@
+{% extends "base/base.html" %}
+{% load static %}
+
+{% block page_title %}Auto-Approval Engine — TengaSale HQ{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width:1000px;margin:0 auto;padding:20px 16px;">
+
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;">
+    <a href="{% url 'hq_dashboard' %}" style="color:var(--primary);text-decoration:none;font-size:0.9rem;">← HQ</a>
+    <div>
+      <h1 style="font-size:1.4rem;font-weight:800;margin:0;">Auto-Approval Engine</h1>
+      <p style="font-size:0.8rem;color:var(--muted);margin:2px 0 0 0;">
+        Review and approve eligible applications. Only applications meeting all criteria are eligible.
+      </p>
+    </div>
+  </div>
+
+  {% if msg %}
+    <div class="alert alert-{% if msg_type == 'success' %}success{% elif msg_type == 'error' %}danger{% else %}warning{% endif %} mb-3">
+      {{ msg }}
+    </div>
+  {% endif %}
+
+  {# ── Summary ── #}
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:24px;">
+    <div class="glass-card" style="padding:14px;text-align:center;">
+      <div style="font-size:0.72rem;color:var(--muted);">Eligible for Auto-Approval</div>
+      <div style="font-size:1.5rem;font-weight:700;color:var(--success);">{{ eligible_count }}</div>
+    </div>
+    <div class="glass-card" style="padding:14px;text-align:center;">
+      <div style="font-size:0.72rem;color:var(--muted);">Blocked</div>
+      <div style="font-size:1.5rem;font-weight:700;color:var(--danger);">{{ blocked_count }}</div>
+    </div>
+    <div class="glass-card" style="padding:14px;text-align:center;">
+      <div style="font-size:0.72rem;color:var(--muted);">Total Pending</div>
+      <div style="font-size:1.5rem;font-weight:700;">{{ eligibility_results|length }}</div>
+    </div>
+  </div>
+
+  {# ── Bulk approve ── #}
+  {% if eligible_count > 0 %}
+  <form method="post" id="bulk-approve-form">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="approve_selected">
+  {% endif %}
+
+  {# ── Application eligibility list ── #}
+  {% for item in eligibility_results %}
+    <div class="glass-card" style="padding:16px;margin-bottom:12px;border-left:4px solid {% if item.result.eligible %}#16a34a{% else %}#dc2626{% endif %};">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+        <div>
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+            {% if eligible_count > 0 and item.result.eligible %}
+              <input type="checkbox" name="app_ids" value="{{ item.app.pk }}" form="bulk-approve-form"
+                     style="width:16px;height:16px;cursor:pointer;">
+            {% endif %}
+            <strong style="font-size:0.95rem;">{{ item.app.application_number }}</strong>
+            <span style="font-size:0.82rem;color:var(--muted);">{{ item.app.customer_name|default:"Unknown" }}</span>
+            <span style="font-size:0.75rem;background:#f3f4f6;padding:2px 7px;border-radius:4px;">
+              {{ item.app.get_status_display }}
+            </span>
+          </div>
+          <div style="margin-top:8px;display:flex;gap:16px;flex-wrap:wrap;">
+            <span style="font-size:0.78rem;color:var(--muted);">
+              Merchant: {% if item.app.created_by %}{{ item.app.created_by.username }}{% else %}Unknown{% endif %}
+            </span>
+            {% if item.app.deal %}
+              <span style="font-size:0.78rem;color:var(--muted);">Deal: {{ item.app.deal }}</span>
+            {% endif %}
+            {% if item.app.submitted_at %}
+              <span style="font-size:0.78rem;color:var(--muted);">Submitted: {{ item.app.submitted_at|date:"d M Y" }}</span>
+            {% endif %}
+          </div>
+        </div>
+        <div style="text-align:right;">
+          {% if item.result.eligible %}
+            <span style="background:#f0fdf4;color:#16a34a;padding:4px 12px;border-radius:8px;font-weight:700;font-size:0.82rem;">
+              Eligible
+            </span>
+          {% else %}
+            <span style="background:#fef2f2;color:#dc2626;padding:4px 12px;border-radius:8px;font-weight:700;font-size:0.82rem;">
+              Blocked
+            </span>
+          {% endif %}
+        </div>
+      </div>
+
+      {# Blocks #}
+      {% if item.result.blocks %}
+        <div style="margin-top:10px;">
+          <p style="font-size:0.78rem;font-weight:700;color:var(--danger);margin:0 0 4px 0;">Blocking Issues:</p>
+          {% for block in item.result.blocks %}
+            <div style="font-size:0.78rem;color:var(--danger);padding:2px 0;">— {{ block }}</div>
+          {% endfor %}
+        </div>
+      {% endif %}
+
+      {# Warnings #}
+      {% if item.result.warnings %}
+        <div style="margin-top:8px;">
+          <p style="font-size:0.78rem;font-weight:700;color:#d97706;margin:0 0 4px 0;">Warnings (non-blocking):</p>
+          {% for w in item.result.warnings %}
+            <div style="font-size:0.78rem;color:#d97706;padding:2px 0;">— {{ w }}</div>
+          {% endfor %}
+        </div>
+      {% endif %}
+
+      {# Passed checks #}
+      {% if item.result.reasons %}
+        <details style="margin-top:8px;">
+          <summary style="font-size:0.77rem;color:var(--muted);cursor:pointer;">{{ item.result.reasons|length }} check(s) passed</summary>
+          {% for reason in item.result.reasons %}
+            <div style="font-size:0.77rem;color:var(--success);padding:1px 0;">✓ {{ reason }}</div>
+          {% endfor %}
+        </details>
+      {% endif %}
+    </div>
+  {% empty %}
+    <div class="glass-card" style="padding:28px;text-align:center;color:var(--muted);">
+      No pending applications to evaluate.
+    </div>
+  {% endfor %}
+
+  {% if eligible_count > 0 %}
+    <div style="margin-top:16px;text-align:right;">
+      <button type="submit" form="bulk-approve-form"
+              onclick="return confirm('Auto-approve all selected eligible applications?')"
+              style="background:var(--success);color:#fff;border:none;padding:10px 28px;border-radius:8px;font-weight:700;cursor:pointer;font-size:0.95rem;">
+        Approve Selected ({{ eligible_count }} eligible)
+      </button>
+    </div>
+  </form>
+  {% endif %}
+
+  <div class="alert alert-warning mt-4" style="font-size:0.8rem;">
+    <strong>Note:</strong> Auto-approval only applies rules, not human judgment.
+    All decisions are logged in the audit trail. Existing contracts with unpaid balances block re-approval.
+  </div>
+
+</div>
+{% endblock %}

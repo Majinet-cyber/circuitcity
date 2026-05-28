@@ -1,0 +1,144 @@
+{% extends "base/base.html" %}
+{% load static %}
+
+{% block page_title %}Merchant Payouts — TengaSale HQ{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width:1000px;margin:0 auto;padding:20px 16px;">
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;">
+    <a href="{% url 'hq_dashboard' %}" style="color:var(--primary);text-decoration:none;font-size:0.9rem;">← HQ</a>
+    <h1 style="font-size:1.4rem;font-weight:800;margin:0;">Merchant Payouts</h1>
+  </div>
+
+  {% if msg %}
+    <div class="alert alert-{% if msg_type == 'success' %}success{% elif msg_type == 'error' %}danger{% else %}info{% endif %} mb-3">
+      {{ msg }}
+    </div>
+  {% endif %}
+
+  {# ── KPI Cards ── #}
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:24px;">
+    <div class="glass-card" style="padding:16px;text-align:center;">
+      <div style="font-size:0.75rem;color:var(--muted);">Pending Settlement</div>
+      <div style="font-size:1.4rem;font-weight:700;color:var(--warning);">MWK {{ pending_total|floatformat:0 }}</div>
+    </div>
+    <div class="glass-card" style="padding:16px;text-align:center;">
+      <div style="font-size:0.75rem;color:var(--muted);">Processing</div>
+      <div style="font-size:1.4rem;font-weight:700;color:#1d4ed8;">MWK {{ processing_total|floatformat:0 }}</div>
+    </div>
+    <div class="glass-card" style="padding:16px;text-align:center;">
+      <div style="font-size:0.75rem;color:var(--muted);">Paid Settlement</div>
+      <div style="font-size:1.4rem;font-weight:700;color:var(--success);">MWK {{ paid_total|floatformat:0 }}</div>
+    </div>
+    <div class="glass-card" style="padding:16px;text-align:center;">
+      <div style="font-size:0.75rem;color:var(--muted);">Total Commission</div>
+      <div style="font-size:1.4rem;font-weight:700;color:var(--primary);">MWK {{ commission_total|floatformat:0 }}</div>
+    </div>
+  </div>
+
+  {# ── Filters ── #}
+  <form method="get" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;align-items:center;">
+    <input type="text" name="merchant" placeholder="Merchant username…" value="{{ merchant_filter }}"
+           style="padding:8px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:0.85rem;min-width:180px;">
+    <select name="status" style="padding:8px 10px;border:1px solid #d1d5db;border-radius:8px;font-size:0.85rem;">
+      <option value="">All Status</option>
+      <option value="pending" {% if status_filter == 'pending' %}selected{% endif %}>Pending</option>
+      <option value="processing" {% if status_filter == 'processing' %}selected{% endif %}>Processing</option>
+      <option value="paid" {% if status_filter == 'paid' %}selected{% endif %}>Paid</option>
+      <option value="failed" {% if status_filter == 'failed' %}selected{% endif %}>Failed</option>
+    </select>
+    <button type="submit" style="background:var(--primary);color:#fff;border:none;padding:8px 16px;border-radius:8px;font-weight:600;cursor:pointer;font-size:0.85rem;">Filter</button>
+    <a href="{% url 'hq_merchant_payouts' %}" style="color:var(--muted);font-size:0.85rem;text-decoration:none;">Reset</a>
+  </form>
+
+  <div class="glass-card" style="padding:0;overflow:hidden;">
+    <div style="overflow-x:auto;">
+      <table style="width:100%;border-collapse:collapse;font-size:0.83rem;">
+        <thead>
+          <tr style="background:#fafafa;border-bottom:2px solid var(--border);">
+            <th style="padding:10px 8px;text-align:left;">Merchant</th>
+            <th style="padding:10px 8px;text-align:left;">Contract</th>
+            <th style="padding:10px 8px;text-align:right;">Cash Price</th>
+            <th style="padding:10px 8px;text-align:right;">Commission (1%)</th>
+            <th style="padding:10px 8px;text-align:right;">Total Payable</th>
+            <th style="padding:10px 8px;text-align:center;">Method</th>
+            <th style="padding:10px 8px;text-align:center;">Status</th>
+            <th style="padding:10px 8px;text-align:center;">Date</th>
+            <th style="padding:10px 8px;text-align:center;">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in payouts %}
+            <tr style="border-bottom:1px solid var(--border);" data-testid="merchant-payout-row">
+              <td style="padding:8px;font-weight:600;">
+                {% if p.merchant %}{{ p.merchant.get_full_name|default:p.merchant.username }}{% else %}<span style="color:var(--muted);">No merchant</span>{% endif %}
+              </td>
+              <td style="padding:8px;color:var(--primary);">
+                {% if p.contract %}{{ p.contract.contract_number }}{% else %}—{% endif %}
+              </td>
+              <td style="padding:8px;text-align:right;">MWK {{ p.cash_price|floatformat:0 }}</td>
+              <td style="padding:8px;text-align:right;color:var(--primary);">MWK {{ p.merchant_commission_amount|floatformat:0 }}</td>
+              <td style="padding:8px;text-align:right;font-weight:700;">MWK {{ p.total_payable|floatformat:0 }}</td>
+              <td style="padding:8px;text-align:center;">
+                <span style="font-size:0.75rem;background:#f3f4f6;padding:2px 6px;border-radius:4px;">
+                  {{ p.get_payout_method_display }}
+                </span>
+              </td>
+              <td style="padding:8px;text-align:center;">
+                <span class="status-badge
+                  {% if p.status == 'paid' %}status-badge--approved
+                  {% elif p.status == 'failed' %}status-badge--rejected
+                  {% elif p.status == 'processing' %}status-badge--review
+                  {% else %}status-badge--pending{% endif %}">
+                  {{ p.get_status_display }}
+                </span>
+              </td>
+              <td style="padding:8px;text-align:center;color:var(--muted);font-size:0.78rem;">
+                {{ p.created_at|date:"d M Y" }}
+              </td>
+              <td style="padding:8px;text-align:center;">
+                {% if p.status == 'pending' %}
+                  <form method="post" style="display:inline;">{% csrf_token %}
+                    <input type="hidden" name="action" value="queue_payout">
+                    <input type="hidden" name="payout_id" value="{{ p.pk }}">
+                    <button type="submit" onclick="return confirm('Queue this payout for processing?')"
+                            style="font-size:0.72rem;padding:3px 8px;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;border-radius:4px;cursor:pointer;">
+                      Queue
+                    </button>
+                  </form>
+                  <form method="post" style="display:inline;">{% csrf_token %}
+                    <input type="hidden" name="action" value="mark_paid">
+                    <input type="hidden" name="payout_id" value="{{ p.pk }}">
+                    <button type="submit" onclick="return confirm('Mark this payout as manually paid?')"
+                            style="font-size:0.72rem;padding:3px 8px;background:#f0fdf4;color:#16a34a;border:1px solid #bbf7d0;border-radius:4px;cursor:pointer;margin-left:3px;">
+                      Mark Paid
+                    </button>
+                  </form>
+                {% elif p.status == 'failed' %}
+                  <form method="post" style="display:inline;">{% csrf_token %}
+                    <input type="hidden" name="action" value="retry_payout">
+                    <input type="hidden" name="payout_id" value="{{ p.pk }}">
+                    <button type="submit" onclick="return confirm('Retry this payout?')"
+                            style="font-size:0.72rem;padding:3px 8px;background:#fef3c7;color:#92400e;border:1px solid #fde68a;border-radius:4px;cursor:pointer;">
+                      Retry
+                    </button>
+                  </form>
+                {% else %}
+                  <span style="color:var(--muted);font-size:0.75rem;">{{ p.provider_reference|default:"—" }}</span>
+                {% endif %}
+              </td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="9" style="text-align:center;padding:20px;color:var(--muted);">No payout records found.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <p style="font-size:0.75rem;color:var(--muted);margin-top:12px;text-align:center;">
+    Merchants have no WHT deduction. Commission = 1% of financed amount (excluding deposit).
+    Payout = full cash price + commission.
+  </p>
+</div>
+{% endblock %}

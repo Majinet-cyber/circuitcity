@@ -52,6 +52,7 @@ INSTALLED_APPS = [
     "approvals",
     "contracts",
     "financing",
+    "risk",
     "dashboard",
     "sales",
     "portal",
@@ -183,9 +184,35 @@ KNOX_API_URL = os.environ.get("KNOX_API_URL", "https://api.samsungknox.com")
 NUOVOPAY_API_KEY = os.environ.get("NUOVOPAY_API_KEY", "")
 NUOVOPAY_API_URL = os.environ.get("NUOVOPAY_API_URL", "https://api.nuovopay.com")
 
+# Twilio SMS
+TWILIO_ACCOUNT_SID = os.environ.get("TWILIO_ACCOUNT_SID", "")
+TWILIO_AUTH_TOKEN = os.environ.get("TWILIO_AUTH_TOKEN", "")
+TWILIO_PHONE_NUMBER = os.environ.get("TWILIO_PHONE_NUMBER", "")
+
+# SendGrid Email
+SENDGRID_API_KEY = os.environ.get("SENDGRID_API_KEY", "")
+DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "noreply@tengasale.com")
+ADMIN_ALERT_EMAIL = os.environ.get("ADMIN_ALERT_EMAIL", "admin@tengasale.com")
+
 # File upload security
 MAX_UPLOAD_SIZE_MB = int(os.environ.get("MAX_UPLOAD_SIZE_MB", "5"))
+MAX_CALL_RECORDING_SIZE_MB = int(os.environ.get("MAX_CALL_RECORDING_SIZE_MB", "15"))
 ALLOWED_KYC_MIME_TYPES = ["image/jpeg", "image/png", "image/webp", "application/pdf"]
+ALLOWED_AUDIO_MIME_TYPES = [
+    "audio/mpeg",
+    "audio/mp3",
+    "audio/wav",
+    "audio/mp4",
+    "audio/webm",
+    "audio/ogg",
+    "audio/x-wav",
+]
+
+# Customer correction token expiry (hours)
+CORRECTION_TOKEN_EXPIRY_HOURS = int(os.environ.get("CORRECTION_TOKEN_EXPIRY_HOURS", "72"))
+
+# PayChangu callback URL
+PAYCHANGU_CALLBACK_URL = os.environ.get("PAYCHANGU_CALLBACK_URL", "")
 
 APP_VERSION = "1.0.0"
 

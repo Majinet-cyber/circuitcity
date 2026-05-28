@@ -4,7 +4,7 @@
 {% block page_title %}Wallet & Earnings — TengaSale{% endblock %}
 
 {% block content %}
-<div class="sales-main">
+<div class="sales-main" data-testid="underwriter-wallet">
 <div class="ts-back-row">
   <a href="{% url 'sales_home' %}" class="ts-back-btn">
     <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
@@ -12,25 +12,29 @@
   </a>
 </div>
 
-{# ── Balance Card ── #}
+{# ── Commission Summary Card ── #}
 <div class="wallet-balance-card">
-  <div class="wallet-balance-card__label">Available Balance</div>
+  <div class="wallet-balance-card__label">Available Commission Balance</div>
   <div class="wallet-balance-card__amount">
     <span class="wallet-currency">MWK</span>
-    <span class="wallet-amount">{{ wallet.balance|floatformat:2 }}</span>
+    <span class="wallet-amount">{{ summary.available_balance|floatformat:0 }}</span>
   </div>
   <div class="wallet-balance-card__stats">
     <div class="wallet-stat">
-      <span class="wallet-stat__label">Total Earned</span>
-      <span class="wallet-stat__value">MWK {{ wallet.total_earned|floatformat:0 }}</span>
+      <span class="wallet-stat__label">This Month (Gross)</span>
+      <span class="wallet-stat__value text-green">MWK {{ summary.current_month_gross|floatformat:0 }}</span>
     </div>
     <div class="wallet-stat">
-      <span class="wallet-stat__label">Paid Out</span>
-      <span class="wallet-stat__value">MWK {{ wallet.total_paid|floatformat:0 }}</span>
+      <span class="wallet-stat__label">WHT (20% est.)</span>
+      <span class="wallet-stat__value text-red">−MWK {{ summary.current_month_wht_estimate|floatformat:0 }}</span>
     </div>
     <div class="wallet-stat">
-      <span class="wallet-stat__label">WHT Withheld</span>
-      <span class="wallet-stat__value text-muted">MWK {{ wallet.total_wht_withheld|floatformat:0 }}</span>
+      <span class="wallet-stat__label">Net Estimate</span>
+      <span class="wallet-stat__value">MWK {{ summary.current_month_net_estimate|floatformat:0 }}</span>
+    </div>
+    <div class="wallet-stat">
+      <span class="wallet-stat__label">Arrears Deductions</span>
+      <span class="wallet-stat__value text-red">MWK {{ summary.total_arrears_deductions|floatformat:0 }}</span>
     </div>
   </div>
 </div>
@@ -45,6 +49,11 @@
     >Earnings</button>
     <button
       class="tab-item"
+      x-bind:class="{ 'tab-item--active': tab === 'deductions' }"
+      x-on:click="tab = 'deductions'"
+    >Deductions</button>
+    <button
+      class="tab-item"
       x-bind:class="{ 'tab-item--active': tab === 'payouts' }"
       x-on:click="tab = 'payouts'"
     >Payouts</button>
@@ -55,11 +64,27 @@
     >Request Payout</button>
   </div>
 
-  {# ── Earnings Tab ── #}
+  {# ── Earnings Tab (Commission Ledger) ── #}
   <div x-show="tab === 'earnings'">
-    {% if transaction_rows %}
+    {% if ledger_rows %}
+      {% for row in ledger_rows %}
+        {% if row.entry_type == 'repayment_commission' %}
+        <div class="tx-row tx-row--credit" data-testid="commission-row">
+          <div class="tx-row__left">
+            <div class="tx-row__type">{{ row.type }}</div>
+            {% if row.contract_number %}
+              <div class="tx-row__meta">{{ row.contract_number }}{% if row.customer_masked %} · {{ row.customer_masked }}{% endif %}</div>
+            {% endif %}
+            <div class="tx-row__date">{{ row.created_at|date:"d M Y, H:i" }}</div>
+          </div>
+          <div class="tx-row__amount text-green">+MWK {{ row.amount|floatformat:0 }}</div>
+        </div>
+        {% endif %}
+      {% endfor %}
+    {% elif transaction_rows %}
       {% for row in transaction_rows %}
-        <div class="tx-row {% if row.is_credit %}tx-row--credit{% else %}tx-row--debit{% endif %}">
+        {% if row.is_credit %}
+        <div class="tx-row tx-row--credit">
           <div class="tx-row__left">
             <div class="tx-row__type">{{ row.type_label }}</div>
             {% if row.contract_number %}
@@ -67,30 +92,51 @@
             {% endif %}
             <div class="tx-row__date">{{ row.created_at|date:"d M Y, H:i" }}</div>
           </div>
-          <div class="tx-row__amount {% if row.is_credit %}text-green{% else %}text-red{% endif %}">
-            {% if row.is_credit %}+{% else %}−{% endif %}MWK {{ row.amount|floatformat:2 }}
-          </div>
+          <div class="tx-row__amount text-green">+MWK {{ row.amount|floatformat:0 }}</div>
         </div>
+        {% endif %}
       {% endfor %}
     {% else %}
       <div class="empty-state">
         <div class="empty-state__icon">
           <svg viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2"/></svg>
         </div>
-        <p>No transactions yet.</p>
+        <p>No commissions yet. Commissions are earned on customer repayments after deposit.</p>
       </div>
     {% endif %}
   </div>
 
-  {# ── Payouts Tab (WHT breakdown) ── #}
+  {# ── Deductions Tab (Arrears) ── #}
+  <div x-show="tab === 'deductions'" x-cloak>
+    {% if ledger_rows %}
+      {% for row in ledger_rows %}
+        {% if row.entry_type == 'arrears_deduction' %}
+        <div class="tx-row tx-row--debit" data-testid="arrears-deduction-row">
+          <div class="tx-row__left">
+            <div class="tx-row__type">{{ row.type }}</div>
+            {% if row.contract_number %}
+              <div class="tx-row__meta">{{ row.contract_number }}</div>
+            {% endif %}
+            <div class="tx-row__date">{{ row.created_at|date:"d M Y, H:i" }}</div>
+          </div>
+          <div class="tx-row__amount text-red">−MWK {{ row.amount|floatformat:0|slice:"1:" }}</div>
+        </div>
+        {% endif %}
+      {% endfor %}
+    {% else %}
+      <div class="empty-state"><p>No arrears deductions.</p></div>
+    {% endif %}
+  </div>
+
+  {# ── Payouts Tab (UnderwriterMonthlyPayout with WHT) ── #}
   <div x-show="tab === 'payouts'" x-cloak>
-    {% if payout_records %}
-      {% for payout in payout_records %}
+    {% if monthly_payouts %}
+      {% for payout in monthly_payouts %}
         <div class="glass-card payout-card mb-8">
           <div class="payout-card__header">
             <div>
               <div class="payout-card__period">{{ payout.period_start|date:"d M Y" }} – {{ payout.period_end|date:"d M Y" }}</div>
-              <div class="payout-card__ref">{% if payout.reference %}Ref: {{ payout.reference }}{% endif %}</div>
+              <div class="payout-card__ref">{% if payout.provider_reference %}Ref: {{ payout.provider_reference }}{% endif %}</div>
             </div>
             <span class="status-badge
               {% if payout.status == 'paid' %}status-badge--approved
@@ -100,24 +146,23 @@
               {{ payout.get_status_display }}
             </span>
           </div>
-
           <div class="payout-breakdown">
             <div class="payout-row">
-              <span>Gross Earnings</span>
-              <span class="text-green">MWK {{ payout.gross_amount|floatformat:2 }}</span>
+              <span>Gross Commission</span>
+              <span class="text-green">MWK {{ payout.gross_commission|floatformat:0 }}</span>
             </div>
             <div class="payout-row">
-              <span>WHT ({{ payout.wht_rate|floatformat:0 }}%… actual {{ payout.wht_rate|floatformat:0 }}%)</span>
-              <span class="text-red">− MWK {{ payout.wht_amount|floatformat:2 }}</span>
+              <span>WHT (20%)</span>
+              <span class="text-red">− MWK {{ payout.wht_amount|floatformat:0 }}</span>
             </div>
             <div class="payout-row payout-row--net">
               <span><strong>Net Payable</strong></span>
-              <span><strong>MWK {{ payout.net_amount|floatformat:2 }}</strong></span>
+              <span><strong>MWK {{ payout.net_amount|floatformat:0 }}</strong></span>
             </div>
             {% if payout.destination_phone %}
               <div class="payout-row">
                 <span>Destination</span>
-                <span>{{ payout.destination_phone }}{% if payout.provider %} ({{ payout.provider }}){% endif %}</span>
+                <span>{{ payout.destination_phone }}</span>
               </div>
             {% endif %}
             {% if payout.paid_at %}
@@ -126,6 +171,30 @@
                 <span>{{ payout.paid_at|date:"d M Y, H:i" }}</span>
               </div>
             {% endif %}
+          </div>
+        </div>
+      {% endfor %}
+    {% elif payout_records %}
+      {# Legacy fallback #}
+      {% for payout in payout_records %}
+        <div class="glass-card payout-card mb-8">
+          <div class="payout-card__header">
+            <div>
+              <div class="payout-card__period">{{ payout.period_start|date:"d M Y" }} – {{ payout.period_end|date:"d M Y" }}</div>
+            </div>
+            <span class="status-badge status-badge--{{ payout.status }}">{{ payout.get_status_display }}</span>
+          </div>
+          <div class="payout-breakdown">
+            <div class="payout-row">
+              <span>Gross</span><span class="text-green">MWK {{ payout.gross_amount|floatformat:0 }}</span>
+            </div>
+            <div class="payout-row">
+              <span>WHT</span><span class="text-red">− MWK {{ payout.wht_amount|floatformat:0 }}</span>
+            </div>
+            <div class="payout-row payout-row--net">
+              <span><strong>Net</strong></span>
+              <span><strong>MWK {{ payout.net_amount|floatformat:0 }}</strong></span>
+            </div>
           </div>
         </div>
       {% endfor %}

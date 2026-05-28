@@ -35,7 +35,7 @@
     </p>
   </div>
 
-  <form method="post">
+  <form method="post" enctype="multipart/form-data">
     {% csrf_token %}
     <div class="ts-review-card">
       <div class="ts-review-card__title">Call Checklist</div>
@@ -47,7 +47,28 @@
       {% include "sales/_yes_no.html" with field_name="customer_confirmed_repayment" label="Did the customer understand the daily/monthly repayment?" current_value=review.customer_confirmed_repayment %}
       {% include "sales/_yes_no.html" with field_name="customer_understands_direct_payment" label="Did the customer understand payments must be made directly to TengaSale?" current_value=review.customer_understands_direct_payment %}
       {% include "sales/_yes_no.html" with field_name="customer_understands_nonpayment" label="Did the customer understand the device may lock if payments are missed?" current_value=review.customer_understands_nonpayment %}
+      {% include "sales/_yes_no.html" with field_name="customer_notified_recording" label="Was the customer notified that this call may be recorded for quality and compliance?" current_value=None %}
     </div>
+
+    {# ── Optional Call Recording Upload ── #}
+    <div class="ts-review-card ts-mb-8">
+      <div class="ts-review-card__title">📎 Call Recording (Optional)</div>
+      {% if call_evidence %}
+        <div class="ts-badge ts-badge--green ts-mb-8">✓ Recording uploaded</div>
+      {% endif %}
+      <p class="ts-meta-small">Upload an audio recording of this call for quality and compliance purposes.</p>
+      <div class="field-group ts-mt-8">
+        <label class="field-label">Upload Recording</label>
+        <input
+          type="file"
+          name="call_recording"
+          class="input"
+          accept="audio/mpeg,audio/mp3,audio/wav,audio/mp4,audio/webm,audio/ogg,.mp3,.wav,.mp4,.webm,.ogg,.m4a"
+        >
+        <div class="ts-meta-small" style="margin-top:4px;">Max 15 MB · MP3, WAV, MP4, WebM, OGG</div>
+      </div>
+    </div>
+
     <button type="submit" class="ts-btn-primary ts-btn-full ts-mt-16">Continue to Income Check →</button>
   </form>
 

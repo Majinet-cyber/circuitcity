@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Link Invalid — TengaSale</title>
+  {% load static %}
+  <link rel="stylesheet" href="{% static 'css/tengasale.css' %}">
+  <style>
+    body { background: #f5f6fa; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+    .error-card { background: #fff; border-radius: 16px; padding: 32px 24px; max-width: 400px; width: 100%; text-align: center; box-shadow: 0 2px 16px rgba(0,0,0,0.08); }
+    .error-icon { font-size: 3rem; margin-bottom: 16px; }
+    .error-title { font-size: 1.2rem; font-weight: 700; color: #c0392b; margin-bottom: 8px; }
+    .error-body { font-size: 0.9rem; color: #555; }
+    .footer-note { font-size: 0.75rem; color: #aaa; margin-top: 24px; }
+  </style>
+</head>
+<body>
+  <div class="error-card">
+    <div class="error-icon">⚠️</div>
+    <div class="error-title">
+      {% if reason == "expired" %}Link Expired
+      {% elif reason == "no_fields" %}No Fields to Edit
+      {% else %}Invalid Link{% endif %}
+    </div>
+    <div class="error-body">
+      {% if reason == "expired" %}
+        This correction link has expired. Please contact TengaSale or your merchant to request a new link.
+      {% elif reason == "no_fields" %}
+        There are no fields currently marked for correction. If you believe this is a mistake, contact TengaSale support.
+      {% else %}
+        This link is not valid. It may have already been used or does not exist.
+        Please contact TengaSale support for assistance.
+      {% endif %}
+    </div>
+    <div class="footer-note">&copy; TengaSale</div>
+  </div>
+</body>
+</html>

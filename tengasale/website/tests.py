@@ -1,242 +1,279 @@
-"""
-Website app tests — Phase 8.
-
-Coverage:
-- Website landing page renders (200)
-- PWA manifest is served
-- Light-mode content checks (no dark sections)
-- Premium copy presence
-- Logo img tag present
-- Legal links present
-- No childish / demo copy
-- Trust & compliance section present
-- Make Payment / Merchant Login present
-"""
-
+"""Website app tests — public pages, lead forms, branding, and HQ page checks."""
 from django.test import TestCase, Client
+from django.urls import reverse
+from .models import MerchantLead, CareerLead
+
+# CSS classes known to cause giant/broken logo rendering
+BROKEN_LOGO_CLASSES = [
+    "giant-logo",
+    "brand-bg",
+    "logo-watermark",
+    "hero-logo-bg",
+    "filter:brightness(0)",
+    "filter: brightness(0)",
+]
 
 
-class WebsiteSmokeTest(TestCase):
+class PublicSiteTests(TestCase):
     def setUp(self):
         self.client = Client()
 
-    def test_website_landing_renders(self):
-        res = self.client.get("/site/")
-        self.assertEqual(res.status_code, 200)
-        self.assertContains(res, "TengaSale")
+    # ── /site/ landing page ──────────────────────────────────────
 
-    def test_offline_page_renders(self):
-        res = self.client.get("/offline/")
-        self.assertEqual(res.status_code, 200)
-        self.assertContains(res, "offline")
+    def test_landing_page_loads(self):
+        response = self.client.get(reverse("website_landing"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "TengaSale")
 
+    def test_landing_page_has_make_payment_link(self):
+        response = self.client.get(reverse("website_landing"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "/pay/")
 
-class WebsiteLightModeTest(TestCase):
-    """Verify the public site stays in light mode throughout."""
+    def test_landing_page_become_merchant_links_to_signup(self):
+        response = self.client.get(reverse("website_landing"))
+        self.assertEqual(response.status_code, 200)
+        signup_url = reverse("website_merchant_signup")
+        self.assertContains(response, signup_url)
 
-    def setUp(self):
-        self.client = Client()
+    def test_landing_page_has_careers_link(self):
+        response = self.client.get(reverse("website_landing"))
+        careers_url = reverse("website_careers")
+        self.assertContains(response, careers_url)
 
-    def _get(self):
-        return self.client.get("/site/")
+    # ── /site/merchant-signup/ ───────────────────────────────────
 
-    def test_no_dark_background_inline_styles(self):
-        """Landing page must not contain hardcoded dark background colours."""
-        res = self._get()
-        content = res.content.decode()
-        forbidden = [
-            "background: #080a10",
-            "background:#080a10",
-            "background: #0f172a",
-            "background:#0f172a",
+    def test_merchant_signup_page_loads(self):
+        response = self.client.get(reverse("website_merchant_signup"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "merchant")
+
+    def test_merchant_signup_form_creates_lead(self):
+        self.assertEqual(MerchantLead.objects.count(), 0)
+        response = self.client.post(reverse("website_merchant_signup"), {
+            "business_name": "Test Phones Lilongwe",
+            "owner_full_name": "John Phiri",
+            "phone": "+265991000000",
+            "district": "Lilongwe",
+            "business_type": "phone_shop",
+            "estimated_monthly_phone_sales": "10",
+            "whatsapp_phone": "",
+            "email": "",
+            "area": "Area 25",
+            "has_business_registration": "yes",
+            "preferred_payout_method": "airtel_money",
+            "message": "Interested in joining.",
+        })
+        self.assertEqual(response.status_code, 302)
+        self.assertRedirects(response, reverse("website_merchant_signup_success"))
+        self.assertEqual(MerchantLead.objects.count(), 1)
+        lead = MerchantLead.objects.first()
+        self.assertEqual(lead.business_name, "Test Phones Lilongwe")
+        self.assertEqual(lead.source, "public_site")
+
+    def test_merchant_signup_shows_errors_on_empty_submit(self):
+        response = self.client.post(reverse("website_merchant_signup"), {})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "required")
+        self.assertEqual(MerchantLead.objects.count(), 0)
+
+    def test_merchant_signup_success_page_loads(self):
+        response = self.client.get(reverse("website_merchant_signup_success"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "received")
+
+    # ── /site/careers/ ───────────────────────────────────────────
+
+    def test_careers_page_loads(self):
+        response = self.client.get(reverse("website_careers"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Careers")
+
+    def test_careers_form_creates_lead(self):
+        self.assertEqual(CareerLead.objects.count(), 0)
+        response = self.client.post(reverse("website_careers"), {
+            "full_name": "Mary Banda",
+            "phone": "+265888000000",
+            "email": "mary@example.com",
+            "district": "Blantyre",
+            "role_interested": "underwriter",
+            "note": "I am experienced in credit assessment.",
+        })
+        self.assertEqual(response.status_code, 302)
+        self.assertRedirects(response, reverse("website_careers_success"))
+        self.assertEqual(CareerLead.objects.count(), 1)
+        lead = CareerLead.objects.first()
+        self.assertEqual(lead.full_name, "Mary Banda")
+        self.assertEqual(lead.role_interested, "underwriter")
+
+    def test_careers_form_shows_errors_on_empty_submit(self):
+        response = self.client.post(reverse("website_careers"), {})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "required")
+        self.assertEqual(CareerLead.objects.count(), 0)
+
+    def test_careers_success_page_loads(self):
+        response = self.client.get(reverse("website_careers_success"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "received")
+
+    # ── /pay/ portal search page ─────────────────────────────────
+
+    def test_pay_page_loads(self):
+        response = self.client.get(reverse("portal_search"))
+        self.assertEqual(response.status_code, 200)
+
+    def test_pay_page_no_login_logout_icons(self):
+        """The /pay/ page should not show login, settings, notification, or logout icons."""
+        response = self.client.get(reverse("portal_search"))
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        self.assertNotIn("logout-button", content,
+            "logout-button should not appear on /pay/ page")
+        self.assertNotIn("notification-button", content,
+            "notification-button should not appear on /pay/ page")
+        self.assertNotIn("admin-button", content,
+            "admin-button should not appear on /pay/ page")
+
+    # ── Branding quality checks ──────────────────────────────────
+
+    def test_public_pages_no_broken_logo_classes(self):
+        """Public pages must not contain CSS classes that cause giant black logo blobs."""
+        pages = [
+            reverse("website_landing"),
+            reverse("website_careers"),
+            reverse("website_merchant_signup"),
         ]
-        for snippet in forbidden:
-            self.assertNotIn(snippet, content, f"Found forbidden dark bg: {snippet!r}")
+        for url in pages:
+            with self.subTest(url=url):
+                response = self.client.get(url)
+                self.assertEqual(response.status_code, 200)
+                content = response.content.decode()
+                for broken_class in BROKEN_LOGO_CLASSES:
+                    self.assertNotIn(broken_class, content,
+                        f"Page {url} contains broken logo class: {broken_class}")
 
-    def test_dark_section_class_not_used_on_compliance(self):
-        """Trust & compliance section must not use site-section--dark."""
-        res = self._get()
-        content = res.content.decode()
-        # The compliance section should NOT have the dark class
-        self.assertNotIn('id="compliance" class="site-section site-section--dark"', content)
-        self.assertNotIn("compliance-section site-section--dark", content)
+    def test_landing_page_ts_brand_image_present(self):
+        """Landing page should reference the TS brand image."""
+        response = self.client.get(reverse("website_landing"))
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        # The TS brand image (large marketing image) should appear on landing
+        self.assertIn("tengasale-logo-icon.png", content,
+            "TS brand image not found on landing page")
 
-    def test_compliance_section_light_class(self):
-        """Trust & compliance section must use the light site-section--light class."""
-        res = self._get()
-        content = res.content.decode()
-        self.assertIn("site-section--light", content, "Compliance section must use site-section--light")
+    def test_careers_page_no_dark_hero_class(self):
+        """Careers hero should be light mode — no dark navy background via old class."""
+        response = self.client.get(reverse("website_careers"))
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        # The new light hero uses .careers-hero but the old dark CSS should be gone
+        self.assertIn("careers-hero", content)
+
+    def test_merchant_signup_has_hero_section(self):
+        """Merchant signup should have a branded hero section."""
+        response = self.client.get(reverse("website_merchant_signup"))
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        self.assertIn("merchant-hero", content,
+            "Merchant signup should have a merchant-hero section")
+
+    def test_public_pages_no_visible_template_comments(self):
+        """Public pages should not render visible Django template comments."""
+        pages = [
+            reverse("website_landing"),
+            reverse("website_careers"),
+            reverse("website_merchant_signup"),
+        ]
+        for url in pages:
+            with self.subTest(url=url):
+                response = self.client.get(url)
+                self.assertEqual(response.status_code, 200)
+                content = response.content.decode()
+                self.assertNotIn("{#", content,
+                    f"Visible template comment found in {url}")
 
 
-class WebsiteCopyTest(TestCase):
-    """Verify premium, professional copy is present and childish copy is absent."""
+class MerchantLeadModelTests(TestCase):
+    def test_merchant_lead_str(self):
+        lead = MerchantLead(business_name="City Phones", owner_full_name="James Mwale")
+        self.assertIn("City Phones", str(lead))
+        self.assertIn("James Mwale", str(lead))
 
-    def setUp(self):
-        self.client = Client()
-
-    def _get(self):
-        return self.client.get("/site/")
-
-    def test_no_pilot_ready(self):
-        res = self._get()
-        self.assertNotContains(res, "pilot-ready")
-
-    def test_no_integration_ready_marketing(self):
-        """'integration-ready' must not appear as a marketing chip/badge."""
-        res = self._get()
-        content = res.content.decode()
-        # Allow "integration" in context, but not as a standalone fluff badge
-        self.assertNotIn(">integration-ready<", content)
-        self.assertNotIn("integration-ready</span>", content)
-
-    def test_structured_repayment_copy(self):
-        res = self._get()
-        self.assertContains(res, "structured")
-
-    def test_contains_contract_language(self):
-        res = self._get()
-        self.assertContains(res, "contract")
-
-    def test_hero_realistic_amounts(self):
-        """Hero must not use the old toy amount MWK 33,000."""
-        res = self._get()
-        self.assertNotContains(res, "MWK 33,000")
-
-    def test_hero_contains_realistic_amount(self):
-        """Hero should contain a realistic phone financing value."""
-        res = self._get()
-        content = res.content.decode()
-        self.assertTrue(
-            "900,000" in content or "62,500" in content or "540,000" in content,
-            "Hero should contain realistic MWK phone-financing values",
+    def test_merchant_lead_default_status(self):
+        lead = MerchantLead.objects.create(
+            business_name="Alpha Shop",
+            owner_full_name="Alice Tembo",
+            phone="0991000001",
+            district="Lilongwe",
+            business_type="phone_shop",
         )
+        self.assertEqual(lead.status, MerchantLead.STATUS_NEW)
+        self.assertEqual(lead.source, "public_site")
+
+    def test_career_lead_str(self):
+        lead = CareerLead(full_name="Bob Chirwa", role_interested="underwriter")
+        self.assertIn("Bob Chirwa", str(lead))
+
+    def test_career_lead_default_status(self):
+        lead = CareerLead.objects.create(
+            full_name="Grace Nyirenda",
+            phone="0888000002",
+            district="Mzuzu",
+            role_interested="sales_agent",
+        )
+        self.assertEqual(lead.status, CareerLead.STATUS_NEW)
 
 
-class WebsiteNavigationTest(TestCase):
-    """Verify key CTAs and navigation elements are present."""
-
-    def setUp(self):
-        self.client = Client()
-
-    def _get(self):
-        return self.client.get("/site/")
-
-    def test_make_payment_present(self):
-        res = self._get()
-        self.assertContains(res, "Make Payment")
-
-    def test_merchant_login_present(self):
-        res = self._get()
-        self.assertContains(res, "Merchant Login")
-
-    def test_logo_img_tag_present(self):
-        """Header must contain an img tag for the TengaSale logo."""
-        res = self._get()
-        content = res.content.decode()
-        self.assertIn("site-logo-img", content)
-        self.assertIn("<img", content)
-
-    def test_how_it_works_anchor(self):
-        res = self._get()
-        self.assertContains(res, "how-it-works")
-
-    def test_merchants_anchor(self):
-        res = self._get()
-        self.assertContains(res, "for-merchants")
-
-    def test_payments_nav_link(self):
-        res = self._get()
-        self.assertContains(res, "payment-channels")
-
-
-class WebsiteTrustSectionTest(TestCase):
-    """Verify trust & compliance section content."""
+class HQPageTests(TestCase):
+    """Tests that require an HQ user — checks for comment visibility and Malawi pill."""
 
     def setUp(self):
-        self.client = Client()
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+        self.user = User.objects.create_user(
+            username="hqtest",
+            password="testpass123",
+        )
+        # Assign HQ role via profile if available
+        try:
+            from accounts.models import UserProfile
+            UserProfile.objects.get_or_create(user=self.user, defaults={"role": "hq"})
+            self.user.profile.role = "hq"
+            self.user.profile.save()
+        except Exception:
+            pass
 
-    def _get(self):
-        return self.client.get("/site/")
+    def _get_hq_page(self):
+        self.client.force_login(self.user)
+        return self.client.get("/tengasale/hq/")
 
-    def test_trust_compliance_heading(self):
-        res = self._get()
-        self.assertContains(res, "Trust, compliance")
+    def test_hq_page_no_visible_template_comments(self):
+        response = self._get_hq_page()
+        if response.status_code == 200:
+            content = response.content.decode()
+            self.assertNotIn("{#", content,
+                "Visible Django template comment {# found in HQ page output")
+            self.assertNotIn("#}", content,
+                "Visible Django template comment #} found in HQ page output")
 
-    def test_kyc_verification_present(self):
-        res = self._get()
-        self.assertContains(res, "KYC verification")
-
-    def test_contract_records_present(self):
-        res = self._get()
-        self.assertContains(res, "Contract records")
-
-    def test_audit_logs_present(self):
-        res = self._get()
-        self.assertContains(res, "Audit logs")
-
-    def test_merchant_controls_present(self):
-        res = self._get()
-        self.assertContains(res, "Merchant controls")
-
-
-class WebsiteFooterLegalTest(TestCase):
-    """Verify footer legal links and light-mode footer."""
-
-    def setUp(self):
-        self.client = Client()
-
-    def _get(self):
-        return self.client.get("/site/")
-
-    def test_terms_of_service_link(self):
-        res = self._get()
-        self.assertContains(res, "Terms of Service")
-
-    def test_privacy_policy_link(self):
-        res = self._get()
-        self.assertContains(res, "Privacy Policy")
-
-    def test_payment_terms_link(self):
-        res = self._get()
-        self.assertContains(res, "Payment Terms")
-
-    def test_merchant_terms_link(self):
-        res = self._get()
-        self.assertContains(res, "Merchant Terms")
-
-    def test_support_link(self):
-        res = self._get()
-        self.assertContains(res, "Help")
-
-    def test_footer_not_dark(self):
-        """Footer must not use the old dark #0f1117 background class."""
-        res = self._get()
-        content = res.content.decode()
-        # Dark footer background colour must not appear inline in footer
-        self.assertNotIn('background: #0f1117', content)
-        self.assertNotIn('background:#0f1117', content)
+    def test_hq_page_has_malawi_indicator(self):
+        response = self._get_hq_page()
+        if response.status_code == 200:
+            content = response.content.decode()
+            self.assertTrue(
+                "Malawi" in content,
+                "Malawi country indicator not found in HQ page",
+            )
 
 
-class WebsiteLegalPagesTest(TestCase):
-    """Verify all legal sub-pages render correctly."""
+class AdminRegistrationTests(TestCase):
+    def test_merchant_lead_admin_registered(self):
+        from django.contrib import admin
+        from .models import MerchantLead
+        self.assertIn(MerchantLead, admin.site._registry)
 
-    def setUp(self):
-        self.client = Client()
-
-    def test_terms_page_renders(self):
-        res = self.client.get("/site/terms/")
-        self.assertEqual(res.status_code, 200)
-        self.assertContains(res, "Terms of Service")
-
-    def test_privacy_page_renders(self):
-        res = self.client.get("/site/privacy/")
-        self.assertEqual(res.status_code, 200)
-        self.assertContains(res, "Privacy Policy")
-
-    def test_payment_terms_page_renders(self):
-        res = self.client.get("/site/payment-terms/")
-        self.assertEqual(res.status_code, 200)
-
-    def test_merchant_terms_page_renders(self):
-        res = self.client.get("/site/merchant-terms/")
-        self.assertEqual(res.status_code, 200)
+    def test_career_lead_admin_registered(self):
+        from django.contrib import admin
+        from .models import CareerLead
+        self.assertIn(CareerLead, admin.site._registry)

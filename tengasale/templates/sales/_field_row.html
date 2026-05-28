@@ -1,0 +1,59 @@
+{% comment %}
+Partial: _field_row.html
+Usage: {% include "sales/_field_row.html" with field_key="full_name" label="Name" value=app.customer_name section="customer" app_id=app.id %}
+{% endcomment %}
+<div class="ts-review-row ts-field-row" x-data="{ open: false }">
+  <span>{{ label }}</span>
+  <div style="display:flex;align-items:center;gap:8px;">
+    <strong>{{ value|default:"—" }}</strong>
+    <button
+      type="button"
+      class="ts-mark-btn"
+      x-on:click="open = !open"
+      title="Mark for review"
+      data-testid="field-mark-button"
+      aria-label="Mark {{ label }} for review"
+    >
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+      </svg>
+    </button>
+  </div>
+
+  {# Mark for review mini-form #}
+  <div
+    x-show="open"
+    x-cloak
+    class="ts-mark-form"
+    style="width:100%;margin-top:8px;background:#fff9f0;border-radius:8px;padding:10px;border:1px solid #f0d9c0;"
+  >
+    <form method="post" action="{% url 'sales_mark_field' app_id %}">
+      {% csrf_token %}
+      <input type="hidden" name="field_key" value="{{ field_key }}">
+      <input type="hidden" name="field_label" value="{{ label }}">
+      <input type="hidden" name="section" value="{{ section }}">
+      <input type="hidden" name="current_value" value="{{ value|default:'' }}">
+      <input type="hidden" name="next" value="{{ request.path }}">
+
+      <div style="margin-bottom:6px;">
+        <label style="font-size:0.78rem;font-weight:600;display:block;margin-bottom:4px;">Reason</label>
+        <select name="reason" style="width:100%;padding:6px;border-radius:6px;border:1px solid #ddd;font-size:0.82rem;">
+          <option value="incorrect_info">Incorrect information</option>
+          <option value="missing_info">Missing information</option>
+          <option value="unclear_doc">Unclear document</option>
+          <option value="needs_confirmation">Needs customer confirmation</option>
+          <option value="needs_updated_proof">Needs updated proof</option>
+          <option value="other">Other</option>
+        </select>
+      </div>
+      <div style="margin-bottom:8px;">
+        <label style="font-size:0.78rem;font-weight:600;display:block;margin-bottom:4px;">Comment (optional)</label>
+        <input type="text" name="comment" placeholder="Add note for customer..." style="width:100%;padding:6px;border-radius:6px;border:1px solid #ddd;font-size:0.82rem;box-sizing:border-box;">
+      </div>
+      <div style="display:flex;gap:6px;">
+        <button type="submit" class="ts-btn-orange" style="flex:1;padding:7px;font-size:0.82rem;">Mark for Review</button>
+        <button type="button" x-on:click="open = false" class="ts-btn-secondary" style="padding:7px 12px;font-size:0.82rem;">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>

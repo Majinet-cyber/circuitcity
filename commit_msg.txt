@@ -1,0 +1,13 @@
+Phase 12 & 13: HQ polish, simulations fix, discount policy, role tests
+
+- Fix simulations layout overflow (minmax grid, min-width:0 on results/cards)
+- Fix Malawi flag pill label in HQ topbar
+- Fix null-user crashes in commissions, merchant payouts, fraud checks templates
+- Rewrite applications page with masked ID/phone, better filters, safe null handling
+- Rewrite reports page with polished TengaSale-branded hub layout
+- Add discount_policy.py: compliance-safe deposit policy, no gender-based pricing
+- Fix external_reference -> provider_reference field error in reconciliation view
+- Add RoleAccessControlTests: merchant/UW denied HQ, unauthenticated redirected
+- Add DiscountPolicyTests: 8 tests proving gender does not affect deposit outcome
+- Fix overflow on deals catalog grid and HQ dashboard wrapper
+- All 526 tests passing

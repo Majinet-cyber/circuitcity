@@ -21,6 +21,10 @@ class FinancingApplicationAdmin(admin.ModelAdmin):
     list_filter = (
         "status",
         "review_status",
+        "gender",
+        "marital_status",
+        "phone_user",
+        "third_party_phone_user_risk_flagged",
         "region",
         "deal__brand",
         "created_at",

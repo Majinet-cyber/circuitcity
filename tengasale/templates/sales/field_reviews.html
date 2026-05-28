@@ -1,0 +1,165 @@
+{% extends "sales/base.html" %}
+{% load static %}
+
+{% block page_title %}Field Reviews — {{ app.application_number }}{% endblock %}
+
+{% block content %}
+<div class="sales-main">
+
+  <div class="ts-back-row">
+    <a href="{% url 'sales_review_summary' app.id %}" class="ts-back-btn">
+      <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+      Back to Summary
+    </a>
+  </div>
+
+  <div class="ts-app-num">{{ app.application_number }}</div>
+  <h2 class="ts-section-label" style="margin-top:0;">Fields Marked for Review</h2>
+
+  {% if field_reviews %}
+    {% regroup field_reviews by section as sections %}
+    {% for section in sections %}
+      <div class="ts-review-card">
+        <div class="ts-review-card__title">{{ section.grouper|title }}</div>
+        {% for fr in section.list %}
+          <div class="ts-review-row ts-review-row--field" data-testid="field-review-row">
+            <div style="flex:1;">
+              <strong>{{ fr.field_label }}</strong>
+              <div class="ts-meta-tag">
+                {% if fr.status == "marked" %}
+                  <span class="ts-badge ts-badge-orange">Needs Review</span>
+                {% elif fr.status == "customer_updated" %}
+                  <span class="ts-badge ts-badge-blue">Customer Updated</span>
+                {% elif fr.status == "accepted" %}
+                  <span class="ts-badge ts-badge-green">Accepted</span>
+                {% elif fr.status == "dismissed" %}
+                  <span class="ts-badge ts-badge-grey">Dismissed</span>
+                {% endif %}
+                <span class="ts-reason-tag">{{ fr.get_reason_display }}</span>
+              </div>
+              {% if fr.current_value_snapshot %}
+                <div class="ts-current-value">Current: {{ fr.current_value_snapshot }}</div>
+              {% endif %}
+              {% if fr.comment %}
+                <div class="ts-comment-text">Note: {{ fr.comment }}</div>
+              {% endif %}
+              {% if fr.marked_by %}
+                <div class="ts-meta-small">Marked by {{ fr.marked_by.get_full_name|default:fr.marked_by.username }}</div>
+              {% endif %}
+            </div>
+            <div class="ts-field-actions">
+              {% if fr.status != "accepted" %}
+                <form method="post" action="{% url 'sales_accept_field_review' fr.pk %}" style="display:inline;">
+                  {% csrf_token %}
+                  <button type="submit" class="ts-btn-xs ts-btn-success">Accept</button>
+                </form>
+              {% endif %}
+              {% if fr.status != "dismissed" %}
+                <form method="post" action="{% url 'sales_dismiss_field_review' fr.pk %}" style="display:inline;">
+                  {% csrf_token %}
+                  <button type="submit" class="ts-btn-xs ts-btn-ghost">Dismiss</button>
+                </form>
+              {% endif %}
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% endfor %}
+
+    {% with marked_count=field_reviews|length %}
+      <div class="ts-review-card" style="background:#fff8f0;border-color:#ff6b1a;">
+        <div class="ts-review-card__title">Actions</div>
+        <a href="{% url 'sales_correction_link' app.id %}" class="ts-btn-primary ts-btn-full">
+          Generate Customer Edit Link
+        </a>
+      </div>
+    {% endwith %}
+
+  {% else %}
+    <div class="ts-claim-card ts-claim-empty" style="margin:16px 0;">
+      <svg class="ts-claim-icon" viewBox="0 0 24 24">
+        <polyline points="20 6 9 17 4 12"/>
+      </svg>
+      <span>No fields marked for review</span>
+    </div>
+  {% endif %}
+
+  <div class="ts-review-card" style="margin-top:16px;">
+    <div class="ts-review-card__title">Mark a Field</div>
+    <form method="post" action="{% url 'sales_mark_field' app.id %}">
+      {% csrf_token %}
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <div>
+          <label class="ts-field-label">Field</label>
+          <select name="field_key" class="ts-select" required>
+            <optgroup label="Customer">
+              <option value="full_name">Full Name</option>
+              <option value="dob">Date of Birth</option>
+              <option value="national_id">National ID</option>
+              <option value="primary_phone">Primary Phone</option>
+              <option value="secondary_phone">Secondary Phone</option>
+            </optgroup>
+            <optgroup label="Income">
+              <option value="income_band">Income Band</option>
+              <option value="income_amount">Income Amount</option>
+              <option value="occupation">Occupation</option>
+              <option value="income_source">Income Source</option>
+              <option value="proof_of_income">Proof of Income</option>
+              <option value="company_name">Company / Employer</option>
+              <option value="company_contact_phone">Employer Contact Phone</option>
+            </optgroup>
+            <optgroup label="Contacts">
+              <option value="guarantor_name">Guarantor Name</option>
+              <option value="guarantor_phone">Guarantor Phone</option>
+              <option value="neighbour_name">Neighbour / Contact Name</option>
+              <option value="neighbour_phone">Neighbour / Contact Phone</option>
+            </optgroup>
+            <optgroup label="Location">
+              <option value="region">Region</option>
+              <option value="district">District</option>
+              <option value="village">Village</option>
+              <option value="traditional_authority">Traditional Authority</option>
+              <option value="gps_location">GPS Location</option>
+            </optgroup>
+            <optgroup label="Documents">
+              <option value="selfie">Selfie / Face Photo</option>
+              <option value="id_front">ID Front</option>
+              <option value="id_back">ID Back</option>
+              <option value="pre_approval_signature">Pre-Approval Signature</option>
+            </optgroup>
+          </select>
+        </div>
+        <div>
+          <label class="ts-field-label">Section</label>
+          <select name="section" class="ts-select">
+            <option value="customer">Customer</option>
+            <option value="income">Income</option>
+            <option value="contacts">Contacts</option>
+            <option value="location">Location</option>
+            <option value="documents">Documents</option>
+          </select>
+        </div>
+        <div>
+          <label class="ts-field-label">Reason</label>
+          <select name="reason" class="ts-select">
+            <option value="incorrect_information">Incorrect information</option>
+            <option value="missing_information">Missing information</option>
+            <option value="unclear_document">Unclear document</option>
+            <option value="needs_customer_confirmation">Needs customer confirmation</option>
+            <option value="needs_updated_proof">Needs updated proof</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+        <div>
+          <label class="ts-field-label">Comment (optional)</label>
+          <textarea name="comment" class="ts-textarea" rows="2" placeholder="Add context for the customer..."></textarea>
+        </div>
+        <button type="submit" class="ts-btn-primary" data-testid="field-mark-button">
+          Mark Field for Review
+        </button>
+      </div>
+    </form>
+  </div>
+
+</div>
+{% endblock %}

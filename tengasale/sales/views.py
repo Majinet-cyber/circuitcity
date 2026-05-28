@@ -16,8 +16,9 @@ from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from accounts.decorators import underwriter_required
-from applications.models import FinancingApplication
-from approvals.models import UnderwriterReview
+from applications.models import ApplicationFieldReview, FinancingApplication
+from applications.models import ApplicationCorrectionToken
+from approvals.models import CallEvidence, UnderwriterReview
 from approvals.views import (
     MAX_ACTIVE,
     bool_from_post,
@@ -28,7 +29,8 @@ from approvals.views import (
     review_guard,
     sync_legacy_corrections,
 )
-from commissions.models import Commission
+from commissions.models import Commission, CommissionLedger, UnderwriterMonthlyPayout
+from commissions.services import get_underwriter_wallet_summary
 from contracts.models import Contract
 from core.models import AuditLog, QueueRule
 from earnings.models import ManagerPayout, MerchantPayout, Wallet, WalletTransaction
@@ -229,10 +231,19 @@ def sales_applications(request):
 
 @underwriter_required
 def sales_review_summary(request, app_id):
+    from applications.services.duplicate_check import check_duplicate_customer
     app, response = review_guard(request, app_id)
     if response:
         return response
     review = get_review(app, request.user)
+
+    # Run duplicate check and log if found
+    dup_result = check_duplicate_customer(app)
+    if dup_result["has_duplicates"]:
+        _audit(request.user, "duplicate_detected", "FinancingApplication", app.pk,
+               {"app": app.application_number, "flags": [f["type"] for f in dup_result["flags"]]},
+               request)
+
     if request.method == "POST":
         review.summary_clear = bool_from_post(request, "summary_clear")
         review.save(update_fields=["summary_clear", "updated_at"])
@@ -240,6 +251,7 @@ def sales_review_summary(request, app_id):
     return render(request, "sales/review_summary.html", {
         "page_heading": "Review Application",
         "app": app, "review": review, "step": 1, "total_steps": 6,
+        "dup_result": dup_result,
         **correction_context(app),
     })
 
@@ -287,6 +299,46 @@ def sales_address_check(request, app_id):
     })
 
 
+ALLOWED_AUDIO_TYPES = {
+    "audio/mpeg", "audio/mp3", "audio/wav", "audio/mp4",
+    "audio/webm", "audio/ogg", "audio/x-m4a",
+}
+MAX_CALL_RECORDING_BYTES = 15 * 1024 * 1024  # 15 MB
+
+
+def _save_call_recording(request, app, stage):
+    """Save uploaded call recording as CallEvidence. Returns the object or None."""
+    uploaded = request.FILES.get("call_recording")
+    if not uploaded:
+        return None
+    if uploaded.size > MAX_CALL_RECORDING_BYTES:
+        messages.warning(request, "Recording not saved: file exceeds 15 MB limit.")
+        return None
+    content_type = uploaded.content_type or ""
+    if content_type not in ALLOWED_AUDIO_TYPES and not uploaded.name.lower().endswith(
+        (".mp3", ".wav", ".mp4", ".webm", ".ogg", ".m4a")
+    ):
+        messages.warning(request, "Recording not saved: unsupported file type.")
+        return None
+    notified = bool_from_post(request, f"{stage.split('_')[0]}_notified_recording")
+    evidence = CallEvidence.objects.create(
+        application=app,
+        stage=stage,
+        uploaded_by=request.user,
+        audio_file=uploaded,
+        customer_notified=notified,
+        notification_script_confirmed=notified,
+    )
+    AuditLog.objects.create(
+        user=request.user,
+        action=AuditLog.ACTION_KYC_CHANGE,
+        object_type="CallEvidence",
+        object_id=str(evidence.pk),
+        detail={"stage": stage, "application": app.application_number},
+    )
+    return evidence
+
+
 @underwriter_required
 def sales_customer_call(request, app_id):
     app, response = review_guard(request, app_id)
@@ -307,10 +359,13 @@ def sales_customer_call(request, app_id):
         for field in call_fields:
             setattr(review, field, bool_from_post(request, field))
         review.save(update_fields=[*call_fields, "updated_at"])
+        _save_call_recording(request, app, CallEvidence.STAGE_CUSTOMER_CALL)
         return redirect("sales_income_check", app_id=app.id)
+    call_evidence = app.call_evidence.filter(stage=CallEvidence.STAGE_CUSTOMER_CALL).first()
     return render(request, "sales/customer_call.html", {
         "page_heading": "Customer Call",
         "app": app, "review": review, "step": 4, "total_steps": 6,
+        "call_evidence": call_evidence,
         **correction_context(app),
     })
 
@@ -397,6 +452,14 @@ def sales_final_review(request, app_id):
 
     score = review.completeness_score()
     score_class = "score-green" if score >= 80 else "score-orange" if score >= 50 else "score-red"
+    from risk.services import find_existing_customer_exposure
+    exposure = find_existing_customer_exposure(
+        national_id=app.national_id,
+        phone=app.customer_phone,
+        exclude_application_id=app.pk,
+    )
+    from risk.models import FraudCheck
+    latest_fraud_check = FraudCheck.objects.filter(application=app).order_by("-created_at").first()
     return render(request, "sales/final_review.html", {
         "page_heading": "Final Review",
         "app": app,
@@ -405,6 +468,8 @@ def sales_final_review(request, app_id):
         "score_class": score_class,
         "step": 6,
         "total_steps": 6,
+        "exposure": exposure,
+        "fraud_check": latest_fraud_check,
         **correction_context(app),
     })
 
@@ -414,7 +479,23 @@ def sales_confirm_approve(request, app_id):
     app, response = review_guard(request, app_id)
     if response:
         return response
+
+    # Run fraud/exposure check and enforce approval guard
+    from risk.services import run_fraud_check, can_approve_application
+    fraud_check = run_fraud_check(app, checked_by=request.user)
+    approval_guard = can_approve_application(app, requesting_user=request.user)
+
     if request.method == "POST":
+        # Block if fraud check says cannot approve (unless HQ override already applied)
+        if not approval_guard["can_approve"]:
+            messages.error(request, approval_guard["blocked_reason"])
+            return render(request, "sales/confirm_approve.html", {
+                "app": app,
+                "page_heading": "Confirm Approve",
+                "fraud_check": fraud_check,
+                "approval_guard": approval_guard,
+            })
+
         app.status = "approved"
         app.review_status = "approved"
         app.reviewed_by = request.user
@@ -427,10 +508,29 @@ def sales_confirm_approve(request, app_id):
         ])
         app.corrections.filter(resolved=False).update(resolved=True)
         process_application_approval(app, approved_by=request.user)
+        # Create portal PaymentContract + MerchantContractPayout
+        try:
+            from portal.services import create_contract_from_application
+            portal_contract = create_contract_from_application(app, approved_by=request.user)
+        except Exception as exc:
+            import logging
+            logging.getLogger(__name__).warning(
+                "Could not create portal contract for app %s: %s", app.pk, exc
+            )
+            portal_contract = None
         _audit(request.user, AuditLog.ACTION_APPROVE, "FinancingApplication", app.id,
                {"application_number": app.application_number}, request)
-        return render(request, "sales/approve_success.html", {"app": app, "page_heading": "Approved"})
-    return render(request, "sales/confirm_approve.html", {"app": app, "page_heading": "Confirm Approve"})
+        return render(request, "sales/approve_success.html", {
+            "app": app,
+            "portal_contract": portal_contract,
+            "page_heading": "Approved",
+        })
+    return render(request, "sales/confirm_approve.html", {
+        "app": app,
+        "page_heading": "Confirm Approve",
+        "fraud_check": fraud_check,
+        "approval_guard": approval_guard,
+    })
 
 
 # ---------------------------------------------------------------------------
@@ -450,8 +550,9 @@ def sales_queue_rules(request):
 @underwriter_required
 def sales_wallet(request):
     wallet, _ = Wallet.objects.get_or_create(user=request.user)
-    transactions = wallet.transactions.all()[:50]
 
+    # Legacy wallet transactions
+    transactions = wallet.transactions.all()[:50]
     tx_type_labels = {
         "commission_credit": "Commission Credit",
         "commission": "Commission Credit",
@@ -477,10 +578,39 @@ def sales_wallet(request):
         for tx in transactions
     ]
 
-    # Monthly payout records with WHT breakdown
+    # Monthly payout records with WHT breakdown (legacy earnings.ManagerPayout)
     payout_records = list(
         ManagerPayout.objects.filter(wallet=wallet).order_by("-period_end")[:12]
     )
+
+    # New Commission Ledger entries
+    ledger_entries = CommissionLedger.objects.filter(user=request.user).select_related("contract")[:100]
+    ledger_rows = []
+    for entry in ledger_entries:
+        customer_display = ""
+        if entry.contract:
+            name = entry.contract.customer_name or ""
+            if len(name) > 4:
+                customer_display = name[:2] + "***" + name[-1:]
+            else:
+                customer_display = "***"
+        ledger_rows.append({
+            "created_at": entry.created_at,
+            "contract_number": entry.contract.contract_number if entry.contract else "",
+            "customer_masked": customer_display,
+            "type": entry.get_entry_type_display(),
+            "base_amount": entry.base_amount,
+            "rate": entry.rate,
+            "amount": entry.amount,
+            "is_credit": entry.amount >= 0,
+            "entry_type": entry.entry_type,
+        })
+
+    # New monthly payouts (commissions.UnderwriterMonthlyPayout)
+    monthly_payouts = UnderwriterMonthlyPayout.objects.filter(user=request.user).order_by("-period_end")[:12]
+
+    # Summary from commissions service
+    summary = get_underwriter_wallet_summary(request.user)
 
     active_tab = request.GET.get("tab", "earnings")
 
@@ -489,5 +619,192 @@ def sales_wallet(request):
         "wallet": wallet,
         "transaction_rows": transaction_rows,
         "payout_records": payout_records,
+        "ledger_rows": ledger_rows,
+        "monthly_payouts": monthly_payouts,
+        "summary": summary,
         "active_tab": active_tab,
     })
+
+
+# ---------------------------------------------------------------------------
+# Field marking (Part B)
+# ---------------------------------------------------------------------------
+
+@underwriter_required
+@require_POST
+def sales_mark_field(request, app_id):
+    """Mark a specific field for customer review/correction."""
+    app, response = review_guard(request, app_id)
+    if response:
+        return response
+
+    field_key = request.POST.get("field_key", "").strip()
+    field_label = request.POST.get("field_label", "").strip()
+    reason = request.POST.get("reason", ApplicationFieldReview.REASON_MISSING)
+    comment = request.POST.get("comment", "").strip()
+    section = request.POST.get("section", ApplicationFieldReview.SECTION_CUSTOMER)
+    current_value = request.POST.get("current_value", "").strip()
+
+    if not field_key:
+        messages.error(request, "No field key provided.")
+        return redirect("sales_review_summary", app_id=app.id)
+
+    # Build label from field_key if not provided
+    if not field_label:
+        field_label = field_key.replace("_", " ").title()
+
+    review_obj, _ = ApplicationFieldReview.objects.get_or_create(
+        application=app,
+        field_key=field_key,
+        defaults={
+            "field_label": field_label,
+            "section": section,
+            "reason": reason,
+            "comment": comment,
+            "current_value_snapshot": current_value,
+            "marked_by": request.user,
+            "status": ApplicationFieldReview.STATUS_MARKED,
+        },
+    )
+    if not _:
+        review_obj.reason = reason
+        review_obj.comment = comment
+        review_obj.field_label = field_label
+        review_obj.section = section
+        review_obj.current_value_snapshot = current_value
+        review_obj.marked_by = request.user
+        review_obj.status = ApplicationFieldReview.STATUS_MARKED
+        review_obj.save()
+
+    _audit(request.user, AuditLog.ACTION_KYC_CHANGE, "ApplicationFieldReview", review_obj.pk,
+           {"field_key": field_key, "reason": reason, "app": app.application_number}, request)
+
+    messages.success(request, f"Field '{field_label}' marked for review.")
+    next_url = request.POST.get("next", "")
+    if next_url:
+        return redirect(next_url)
+    return redirect("sales_review_summary", app_id=app.id)
+
+
+@underwriter_required
+def sales_field_reviews(request, app_id):
+    """Show all field reviews for an application."""
+    app, response = review_guard(request, app_id)
+    if response:
+        return response
+    field_reviews = ApplicationFieldReview.objects.filter(application=app).order_by("section", "field_key")
+    return render(request, "sales/field_reviews.html", {
+        "page_heading": "Field Reviews",
+        "app": app,
+        "field_reviews": field_reviews,
+    })
+
+
+@underwriter_required
+@require_POST
+def sales_dismiss_field_review(request, review_id):
+    """Dismiss a field review mark."""
+    review_obj = get_object_or_404(ApplicationFieldReview, pk=review_id)
+    app, response = review_guard(request, review_obj.application_id)
+    if response:
+        return response
+    review_obj.status = ApplicationFieldReview.STATUS_DISMISSED
+    review_obj.save(update_fields=["status", "updated_at"])
+    messages.success(request, "Field review dismissed.")
+    return redirect("sales_field_reviews", app_id=review_obj.application_id)
+
+
+@underwriter_required
+@require_POST
+def sales_accept_field_review(request, review_id):
+    """Accept a customer-updated field review."""
+    review_obj = get_object_or_404(ApplicationFieldReview, pk=review_id)
+    app, response = review_guard(request, review_obj.application_id)
+    if response:
+        return response
+    review_obj.status = ApplicationFieldReview.STATUS_ACCEPTED
+    review_obj.save(update_fields=["status", "updated_at"])
+    _audit(request.user, AuditLog.ACTION_KYC_CHANGE, "ApplicationFieldReview", review_obj.pk,
+           {"field_key": review_obj.field_key, "action": "accepted"}, request)
+    messages.success(request, f"Field '{review_obj.field_label}' accepted.")
+    return redirect("sales_field_reviews", app_id=review_obj.application_id)
+
+
+@underwriter_required
+def sales_send_correction_link(request, app_id):
+    """Generate/refresh correction token and show the customer edit link."""
+    app, response = review_guard(request, app_id)
+    if response:
+        return response
+
+    marked_fields = ApplicationFieldReview.objects.filter(
+        application=app, status=ApplicationFieldReview.STATUS_MARKED
+    )
+    if not marked_fields.exists():
+        messages.warning(request, "No fields are currently marked for review.")
+        return redirect("sales_review_summary", app_id=app.id)
+
+    token_obj = ApplicationCorrectionToken.create_or_refresh(app)
+
+    _audit(request.user, AuditLog.ACTION_KYC_CHANGE, "ApplicationCorrectionToken", token_obj.pk,
+           {"app": app.application_number, "action": "correction_link_generated"}, request)
+
+    correction_url = request.build_absolute_uri(
+        f"/applications/{token_obj.token}/correct/"
+    )
+
+    return render(request, "sales/correction_link.html", {
+        "page_heading": "Customer Edit Link",
+        "app": app,
+        "token_obj": token_obj,
+        "correction_url": correction_url,
+        "marked_fields": marked_fields,
+    })
+
+
+# ---------------------------------------------------------------------------
+# Guarantor call review step
+# ---------------------------------------------------------------------------
+
+@underwriter_required
+def sales_guarantor_call(request, app_id):
+    app, response = review_guard(request, app_id)
+    if response:
+        return response
+    review = get_review(app, request.user)
+    guarantor_fields = [
+        "location_neighbour_spoken",
+        "location_confirmed",
+        "location_traceable",
+    ]
+    if request.method == "POST":
+        for field in guarantor_fields:
+            setattr(review, field, bool_from_post(request, field))
+        review.save(update_fields=[*guarantor_fields, "updated_at"])
+        _save_call_recording(request, app, CallEvidence.STAGE_GUARANTOR_CALL)
+        return redirect("sales_income_check", app_id=app.id)
+    call_evidence = app.call_evidence.filter(stage=CallEvidence.STAGE_GUARANTOR_CALL).first()
+    return render(request, "sales/guarantor_call.html", {
+        "page_heading": "Guarantor Call",
+        "app": app,
+        "review": review,
+        "step": 5,
+        "total_steps": 7,
+        "call_evidence": call_evidence,
+        **correction_context(app),
+    })
+
+
+# ---------------------------------------------------------------------------
+# Payments list (underwriter can view portal payments)
+# ---------------------------------------------------------------------------
+
+@underwriter_required
+def sales_payments(request):
+    from portal.models import PaymentContract, PaymentTransaction
+    recent_transactions = PaymentTransaction.objects.select_related("payment_contract").order_by("-created_at")[:50]
+    return render(request, "sales/payments_list.html", {
+        "page_heading": "Payments",
+        "transactions": recent_transactions,
+    })
+

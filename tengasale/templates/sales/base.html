@@ -2,7 +2,7 @@
 {% load static %}
 
 {# ─────────────────────────────────────────────────────────────────────
-   KulaSell-style compact mobile header for all /sales/ pages.
+   Compact mobile header for all /sales/ pages.
    The header title is passed by the view via context variable `page_heading`
    (default: "TengaSale"). No nested blocks used to avoid Django limitation.
 ───────────────────────────────────────────────────────────────────── #}
@@ -12,7 +12,7 @@
   <div class="mobile-header__left">
     <a href="{% url 'sales_home' %}" class="mobile-header__logo-link" aria-label="TengaSale home">
       <img
-        src="{% if tengasale_logo_icon_url %}{{ tengasale_logo_icon_url }}{% else %}{% static 'images/brand/tengasale-logo-icon.png' %}{% endif %}"
+        src="{% if tengasale_app_icon_url %}{{ tengasale_app_icon_url }}{% else %}{% static 'images/brand/tengasale-logo-icon.png' %}{% endif %}"
         alt="TS"
         class="ts-header-icon"
       >

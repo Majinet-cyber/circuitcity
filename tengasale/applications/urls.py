@@ -14,6 +14,8 @@ urlpatterns = [
     path("<int:app_id>/submitted/", views.application_submitted, name="application_submitted"),
     path("<int:app_id>/corrections/", views.application_corrections, name="application_corrections"),
 
+    path("<str:token>/correct/", views.customer_field_correction, name="customer_field_correction"),
+
     path("active/", views.active_applications, name="active_applications"),
     path("pending/", views.pending_applications, name="pending_applications"),
     path("needs-edit/", views.needs_edit_applications, name="needs_edit_applications"),

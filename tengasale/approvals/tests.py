@@ -81,7 +81,7 @@ class ApprovalQueueTests(TestCase):
         # /tengasale/underwriter/ redirects to /sales/ — follow to final destination
         response = self.client.get(reverse("underwriter_dashboard"), follow=True)
 
-        # New KulaSell-style home shows the app number in the active list
+        # TengaSale home shows the app number in the active list
         self.assertContains(response, app.application_number)
 
     def test_merchant_submitted_page_shows_reviewer_name_for_under_review(self):
@@ -359,3 +359,241 @@ class ApprovalQueueTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Applications")
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Phase 10 Part D: Call Recording Upload Tests
+# ──────────────────────────────────────────────────────────────────────────────
+
+from django.core.files.uploadedfile import SimpleUploadedFile
+from approvals.models import CallEvidence
+
+
+class CallRecordingUploadTests(TestCase):
+    """
+    Tests for call recording upload validation.
+    - valid audio accepted
+    - invalid file type rejected (in model/service layer)
+    - only authorized staff can access recordings
+    - upload creates audit log entry
+    - customer call template shows upload field
+    """
+
+    def setUp(self):
+        User = get_user_model()
+        self.merchant = User.objects.create_user(username="merch_ce", password="pass123")
+        assign_role(self.merchant, "merchant")
+        self.underwriter = User.objects.create_user(username="uw_ce", password="pass123")
+        assign_role(self.underwriter, "underwriter")
+        self.app = FinancingApplication.objects.create(
+            created_by=self.merchant,
+            status="under_review",
+            claimed_by=self.underwriter,
+            customer_name="Ruth Mkwanda",
+            customer_phone="0991112233",
+        )
+        UnderwriterReview.objects.get_or_create(application=self.app)
+
+    def _make_audio_file(self, filename="call.mp3", content=b"ID3\x00\x00\x00\x00\x00\x00\x00"):
+        return SimpleUploadedFile(filename, content, content_type="audio/mpeg")
+
+    def test_call_evidence_model_creates_correctly(self):
+        audio = self._make_audio_file()
+        evidence = CallEvidence.objects.create(
+            application=self.app,
+            stage=CallEvidence.STAGE_CUSTOMER_CALL,
+            uploaded_by=self.underwriter,
+            audio_file=audio,
+            customer_notified=True,
+            notification_script_confirmed=True,
+            notes="Test call evidence",
+        )
+        self.assertEqual(evidence.stage, CallEvidence.STAGE_CUSTOMER_CALL)
+        self.assertEqual(evidence.uploaded_by, self.underwriter)
+        self.assertTrue(evidence.customer_notified)
+        self.assertIsNotNone(evidence.pk)
+
+    def test_call_evidence_requires_application(self):
+        with self.assertRaises(Exception):
+            CallEvidence.objects.create(
+                application=None,
+                stage=CallEvidence.STAGE_CUSTOMER_CALL,
+                uploaded_by=self.underwriter,
+            )
+
+    def test_customer_call_page_renders_with_upload_field(self):
+        self.client.login(username="uw_ce", password="pass123")
+        response = self.client.get(
+            reverse("sales_customer_call", args=[self.app.id])
+        )
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        self.assertIn("call_recording", content)
+        self.assertIn("audio/mpeg", content)
+
+    def test_customer_call_page_shows_notification_question(self):
+        self.client.login(username="uw_ce", password="pass123")
+        response = self.client.get(
+            reverse("sales_customer_call", args=[self.app.id])
+        )
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        self.assertIn("recorded for quality and compliance", content)
+
+    def test_merchant_cannot_access_customer_call_review(self):
+        self.client.login(username="merch_ce", password="pass123")
+        response = self.client.get(
+            reverse("sales_customer_call", args=[self.app.id])
+        )
+        self.assertIn(response.status_code, [302, 403])
+
+    def test_call_evidence_stage_choices(self):
+        stages = [c[0] for c in CallEvidence.STAGE_CHOICES]
+        self.assertIn(CallEvidence.STAGE_CUSTOMER_CALL, stages)
+        self.assertIn(CallEvidence.STAGE_GUARANTOR_CALL, stages)
+        self.assertIn(CallEvidence.STAGE_EMPLOYER_CALL, stages)
+
+    def test_call_evidence_notified_flag_defaults_false(self):
+        evidence = CallEvidence(
+            application=self.app,
+            stage=CallEvidence.STAGE_GUARANTOR_CALL,
+            uploaded_by=self.underwriter,
+        )
+        self.assertFalse(evidence.customer_notified)
+        self.assertFalse(evidence.notification_script_confirmed)
+
+    def test_unauthenticated_cannot_access_customer_call_page(self):
+        self.client.logout()
+        response = self.client.get(
+            reverse("sales_customer_call", args=[self.app.id])
+        )
+        self.assertIn(response.status_code, [302, 403])
+
+    def test_call_evidence_str_representation(self):
+        evidence = CallEvidence.objects.create(
+            application=self.app,
+            stage=CallEvidence.STAGE_EMPLOYER_CALL,
+            uploaded_by=self.underwriter,
+        )
+        self.assertIn("Employer", str(evidence))
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Phase 10 Part C: ReviewQuestion seed tests
+# ──────────────────────────────────────────────────────────────────────────────
+
+from approvals.models import ReviewQuestion
+
+
+class ReviewQuestionSeedTests(TestCase):
+    """Test that seed_review_questions creates the required structured questions."""
+
+    def test_seed_creates_identity_check_questions(self):
+        from django.core.management import call_command
+        call_command("seed_review_questions", verbosity=0)
+        identity_questions = ReviewQuestion.objects.filter(stage="identity", active=True)
+        self.assertGreaterEqual(identity_questions.count(), 5)
+
+    def test_seed_creates_customer_call_questions(self):
+        from django.core.management import call_command
+        call_command("seed_review_questions", verbosity=0)
+        call_questions = ReviewQuestion.objects.filter(stage="customer_call", active=True)
+        self.assertGreaterEqual(call_questions.count(), 5)
+
+    def test_seed_creates_guarantor_call_questions(self):
+        from django.core.management import call_command
+        call_command("seed_review_questions", verbosity=0)
+        guarantor_questions = ReviewQuestion.objects.filter(stage="guarantor_call", active=True)
+        self.assertGreaterEqual(guarantor_questions.count(), 3)
+
+    def test_seed_creates_employer_call_questions(self):
+        from django.core.management import call_command
+        call_command("seed_review_questions", verbosity=0)
+        employer_questions = ReviewQuestion.objects.filter(stage="employer_call", active=True)
+        self.assertGreaterEqual(employer_questions.count(), 3)
+
+    def test_seed_is_idempotent(self):
+        from django.core.management import call_command
+        call_command("seed_review_questions", verbosity=0)
+        count_first = ReviewQuestion.objects.count()
+        call_command("seed_review_questions", verbosity=0)
+        count_second = ReviewQuestion.objects.count()
+        self.assertEqual(count_first, count_second)
+
+    def test_fail_if_no_questions_have_risk_weight(self):
+        from django.core.management import call_command
+        call_command("seed_review_questions", verbosity=0)
+        critical = ReviewQuestion.objects.filter(fail_if_no=True, active=True)
+        self.assertGreater(critical.count(), 0, "Some questions must be fail_if_no=True")
+
+    def test_question_key_is_unique(self):
+        from django.core.management import call_command
+        call_command("seed_review_questions", verbosity=0)
+        keys = list(ReviewQuestion.objects.values_list("question_key", flat=True))
+        self.assertEqual(len(keys), len(set(keys)), "All question_keys must be unique")
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Phase 10 Part N: HQ Operations tests
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+class HQOperationsTests(TestCase):
+    """Tests for HQ safe operations page."""
+
+    def setUp(self):
+        User = get_user_model()
+        self.hq_user = User.objects.create_user(username="hq_ops", password="pass123", is_staff=True)
+        assign_role(self.hq_user, "hq")
+        self.merchant = User.objects.create_user(username="merch_ops", password="pass123")
+        assign_role(self.merchant, "merchant")
+        self.underwriter = User.objects.create_user(username="uw_ops", password="pass123")
+        assign_role(self.underwriter, "underwriter")
+
+    def test_hq_operations_page_accessible(self):
+        self.client.login(username="hq_ops", password="pass123")
+        response = self.client.get(reverse("hq_operations"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Safe Operations")
+
+    def test_merchant_cannot_access_hq_operations(self):
+        self.client.login(username="merch_ops", password="pass123")
+        response = self.client.get(reverse("hq_operations"))
+        self.assertIn(response.status_code, [302, 403])
+
+    def test_underwriter_cannot_access_hq_operations(self):
+        self.client.login(username="uw_ops", password="pass123")
+        response = self.client.get(reverse("hq_operations"))
+        self.assertIn(response.status_code, [302, 403])
+
+    def test_release_stuck_claim_sets_status_to_pending(self):
+        self.client.login(username="hq_ops", password="pass123")
+        app = FinancingApplication.objects.create(
+            created_by=self.merchant,
+            status="under_review",
+            claimed_by=self.underwriter,
+        )
+        response = self.client.post(reverse("hq_operations"), {
+            "action": "release_stuck_claim",
+            "app_id": app.pk,
+        })
+        app.refresh_from_db()
+        self.assertIn(response.status_code, [200, 302])
+        self.assertEqual(app.status, "pending_review")
+        self.assertIsNone(app.claimed_by)
+
+    def test_release_creates_audit_log(self):
+        from core.models import AuditLog
+        self.client.login(username="hq_ops", password="pass123")
+        app = FinancingApplication.objects.create(
+            created_by=self.merchant,
+            status="under_review",
+            claimed_by=self.underwriter,
+        )
+        self.client.post(reverse("hq_operations"), {
+            "action": "release_stuck_claim",
+            "app_id": app.pk,
+        })
+        self.assertTrue(
+            AuditLog.objects.filter(action="hq_release_stuck_claim").exists()
+        )

@@ -1,0 +1,9 @@
+{
+  "contract_number": "TS-MW-00000001",
+  "payg_number": "TSG000001",
+  "customer_name": "Test Customer",
+  "device_model": "Demo Phone",
+  "total_amount": "150000.00",
+  "deposit_paid": "30000.00",
+  "amount_paid": "30000.00"
+}

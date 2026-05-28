@@ -22,7 +22,7 @@
       </p>
       <div class="hero__ctas">
         <a href="{% url 'portal_search' %}" class="btn-primary">Make a Payment</a>
-        <a href="#for-merchants" class="btn-secondary">Become a Merchant</a>
+        <a href="{% url 'website_merchant_signup' %}" class="btn-secondary">Become a Merchant</a>
       </div>
       <div class="hero__trust">
         <span class="hero__trust-item">
@@ -45,6 +45,15 @@
     </div>
 
     <div class="hero__visual" aria-hidden="true">
+      <!-- TS Brand image — constrained glass card -->
+      <div class="hcard hero-brand-card">
+        <img
+          src="{% static 'images/brand/tengasale-logo-icon.png' %}"
+          alt="TengaSale"
+          class="hero-brand-img"
+          loading="eager"
+        >
+      </div>
       <!-- Active contract card -->
       <div class="hcard">
         <div class="hcard__label">Active Contract</div>
@@ -79,6 +88,51 @@
             <span class="hcard__badge-dot"></span> 24 contracts
           </div>
         </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Platform Stats ─────────────────────────────────────────── -->
+<section class="site-section site-section--brand-showcase" id="brand-showcase">
+  <div class="site-section__inner">
+    <div class="brand-showcase-copy" style="max-width:600px;margin-bottom:32px;">
+      <span class="section-eyebrow">TengaSale Platform</span>
+      <h2 class="section-heading">Built for merchants, customers, and repayment control</h2>
+      <p class="section-sub">
+        One platform that connects merchants offering smartphones on instalments
+        with customers making structured repayments — with full visibility,
+        contract records, and mobile money payment support.
+      </p>
+    </div>
+    <div class="platform-stats-grid">
+      <div class="platform-stat-card">
+        <div class="platform-stat-icon">
+          <svg viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+        </div>
+        <div class="platform-stat-val">Smartphones</div>
+        <div class="platform-stat-label">Structured instalment financing for real customers</div>
+      </div>
+      <div class="platform-stat-card">
+        <div class="platform-stat-icon">
+          <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        </div>
+        <div class="platform-stat-val">Multi-party</div>
+        <div class="platform-stat-label">Merchants, underwriters, and HQ on one platform</div>
+      </div>
+      <div class="platform-stat-card">
+        <div class="platform-stat-icon">
+          <svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+        </div>
+        <div class="platform-stat-val">Mobile Money</div>
+        <div class="platform-stat-label">Airtel Money &amp; TNM Mpamba payment collection</div>
+      </div>
+      <div class="platform-stat-card">
+        <div class="platform-stat-icon">
+          <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        </div>
+        <div class="platform-stat-val">KYC &amp; Lock</div>
+        <div class="platform-stat-label">Identity verification, device lock, and contract records</div>
       </div>
     </div>
   </div>
@@ -239,8 +293,8 @@
           and payment collection — giving you operational visibility across your portfolio.
         </p>
         <div class="btn-row">
-          <a href="{% url 'login' %}" class="btn-primary">Merchant Login</a>
-          <a href="mailto:support@tengasale.africa" class="btn-secondary">Enquire About Onboarding</a>
+          <a href="{% url 'website_merchant_signup' %}" class="btn-primary">Become a Merchant</a>
+          <a href="{% url 'login' %}" class="btn-secondary">Merchant Login</a>
         </div>
       </div>
       <div class="feature-list" style="direction:ltr">
@@ -466,7 +520,14 @@
       <details class="faq-item">
         <summary>How do I become a TengaSale merchant?</summary>
         <div class="faq-item__body">
-          <p>Contact TengaSale at <a href="mailto:support@tengasale.africa">support@tengasale.africa</a> to discuss merchant onboarding. Once onboarded, you will receive access to the merchant platform where you can create applications, manage contracts, and track repayments. See our <a href="{% url 'website_merchant_terms' %}">Merchant Terms</a> for full details.</p>
+          <p>Submit a merchant interest form at <a href="{% url 'website_merchant_signup' %}">tengasale.africa/site/merchant-signup/</a>. Our onboarding team will contact you to discuss requirements and next steps. Once onboarded, you will receive access to the merchant platform. See our <a href="{% url 'website_merchant_terms' %}">Merchant Terms</a> for full details.</p>
+        </div>
+      </details>
+
+      <details class="faq-item">
+        <summary>Is TengaSale available outside Malawi?</summary>
+        <div class="faq-item__body">
+          <p>TengaSale is currently operating as a Malawi pilot. Expansion to other markets is planned as the platform matures. If you are interested in partnering in another market, contact us at <a href="mailto:support@tengasale.africa">support@tengasale.africa</a>.</p>
         </div>
       </details>
 
@@ -484,6 +545,21 @@
         </div>
       </details>
 
+    </div>
+  </div>
+</section>
+
+<!-- ── Bottom CTA ─────────────────────────────────────────────── -->
+<section class="site-cta-section">
+  <div class="site-section__inner" style="text-align:center;">
+    <h2 class="section-heading" style="color:#fff;">Ready to join TengaSale?</h2>
+    <p class="section-sub" style="color:rgba(255,255,255,0.80);margin-bottom:32px;">
+      Whether you run a phone shop, are looking for a new career, or need to make a payment — we are here.
+    </p>
+    <div class="hero__ctas" style="justify-content:center;flex-wrap:wrap;">
+      <a href="{% url 'website_merchant_signup' %}" class="btn-primary btn-primary--white">Become a Merchant</a>
+      <a href="{% url 'portal_search' %}" class="btn-secondary btn-secondary--white">Make a Payment</a>
+      <a href="{% url 'website_careers' %}" class="btn-secondary btn-secondary--white">Careers</a>
     </div>
   </div>
 </section>

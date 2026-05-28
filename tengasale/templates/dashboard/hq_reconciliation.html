@@ -1,0 +1,92 @@
+{% extends "base/base.html" %}
+{% load static %}
+
+{% block page_title %}Reconciliation — TengaSale HQ{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width:1100px;margin:0 auto;padding:24px 16px;">
+
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px;">
+    <a href="{% url 'hq_dashboard' %}" style="color:var(--primary);text-decoration:none;font-size:0.85rem;font-weight:600;">← HQ</a>
+    <div>
+      <h1 style="font-size:1.4rem;font-weight:800;margin:0;">Reconciliation</h1>
+      <p style="font-size:0.8rem;color:var(--muted);margin:2px 0 0 0;">Match payments to contracts and resolve unreconciled transactions.</p>
+    </div>
+  </div>
+
+  {% if msg %}
+  <div class="alert alert-{% if msg_type == 'success' %}success{% elif msg_type == 'error' %}danger{% else %}info{% endif %} mt-3" role="alert">
+    {{ msg }}
+  </div>
+  {% endif %}
+
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin:20px 0;">
+    <div class="glass-card" style="padding:16px;text-align:center;">
+      <div style="font-size:0.72rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.06em;">Matched</div>
+      <div style="font-size:1.5rem;font-weight:800;color:#16a34a;margin-top:4px;">{{ matched }}</div>
+    </div>
+    <div class="glass-card" style="padding:16px;text-align:center;">
+      <div style="font-size:0.72rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.06em;">Unmatched</div>
+      <div style="font-size:1.5rem;font-weight:800;color:#dc2626;margin-top:4px;">{{ unmatched }}</div>
+    </div>
+    <div class="glass-card" style="padding:16px;text-align:center;">
+      <div style="font-size:0.72rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.06em;">Duplicate Refs</div>
+      <div style="font-size:1.5rem;font-weight:800;color:#d97706;margin-top:4px;">{{ dup_refs }}</div>
+    </div>
+    <div class="glass-card" style="padding:16px;text-align:center;">
+      <div style="font-size:0.72rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.06em;">External Pending</div>
+      <div style="font-size:1.5rem;font-weight:800;color:#2563eb;margin-top:4px;">{{ ext_pending }}</div>
+    </div>
+  </div>
+
+  <div class="glass-card" style="padding:0;overflow:hidden;">
+    <div style="padding:14px 16px;border-bottom:1px solid var(--border);">
+      <h2 style="font-size:0.9rem;font-weight:800;margin:0;">Unmatched / Pending Transactions</h2>
+    </div>
+    <div style="overflow-x:auto;">
+      <table style="width:100%;border-collapse:collapse;font-size:0.82rem;">
+        <thead>
+          <tr style="background:#f8fafc;">
+            <th style="padding:10px 14px;text-align:left;font-weight:700;font-size:0.72rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);">Reference</th>
+            <th style="padding:10px 14px;text-align:left;font-weight:700;font-size:0.72rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);">Provider</th>
+            <th style="padding:10px 14px;text-align:right;font-weight:700;font-size:0.72rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);">Amount</th>
+            <th style="padding:10px 14px;text-align:center;font-weight:700;font-size:0.72rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);">Status</th>
+            <th style="padding:10px 14px;text-align:left;font-weight:700;font-size:0.72rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);">Contract</th>
+            <th style="padding:10px 14px;text-align:center;font-weight:700;font-size:0.72rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);">Date</th>
+            <th style="padding:10px 14px;text-align:center;font-weight:700;font-size:0.72rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for txn in unmatched_qs %}
+          <tr style="border-top:1px solid var(--border);">
+            <td style="padding:10px 14px;font-size:0.75rem;color:var(--muted);">{{ txn.internal_reference }}</td>
+            <td style="padding:10px 14px;">{{ txn.provider }}</td>
+            <td style="padding:10px 14px;text-align:right;font-weight:700;">MWK {{ txn.amount|floatformat:0 }}</td>
+            <td style="padding:10px 14px;text-align:center;">
+              <span class="status-badge {% if txn.status == 'paid' %}status-badge--approved{% elif txn.status == 'failed' %}status-badge--rejected{% else %}status-badge--pending{% endif %}">
+                {{ txn.status }}
+              </span>
+            </td>
+            <td style="padding:10px 14px;">
+              {% if txn.payment_contract %}{{ txn.payment_contract.contract_number }}{% else %}<span style="color:#dc2626;font-size:0.75rem;">Unlinked</span>{% endif %}
+            </td>
+            <td style="padding:10px 14px;text-align:center;color:var(--muted);">{{ txn.created_at|date:"d M Y" }}</td>
+            <td style="padding:10px 14px;text-align:center;">
+              <form method="post" style="display:inline;">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="mark_reconciled">
+                <input type="hidden" name="txn_id" value="{{ txn.pk }}">
+                <button type="submit" class="btn btn-xs btn-outline-success" style="font-size:0.72rem;padding:2px 8px;">Reconcile</button>
+              </form>
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="7" style="padding:32px;text-align:center;color:var(--muted);">No unmatched transactions found.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

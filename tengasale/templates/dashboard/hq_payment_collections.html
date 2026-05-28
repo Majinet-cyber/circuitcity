@@ -1,0 +1,117 @@
+{% extends "base/base.html" %}
+{% load static %}
+
+{% block page_title %}Payment Collections — TengaSale HQ{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width:1100px;margin:0 auto;padding:24px 16px;">
+
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px;">
+    <a href="{% url 'hq_dashboard' %}" style="color:var(--primary);text-decoration:none;font-size:0.85rem;font-weight:600;">← HQ</a>
+    <div>
+      <h1 style="font-size:1.4rem;font-weight:800;margin:0;">Payment Collections</h1>
+      <p style="font-size:0.8rem;color:var(--muted);margin:2px 0 0 0;">Track and monitor all payment activity across the platform.</p>
+    </div>
+    <a href="?export=csv" class="btn btn-sm btn-outline-secondary ms-auto" style="margin-left:auto;">Export CSV</a>
+  </div>
+
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin:20px 0;">
+    <div class="glass-card" style="padding:16px;text-align:center;">
+      <div style="font-size:0.72rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.06em;">Collections Today</div>
+      <div style="font-size:1.4rem;font-weight:800;color:#16a34a;margin-top:4px;">MWK {{ collections_today|floatformat:0 }}</div>
+    </div>
+    <div class="glass-card" style="padding:16px;text-align:center;">
+      <div style="font-size:0.72rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.06em;">Collections This Month</div>
+      <div style="font-size:1.4rem;font-weight:800;color:var(--primary);margin-top:4px;">MWK {{ collections_month|floatformat:0 }}</div>
+    </div>
+    <div class="glass-card" style="padding:16px;text-align:center;">
+      <div style="font-size:0.72rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.06em;">Failed Payments</div>
+      <div style="font-size:1.4rem;font-weight:800;color:#dc2626;margin-top:4px;">{{ failed_payments }}</div>
+    </div>
+    <div class="glass-card" style="padding:16px;text-align:center;">
+      <div style="font-size:0.72rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.06em;">Pending Processing</div>
+      <div style="font-size:1.4rem;font-weight:800;color:#d97706;margin-top:4px;">{{ pending_payments }}</div>
+    </div>
+  </div>
+
+  <div class="glass-card" style="padding:16px;margin-bottom:20px;">
+    <form method="get" style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;">
+      <div>
+        <label style="font-size:0.75rem;font-weight:700;color:var(--muted);">Status</label>
+        <select name="status" class="form-select form-select-sm" style="min-width:130px;">
+          <option value="">All</option>
+          <option value="paid" {% if status_filter == 'paid' %}selected{% endif %}>Paid</option>
+          <option value="pending" {% if status_filter == 'pending' %}selected{% endif %}>Pending</option>
+          <option value="failed" {% if status_filter == 'failed' %}selected{% endif %}>Failed</option>
+          <option value="processing" {% if status_filter == 'processing' %}selected{% endif %}>Processing</option>
+        </select>
+      </div>
+      <div>
+        <label style="font-size:0.75rem;font-weight:700;color:var(--muted);">Provider</label>
+        <select name="provider" class="form-select form-select-sm" style="min-width:130px;">
+          <option value="">All</option>
+          {% for p in providers %}<option value="{{ p }}" {% if provider_filter == p %}selected{% endif %}>{{ p }}</option>{% endfor %}
+        </select>
+      </div>
+      <div>
+        <label style="font-size:0.75rem;font-weight:700;color:var(--muted);">From</label>
+        <input type="date" name="date_from" class="form-control form-control-sm" value="{{ date_from }}">
+      </div>
+      <div>
+        <label style="font-size:0.75rem;font-weight:700;color:var(--muted);">To</label>
+        <input type="date" name="date_to" class="form-control form-control-sm" value="{{ date_to }}">
+      </div>
+      <button type="submit" class="btn btn-warning btn-sm fw-bold">Filter</button>
+      <a href="?" class="btn btn-outline-secondary btn-sm">Clear</a>
+    </form>
+  </div>
+
+  <div class="glass-card" style="padding:0;overflow:hidden;">
+    <div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
+      <h2 style="font-size:0.9rem;font-weight:800;margin:0;">Recent Transactions</h2>
+      <span style="font-size:0.75rem;color:var(--muted);">Latest 100</span>
+    </div>
+    <div style="overflow-x:auto;">
+      <table style="width:100%;border-collapse:collapse;font-size:0.82rem;">
+        <thead>
+          <tr style="background:#f8fafc;">
+            <th style="padding:10px 14px;text-align:left;font-weight:700;font-size:0.72rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);">Contract</th>
+            <th style="padding:10px 14px;text-align:left;font-weight:700;font-size:0.72rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);">Customer</th>
+            <th style="padding:10px 14px;text-align:left;font-weight:700;font-size:0.72rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);">Provider</th>
+            <th style="padding:10px 14px;text-align:right;font-weight:700;font-size:0.72rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);">Amount</th>
+            <th style="padding:10px 14px;text-align:center;font-weight:700;font-size:0.72rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);">Status</th>
+            <th style="padding:10px 14px;text-align:center;font-weight:700;font-size:0.72rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);">Date</th>
+            <th style="padding:10px 14px;text-align:left;font-weight:700;font-size:0.72rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);">Reference</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for txn in transactions %}
+          <tr style="border-top:1px solid var(--border);">
+            <td style="padding:10px 14px;font-weight:600;">
+              {% if txn.payment_contract %}{{ txn.payment_contract.contract_number }}{% else %}<span style="color:var(--muted);">—</span>{% endif %}
+            </td>
+            <td style="padding:10px 14px;">
+              {% if txn.payment_contract %}{{ txn.payment_contract.customer_name }}{% else %}<span style="color:var(--muted);">—</span>{% endif %}
+            </td>
+            <td style="padding:10px 14px;">{{ txn.provider }}</td>
+            <td style="padding:10px 14px;text-align:right;font-weight:700;">MWK {{ txn.amount|floatformat:0 }}</td>
+            <td style="padding:10px 14px;text-align:center;">
+              <span class="status-badge {% if txn.status == 'paid' %}status-badge--approved{% elif txn.status == 'failed' %}status-badge--rejected{% else %}status-badge--pending{% endif %}">
+                {{ txn.status }}
+              </span>
+            </td>
+            <td style="padding:10px 14px;text-align:center;color:var(--muted);">
+              {% if txn.paid_at %}{{ txn.paid_at|date:"d M Y" }}{% else %}{{ txn.created_at|date:"d M Y" }}{% endif %}
+            </td>
+            <td style="padding:10px 14px;font-size:0.75rem;color:var(--muted);">{{ txn.external_reference|default:txn.internal_reference|truncatechars:20 }}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="7" style="padding:32px;text-align:center;color:var(--muted);">No transactions found.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

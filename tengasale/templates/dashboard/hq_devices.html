@@ -1,0 +1,182 @@
+{% extends "base/base.html" %}
+{% load static %}
+
+{% block page_title %}Device Enrollment — TengaSale HQ{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width:1050px;margin:0 auto;padding:20px 16px;">
+
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;">
+    <a href="{% url 'hq_dashboard' %}" style="color:var(--primary);text-decoration:none;font-size:0.9rem;">← HQ</a>
+    <div>
+      <h1 style="font-size:1.4rem;font-weight:800;margin:0;">Device Enrollment</h1>
+      <p style="font-size:0.8rem;color:var(--muted);margin:2px 0 0 0;">Manage device lock and enrollment status across all contracts.</p>
+    </div>
+  </div>
+
+  {% if msg %}
+    <div class="alert alert-{% if msg_type == 'success' %}success{% elif msg_type == 'error' %}danger{% else %}info{% endif %} mb-3">
+      {{ msg }}
+    </div>
+  {% endif %}
+
+  {# ── KPI Cards ── #}
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:24px;">
+    <div class="glass-card" style="padding:14px;text-align:center;">
+      <div style="font-size:0.72rem;color:var(--muted);">Enrolled</div>
+      <div style="font-size:1.5rem;font-weight:700;color:var(--success);">{{ total_enrolled }}</div>
+    </div>
+    <div class="glass-card" style="padding:14px;text-align:center;">
+      <div style="font-size:0.72rem;color:var(--muted);">Pending Enrollment</div>
+      <div style="font-size:1.5rem;font-weight:700;color:var(--warning);">{{ total_pending }}</div>
+    </div>
+    <div class="glass-card" style="padding:14px;text-align:center;">
+      <div style="font-size:0.72rem;color:var(--muted);">Failed</div>
+      <div style="font-size:1.5rem;font-weight:700;color:var(--danger);">{{ total_failed }}</div>
+    </div>
+    <div class="glass-card" style="padding:14px;text-align:center;">
+      <div style="font-size:0.72rem;color:var(--muted);">Locked</div>
+      <div style="font-size:1.5rem;font-weight:700;color:#1d4ed8;">{{ total_locked }}</div>
+    </div>
+  </div>
+
+  {# ── Filters ── #}
+  <form method="get" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;align-items:center;">
+    <input type="text" name="search" placeholder="Contract / customer / phone / device…" value="{{ search }}"
+           style="padding:8px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:0.85rem;min-width:220px;">
+    <select name="enrollment" style="padding:8px 10px;border:1px solid #d1d5db;border-radius:8px;font-size:0.85rem;">
+      <option value="">All Enrollment</option>
+      <option value="none" {% if enroll_filter == 'none' %}selected{% endif %}>Not Enrolled</option>
+      <option value="pending" {% if enroll_filter == 'pending' %}selected{% endif %}>Pending</option>
+      <option value="enrolled" {% if enroll_filter == 'enrolled' %}selected{% endif %}>Enrolled</option>
+      <option value="failed" {% if enroll_filter == 'failed' %}selected{% endif %}>Failed</option>
+    </select>
+    <select name="lock" style="padding:8px 10px;border:1px solid #d1d5db;border-radius:8px;font-size:0.85rem;">
+      <option value="">All Lock Status</option>
+      <option value="locked" {% if lock_filter == 'locked' %}selected{% endif %}>Locked</option>
+      <option value="unlocked" {% if lock_filter == 'unlocked' %}selected{% endif %}>Unlocked</option>
+      <option value="unknown" {% if lock_filter == 'unknown' %}selected{% endif %}>Unknown</option>
+    </select>
+    <button type="submit" style="background:var(--primary);color:#fff;border:none;padding:8px 16px;border-radius:8px;font-weight:600;cursor:pointer;font-size:0.85rem;">Filter</button>
+    <a href="{% url 'hq_devices' %}" style="color:var(--muted);font-size:0.85rem;text-decoration:none;">Reset</a>
+  </form>
+
+  {# ── Devices Table ── #}
+  <div class="glass-card" style="padding:0;overflow:hidden;">
+    <div style="overflow-x:auto;">
+      <table style="width:100%;border-collapse:collapse;font-size:0.82rem;">
+        <thead>
+          <tr style="background:#fafafa;border-bottom:2px solid var(--border);">
+            <th style="padding:10px 8px;text-align:left;">Contract</th>
+            <th style="padding:10px 8px;text-align:left;">Customer</th>
+            <th style="padding:10px 8px;text-align:left;">Device</th>
+            <th style="padding:10px 8px;text-align:center;">Provider</th>
+            <th style="padding:10px 8px;text-align:center;">Enrollment</th>
+            <th style="padding:10px 8px;text-align:center;">Lock</th>
+            <th style="padding:10px 8px;text-align:center;">Last Sync</th>
+            <th style="padding:10px 8px;text-align:center;">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for device in devices %}
+            <tr style="border-bottom:1px solid var(--border);" data-testid="device-row">
+              <td style="padding:8px;">
+                <span style="font-weight:600;color:var(--primary);">{{ device.contract_number }}</span><br>
+                <span style="font-size:0.75rem;color:var(--muted);">{{ device.payg_number }}</span>
+              </td>
+              <td style="padding:8px;">
+                {{ device.customer_name|default:"—" }}<br>
+                <span style="font-size:0.75rem;color:var(--muted);">{{ device.masked_phone }}</span>
+              </td>
+              <td style="padding:8px;color:var(--muted);">{{ device.device_model|default:"—" }}</td>
+              <td style="padding:8px;text-align:center;">
+                {% if device.device_lock_provider %}
+                  <span style="font-size:0.72rem;background:#eff6ff;color:#1d4ed8;padding:2px 6px;border-radius:4px;">
+                    {{ device.device_lock_provider }}
+                  </span>
+                {% else %}—{% endif %}
+              </td>
+              <td style="padding:8px;text-align:center;">
+                <span style="font-size:0.72rem;padding:2px 8px;border-radius:4px;font-weight:600;
+                  {% if device.device_enrollment_status == 'enrolled' %}background:#f0fdf4;color:#16a34a;
+                  {% elif device.device_enrollment_status == 'pending' %}background:#fef3c7;color:#92400e;
+                  {% elif device.device_enrollment_status == 'failed' %}background:#fef2f2;color:#dc2626;
+                  {% else %}background:#f3f4f6;color:#6b7280;{% endif %}">
+                  {{ device.device_enrollment_status|upper }}
+                </span>
+              </td>
+              <td style="padding:8px;text-align:center;">
+                <span style="font-size:0.72rem;padding:2px 8px;border-radius:4px;font-weight:600;
+                  {% if device.device_lock_status == 'locked' %}background:#fef2f2;color:#dc2626;
+                  {% elif device.device_lock_status == 'unlocked' %}background:#f0fdf4;color:#16a34a;
+                  {% else %}background:#f3f4f6;color:#6b7280;{% endif %}">
+                  {{ device.device_lock_status|upper }}
+                </span>
+              </td>
+              <td style="padding:8px;text-align:center;color:var(--muted);font-size:0.75rem;">
+                {% if device.last_lock_sync_at %}{{ device.last_lock_sync_at|date:"d M H:i" }}{% else %}Never{% endif %}
+                {% if device.last_lock_error %}
+                  <br><span style="color:var(--danger);" title="{{ device.last_lock_error }}">Error</span>
+                {% endif %}
+              </td>
+              <td style="padding:8px;text-align:center;">
+                <div style="display:flex;gap:4px;justify-content:center;flex-wrap:wrap;">
+                  {% if device.device_enrollment_status == 'none' or device.device_enrollment_status == 'failed' %}
+                    <form method="post" style="display:inline;">{% csrf_token %}
+                      <input type="hidden" name="action" value="enroll_device">
+                      <input type="hidden" name="contract_id" value="{{ device.pk }}">
+                      <button type="submit" onclick="return confirm('Enroll device?')"
+                              style="font-size:0.72rem;padding:3px 8px;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;border-radius:4px;cursor:pointer;">
+                        Enroll
+                      </button>
+                    </form>
+                  {% endif %}
+                  {% if device.device_lock_status != 'locked' %}
+                    <form method="post" style="display:inline;">{% csrf_token %}
+                      <input type="hidden" name="action" value="lock_device">
+                      <input type="hidden" name="contract_id" value="{{ device.pk }}">
+                      <button type="submit" onclick="return confirm('Lock this device?')"
+                              style="font-size:0.72rem;padding:3px 8px;background:#fef2f2;color:#dc2626;border:1px solid #fecaca;border-radius:4px;cursor:pointer;">
+                        Lock
+                      </button>
+                    </form>
+                  {% else %}
+                    <form method="post" style="display:inline;">{% csrf_token %}
+                      <input type="hidden" name="action" value="unlock_device">
+                      <input type="hidden" name="contract_id" value="{{ device.pk }}">
+                      <button type="submit" onclick="return confirm('Unlock this device?')"
+                              style="font-size:0.72rem;padding:3px 8px;background:#f0fdf4;color:#16a34a;border:1px solid #bbf7d0;border-radius:4px;cursor:pointer;">
+                        Unlock
+                      </button>
+                    </form>
+                  {% endif %}
+                  {% if device.status == 'completed' %}
+                    <form method="post" style="display:inline;">{% csrf_token %}
+                      <input type="hidden" name="action" value="release_device">
+                      <input type="hidden" name="contract_id" value="{{ device.pk }}">
+                      <button type="submit" onclick="return confirm('Release device from system?')"
+                              style="font-size:0.72rem;padding:3px 8px;background:#fef3c7;color:#92400e;border:1px solid #fde68a;border-radius:4px;cursor:pointer;">
+                        Release
+                      </button>
+                    </form>
+                  {% endif %}
+                </div>
+              </td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="8" style="text-align:center;padding:28px;color:var(--muted);">No device records found.</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <p style="font-size:0.75rem;color:var(--muted);margin-top:8px;">
+    Showing {{ devices|length }} device record{{ devices|length|pluralize }}.
+    IMEI data is stored in contract records and not displayed here for security.
+  </p>
+
+</div>
+{% endblock %}

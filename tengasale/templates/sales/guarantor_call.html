@@ -1,0 +1,66 @@
+{% extends "sales/base.html" %}
+{% load static %}
+
+{% block page_title %}Guarantor Call — {{ app.application_number }}{% endblock %}
+
+{% block content %}
+<div class="sales-main">
+
+  <div class="ts-back-row">
+    <a href="{% url 'sales_customer_call' app.id %}" class="ts-back-btn">
+      <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+      Back
+    </a>
+  </div>
+
+  {% include "sales/_step_bar.html" with step=step total_steps=total_steps %}
+
+  <div class="ts-app-num">{{ app.application_number }}</div>
+
+  <div class="ts-review-card">
+    <div class="ts-review-card__title">Guarantor / Contact Details</div>
+    <div class="ts-review-row"><span>Guarantor / Next of Kin</span><strong>{{ app.next_of_kin_1_name|default:"—" }}</strong></div>
+    <div class="ts-review-row"><span>Phone</span><strong>{{ app.next_of_kin_1_phone|default:"—" }}</strong></div>
+    <div class="ts-review-row"><span>Relationship</span><strong>{{ app.next_of_kin_1_relationship|default:"—" }}</strong></div>
+  </div>
+
+  <form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    <div class="ts-review-card">
+      <div class="ts-review-card__title">Guarantor Call Verification</div>
+      <p class="ts-check-note">
+        📋 Before asking questions, inform the contact:
+        <em>"This call may be recorded for quality and compliance purposes."</em>
+      </p>
+      {% include "sales/_yes_no.html" with field_name="location_neighbour_spoken" label="Did you speak with the guarantor / contact?" current_value=review.location_neighbour_spoken %}
+      {% include "sales/_yes_no.html" with field_name="location_confirmed" label="Did the guarantor confirm they know the customer?" current_value=review.location_confirmed %}
+      {% include "sales/_yes_no.html" with field_name="location_traceable" label="Is the guarantor confident the customer can pay?" current_value=review.location_traceable %}
+      {% include "sales/_yes_no.html" with field_name="guarantor_notified_recording" label="Was the contact notified that this call may be recorded for quality and compliance?" current_value=None %}
+    </div>
+
+    {# ── Optional Call Recording Upload ── #}
+    <div class="ts-review-card ts-mb-8">
+      <div class="ts-review-card__title">📎 Call Recording (Optional)</div>
+      {% if call_evidence %}
+        <div class="ts-badge ts-badge--green ts-mb-8">✓ Recording uploaded</div>
+      {% endif %}
+      <p class="ts-meta-small">Upload an audio recording of this call for quality and compliance purposes.</p>
+      <div class="field-group ts-mt-8">
+        <label class="field-label">Upload Recording</label>
+        <input
+          type="file"
+          name="call_recording"
+          class="input"
+          accept="audio/mpeg,audio/mp3,audio/wav,audio/mp4,audio/webm,audio/ogg,.mp3,.wav,.mp4,.webm,.ogg,.m4a"
+        >
+        <div class="ts-meta-small" style="margin-top:4px;">Max 15 MB · MP3, WAV, MP4, WebM, OGG</div>
+      </div>
+    </div>
+
+    <button type="submit" class="ts-btn-primary ts-btn-full ts-mt-16">
+      Continue to Income Check →
+    </button>
+  </form>
+
+</div>
+{% endblock %}

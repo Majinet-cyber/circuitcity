@@ -4,6 +4,46 @@ from django.db import models
 from applications.models import FinancingApplication
 
 
+class CallEvidence(models.Model):
+    STAGE_CUSTOMER_CALL = "customer_call"
+    STAGE_GUARANTOR_CALL = "guarantor_call"
+    STAGE_EMPLOYER_CALL = "employer_call"
+
+    STAGE_CHOICES = [
+        (STAGE_CUSTOMER_CALL, "Customer Call"),
+        (STAGE_GUARANTOR_CALL, "Guarantor Call"),
+        (STAGE_EMPLOYER_CALL, "Employer/Income Call"),
+    ]
+
+    application = models.ForeignKey(
+        FinancingApplication,
+        on_delete=models.CASCADE,
+        related_name="call_evidence",
+    )
+    stage = models.CharField(max_length=30, choices=STAGE_CHOICES)
+    uploaded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="uploaded_call_evidence",
+    )
+    audio_file = models.FileField(upload_to="call_recordings/", blank=True, null=True)
+    duration_seconds = models.PositiveIntegerField(null=True, blank=True)
+    customer_notified = models.BooleanField(default=False)
+    notification_script_confirmed = models.BooleanField(default=False)
+    notes = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Call Evidence"
+        verbose_name_plural = "Call Evidence"
+
+    def __str__(self):
+        return f"{self.get_stage_display()} evidence for {self.application_id}"
+
+
 class UnderwriterReview(models.Model):
     application = models.OneToOneField(
         FinancingApplication,
@@ -76,3 +116,107 @@ class UnderwriterReview(models.Model):
 
     def __str__(self):
         return f"Review for {self.application}"
+
+
+class ReviewQuestion(models.Model):
+    """
+    Structured questionnaire question for a review stage.
+    Questions are configurable per stage and can be risk-weighted.
+    """
+
+    STAGE_IDENTITY = "identity"
+    STAGE_ADDRESS = "address"
+    STAGE_CUSTOMER_CALL = "customer_call"
+    STAGE_GUARANTOR_CALL = "guarantor_call"
+    STAGE_EMPLOYER_CALL = "employer_call"
+    STAGE_INCOME = "income"
+    STAGE_FINAL = "final_review"
+
+    STAGE_CHOICES = [
+        (STAGE_IDENTITY, "Identity Check"),
+        (STAGE_ADDRESS, "Address Check"),
+        (STAGE_CUSTOMER_CALL, "Customer Call"),
+        (STAGE_GUARANTOR_CALL, "Guarantor Call"),
+        (STAGE_EMPLOYER_CALL, "Employer / Income Call"),
+        (STAGE_INCOME, "Income Check"),
+        (STAGE_FINAL, "Final Review"),
+    ]
+
+    ANSWER_YES_NO = "yes_no"
+    ANSWER_TEXT = "text"
+    ANSWER_NUMBER = "number"
+    ANSWER_CHOICE = "choice"
+    ANSWER_FILE = "file"
+    ANSWER_AUDIO = "audio"
+
+    ANSWER_TYPE_CHOICES = [
+        (ANSWER_YES_NO, "Yes / No"),
+        (ANSWER_TEXT, "Text"),
+        (ANSWER_NUMBER, "Number"),
+        (ANSWER_CHOICE, "Choice"),
+        (ANSWER_FILE, "File"),
+        (ANSWER_AUDIO, "Audio"),
+    ]
+
+    stage = models.CharField(max_length=30, choices=STAGE_CHOICES)
+    question_key = models.CharField(max_length=80, unique=True)
+    question_text = models.TextField()
+    help_text = models.TextField(blank=True)
+    answer_type = models.CharField(max_length=20, choices=ANSWER_TYPE_CHOICES, default=ANSWER_YES_NO)
+    required = models.BooleanField(default=True)
+    risk_weight = models.PositiveIntegerField(default=1)
+    fail_if_no = models.BooleanField(
+        default=False,
+        help_text="If True, a 'No' answer flags this as a risk factor",
+    )
+    order = models.PositiveIntegerField(default=0)
+    active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["stage", "order", "id"]
+        verbose_name = "Review Question"
+        verbose_name_plural = "Review Questions"
+
+    def __str__(self):
+        return f"[{self.stage}] {self.question_key}"
+
+
+class ReviewAnswer(models.Model):
+    """
+    Answer to a structured review question for a specific application review.
+    """
+
+    application = models.ForeignKey(
+        FinancingApplication,
+        on_delete=models.CASCADE,
+        related_name="review_answers",
+    )
+    review = models.ForeignKey(
+        UnderwriterReview,
+        on_delete=models.CASCADE,
+        related_name="structured_answers",
+    )
+    question = models.ForeignKey(
+        ReviewQuestion,
+        on_delete=models.CASCADE,
+        related_name="answers",
+    )
+    answer_value = models.TextField(blank=True)
+    answered_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="review_answers_given",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = [("review", "question")]
+        ordering = ["question__order"]
+        verbose_name = "Review Answer"
+        verbose_name_plural = "Review Answers"
+
+    def __str__(self):
+        return f"{self.question.question_key}: {self.answer_value[:40]}"

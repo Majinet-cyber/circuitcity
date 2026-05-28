@@ -10,6 +10,7 @@
 </a>
 
 <h1 class="greeting">Customer Details</h1>
+<p class="text-muted small mb-3" style="margin-top:-8px;">Step 1 of 8 — Identity &amp; Demographics</p>
 
 <form method="post" class="card">
     {% csrf_token %}
@@ -18,18 +19,14 @@
     <div class="form-group{% if 'customer_name' in app.correction_fields %} has-correction{% endif %}">
         <label for="{{ form.customer_name.id_for_label }}">Customer full name <span class="required-star">*</span></label>
         {{ form.customer_name }}
-        {% for error in form.customer_name.errors %}
-            <div class="field-error">{{ error }}</div>
-        {% endfor %}
+        {% for error in form.customer_name.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
     </div>
 
     <div class="form-group{% if 'national_id' in app.correction_fields %} has-correction{% endif %}">
         <label for="{{ form.national_id.id_for_label }}">National ID <span class="required-star">*</span></label>
         {{ form.national_id }}
         <p class="field-help">8 letters or numbers, e.g. RQXFVZC9</p>
-        {% for error in form.national_id.errors %}
-            <div class="field-error">{{ error }}</div>
-        {% endfor %}
+        {% for error in form.national_id.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
     </div>
 
     <div class="form-group{% if 'customer_phone' in app.correction_fields %} has-correction{% endif %}">
@@ -38,41 +35,72 @@
             <span class="input-prefix">+265</span>
             {{ form.customer_phone }}
         </div>
-        {% for error in form.customer_phone.errors %}
-            <div class="field-error">{{ error }}</div>
-        {% endfor %}
+        {% for error in form.customer_phone.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+    </div>
+
+    <div class="form-group{% if 'date_of_birth' in app.correction_fields %} has-correction{% endif %}">
+        <label for="{{ form.date_of_birth.id_for_label }}">Date of birth</label>
+        {{ form.date_of_birth }}
+        {% for error in form.date_of_birth.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+    </div>
+
+    <div class="form-group{% if 'gender' in app.correction_fields %} has-correction{% endif %}">
+        <label for="{{ form.gender.id_for_label }}">Gender <span class="required-star">*</span></label>
+        {{ form.gender }}
+        {% for error in form.gender.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+    </div>
+
+    <div class="form-group{% if 'marital_status' in app.correction_fields %} has-correction{% endif %}">
+        <label for="{{ form.marital_status.id_for_label }}">Marital status</label>
+        {{ form.marital_status }}
+        {% for error in form.marital_status.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+    </div>
+
+    <div class="form-group{% if 'num_dependents' in app.correction_fields %} has-correction{% endif %}">
+        <label for="{{ form.num_dependents.id_for_label }}">Number of dependents</label>
+        {{ form.num_dependents }}
+        {% for error in form.num_dependents.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+    </div>
+
+    <div class="form-group{% if 'phone_user' in app.correction_fields %} has-correction{% endif %}">
+        <label for="{{ form.phone_user.id_for_label }}">Who will mainly use this phone? <span class="required-star">*</span></label>
+        {{ form.phone_user }}
+        {% for error in form.phone_user.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+    </div>
+
+    <div class="form-group" id="phone-user-other-group" hidden>
+        <label for="{{ form.phone_user_other.id_for_label }}">Specify who</label>
+        {{ form.phone_user_other }}
+        {% for error in form.phone_user_other.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+    </div>
+
+    <div class="alert alert-warning" id="third-party-warning" style="display:none;margin-top:8px;font-size:0.9rem;">
+        ⚠️ Phones financed under a customer's ID should normally be used by the applicant.
+        Third-party use may require additional review.
     </div>
 
     <div class="form-group{% if 'occupation' in app.correction_fields %} has-correction{% endif %}">
         <label for="{{ form.occupation.id_for_label }}">Occupation <span class="required-star">*</span></label>
         {{ form.occupation }}
-        {% for error in form.occupation.errors %}
-            <div class="field-error">{{ error }}</div>
-        {% endfor %}
+        {% for error in form.occupation.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
     </div>
 
     <div class="form-group" data-occupation-other-group hidden>
         <label for="{{ form.occupation_other.id_for_label }}">Specify occupation <span class="required-star">*</span></label>
         {{ form.occupation_other }}
-        {% for error in form.occupation_other.errors %}
-            <div class="field-error">{{ error }}</div>
-        {% endfor %}
+        {% for error in form.occupation_other.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
     </div>
 
     <div class="form-group{% if 'income_band' in app.correction_fields %} has-correction{% endif %}">
         <label for="{{ form.income_band.id_for_label }}">Income band <span class="required-star">*</span></label>
         {{ form.income_band }}
-        {% for error in form.income_band.errors %}
-            <div class="field-error">{{ error }}</div>
-        {% endfor %}
+        {% for error in form.income_band.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
     </div>
 
     <div class="form-group{% if 'exact_monthly_income' in app.correction_fields %} has-correction{% endif %}">
         <label for="{{ form.exact_monthly_income.id_for_label }}">Exact monthly income <span class="required-star">*</span></label>
         {{ form.exact_monthly_income }}
-        {% for error in form.exact_monthly_income.errors %}
-            <div class="field-error">{{ error }}</div>
-        {% endfor %}
+        {% for error in form.exact_monthly_income.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
     </div>
 
     <div class="form-actions">
@@ -82,55 +110,50 @@
 </form>
 
 <script>
-    (function () {
-        function clampInput(input, pattern, limit) {
-            if (!input) {
-                return;
-            }
+(function () {
+    function clampInput(input, pattern, limit) {
+        if (!input) return;
+        function clean(v) { return v.replace(pattern, "").slice(0, limit); }
+        function applyClean() { input.value = clean(input.value); }
+        input.addEventListener("input", applyClean);
+        input.addEventListener("paste", function (e) {
+            e.preventDefault();
+            const pasted = (e.clipboardData || window.clipboardData).getData("text");
+            const s = input.selectionStart || 0, end = input.selectionEnd || 0;
+            input.value = clean(input.value.slice(0, s) + pasted + input.value.slice(end));
+        });
+    }
+    clampInput(document.querySelector("[data-national-id-input]"), /[^A-Z0-9]/gi, 8);
+    const nationalId = document.querySelector("[data-national-id-input]");
+    if (nationalId) {
+        nationalId.addEventListener("input", function () { nationalId.value = nationalId.value.toUpperCase(); });
+        nationalId.addEventListener("paste", function () { nationalId.value = nationalId.value.toUpperCase(); });
+    }
+    clampInput(document.querySelector("[data-phone-input]"), /[^0-9]/g, 9);
+})();
 
-            function clean(value) {
-                return value.replace(pattern, "").slice(0, limit);
-            }
+(function () {
+    const occupation = document.getElementById("id_occupation");
+    const otherGroup = document.querySelector("[data-occupation-other-group]");
+    if (!occupation || !otherGroup) return;
+    function syncOccupationOther() { otherGroup.hidden = occupation.value !== "Other"; }
+    occupation.addEventListener("change", syncOccupationOther);
+    syncOccupationOther();
+})();
 
-            function applyClean() {
-                input.value = clean(input.value);
-            }
-
-            input.addEventListener("input", applyClean);
-            input.addEventListener("paste", function (event) {
-                event.preventDefault();
-                const pasted = (event.clipboardData || window.clipboardData).getData("text");
-                const start = input.selectionStart || 0;
-                const end = input.selectionEnd || 0;
-                input.value = clean(input.value.slice(0, start) + pasted + input.value.slice(end));
-            });
-        }
-
-        clampInput(document.querySelector("[data-national-id-input]"), /[^A-Z0-9]/gi, 8);
-        const nationalId = document.querySelector("[data-national-id-input]");
-        if (nationalId) {
-            nationalId.addEventListener("input", function () {
-                nationalId.value = nationalId.value.toUpperCase();
-            });
-            nationalId.addEventListener("paste", function () {
-                nationalId.value = nationalId.value.toUpperCase();
-            });
-        }
-        clampInput(document.querySelector("[data-phone-input]"), /[^0-9]/g, 9);
-    })();
-
-    (function () {
-        const occupation = document.getElementById("id_occupation");
-        const otherGroup = document.querySelector("[data-occupation-other-group]");
-        if (!occupation || !otherGroup) {
-            return;
-        }
-        function syncOccupationOther() {
-            otherGroup.hidden = occupation.value !== "Other";
-        }
-        occupation.addEventListener("change", syncOccupationOther);
-        syncOccupationOther();
-    })();
+(function () {
+    const phoneUser = document.getElementById("id_phone_user");
+    const otherGroup = document.getElementById("phone-user-other-group");
+    const warning = document.getElementById("third-party-warning");
+    if (!phoneUser) return;
+    function syncPhoneUser() {
+        const val = phoneUser.value;
+        if (otherGroup) otherGroup.hidden = (val !== "other");
+        if (warning) warning.style.display = (val && val !== "customer_self") ? "block" : "none";
+    }
+    phoneUser.addEventListener("change", syncPhoneUser);
+    syncPhoneUser();
+})();
 </script>
 
 {% endblock %}

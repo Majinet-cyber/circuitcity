@@ -32,7 +32,7 @@
   <div x-show="canClaim && cooldownRemaining <= 0">
     <form method="post" action="{% url 'sales_claim_next' %}">
       {% csrf_token %}
-      <button type="submit" class="ts-claim-card ts-claim-ready">
+      <button type="submit" class="ts-claim-card ts-claim-ready" data-testid="claim-next">
         <svg class="ts-claim-icon" viewBox="0 0 24 24" aria-hidden="true">
           <path d="M18 11V6a3 3 0 0 0-3-3 3 3 0 0 0-3 3v5"/>
           <path d="M9 11V6a3 3 0 0 0-3-3 3 3 0 0 0-3 3v9a3 3 0 0 0 3 3h8a3 3 0 0 0 3-3v-3"/>

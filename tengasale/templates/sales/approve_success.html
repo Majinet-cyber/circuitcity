@@ -14,7 +14,14 @@
       <strong>{{ app.customer_name }}</strong>'s application
       <strong>{{ app.application_number }}</strong> has been approved.
     </p>
-    <p class="ts-success-sub">The merchant will be notified to complete the contract, IMEI entry, and device setup.</p>
+    {% if portal_contract %}
+    <div class="ts-review-card ts-mb-8" style="text-align:left;">
+      <div class="ts-review-row"><span>Contract Number</span><strong>{{ portal_contract.contract_number }}</strong></div>
+      <div class="ts-review-row"><span>PayG Number</span><strong>{{ portal_contract.payg_number }}</strong></div>
+      <div class="ts-review-row"><span>Total Amount</span><strong>MWK {{ portal_contract.total_amount|floatformat:0 }}</strong></div>
+    </div>
+    {% endif %}
+    <p class="ts-success-sub">The merchant will be notified to complete the IMEI entry and device setup.</p>
     <a href="{% url 'sales_home' %}" class="ts-btn-primary ts-btn-full ts-mt-24">Back to Home</a>
   </div>
 </div>

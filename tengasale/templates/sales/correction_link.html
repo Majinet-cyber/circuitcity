@@ -1,0 +1,70 @@
+{% extends "sales/base.html" %}
+{% load static %}
+
+{% block page_title %}Customer Edit Link — TengaSale{% endblock %}
+
+{% block content %}
+<div class="sales-main">
+<div class="ts-back-row">
+  <a href="{% url 'sales_review_summary' app.id %}" class="ts-back-btn">
+    <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+    Back
+  </a>
+</div>
+
+<div class="glass-card mb-8">
+  <div class="review-card__title">🔗 Customer Edit Link</div>
+  <p class="section-description">
+    Share this secure link with the customer. They can only edit the marked fields.
+    The link expires in <strong>72 hours</strong>.
+  </p>
+</div>
+
+<div class="glass-card mb-8">
+  <div class="field-label">Secure Correction Link</div>
+  <div style="background:#f5f5f5;border-radius:8px;padding:12px;word-break:break-all;font-size:0.82rem;font-family:monospace;margin:8px 0;">
+    {{ correction_url }}
+  </div>
+  <button
+    onclick="navigator.clipboard.writeText('{{ correction_url }}').then(()=>this.textContent='Copied!').catch(()=>{})"
+    class="btn-primary mt-8"
+    style="width:100%"
+  >Copy Link</button>
+  <p class="section-description mt-8" style="font-size:0.78rem;">
+    Expires: {{ token_obj.expires_at|date:"d M Y, H:i" }}
+  </p>
+</div>
+
+<div class="glass-card mb-8">
+  <div class="review-card__title">Fields Marked for Review</div>
+  {% for review in marked_fields %}
+    <div class="correction-field-row">
+      <span class="correction-field-key">{{ review.field_label }}</span>
+      <span class="status-badge status-badge--pending">{{ review.get_reason_display }}</span>
+    </div>
+    {% if review.comment %}
+      <div class="correction-field-note">{{ review.comment }}</div>
+    {% endif %}
+  {% endfor %}
+</div>
+
+<div class="glass-card mb-8">
+  <div class="review-card__title">Send via SMS (optional)</div>
+  <p class="section-description">SMS sending will be available when Twilio is configured.</p>
+  <div class="field-group">
+    <label class="field-label">Customer Phone</label>
+    <div class="phone-input-row">
+      <span class="phone-prefix">+265</span>
+      <input type="tel" class="input" value="{{ app.customer_phone }}" readonly>
+    </div>
+  </div>
+  <button class="btn-secondary btn-full mt-8" disabled>Send SMS (coming soon)</button>
+</div>
+</div>
+
+<style>
+.correction-field-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);}
+.correction-field-key{font-weight:600;font-size:0.9rem;}
+.correction-field-note{font-size:0.8rem;color:var(--muted);padding:2px 0 6px;}
+</style>
+{% endblock %}

@@ -39,6 +39,49 @@
     + NEW APPLICATION
 </a>
 
+{# ── TengaSale Settlement Section ── #}
+{% if merchant_payout_summary %}
+<section class="card" data-testid="merchant-payout-row">
+    <div class="section-title-row">
+        <h2>Cash Settlements</h2>
+    </div>
+    <div class="metric-grid compact-metrics">
+        <div>
+            <span>Pending settlements</span>
+            <strong>{{ merchant_payout_summary.pending_count }}</strong>
+        </div>
+        <div>
+            <span>Pending value</span>
+            <strong class="amount-positive">MWK {{ merchant_payout_summary.pending_total|floatformat:0 }}</strong>
+        </div>
+        <div>
+            <span>Paid settlements</span>
+            <strong>{{ merchant_payout_summary.paid_count }}</strong>
+        </div>
+        <div>
+            <span>Paid total</span>
+            <strong class="amount-positive">MWK {{ merchant_payout_summary.paid_total|floatformat:0 }}</strong>
+        </div>
+    </div>
+    {% if merchant_payout_summary.recent %}
+    <h3 style="margin:12px 0 6px;font-size:0.9rem;">Recent Payouts</h3>
+    {% for p in merchant_payout_summary.recent %}
+    <article class="transaction-row">
+        <div>
+            <strong>{{ p.contract.contract_number|default:"—" }}</strong>
+            <p class="text-muted">Cash Price: MWK {{ p.cash_price|floatformat:0 }} + 1% Commission: MWK {{ p.merchant_commission_amount|floatformat:0 }}</p>
+            <p class="text-muted">Method: {{ p.get_payout_method_display }} · {{ p.created_at|date:"d M Y" }}</p>
+        </div>
+        <div class="transaction-side">
+            <span class="amount-positive">MWK {{ p.total_payable|floatformat:0 }}</span>
+            <span class="status-pill status-{{ p.status }}">{{ p.get_status_display }}</span>
+        </div>
+    </article>
+    {% endfor %}
+    {% endif %}
+</section>
+{% endif %}
+
 <section class="card">
     <div class="section-title-row">
         <h2>Device financing</h2>

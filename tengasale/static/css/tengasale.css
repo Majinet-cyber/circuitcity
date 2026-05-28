@@ -1,5 +1,5 @@
 /**
- * tengasale.css — Phase 7 KulaSell-style mobile UI
+ * tengasale.css — TengaSale mobile UI
  * Version: 1.0.2
  *
  * Provides the compact mobile shell used by /sales/ pages.
@@ -1161,3 +1161,245 @@
 }
 
 .empty-sub { font-size: 13px; margin: 4px 0 0; }
+
+/* ═══════════════════════════════════════════════════════════════════
+   Phase 10 additions
+   ═══════════════════════════════════════════════════════════════════ */
+
+.sales-header-logo { width: 32px; height: 32px; object-fit: contain; display: block; }
+
+.country-pill {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: #f0f4f8; border-radius: 20px; padding: 3px 10px;
+  font-size: 0.78rem; font-weight: 600; color: #333; border: 1px solid #e0e7ef;
+}
+
+.ts-field-row { position: relative; }
+
+.ts-mark-btn {
+  background: none; border: 1.5px solid #e0e7ef; border-radius: 50%;
+  width: 22px; height: 22px; cursor: pointer; padding: 3px; color: #aaa;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  transition: border-color 0.15s, color 0.15s;
+}
+.ts-mark-btn:hover { border-color: #e67e22; color: #e67e22; }
+.ts-mark-form { width: 100%; margin-top: 8px; }
+
+.ts-btn-orange {
+  background: #e67e22; color: #fff; border: none; border-radius: 8px;
+  font-weight: 700; cursor: pointer; font-size: 0.85rem; padding: 8px 14px;
+}
+.ts-btn-orange:hover { background: #d35400; }
+
+.ts-btn-secondary {
+  background: #f5f6fa; color: #555; border: 1.5px solid #e0e7ef;
+  border-radius: 8px; cursor: pointer; font-size: 0.85rem; padding: 8px 14px;
+}
+
+.text-green { color: #27ae60; }
+.text-red { color: #e74c3c; }
+.text-orange { color: #e67e22; }
+
+[data-testid="arrears-deduction-row"] { border-left: 3px solid #e74c3c; }
+[data-testid="commission-row"] { border-left: 3px solid #27ae60; }
+
+
+/* -------------------------------------------------------------------
+   Phase 10: Field marking, Malawi pill, commission rows
+   ------------------------------------------------------------------- */
+
+/* -- Sales header logo (small T icon) ---- */
+.sales-header-logo,
+.ts-header-icon {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+  display: block;
+}
+
+/* -- Malawi flag pill ---- */
+.country-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: #f0f4f8;
+  border-radius: 20px;
+  padding: 3px 10px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #333;
+  border: 1px solid #e0e7ef;
+}
+
+/* -- Field row with mark button ---- */
+.ts-field-row {
+  position: relative;
+}
+
+.ts-mark-btn {
+  background: none;
+  border: 1.5px solid #e0e7ef;
+  border-radius: 50%;
+  width: 22px;
+  height: 22px;
+  cursor: pointer;
+  padding: 3px;
+  color: #aaa;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.ts-mark-btn:hover {
+  border-color: #e67e22;
+  color: #e67e22;
+}
+
+.ts-mark-form {
+  width: 100%;
+  margin-top: 8px;
+}
+
+/* -- Orange action button ---- */
+.ts-btn-orange {
+  background: #e67e22;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-weight: 700;
+  cursor: pointer;
+  font-size: 0.85rem;
+  padding: 8px 14px;
+}
+
+.ts-btn-orange:hover { background: #d35400; }
+
+/* -- Secondary button ---- */
+.ts-btn-secondary {
+  background: #f5f6fa;
+  color: #555;
+  border: 1.5px solid #e0e7ef;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  padding: 8px 14px;
+}
+
+/* -- Commission/arrears row badges ---- */
+.text-green { color: #27ae60; }
+.text-red { color: #e74c3c; }
+.text-orange { color: #e67e22; }
+
+/* -- Arrears deduction row ---- */
+[data-testid="arrears-deduction-row"] {
+  border-left: 3px solid #e74c3c;
+}
+
+/* -- Commission row ---- */
+[data-testid="commission-row"] {
+  border-left: 3px solid #27ae60;
+}
+
+/* -- Field review badges ---- */
+.ts-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 700;
+}
+.ts-badge-orange { background: rgba(255,106,0,0.12); color: #ff6b1a; }
+.ts-badge-blue   { background: rgba(29,78,216,0.10);  color: #1d4ed8; }
+.ts-badge-green  { background: rgba(22,163,74,0.10);  color: #16a34a; }
+.ts-badge-grey   { background: #f0f0f0; color: #666; }
+
+/* -- Extra small button ---- */
+.ts-btn-xs {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  border: 1.5px solid;
+  text-decoration: none;
+  background: transparent;
+}
+.ts-btn-success  { border-color: #16a34a; color: #16a34a; }
+.ts-btn-success:hover { background: #16a34a; color: #fff; }
+.ts-btn-ghost    { border-color: #e0e7ef; color: #666; }
+.ts-btn-ghost:hover  { background: #f5f5f5; }
+
+/* -- Field actions row ---- */
+.ts-field-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+/* -- Field meta ---- */
+.ts-reason-tag {
+  font-size: 11px;
+  color: #888;
+  margin-left: 4px;
+}
+.ts-current-value {
+  font-size: 12px;
+  color: #555;
+  margin-top: 4px;
+}
+.ts-comment-text {
+  font-size: 11px;
+  color: #f59e0b;
+  font-style: italic;
+  margin-top: 2px;
+}
+.ts-meta-small {
+  font-size: 10px;
+  color: #aaa;
+  margin-top: 2px;
+}
+
+/* -- Form elements ---- */
+.ts-field-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  color: #555;
+  margin-bottom: 4px;
+}
+.ts-select {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1.5px solid #e4e7eb;
+  border-radius: 8px;
+  font-size: 14px;
+  background: #fff;
+}
+.ts-textarea {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1.5px solid #e4e7eb;
+  border-radius: 8px;
+  font-size: 14px;
+  resize: vertical;
+}
+
+/* -- Country pill ---- */
+.ts-country-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: #f0f4f8;
+  border-radius: 20px;
+  padding: 3px 10px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #333;
+  border: 1px solid #e0e7ef;
+}

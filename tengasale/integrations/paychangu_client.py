@@ -356,6 +356,118 @@ def _log_http_error(context: str, exc: Any) -> None:
     logger.error("PayChangu %s HTTP %s: %s", context, code, detail)
 
 
+def get_mobile_money_operators() -> Dict[str, Any]:
+    """Fetch available mobile money operators from PayChangu API."""
+    if is_mock_mode():
+        return {
+            "status": "success",
+            "operators": [
+                {"name": "Airtel Money", "code": "airtel", "ref_id": "mock-airtel-ref"},
+                {"name": "TNM Mpamba", "code": "tnm", "ref_id": "mock-tnm-ref"},
+            ],
+            "message": "Mock operators.",
+        }
+    if not requests:
+        return {"status": "error", "message": "requests not installed.", "operators": []}
+    try:
+        response = requests.get(f"{_api_base()}/mobile-money", headers=_headers(), timeout=15)
+        response.raise_for_status()
+        data = response.json()
+        operators = data if isinstance(data, list) else (
+            data.get("data") or data.get("operators") or data.get("result") or []
+        )
+        logger.info("PayChangu operators fetched: %d", len(operators))
+        return {"status": "success", "operators": operators, "message": "OK"}
+    except Exception as exc:
+        logger.error("PayChangu get_mobile_money_operators error: %s", exc)
+        return {"status": "error", "message": str(exc), "operators": []}
+
+
+def get_operator_ref_id(method: str) -> Dict[str, Any]:
+    """
+    Resolve the PayChangu operator ref_id for 'airtel' or 'tnm'.
+    Supports env overrides: PAYCHANGU_AIRTEL_REF_ID / PAYCHANGU_TNM_REF_ID.
+    Caches result for 24 hours.
+    """
+    import os
+    method = method.lower().strip()
+    if method in ("airtel_money", "airtel"):
+        method = "airtel"
+    elif method in ("tnm_mpamba", "tnm", "mpamba"):
+        method = "tnm"
+    else:
+        return {"status": "error", "message": f"Unknown payment method: {method}"}
+
+    env_key = f"PAYCHANGU_{method.upper()}_REF_ID"
+    env_ref = os.getenv(env_key, "").strip()
+    if env_ref:
+        return {"status": "success", "ref_id": env_ref, "operator_name": method.upper(), "message": f"Via {env_key}"}
+
+    try:
+        from django.core.cache import cache
+        cached = cache.get(f"paychangu_op_{method}")
+        if cached:
+            return cached
+    except Exception:
+        cache = None
+
+    result = get_mobile_money_operators()
+    if result.get("status") != "success":
+        return {"status": "error", "message": f"Could not fetch operators: {result.get('message')}"}
+
+    keywords = {"airtel": ["airtel"], "tnm": ["tnm", "mpamba"]}.get(method, [])
+    matched = None
+    for op in result.get("operators", []):
+        name = (op.get("name") or "").lower()
+        code = (op.get("code") or "").lower()
+        if any(kw in name or kw in code for kw in keywords):
+            matched = op
+            break
+
+    if not matched:
+        return {"status": "error", "message": f"No PayChangu operator found for {method}."}
+
+    ref_id = matched.get("ref_id") or matched.get("uuid") or matched.get("id") or matched.get("operator_id")
+    if not ref_id:
+        return {"status": "error", "message": f"Operator {matched.get('name')} has no ref_id."}
+
+    data = {"status": "success", "ref_id": ref_id, "operator_name": matched.get("name", method), "message": "OK"}
+    try:
+        if cache:
+            cache.set(f"paychangu_op_{method}", data, 86400)
+    except Exception:
+        pass
+    return data
+
+
+def validate_test_mode_phone(phone: str, method: str) -> Dict[str, Any]:
+    """
+    Validate a phone number for PayChangu sandbox test mode.
+    Test numbers: Airtel success=990000000, TNM success=899817565.
+    """
+    try:
+        normalized = normalize_phone(phone)
+    except ValueError as exc:
+        return {"valid": False, "message": str(exc)}
+
+    valid_numbers = {"airtel": ["990000000", "990000001"], "tnm": ["899817565", "899817566"]}
+    m = method.lower()
+    if m in ("airtel_money", "airtel"):
+        m = "airtel"
+    elif m in ("tnm_mpamba", "tnm", "mpamba"):
+        m = "tnm"
+    allowed = valid_numbers.get(m, [])
+    if normalized not in allowed:
+        return {
+            "valid": False,
+            "message": (
+                f"Test mode: use PayChangu sandbox numbers only. "
+                f"For {method.upper()}: {', '.join(allowed)}."
+            ),
+        }
+    return {"valid": True, "message": "Test number valid."}
+
+
 def _friendly_error(exc: Any) -> str:
     code = getattr(getattr(exc, "response", None), "status_code", "?")
     try:

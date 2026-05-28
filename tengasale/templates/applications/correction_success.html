@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Updates Submitted — TengaSale</title>
+  {% load static %}
+  <link rel="stylesheet" href="{% static 'css/tengasale.css' %}">
+  <style>
+    body { background: #f5f6fa; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+    .success-card { background: #fff; border-radius: 16px; padding: 32px 24px; max-width: 400px; width: 100%; text-align: center; box-shadow: 0 2px 16px rgba(0,0,0,0.08); }
+    .success-icon { font-size: 3rem; margin-bottom: 16px; }
+    .success-title { font-size: 1.3rem; font-weight: 700; color: #111; margin-bottom: 8px; }
+    .success-body { font-size: 0.9rem; color: #555; }
+    .footer-note { font-size: 0.75rem; color: #aaa; margin-top: 24px; }
+  </style>
+</head>
+<body>
+  <div class="success-card">
+    <div class="success-icon">✅</div>
+    <div class="success-title">Updates Submitted</div>
+    <div class="success-body">
+      {% if updated_count %}
+        {{ updated_count }} field{{ updated_count|pluralize }} updated for application <strong>{{ app_number }}</strong>.
+        TengaSale will review your updates shortly.
+      {% else %}
+        No changes were detected. If you have questions, contact TengaSale support.
+      {% endif %}
+    </div>
+    <div class="footer-note">&copy; TengaSale</div>
+  </div>
+</body>
+</html>

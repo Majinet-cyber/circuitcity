@@ -29,14 +29,31 @@
       {% endif %}
     </div>
 
-    <form method="post">
-      {% csrf_token %}
-      <button type="submit" class="ts-btn-approve ts-btn-big ts-btn-full ts-mt-16">
-        <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
-        APPROVE
-      </button>
-    </form>
-    <a href="{% url 'sales_final_review' app.id %}" class="ts-btn-secondary ts-btn-full ts-mt-8">Cancel</a>
+    {% if approval_guard and not approval_guard.can_approve %}
+      <div class="alert alert-danger mt-3" role="alert">
+        <strong>⛔ Approval Blocked</strong><br>
+        {{ approval_guard.blocked_reason }}
+        {% if approval_guard.requires_hq %}
+          <br><span class="small">Please contact HQ to override this block.</span>
+        {% endif %}
+      </div>
+      <a href="{% url 'sales_final_review' app.id %}" class="ts-btn-secondary ts-btn-full ts-mt-8">Back to Review</a>
+    {% else %}
+      {% if fraud_check and fraud_check.risk_level != 'none' %}
+        <div class="alert alert-warning mt-3 mb-2" role="alert" style="font-size:0.88rem;">
+          ⚠️ Fraud check: <strong>{{ fraud_check.get_risk_level_display }}</strong>
+          — {{ fraud_check.get_recommended_action_display }}
+        </div>
+      {% endif %}
+      <form method="post">
+        {% csrf_token %}
+        <button type="submit" class="ts-btn-approve ts-btn-big ts-btn-full ts-mt-16" data-testid="approve-application">
+          <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+          APPROVE
+        </button>
+      </form>
+      <a href="{% url 'sales_final_review' app.id %}" class="ts-btn-secondary ts-btn-full ts-mt-8">Cancel</a>
+    {% endif %}
   </div>
 
 </div>

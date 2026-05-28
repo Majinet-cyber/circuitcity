@@ -13,4 +13,8 @@ urlpatterns = [
     path("privacy/", views.privacy, name="website_privacy"),
     path("payment-terms/", views.payment_terms, name="website_payment_terms"),
     path("merchant-terms/", views.merchant_terms, name="website_merchant_terms"),
+    path("merchant-signup/", views.merchant_signup, name="website_merchant_signup"),
+    path("merchant-signup/success/", views.merchant_signup_success, name="website_merchant_signup_success"),
+    path("careers/", views.careers, name="website_careers"),
+    path("careers/success/", views.careers_success, name="website_careers_success"),
 ]

@@ -1,0 +1,36 @@
+{% extends "website/site_base.html" %}
+{% load static %}
+
+{% block site_title %}Application Received — TengaSale Careers{% endblock %}
+
+{% block site_content %}
+
+<section class="lead-form-section">
+  <div class="lead-success-shell">
+
+    <div class="lead-success-icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24">
+        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+        <polyline points="22,4 12,14.01 9,11.01"/>
+      </svg>
+    </div>
+
+    <h1 class="lead-success-title">Application received</h1>
+    <p class="lead-success-body">
+      Thank you for your interest in joining TengaSale. We have received your application
+      and will be in touch when a suitable opportunity becomes available.
+    </p>
+    <p class="lead-success-body">
+      If you have any questions, email us at
+      <a href="mailto:support@tengasale.africa">support@tengasale.africa</a>.
+    </p>
+
+    <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center;margin-top:28px;">
+      <a href="{% url 'website_landing' %}" class="btn-primary">Back to TengaSale</a>
+      <a href="{% url 'website_careers' %}" class="btn-secondary">View Careers</a>
+    </div>
+
+  </div>
+</section>
+
+{% endblock %}

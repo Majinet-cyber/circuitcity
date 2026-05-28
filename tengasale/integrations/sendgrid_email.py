@@ -168,6 +168,61 @@ def send_admin_alert(
     return send_email(to=recipient, subject=f"[TengaSale Alert] {subject}", body_html=html, body_text=body)
 
 
+def send_marked_field_correction_email(
+    to: str,
+    customer_name: str,
+    edit_url: str,
+    expires_hours: int = 72,
+    marked_fields: Optional[List[str]] = None,
+) -> Dict[str, Any]:
+    """Email customer a secure link to correct their marked application fields."""
+    subject = "TengaSale — Action Required: Please Update Your Application"
+    fields_html = ""
+    if marked_fields:
+        items = "".join(f"<li>{f}</li>" for f in marked_fields)
+        fields_html = f"<p><strong>Fields requiring update:</strong></p><ul>{items}</ul>"
+    html = f"""
+    <p>Dear {customer_name},</p>
+    <p>Your TengaSale application requires a small update. Our team has flagged the following fields:</p>
+    {fields_html}
+    <p>Please click the secure link below to make the corrections (valid for {expires_hours} hours):</p>
+    <p><a href="{edit_url}" style="background:#e67e22;color:#fff;padding:10px 20px;text-decoration:none;border-radius:6px;">
+      Update My Application
+    </a></p>
+    <p>If the button does not work, copy and paste this link:<br><code>{edit_url}</code></p>
+    <p>Thank you for your cooperation — TengaSale: <em>Endless Possibilities</em>.</p>
+    """
+    return send_email(to=to, subject=subject, body_html=html)
+
+
+def send_merchant_payout_notification_email(
+    to: str,
+    merchant_name: str,
+    cash_price: str,
+    merchant_commission: str,
+    total_payable: str,
+    contract_number: str,
+    payout_method: str = "",
+) -> Dict[str, Any]:
+    """Notify merchant that a payout has been created for a contract."""
+    subject = f"TengaSale — Merchant Payout Ready: {contract_number}"
+    method_row = f"<tr><td><strong>Payout Method:</strong></td><td>{payout_method}</td></tr>" if payout_method else ""
+    html = f"""
+    <p>Dear {merchant_name},</p>
+    <p>A payout has been prepared for the following TengaSale contract:</p>
+    <table style="border-collapse:collapse;font-family:sans-serif;margin-top:12px;">
+      <tr><td><strong>Contract:</strong></td><td>{contract_number}</td></tr>
+      <tr><td><strong>Cash Price:</strong></td><td>MWK {cash_price}</td></tr>
+      <tr><td><strong>Merchant Commission (1%):</strong></td><td>MWK {merchant_commission}</td></tr>
+      <tr style="border-top:1px solid #ccc;"><td><strong>Total Payable:</strong></td><td><strong>MWK {total_payable}</strong></td></tr>
+      {method_row}
+    </table>
+    <p>No withholding tax (WHT) is applied to merchant payouts.</p>
+    <p>— The TengaSale Team<br><em>Endless Possibilities</em></p>
+    """
+    return send_email(to=to, subject=subject, body_html=html)
+
+
 def send_payout_notification_email(
     to: str,
     agent_name: str,

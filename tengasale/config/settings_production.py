@@ -1,0 +1,126 @@
+"""
+config/settings_production.py
+
+Production settings for TengaSale.
+Import from base settings and override security-critical values.
+
+Usage:
+    Set environment variable:  DJANGO_SETTINGS_MODULE=config.settings_production
+    Or in wsgi.py / manage.py:  os.environ.setdefault(...)
+
+IMPORTANT:
+- Never commit real secrets to version control.
+- All sensitive values must come from environment variables.
+- Set DEBUG=False and SECRET_KEY from env before deploying.
+"""
+
+from .settings import *  # noqa: F401, F403
+import os
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Core security
+# ──────────────────────────────────────────────────────────────────────────────
+
+DEBUG = False
+
+SECRET_KEY = os.environ["DJANGO_SECRET_KEY"]  # Must be set — no default
+
+ALLOWED_HOSTS = os.environ.get("ALLOWED_HOSTS", "").split(",")
+CSRF_TRUSTED_ORIGINS = os.environ.get("CSRF_TRUSTED_ORIGINS", "").split(",")
+
+# ──────────────────────────────────────────────────────────────────────────────
+# HTTPS enforcement
+# ──────────────────────────────────────────────────────────────────────────────
+
+SECURE_SSL_REDIRECT = True
+SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE = True
+SECURE_HSTS_SECONDS = 31536000  # 1 year
+SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+SECURE_HSTS_PRELOAD = True
+SECURE_BROWSER_XSS_FILTER = True
+SECURE_CONTENT_TYPE_NOSNIFF = True
+X_FRAME_OPTIONS = "DENY"
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Database (PostgreSQL-ready)
+# ──────────────────────────────────────────────────────────────────────────────
+
+DATABASE_URL = os.environ.get("DATABASE_URL", "")
+if DATABASE_URL:
+    import dj_database_url  # pip install dj-database-url psycopg2-binary
+    DATABASES = {"default": dj_database_url.config(default=DATABASE_URL, conn_max_age=600)}
+# else falls back to SQLite from base settings (dev only — override in production)
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Static and media files
+# ──────────────────────────────────────────────────────────────────────────────
+
+STATIC_ROOT = os.environ.get("STATIC_ROOT", str(BASE_DIR / "staticfiles"))  # noqa: F405
+MEDIA_ROOT = os.environ.get("MEDIA_ROOT", str(BASE_DIR / "media"))  # noqa: F405
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Email (SendGrid in production)
+# ──────────────────────────────────────────────────────────────────────────────
+
+SENDGRID_API_KEY = os.environ.get("SENDGRID_API_KEY", "")
+if SENDGRID_API_KEY:
+    EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+    EMAIL_HOST = "smtp.sendgrid.net"
+    EMAIL_PORT = 587
+    EMAIL_USE_TLS = True
+    EMAIL_HOST_USER = "apikey"
+    EMAIL_HOST_PASSWORD = SENDGRID_API_KEY
+else:
+    EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+
+DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "noreply@tengasale.com")
+ADMIN_ALERT_EMAIL = os.environ.get("ADMIN_ALERT_EMAIL", "admin@tengasale.com")
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Payment providers
+# ──────────────────────────────────────────────────────────────────────────────
+
+MOCK_PAYMENTS = os.environ.get("MOCK_PAYMENTS", "false").lower() == "true"
+PAYCHANGU_PUBLIC_KEY = os.environ.get("PAYCHANGU_PUBLIC_KEY", "")
+PAYCHANGU_SECRET_KEY = os.environ.get("PAYCHANGU_SECRET_KEY", "")
+PAYCHANGU_WEBHOOK_SECRET = os.environ.get("PAYCHANGU_WEBHOOK_SECRET", "")
+PAYCHANGU_API_BASE = os.environ.get("PAYCHANGU_API_BASE", "https://api.paychangu.com")
+PAYCHANGU_CALLBACK_URL = os.environ.get("PAYCHANGU_CALLBACK_URL", "")
+
+# ──────────────────────────────────────────────────────────────────────────────
+# SMS / Twilio
+# ──────────────────────────────────────────────────────────────────────────────
+
+TWILIO_ACCOUNT_SID = os.environ.get("TWILIO_ACCOUNT_SID", "")
+TWILIO_AUTH_TOKEN = os.environ.get("TWILIO_AUTH_TOKEN", "")
+TWILIO_PHONE_NUMBER = os.environ.get("TWILIO_PHONE_NUMBER", "")
+MOCK_SMS = os.environ.get("MOCK_SMS", "false").lower() == "true"
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Logging (safe — no secrets, no full IDs)
+# ──────────────────────────────────────────────────────────────────────────────
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "verbose": {
+            "format": "{levelname} {asctime} {module} {message}",
+            "style": "{",
+        },
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "verbose",
+        },
+    },
+    "loggers": {
+        "django": {"handlers": ["console"], "level": "WARNING"},
+        "integrations": {"handlers": ["console"], "level": "INFO"},
+        "risk": {"handlers": ["console"], "level": "INFO"},
+        "commissions": {"handlers": ["console"], "level": "INFO"},
+        "portal": {"handlers": ["console"], "level": "INFO"},
+    },
+}

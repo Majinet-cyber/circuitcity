@@ -379,6 +379,51 @@ class DeviceCommand(models.Model):
         return f"{self.command_type} {self.device}"
 
 
+class DeviceCheck(models.Model):
+    """IMEI/warranty/lock eligibility check placeholder for device verification."""
+
+    STATUS_PENDING = "pending"
+    STATUS_PASSED = "passed"
+    STATUS_FAILED = "failed"
+    STATUS_SKIPPED = "skipped"
+
+    STATUS_CHOICES = [
+        (STATUS_PENDING, "Pending"),
+        (STATUS_PASSED, "Passed"),
+        (STATUS_FAILED, "Failed"),
+        (STATUS_SKIPPED, "Skipped"),
+    ]
+
+    contract = models.ForeignKey(
+        FinancingContract,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="device_checks",
+    )
+    imei = models.CharField(max_length=40)
+    provider = models.CharField(max_length=60, default="mock")
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING)
+    warranty_status = models.CharField(max_length=40, blank=True)
+    lock_eligible = models.BooleanField(default=False)
+    response_summary = models.TextField(blank=True)
+    checked_at = models.DateTimeField(auto_now_add=True)
+    checked_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="device_checks",
+    )
+
+    class Meta:
+        ordering = ["-checked_at"]
+        verbose_name = "Device Check"
+
+    def __str__(self):
+        return f"DeviceCheck IMEI={self.imei} [{self.status}]"
+
+
 def generate_unlock_token():
     for _ in range(100):
         token = "".join(secrets.choice("0123456789") for _ in range(6))

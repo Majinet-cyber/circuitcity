@@ -41,7 +41,38 @@
     <div class="ts-review-row"><span>Phone</span><strong>+265 {{ app.customer_phone }}</strong></div>
     <div class="ts-review-row"><span>National ID</span><strong>{{ app.national_id }}</strong></div>
     <div class="ts-review-row"><span>District</span><strong>{{ app.district }}</strong></div>
+    {% if app.gender %}<div class="ts-review-row"><span>Gender</span><strong>{{ app.get_gender_display }}</strong></div>{% endif %}
+    {% if app.marital_status %}<div class="ts-review-row"><span>Marital Status</span><strong>{{ app.get_marital_status_display }}</strong></div>{% endif %}
+    {% if app.num_dependents is not None %}<div class="ts-review-row"><span>Dependents</span><strong>{{ app.num_dependents }}</strong></div>{% endif %}
+    {% if app.phone_user %}<div class="ts-review-row"><span>Phone User</span><strong>{{ app.get_phone_user_display }}</strong></div>{% endif %}
+    {% if app.third_party_phone_user_risk_flagged %}<div class="ts-review-row"><span></span><strong style="color:#e85d04;">⚠️ Third-party phone use flagged</strong></div>{% endif %}
   </div>
+
+  {# ── Existing Exposure / Fraud Check ── #}
+  {% if exposure and exposure.has_exposure %}
+  <div class="ts-review-card ts-mb-8" style="border-left:4px solid #ef4444;">
+    <div class="ts-review-card__title" style="color:#ef4444;">⚠️ Existing Customer Exposure</div>
+    {% if exposure.active_contracts %}
+      <div class="ts-review-row"><span style="color:#ef4444;">Active contracts</span><strong>{{ exposure.active_contracts|length }}</strong></div>
+      {% for c in exposure.active_contracts %}
+        <div class="ts-review-row ts-indent"><span>{{ c.contract_number }}</span><strong>{{ c.status }} — MWK {{ c.amount_remaining|floatformat:0 }} remaining</strong></div>
+      {% endfor %}
+    {% endif %}
+    {% if exposure.overdue_contracts %}
+      <div class="ts-review-row"><span style="color:#dc2626;">Overdue</span><strong>{{ exposure.overdue_contracts|length }}</strong></div>
+    {% endif %}
+    {% if exposure.locked_contracts %}
+      <div class="ts-review-row"><span style="color:#7c3aed;">Locked</span><strong>{{ exposure.locked_contracts|length }}</strong></div>
+    {% endif %}
+    {% if exposure.completed_contracts %}
+      <div class="ts-review-row"><span style="color:#16a34a;">Completed</span><strong>{{ exposure.completed_contracts|length }}</strong></div>
+    {% endif %}
+    {% if fraud_check %}
+      <div class="ts-review-row ts-mt-8"><span>Risk Level</span><strong style="color:{% if fraud_check.risk_level == 'block' or fraud_check.risk_level == 'high' %}#ef4444{% elif fraud_check.risk_level == 'medium' %}#f59e0b{% else %}#16a34a{% endif %}">{{ fraud_check.get_risk_level_display }}</strong></div>
+      <div class="ts-review-row"><span>Recommended</span><strong>{{ fraud_check.get_recommended_action_display }}</strong></div>
+    {% endif %}
+  </div>
+  {% endif %}
 
   {% if app.deal %}
   <div class="ts-review-card ts-mb-8">

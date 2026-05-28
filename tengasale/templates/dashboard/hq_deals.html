@@ -1,0 +1,475 @@
+{% extends "base/base.html" %}
+{% load static %}
+
+{% block page_title %}Device Finance Catalog — TengaSale HQ{% endblock %}
+
+{% block extra_head %}
+<style>
+.dc-wrap { max-width:1200px; margin:0 auto; padding:24px 16px; overflow-x:hidden; box-sizing:border-box; }
+.dc-header { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:24px; }
+.dc-header-left { display:flex; align-items:center; gap:12px; }
+.dc-title { font-size:1.4rem; font-weight:900; margin:0; letter-spacing:-0.01em; }
+.dc-sub { font-size:0.78rem; color:var(--muted); margin:2px 0 0; }
+.dc-actions { display:flex; gap:8px; align-items:center; }
+.dc-btn-primary {
+  background:var(--primary); color:#fff; border:none; padding:9px 18px;
+  border-radius:9px; font-weight:800; cursor:pointer; font-size:0.85rem;
+  transition:opacity .12s;
+}
+.dc-btn-primary:hover { opacity:.88; }
+.dc-btn-ghost {
+  background:#f8fafc; color:#475569; border:1.5px solid #e2e8f0;
+  padding:8px 14px; border-radius:9px; font-weight:700; cursor:pointer; font-size:0.82rem;
+}
+
+.dc-filter-bar {
+  display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;
+  margin-bottom:20px; background:#fff; border:1.5px solid #e2e8f0;
+  border-radius:12px; padding:14px 16px;
+}
+.dc-filter-bar input, .dc-filter-bar select {
+  padding:7px 10px; border:1.5px solid #e2e8f0; border-radius:8px;
+  font-size:0.82rem; color:#0f172a; min-width:120px;
+}
+.dc-filter-bar input:focus, .dc-filter-bar select:focus {
+  outline:none; border-color:var(--primary);
+}
+
+.dc-cards { display:grid; grid-template-columns:repeat(auto-fill,minmax(min(300px,100%),1fr)); gap:16px; }
+
+.dc-card {
+  background:#fff; border:2px solid #e2e8f0; border-radius:16px;
+  overflow:hidden; transition:box-shadow .15s, border-color .15s;
+  box-shadow:0 1px 4px rgba(15,23,42,.05);
+}
+.dc-card:hover { box-shadow:0 4px 20px rgba(15,23,42,.10); border-color:#cbd5e1; }
+.dc-card--inactive { opacity:.6; }
+.dc-card--inactive .dc-card-top { background:#f8fafc; }
+
+.dc-card-top {
+  display:flex; align-items:flex-start; justify-content:space-between;
+  padding:16px 16px 12px; background:linear-gradient(135deg,#fff8f0 0%,#fff 100%);
+  border-bottom:1px solid #f1f5f9; gap:10px;
+}
+.dc-brand-badge {
+  display:inline-flex; align-items:center; gap:5px; background:rgba(255,107,26,.10);
+  color:#ff6b1a; font-size:0.65rem; font-weight:800; text-transform:uppercase;
+  letter-spacing:.07em; padding:3px 9px; border-radius:99px;
+}
+.dc-model { font-size:0.98rem; font-weight:800; color:#0f172a; margin:5px 0 2px; letter-spacing:-0.01em; }
+.dc-specs { font-size:0.75rem; color:#64748b; }
+
+.dc-stock-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; margin-top:4px; }
+.dc-stock-dot--in   { background:#16a34a; }
+.dc-stock-dot--lim  { background:#d97706; }
+.dc-stock-dot--out  { background:#dc2626; }
+
+.dc-card-metrics {
+  display:grid; grid-template-columns:1fr 1fr; gap:1px;
+  background:#f1f5f9; border-bottom:1px solid #f1f5f9;
+}
+.dc-metric {
+  background:#fff; padding:10px 14px; text-align:center;
+}
+.dc-metric-val { font-size:0.95rem; font-weight:800; color:#0f172a; line-height:1.1; }
+.dc-metric-label { font-size:0.65rem; font-weight:600; color:#94a3b8; text-transform:uppercase; letter-spacing:.05em; margin-top:2px; }
+
+.dc-card-footer {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:12px 16px; gap:10px; flex-wrap:wrap;
+}
+.dc-status-pill {
+  font-size:0.7rem; font-weight:800; padding:3px 10px; border-radius:99px; white-space:nowrap;
+}
+.dc-status-pill--active   { background:rgba(22,163,74,.12); color:#16a34a; }
+.dc-status-pill--inactive { background:#f1f5f9; color:#94a3b8; }
+.dc-status-pill--featured { background:rgba(255,107,26,.12); color:#ff6b1a; }
+
+.dc-lock-tag {
+  font-size:0.68rem; font-weight:700; color:#7c3aed;
+  background:rgba(124,58,237,.10); padding:2px 8px; border-radius:99px;
+}
+
+.dc-card-actions { display:flex; gap:6px; }
+.dc-edit-btn {
+  font-size:0.72rem; font-weight:700; padding:5px 12px;
+  border-radius:7px; cursor:pointer; border:1.5px solid;
+}
+.dc-edit-btn--edit   { background:#fff; border-color:#e2e8f0; color:#475569; }
+.dc-edit-btn--toggle-on  { background:rgba(22,163,74,.10); border-color:#16a34a; color:#16a34a; }
+.dc-edit-btn--toggle-off { background:rgba(220,38,38,.10); border-color:#dc2626; color:#dc2626; }
+
+/* ── Modal overlay ── */
+.dc-modal {
+  display:none; position:fixed; inset:0; background:rgba(15,23,42,.5);
+  z-index:1000; align-items:center; justify-content:center; padding:16px;
+}
+.dc-modal-box {
+  background:#fff; border-radius:20px; max-width:560px; width:100%;
+  max-height:92vh; overflow-y:auto; box-shadow:0 25px 60px rgba(15,23,42,.3);
+}
+.dc-modal-hdr {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:18px 22px 14px; border-bottom:1px solid #f1f5f9; position:sticky; top:0; background:#fff; z-index:1;
+}
+.dc-modal-title { font-size:1rem; font-weight:800; margin:0; }
+.dc-modal-close {
+  background:none; border:none; cursor:pointer; font-size:1.5rem;
+  color:#94a3b8; line-height:1; padding:0 4px;
+}
+.dc-modal-body { padding:20px 22px; }
+.dc-modal-body .dc-field { margin-bottom:14px; }
+.dc-modal-body .dc-field label { font-size:0.72rem; font-weight:700; color:#64748b; display:block; margin-bottom:4px; }
+.dc-modal-body .dc-field input,
+.dc-modal-body .dc-field select,
+.dc-modal-body .dc-field textarea {
+  width:100%; padding:8px 10px; border:1.5px solid #e2e8f0; border-radius:8px;
+  font-size:0.85rem; color:#0f172a;
+}
+.dc-modal-body .dc-field input:focus,
+.dc-modal-body .dc-field select:focus { outline:none; border-color:var(--primary); }
+.dc-field-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.dc-modal-footer { display:flex; gap:10px; justify-content:flex-end; padding:14px 22px; border-top:1px solid #f1f5f9; }
+.dc-modal-footer button[type=submit] { background:var(--primary); color:#fff; border:none; padding:9px 22px; border-radius:9px; font-weight:800; cursor:pointer; }
+.dc-modal-footer .dc-cancel { background:#f8fafc; color:#475569; border:1.5px solid #e2e8f0; padding:9px 16px; border-radius:9px; font-weight:700; cursor:pointer; }
+
+.dc-empty {
+  grid-column:1/-1; background:#fff; border:2px dashed #e2e8f0; border-radius:16px;
+  padding:56px 32px; text-align:center; color:#94a3b8;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="dc-wrap">
+
+  <div class="dc-header">
+    <div class="dc-header-left">
+      <a href="{% url 'hq_dashboard' %}" style="color:var(--primary);text-decoration:none;font-size:0.85rem;font-weight:600;">← HQ</a>
+      <div>
+        <h1 class="dc-title">Device Finance Catalog</h1>
+        <p class="dc-sub">Manage devices, pricing, deposit options, lock readiness, and availability.</p>
+      </div>
+    </div>
+    <div class="dc-actions">
+      <button class="dc-btn-ghost" onclick="document.getElementById('add-brand-modal').style.display='flex'">+ Brand</button>
+      <button class="dc-btn-primary" onclick="document.getElementById('add-deal-modal').style.display='flex'">+ Add Device Deal</button>
+    </div>
+  </div>
+
+  {% if msg %}
+  <div class="alert alert-{% if msg_type == 'success' %}success{% elif msg_type == 'error' %}danger{% else %}info{% endif %} mb-3" role="alert">{{ msg }}</div>
+  {% endif %}
+
+  <form method="get" class="dc-filter-bar">
+    <input type="text" name="search" placeholder="Search brand, model, specs..." value="{{ search }}" style="flex:1;min-width:180px;">
+    <select name="brand">
+      <option value="">All Brands</option>
+      {% for b in brands %}<option value="{{ b.pk }}" {% if brand_filter == b.pk|stringformat:'s' %}selected{% endif %}>{{ b.name }}</option>{% endfor %}
+    </select>
+    <select name="status">
+      <option value="">All Status</option>
+      <option value="active" {% if status_filter == 'active' %}selected{% endif %}>Active</option>
+      <option value="inactive" {% if status_filter == 'inactive' %}selected{% endif %}>Inactive</option>
+    </select>
+    <button type="submit" style="background:var(--primary);color:#fff;border:none;padding:8px 16px;border-radius:8px;font-weight:700;cursor:pointer;font-size:0.82rem;">Filter</button>
+    <a href="{% url 'hq_deals' %}" style="color:var(--muted);font-size:0.82rem;text-decoration:none;align-self:center;">Reset</a>
+  </form>
+
+  <div class="dc-cards">
+    {% for deal in deals %}
+    <div class="dc-card {% if not deal.is_active %}dc-card--inactive{% endif %}" data-testid="deal-card-{{ deal.pk }}">
+
+      <div class="dc-card-top">
+        <div style="flex:1;min-width:0;">
+          <span class="dc-brand-badge">{{ deal.brand.name }}</span>
+          <div class="dc-model">{{ deal.model_name }}</div>
+          <div class="dc-specs">{{ deal.specs }}</div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
+          {% if deal.is_featured %}<span class="dc-status-pill dc-status-pill--featured">Featured</span>{% endif %}
+          <span class="dc-status-pill {% if deal.is_active %}dc-status-pill--active{% else %}dc-status-pill--inactive{% endif %}">
+            {% if deal.is_active %}Active{% else %}Inactive{% endif %}
+          </span>
+          <div style="display:flex;align-items:center;gap:5px;font-size:0.72rem;color:var(--muted);">
+            <div class="dc-stock-dot {% if deal.stock_status == 'in_stock' %}dc-stock-dot--in{% elif deal.stock_status == 'limited' %}dc-stock-dot--lim{% else %}dc-stock-dot--out{% endif %}"></div>
+            {{ deal.get_stock_status_display }}
+          </div>
+        </div>
+      </div>
+
+      <div class="dc-card-metrics">
+        <div class="dc-metric">
+          <div class="dc-metric-val">MWK {{ deal.default_cash_price|default:deal.cash_price|floatformat:0 }}</div>
+          <div class="dc-metric-label">Cash Price</div>
+        </div>
+        <div class="dc-metric">
+          <div class="dc-metric-val">MWK {{ deal.calculated_total_loan|floatformat:0 }}</div>
+          <div class="dc-metric-label">Contract Value</div>
+        </div>
+        <div class="dc-metric">
+          <div class="dc-metric-val">MWK {{ deal.deposit_amount|floatformat:0 }}</div>
+          <div class="dc-metric-label">Deposit ({{ deal.deposit_percent }}%)</div>
+        </div>
+        <div class="dc-metric">
+          <div class="dc-metric-val">MWK {{ deal.monthly_payment|floatformat:0 }}/mo</div>
+          <div class="dc-metric-label">{{ deal.term_months }}-Month Plan</div>
+        </div>
+      </div>
+
+      <div class="dc-card-footer">
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+          {% if deal.lock_provider %}
+          <span class="dc-lock-tag">{{ deal.lock_provider|title }}</span>
+          {% else %}
+          <span style="font-size:0.68rem;color:#94a3b8;">No lock provider</span>
+          {% endif %}
+          <span style="font-size:0.68rem;color:#94a3b8;">{{ deal.country }}</span>
+        </div>
+        <div class="dc-card-actions">
+          <button class="dc-edit-btn dc-edit-btn--edit"
+            data-deal-id="{{ deal.pk }}"
+            data-brand-id="{{ deal.brand.pk }}"
+            data-model-name="{{ deal.model_name|escapejs }}"
+            data-specs="{{ deal.specs|escapejs }}"
+            data-cash-price="{{ deal.cash_price }}"
+            data-min-price="{{ deal.min_cash_price }}"
+            data-max-price="{{ deal.max_cash_price }}"
+            data-def-price="{{ deal.default_cash_price }}"
+            data-deposit-pct="{{ deal.deposit_percent }}"
+            data-multiplier="{{ deal.loan_multiplier }}"
+            data-term="{{ deal.term_months }}"
+            data-active="{{ deal.is_active|lower }}"
+            data-featured="{{ deal.is_featured|lower }}"
+            data-stock="{{ deal.stock_status }}"
+            data-lock="{{ deal.lock_provider }}"
+            data-country="{{ deal.country }}"
+            onclick="openEditModal(this)">Edit</button>
+          <form method="post" style="display:inline;" onsubmit="return confirm('Toggle this deal?');">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="toggle_deal">
+            <input type="hidden" name="deal_id" value="{{ deal.pk }}">
+            <button type="submit" class="dc-edit-btn {% if deal.is_active %}dc-edit-btn--toggle-on{% else %}dc-edit-btn--toggle-off{% endif %}">
+              {% if deal.is_active %}Deactivate{% else %}Activate{% endif %}
+            </button>
+          </form>
+        </div>
+      </div>
+
+    </div>
+    {% empty %}
+    <div class="dc-empty">
+      <svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="#cbd5e1" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom:10px;"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+      <div style="font-size:1rem;font-weight:800;color:#475569;margin-bottom:6px;">No devices found</div>
+      <div style="font-size:0.82rem;">Add a device deal or adjust your filters.</div>
+    </div>
+    {% endfor %}
+  </div>
+
+</div>
+
+<!-- ── Add Deal Modal ────────────────────────────────────────── -->
+<div id="add-deal-modal" class="dc-modal">
+  <div class="dc-modal-box">
+    <div class="dc-modal-hdr">
+      <h2 class="dc-modal-title">Add Device Deal</h2>
+      <button class="dc-modal-close" onclick="document.getElementById('add-deal-modal').style.display='none'">&times;</button>
+    </div>
+    <div class="dc-modal-body">
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="add_deal">
+        <div class="dc-field">
+          <label>Brand</label>
+          <select name="brand_id" required>
+            {% for b in brands %}<option value="{{ b.pk }}">{{ b.name }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="dc-field-row">
+          <div class="dc-field"><label>Model Name</label><input type="text" name="model_name" required placeholder="e.g. Galaxy A15"></div>
+          <div class="dc-field"><label>Specs</label><input type="text" name="specs" placeholder="e.g. 4GB/128GB"></div>
+        </div>
+        <div class="dc-field-row">
+          <div class="dc-field"><label>Cash Price (MWK)</label><input type="number" name="cash_price" min="0" step="1000" value="400000"></div>
+          <div class="dc-field"><label>Default Cash Price (MWK)</label><input type="number" name="default_cash_price" min="0" step="1000" value="400000"></div>
+        </div>
+        <div class="dc-field-row">
+          <div class="dc-field"><label>Min Cash Price (MWK)</label><input type="number" name="min_cash_price" min="0" step="1000" value="0"></div>
+          <div class="dc-field"><label>Max Cash Price (MWK)</label><input type="number" name="max_cash_price" min="0" step="1000" value="0"></div>
+        </div>
+        <div class="dc-field-row">
+          <div class="dc-field"><label>Deposit % (13–16)</label><input type="number" name="deposit_percent" min="13" max="16" step="0.5" value="13"></div>
+          <div class="dc-field"><label>Loan Multiplier</label><input type="number" name="loan_multiplier" step="0.1" value="2.5"></div>
+        </div>
+        <div class="dc-field-row">
+          <div class="dc-field"><label>Term (months)</label><input type="number" name="term_months" min="1" value="12"></div>
+          <div class="dc-field"><label>Stock Status</label>
+            <select name="stock_status">
+              <option value="in_stock">In Stock</option>
+              <option value="limited">Limited</option>
+              <option value="out_of_stock">Out of Stock</option>
+            </select>
+          </div>
+        </div>
+        <div class="dc-field-row">
+          <div class="dc-field"><label>Lock Provider</label>
+            <select name="lock_provider">
+              <option value="">None</option>
+              <option value="mock">Mock/Sandbox</option>
+              <option value="knox">Knox (Samsung)</option>
+              <option value="nuovo">NuovoPay</option>
+              <option value="upya">Upya</option>
+              <option value="predikt">Predikt</option>
+              <option value="paretix">Paretix</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+          <div class="dc-field"><label>Country</label><input type="text" name="country" value="MW" maxlength="10"></div>
+        </div>
+        <div class="dc-field" style="display:flex;gap:16px;align-items:center;">
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:0.82rem;font-weight:700;color:#334155;">
+            <input type="checkbox" name="is_active" checked style="width:auto;"> Active
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:0.82rem;font-weight:700;color:#334155;">
+            <input type="checkbox" name="is_featured" style="width:auto;"> Featured
+          </label>
+        </div>
+        <div class="dc-field"><label>Notes</label><textarea name="notes" rows="2" style="resize:vertical;"></textarea></div>
+        <div class="dc-modal-footer">
+          <button type="button" class="dc-cancel" onclick="document.getElementById('add-deal-modal').style.display='none'">Cancel</button>
+          <button type="submit">Create Deal</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- ── Edit Deal Modal ───────────────────────────────────────── -->
+<div id="edit-deal-modal" class="dc-modal">
+  <div class="dc-modal-box">
+    <div class="dc-modal-hdr">
+      <h2 class="dc-modal-title">Edit Device Deal</h2>
+      <button class="dc-modal-close" onclick="document.getElementById('edit-deal-modal').style.display='none'">&times;</button>
+    </div>
+    <div class="dc-modal-body">
+      <form method="post" id="edit-deal-form">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="edit_deal">
+        <input type="hidden" name="deal_id" id="edit-deal-id">
+        <div class="dc-field">
+          <label>Brand</label>
+          <select name="brand_id" id="edit-brand-id" required>
+            {% for b in brands %}<option value="{{ b.pk }}">{{ b.name }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="dc-field-row">
+          <div class="dc-field"><label>Model Name</label><input type="text" name="model_name" id="edit-model-name" required></div>
+          <div class="dc-field"><label>Specs</label><input type="text" name="specs" id="edit-specs"></div>
+        </div>
+        <div class="dc-field-row">
+          <div class="dc-field"><label>Cash Price (MWK)</label><input type="number" name="cash_price" id="edit-cash-price" min="0" step="1000"></div>
+          <div class="dc-field"><label>Default Cash Price (MWK)</label><input type="number" name="default_cash_price" id="edit-default-cash-price" min="0" step="1000"></div>
+        </div>
+        <div class="dc-field-row">
+          <div class="dc-field"><label>Min Cash Price</label><input type="number" name="min_cash_price" id="edit-min-cash-price" min="0" step="1000"></div>
+          <div class="dc-field"><label>Max Cash Price</label><input type="number" name="max_cash_price" id="edit-max-cash-price" min="0" step="1000"></div>
+        </div>
+        <div class="dc-field-row">
+          <div class="dc-field"><label>Deposit % (13–16)</label><input type="number" name="deposit_percent" id="edit-deposit-pct" min="13" max="16" step="0.5"></div>
+          <div class="dc-field"><label>Loan Multiplier</label><input type="number" name="loan_multiplier" id="edit-loan-multiplier" step="0.1"></div>
+        </div>
+        <div class="dc-field-row">
+          <div class="dc-field"><label>Term (months)</label><input type="number" name="term_months" id="edit-term-months" min="1"></div>
+          <div class="dc-field"><label>Stock Status</label>
+            <select name="stock_status" id="edit-stock-status">
+              <option value="in_stock">In Stock</option>
+              <option value="limited">Limited</option>
+              <option value="out_of_stock">Out of Stock</option>
+            </select>
+          </div>
+        </div>
+        <div class="dc-field-row">
+          <div class="dc-field"><label>Lock Provider</label>
+            <select name="lock_provider" id="edit-lock-provider">
+              <option value="">None</option>
+              <option value="mock">Mock/Sandbox</option>
+              <option value="knox">Knox (Samsung)</option>
+              <option value="nuovo">NuovoPay</option>
+              <option value="upya">Upya</option>
+              <option value="predikt">Predikt</option>
+              <option value="paretix">Paretix</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+          <div class="dc-field"><label>Country</label><input type="text" name="country" id="edit-country" maxlength="10"></div>
+        </div>
+        <div class="dc-field" style="display:flex;gap:16px;align-items:center;">
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:0.82rem;font-weight:700;color:#334155;">
+            <input type="checkbox" name="is_active" id="edit-is-active" style="width:auto;"> Active
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:0.82rem;font-weight:700;color:#334155;">
+            <input type="checkbox" name="is_featured" id="edit-is-featured" style="width:auto;"> Featured
+          </label>
+        </div>
+        <div class="dc-modal-footer">
+          <button type="button" class="dc-cancel" onclick="document.getElementById('edit-deal-modal').style.display='none'">Cancel</button>
+          <button type="submit">Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- ── Add Brand Modal ───────────────────────────────────────── -->
+<div id="add-brand-modal" class="dc-modal">
+  <div class="dc-modal-box" style="max-width:380px;">
+    <div class="dc-modal-hdr">
+      <h2 class="dc-modal-title">Add Brand</h2>
+      <button class="dc-modal-close" onclick="document.getElementById('add-brand-modal').style.display='none'">&times;</button>
+    </div>
+    <div class="dc-modal-body">
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="add_brand">
+        <div class="dc-field"><label>Brand Name</label><input type="text" name="brand_name" required autofocus placeholder="e.g. Samsung"></div>
+        <div class="dc-modal-footer">
+          <button type="button" class="dc-cancel" onclick="document.getElementById('add-brand-modal').style.display='none'">Cancel</button>
+          <button type="submit">Add Brand</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function openEditModal(btn) {
+  var d = btn.dataset;
+  document.getElementById('edit-deal-id').value = d.dealId;
+  document.getElementById('edit-brand-id').value = d.brandId;
+  document.getElementById('edit-model-name').value = d.modelName;
+  document.getElementById('edit-specs').value = d.specs;
+  document.getElementById('edit-cash-price').value = d.cashPrice;
+  document.getElementById('edit-min-cash-price').value = d.minPrice;
+  document.getElementById('edit-max-cash-price').value = d.maxPrice;
+  document.getElementById('edit-default-cash-price').value = d.defPrice;
+  document.getElementById('edit-deposit-pct').value = d.depositPct;
+  document.getElementById('edit-loan-multiplier').value = d.multiplier;
+  document.getElementById('edit-term-months').value = d.term;
+  document.getElementById('edit-is-active').checked = d.active === 'true';
+  document.getElementById('edit-is-featured').checked = d.featured === 'true';
+  document.getElementById('edit-stock-status').value = d.stock;
+  document.getElementById('edit-lock-provider').value = d.lock;
+  document.getElementById('edit-country').value = d.country;
+  document.getElementById('edit-deal-modal').style.display = 'flex';
+}
+// Close modals on backdrop click
+document.querySelectorAll('.dc-modal').forEach(function(m) {
+  m.addEventListener('click', function(e) {
+    if (e.target === m) m.style.display = 'none';
+  });
+});
+</script>
+{% endblock %}

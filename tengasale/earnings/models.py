@@ -176,6 +176,11 @@ class MerchantPayout(models.Model):
     contract_number = models.CharField(max_length=100, blank=True)
     device_description = models.CharField(max_length=200, blank=True)
     cash_price = models.DecimalField(max_digits=14, decimal_places=2)
+    deposit_amount = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal("0"))
+    financed_amount = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal("0"))
+    merchant_commission_rate = models.DecimalField(max_digits=5, decimal_places=4, default=Decimal("0.0100"))
+    merchant_commission_amount = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal("0"))
+    total_payable = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal("0"))
     paid_amount = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal("0"))
 
     status = models.CharField(max_length=30, choices=STATUS_CHOICES, default=STATUS_PENDING)
@@ -197,7 +202,7 @@ class MerchantPayout(models.Model):
 
     @property
     def net_amount(self):
-        return self.cash_price
+        return self.total_payable if self.total_payable else self.cash_price
 
     def __str__(self):
         return (

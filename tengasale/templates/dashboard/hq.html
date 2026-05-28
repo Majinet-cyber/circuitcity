@@ -1,101 +1,1431 @@
 {% extends "base/base.html" %}
+{% load static %}
 
-{% block page_title %}HQ{% endblock %}
+{% block page_title %}HQ Command Center — TengaSale{% endblock %}
+
+{% block extra_head %}
+<style>
+/* ═══════════════════════════════════════════════════════════════════
+   HQ COMMAND CENTER  ·  Premium Dashboard
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ── Design tokens ─────────────────────────────────────────────── */
+:root {
+  --hq-orange:    #ff6b1a;
+  --hq-orange-lt: rgba(255,107,26,0.10);
+  --hq-green:     #16a34a;
+  --hq-green-lt:  rgba(22,163,74,0.10);
+  --hq-red:       #dc2626;
+  --hq-red-lt:    rgba(220,38,38,0.10);
+  --hq-blue:      #2563eb;
+  --hq-blue-lt:   rgba(37,99,235,0.10);
+  --hq-amber:     #d97706;
+  --hq-amber-lt:  rgba(217,119,6,0.10);
+  --hq-purple:    #7c3aed;
+  --hq-purple-lt: rgba(124,58,237,0.10);
+  --hq-ink:       #0f172a;
+  --hq-ink2:      #334155;
+  --hq-muted:     #64748b;
+  --hq-border:    #e2e8f0;
+  --hq-surface:   #ffffff;
+  --hq-bg:        #f8fafc;
+  --hq-radius:    14px;
+  --hq-shadow:    0 1px 3px rgba(15,23,42,0.06), 0 4px 12px rgba(15,23,42,0.04);
+  --hq-shadow-lg: 0 4px 20px rgba(15,23,42,0.10), 0 1px 4px rgba(15,23,42,0.06);
+}
+
+/* ── Unshackle app-shell for desktop ───────────────────────────── */
+/* :has() supported in all modern browsers — also covered by JS fallback */
+.app-shell:has(.hq-topbar) {
+  max-width: 100% !important;
+  box-shadow: none !important;
+  overflow: visible !important;
+  background: var(--hq-bg) !important;
+}
+
+.app-shell:has(.hq-topbar) main.content {
+  background: var(--hq-bg) !important;
+  padding: 0 !important;
+}
+
+/* ── HQ Topbar ─────────────────────────────────────────────────── */
+.hq-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: var(--hq-surface);
+  border-bottom: 1px solid var(--hq-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 22px;
+  height: 62px;
+  gap: 12px;
+}
+
+.hq-brand-link {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  text-decoration: none;
+  color: inherit;
+  flex-shrink: 0;
+}
+
+.hq-logo-mark {
+  width: 38px;
+  height: 38px;
+  background: linear-gradient(135deg, #ff6b1a 0%, #e85c0a 100%);
+  border-radius: 11px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  box-shadow: 0 3px 10px rgba(255,107,26,0.40);
+  color: #fff;
+  font-size: 20px;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  font-family: system-ui, -apple-system, sans-serif;
+  line-height: 1;
+}
+
+.hq-brand-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1;
+  gap: 2px;
+}
+
+.hq-brand-name {
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--hq-ink);
+  letter-spacing: -0.025em;
+}
+
+.hq-brand-sub {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--hq-muted);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.hq-topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* Malawi country pill */
+.hq-country-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  background: #f1f5f9;
+  border: 1.5px solid var(--hq-border);
+  border-radius: 99px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--hq-ink);
+  white-space: nowrap;
+  line-height: 1;
+  cursor: default;
+}
+
+/* HQ icon buttons */
+.hq-icon-btn {
+  width: 37px;
+  height: 37px;
+  display: grid;
+  place-items: center;
+  border: 1.5px solid var(--hq-border);
+  border-radius: 10px;
+  background: var(--hq-surface);
+  color: var(--hq-muted);
+  cursor: pointer;
+  text-decoration: none;
+  transition: all 0.13s;
+  position: relative;
+  padding: 0;
+}
+
+.hq-icon-btn svg {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.hq-icon-btn:hover { border-color: #94a3b8; background: #f8fafc; color: var(--hq-ink); }
+.hq-icon-btn--wa  { color: #16a34a; }
+.hq-icon-btn--wa svg { fill: currentColor; stroke: none; }
+.hq-icon-btn--wa:hover { border-color: #16a34a; background: #dcfce7; color: #16a34a; }
+.hq-icon-btn--danger:hover { border-color: var(--hq-red); color: var(--hq-red); background: var(--hq-red-lt); }
+
+.hq-notif-pip {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--hq-orange);
+  border: 1.5px solid var(--hq-surface);
+}
+
+/* ── Dashboard wrapper ─────────────────────────────────────────── */
+.hq-dash {
+  padding: 22px 22px 48px;
+  max-width: 1440px;
+  margin: 0 auto;
+  background: var(--hq-bg);
+  min-height: calc(100vh - 62px);
+  overflow-x: hidden;
+  box-sizing: border-box;
+}
+
+/* ── Page header row ───────────────────────────────────────────── */
+.hq-ph {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-bottom: 22px;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.hq-ph-title {
+  font-size: 23px;
+  font-weight: 900;
+  color: var(--hq-ink);
+  margin: 0 0 3px;
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+
+.hq-ph-sub {
+  font-size: 13px;
+  color: var(--hq-muted);
+  margin: 0;
+}
+
+.hq-ph-time {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--hq-muted);
+  background: var(--hq-surface);
+  border: 1.5px solid var(--hq-border);
+  padding: 5px 12px;
+  border-radius: 99px;
+  white-space: nowrap;
+}
+
+/* ── Section label ─────────────────────────────────────────────── */
+.hq-sl {
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: var(--hq-muted);
+  margin: 0 0 10px;
+}
+
+/* ── KPI tiles ─────────────────────────────────────────────────── */
+.hq-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 10px;
+  margin-bottom: 22px;
+}
+
+.hq-kpi {
+  background: var(--hq-surface);
+  border: 1.5px solid var(--hq-border);
+  border-top: 3px solid var(--kpi-accent, var(--hq-border));
+  border-radius: var(--hq-radius);
+  padding: 14px 14px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-shadow: var(--hq-shadow);
+  transition: box-shadow 0.14s, transform 0.12s;
+}
+
+.hq-kpi:hover { box-shadow: var(--hq-shadow-lg); transform: translateY(-2px); }
+
+.hq-kpi__icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  display: grid;
+  place-items: center;
+  background: var(--kpi-bg, #f1f5f9);
+  color: var(--kpi-color, var(--hq-muted));
+  flex-shrink: 0;
+}
+
+.hq-kpi__icon svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.hq-kpi__val {
+  font-size: 26px;
+  font-weight: 900;
+  color: var(--kpi-color, var(--hq-ink));
+  line-height: 1;
+  letter-spacing: -0.04em;
+}
+
+.hq-kpi__val--sm { font-size: 15px; letter-spacing: -0.01em; }
+
+.hq-kpi__label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--hq-muted);
+  line-height: 1.3;
+}
+
+/* Colour presets */
+.kpi-orange { --kpi-accent: #ff6b1a; --kpi-color: #ff6b1a; --kpi-bg: rgba(255,107,26,0.10); }
+.kpi-green  { --kpi-accent: #16a34a; --kpi-color: #16a34a; --kpi-bg: rgba(22,163,74,0.10); }
+.kpi-red    { --kpi-accent: #dc2626; --kpi-color: #dc2626; --kpi-bg: rgba(220,38,38,0.10); }
+.kpi-blue   { --kpi-accent: #2563eb; --kpi-color: #2563eb; --kpi-bg: rgba(37,99,235,0.10); }
+.kpi-amber  { --kpi-accent: #d97706; --kpi-color: #d97706; --kpi-bg: rgba(217,119,6,0.10); }
+.kpi-slate  { --kpi-accent: #64748b; --kpi-color: #475569; --kpi-bg: #f1f5f9; }
+
+/* ── Charts row ────────────────────────────────────────────────── */
+.hq-charts-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin-bottom: 26px;
+}
+
+.hq-chart-card {
+  background: var(--hq-surface);
+  border: 1.5px solid var(--hq-border);
+  border-radius: var(--hq-radius);
+  padding: 16px;
+  box-shadow: var(--hq-shadow);
+}
+
+.hq-chart-hdr {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.hq-chart-title {
+  font-size: 11.5px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--hq-ink2);
+}
+
+.hq-chart-pill {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 9px;
+  border-radius: 99px;
+  background: #f1f5f9;
+  color: var(--hq-muted);
+}
+
+/* Pipeline progress bars */
+.hq-pipeline {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.hq-pipe-item {
+  display: grid;
+  grid-template-columns: 90px 1fr 32px;
+  align-items: center;
+  gap: 9px;
+}
+
+.hq-pipe-label {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--hq-ink2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hq-pipe-track {
+  height: 7px;
+  background: #f1f5f9;
+  border-radius: 99px;
+  overflow: hidden;
+}
+
+.hq-pipe-fill {
+  height: 100%;
+  border-radius: 99px;
+  min-width: 4px;
+  transition: width 0.9s ease;
+}
+
+.hq-pipe-num {
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--hq-ink);
+  text-align: right;
+}
+
+/* Donut legend */
+.hq-donut-wrap {
+  position: relative;
+  height: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 10px;
+}
+
+.hq-donut-center {
+  position: absolute;
+  text-align: center;
+  pointer-events: none;
+}
+
+.hq-donut-center__val {
+  font-size: 22px;
+  font-weight: 900;
+  color: var(--hq-ink);
+  line-height: 1;
+}
+
+.hq-donut-center__lbl {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--hq-muted);
+}
+
+.hq-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.hq-legend-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11.5px;
+  color: var(--hq-ink2);
+}
+
+.hq-legend-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.hq-legend-val {
+  margin-left: auto;
+  font-weight: 800;
+  font-size: 12px;
+  color: var(--hq-ink);
+}
+
+/* ── Navigation groups ─────────────────────────────────────────── */
+.hq-nav-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  margin-bottom: 28px;
+}
+
+.hq-nav-card {
+  background: var(--hq-surface);
+  border: 1.5px solid var(--hq-border);
+  border-radius: var(--hq-radius);
+  overflow: hidden;
+  box-shadow: var(--hq-shadow);
+}
+
+.hq-nav-card-hdr {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 15px 11px;
+  border-bottom: 1.5px solid var(--hq-border);
+  background: #fafbfc;
+}
+
+.hq-nav-card-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.hq-nav-card-icon svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.hq-nav-card-title {
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--hq-ink);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.hq-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 10px 15px;
+  border-bottom: 1px solid #f8fafc;
+  text-decoration: none;
+  color: var(--hq-ink);
+  transition: background 0.12s;
+  min-height: 50px;
+  position: relative;
+}
+
+.hq-nav-item:last-child { border-bottom: none; }
+.hq-nav-item:hover { background: #f8fafc; }
+
+.hq-nav-item__icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  background: #f1f5f9;
+  color: var(--hq-muted);
+}
+
+.hq-nav-item__icon svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.hq-nav-item__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.hq-nav-item__title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--hq-ink);
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hq-nav-item__desc {
+  font-size: 11px;
+  color: var(--hq-muted);
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 1px;
+}
+
+.hq-nav-badge {
+  font-size: 10px;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 99px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.hq-nav-badge--orange { background: var(--hq-orange-lt); color: var(--hq-orange); }
+.hq-nav-badge--red    { background: var(--hq-red-lt);    color: var(--hq-red); }
+.hq-nav-badge--soon   { background: #f1f5f9;              color: #94a3b8; }
+
+.hq-nav-arrow {
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
+}
+
+.hq-nav-arrow svg {
+  width: 13px;
+  height: 13px;
+  fill: none;
+  stroke: #cbd5e1;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.hq-nav-item--dim {
+  opacity: 0.52;
+  cursor: default;
+  pointer-events: none;
+}
+
+/* Icon colour helpers */
+.ni-orange { background: rgba(255,107,26,0.10) !important; color: #ff6b1a !important; }
+.ni-green  { background: rgba(22,163,74,0.10)  !important; color: #16a34a !important; }
+.ni-blue   { background: rgba(37,99,235,0.10)  !important; color: #2563eb !important; }
+.ni-red    { background: rgba(220,38,38,0.10)  !important; color: #dc2626 !important; }
+.ni-amber  { background: rgba(217,119,6,0.10)  !important; color: #d97706 !important; }
+.ni-purple { background: rgba(124,58,237,0.10) !important; color: #7c3aed !important; }
+.ni-slate  { background: #f1f5f9               !important; color: #475569 !important; }
+
+/* ── Command Pulse ──────────────────────────────────────────────── */
+.hq-pulse-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 28px;
+}
+
+@media (max-width: 1100px) {
+  .hq-pulse-grid { grid-template-columns: repeat(4, 1fr); }
+}
+
+@media (max-width: 800px) {
+  .hq-pulse-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+.hq-pulse-card {
+  background: var(--hq-surface);
+  border: 1.5px solid var(--hq-border);
+  border-radius: 12px;
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: var(--hq-shadow);
+}
+
+.hq-pulse-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.hq-pulse-icon svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.hq-pulse-body { flex: 1; min-width: 0; }
+
+.hq-pulse-val {
+  font-size: 20px;
+  font-weight: 900;
+  color: var(--hq-ink);
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
+.hq-pulse-val--sm {
+  font-size: 14px;
+  letter-spacing: -0.01em;
+}
+
+.hq-pulse-label {
+  font-size: 10.5px;
+  color: var(--hq-muted);
+  font-weight: 600;
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── HQ footer ─────────────────────────────────────────────────── */
+.hq-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 0 0;
+  border-top: 1px solid var(--hq-border);
+  font-size: 11.5px;
+  color: var(--hq-muted);
+}
+
+.hq-footer-brand {
+  font-weight: 800;
+  color: var(--hq-ink2);
+  letter-spacing: -0.01em;
+}
+
+/* ── Responsive ────────────────────────────────────────────────── */
+@media (max-width: 1100px) {
+  .hq-kpi-grid  { grid-template-columns: repeat(5, 1fr); }
+  .hq-charts-grid { grid-template-columns: repeat(2, 1fr); }
+  .hq-nav-grid  { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 720px) {
+  .hq-dash { padding: 14px 14px 36px; }
+  .hq-topbar { padding: 0 14px; height: 56px; }
+  .hq-kpi-grid { grid-template-columns: repeat(3, 1fr); }
+  .hq-charts-grid { grid-template-columns: 1fr; }
+  .hq-nav-grid { grid-template-columns: 1fr; }
+  .hq-brand-sub { display: none; }
+  .hq-country-pill { display: none; }
+  .hq-kpi__val { font-size: 22px; }
+  .hq-kpi { padding: 11px 10px 9px; }
+  .hq-ph-time { display: none; }
+}
+
+@media (max-width: 460px) {
+  .hq-kpi-grid { grid-template-columns: repeat(2, 1fr); }
+}
+</style>
+{% endblock %}
+
+
+{% block topbar %}
+<header class="hq-topbar" data-testid="hq-topbar">
+
+  <a href="{% url 'home' %}" class="hq-brand-link" aria-label="TengaSale HQ Home">
+    <div class="hq-logo-mark" aria-hidden="true">T</div>
+    <div class="hq-brand-text">
+      <span class="hq-brand-name">TengaSale</span>
+      <span class="hq-brand-sub">HQ Command Center</span>
+    </div>
+  </a>
+
+  <div class="hq-topbar-right">
+
+    <span class="hq-country-pill" title="Operating country: Malawi">
+      🇲🇼 Malawi
+    </span>
+
+    {% if request.user.is_authenticated %}
+
+      <button class="hq-icon-btn" type="button" aria-label="Notifications" title="Notifications">
+        <div class="hq-notif-pip"></div>
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/>
+          <path d="M13.7 21a2 2 0 0 1-3.4 0"/>
+        </svg>
+      </button>
+
+      <a class="hq-icon-btn hq-icon-btn--wa"
+         href="{{ tengasale_whatsapp_link }}"
+         target="_blank" rel="noopener noreferrer"
+         aria-label="WhatsApp support" title="WhatsApp Support">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.46 1.33 4.96L2.05 22l5.25-1.38a9.93 9.93 0 0 0 4.74 1.21h.01c5.46 0 9.91-4.45 9.91-9.91A9.86 9.86 0 0 0 19.05 4.9 9.85 9.85 0 0 0 12.04 2Z"/>
+        </svg>
+      </a>
+
+      {% if current_user_can_use_django_admin %}
+        <a class="hq-icon-btn" href="{% url 'admin:index' %}" aria-label="Django Admin" title="Django Admin">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06A1.65 1.65 0 0 0 15 19.4a1.65 1.65 0 0 0-1 .6 1.65 1.65 0 0 0-.38 1.07V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-.6-1 1.65 1.65 0 0 0-1.07-.38H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-.6A1.65 1.65 0 0 0 10.4 3V3a2 2 0 0 1 4 0v.09A1.65 1.65 0 0 0 15 4.6a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.14.36.36.7.6 1c.24.3.63.43 1.07.43H21a2 2 0 0 1 0 4h-.09A1.65 1.65 0 0 0 19.4 15Z"/>
+          </svg>
+        </a>
+      {% endif %}
+
+      <form method="post" action="{% url 'logout' %}" style="margin:0;display:contents;">
+        {% csrf_token %}
+        <button class="hq-icon-btn hq-icon-btn--danger" type="submit" aria-label="Log out" title="Log out">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+            <path d="M16 17l5-5-5-5"/>
+            <path d="M21 12H9"/>
+          </svg>
+        </button>
+      </form>
+
+    {% endif %}
+  </div>
+
+</header>
+{% endblock topbar %}
 
 {% block content %}
+<div class="hq-dash" data-testid="hq-dashboard">
 
-<h1 class="greeting">HQ</h1>
 
-<section class="card">
-    <div class="metric-grid">
-        <div>
-            <span>Total merchants</span>
-            <strong>{{ total_merchants }}</strong>
-        </div>
-        <div>
-            <span>Total underwriters</span>
-            <strong>{{ total_underwriters }}</strong>
-        </div>
-        <div>
-            <span>Total HQ users</span>
-            <strong>{{ total_hq_users }}</strong>
-        </div>
-        <div>
-            <span>Pending review</span>
-            <strong>{{ pending_review_count }}</strong>
-        </div>
-        <div>
-            <span>Under review</span>
-            <strong>{{ under_review_count }}</strong>
-        </div>
-        <div>
-            <span>Approved</span>
-            <strong>{{ approved_count }}</strong>
-        </div>
-        <div>
-            <span>Rejected</span>
-            <strong>{{ rejected_count }}</strong>
-        </div>
-        <div>
-            <span>Completed contracts</span>
-            <strong>{{ completed_contracts_count }}</strong>
-        </div>
-        <div>
-            <span>Queue depth</span>
-            <strong>{{ waiting_count }}</strong>
-        </div>
+  <div class="hq-ph">
+    <div>
+      <h1 class="hq-ph-title">Command Center</h1>
+      <p class="hq-ph-sub">TengaSale Operations Dashboard &mdash; Live Overview</p>
     </div>
-</section>
+    <span class="hq-ph-time" id="hq-clock" aria-live="polite"></span>
+  </div>
 
-<section class="stat-card">
-    <span>Management overview</span>
-    <strong>{{ waiting_count }} waiting for review</strong>
-</section>
+  <p class="hq-sl">Key Metrics</p>
+  <div class="hq-kpi-grid" data-testid="hq-kpi-grid">
 
-<section class="menu-list">
-    <h2>HQ Links</h2>
-    {% if request.user.is_staff or request.user.is_superuser %}
-        <a href="{% url 'admin:index' %}" class="menu-row">
-            <span class="left">
-                <span class="menu-icon icon-tools">A</span>
-                <span class="menu-row-copy">
-                    <span>Django Admin</span>
-                    <small>Manage Django records and platform configuration.</small>
-                </span>
-            </span>
-            <span class="arrow" aria-hidden="true">></span>
+    <div class="hq-kpi kpi-orange">
+      <div class="hq-kpi__icon">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      </div>
+      <div class="hq-kpi__val">{{ total_merchants }}</div>
+      <div class="hq-kpi__label">Total Merchants</div>
+    </div>
+
+    <div class="hq-kpi kpi-blue">
+      <div class="hq-kpi__icon">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      </div>
+      <div class="hq-kpi__val">{{ total_underwriters }}</div>
+      <div class="hq-kpi__label">Underwriters</div>
+    </div>
+
+    <div class="hq-kpi kpi-amber">
+      <div class="hq-kpi__icon">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>
+      </div>
+      <div class="hq-kpi__val">{{ pending_review_count }}</div>
+      <div class="hq-kpi__label">Pending Review</div>
+    </div>
+
+    <div class="hq-kpi kpi-blue">
+      <div class="hq-kpi__icon">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+      </div>
+      <div class="hq-kpi__val">{{ under_review_count }}</div>
+      <div class="hq-kpi__label">Under Review</div>
+    </div>
+
+    <div class="hq-kpi kpi-green">
+      <div class="hq-kpi__icon">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22,4 12,14.01 9,11.01"/></svg>
+      </div>
+      <div class="hq-kpi__val">{{ approved_count }}</div>
+      <div class="hq-kpi__label">Approved</div>
+    </div>
+
+    <div class="hq-kpi kpi-red">
+      <div class="hq-kpi__icon">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+      </div>
+      <div class="hq-kpi__val">{{ rejected_count }}</div>
+      <div class="hq-kpi__label">Rejected</div>
+    </div>
+
+    <div class="hq-kpi kpi-green">
+      <div class="hq-kpi__icon">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="9,11 12,14 22,4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+      </div>
+      <div class="hq-kpi__val">{{ completed_contracts_count }}</div>
+      <div class="hq-kpi__label">Completed</div>
+    </div>
+
+    <div class="hq-kpi kpi-orange">
+      <div class="hq-kpi__icon">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+      </div>
+      <div class="hq-kpi__val">{{ active_contracts_count }}</div>
+      <div class="hq-kpi__label">Active Contracts</div>
+    </div>
+
+    <div class="hq-kpi kpi-red">
+      <div class="hq-kpi__icon">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      </div>
+      <div class="hq-kpi__val">{{ overdue_contracts_count }}</div>
+      <div class="hq-kpi__label">Overdue</div>
+    </div>
+
+    <div class="hq-kpi kpi-green">
+      <div class="hq-kpi__icon">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+      </div>
+      <div class="hq-kpi__val hq-kpi__val--sm">{{ paid_today|floatformat:0 }}</div>
+      <div class="hq-kpi__label">MWK Paid Today</div>
+    </div>
+
+  </div>
+
+  <p class="hq-sl">Command Pulse</p>
+  <div class="hq-pulse-grid">
+
+    <div class="hq-pulse-card">
+      <div class="hq-pulse-icon" style="background:rgba(22,163,74,0.10);color:#16a34a;">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/></svg>
+      </div>
+      <div class="hq-pulse-body">
+        <div class="hq-pulse-val">{{ sales_today }}</div>
+        <div class="hq-pulse-label">Applications Today</div>
+      </div>
+    </div>
+
+    <div class="hq-pulse-card">
+      <div class="hq-pulse-icon" style="background:rgba(37,99,235,0.10);color:#2563eb;">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+      </div>
+      <div class="hq-pulse-body">
+        <div class="hq-pulse-val hq-pulse-val--sm">{{ collections_today|floatformat:0 }}</div>
+        <div class="hq-pulse-label">MWK Collected Today</div>
+      </div>
+    </div>
+
+    <div class="hq-pulse-card">
+      <div class="hq-pulse-icon" style="background:rgba(255,107,26,0.10);color:#ff6b1a;">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+      </div>
+      <div class="hq-pulse-body">
+        <div class="hq-pulse-val">{{ active_contracts_count }}</div>
+        <div class="hq-pulse-label">Active Contracts</div>
+      </div>
+    </div>
+
+    <div class="hq-pulse-card">
+      <div class="hq-pulse-icon" style="background:rgba(220,38,38,0.10);color:#dc2626;">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      </div>
+      <div class="hq-pulse-body">
+        <div class="hq-pulse-val">{{ overdue_contracts_count }}</div>
+        <div class="hq-pulse-label">Overdue Contracts</div>
+      </div>
+    </div>
+
+    <div class="hq-pulse-card">
+      <div class="hq-pulse-icon" style="background:rgba(124,58,237,0.10);color:#7c3aed;">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="22,4 12,14.01 9,11.01"/><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/></svg>
+      </div>
+      <div class="hq-pulse-body">
+        <div class="hq-pulse-val">{{ approval_rate }}%</div>
+        <div class="hq-pulse-label">Approval Conversion</div>
+      </div>
+    </div>
+
+    <div class="hq-pulse-card">
+      <div class="hq-pulse-icon" style="background:rgba(217,119,6,0.10);color:#d97706;">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+      </div>
+      <div class="hq-pulse-body">
+        <div class="hq-pulse-val">{{ lock_exposure_count }}</div>
+        <div class="hq-pulse-label">Device Lock Exposure</div>
+      </div>
+    </div>
+
+    <div class="hq-pulse-card">
+      <div class="hq-pulse-icon" style="background:rgba(255,107,26,0.10);color:#ff6b1a;">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg>
+      </div>
+      <div class="hq-pulse-body">
+        <div class="hq-pulse-val hq-pulse-val--sm">{{ merchant_payout_pending|floatformat:0 }}</div>
+        <div class="hq-pulse-label">Merchant Payouts Due</div>
+      </div>
+    </div>
+
+    <div class="hq-pulse-card">
+      <div class="hq-pulse-icon" style="background:rgba(22,163,74,0.10);color:#16a34a;">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      </div>
+      <div class="hq-pulse-body">
+        <div class="hq-pulse-val hq-pulse-val--sm">{{ uw_payout_liability|floatformat:0 }}</div>
+        <div class="hq-pulse-label">UW Payout Liability</div>
+      </div>
+    </div>
+
+  </div>
+
+  <p class="hq-sl">Analytics</p>
+  <div class="hq-charts-grid" data-testid="hq-charts-grid">
+
+
+    <div class="hq-chart-card">
+      <div class="hq-chart-hdr">
+        <span class="hq-chart-title" data-testid="daily-sales-chart">Application Pipeline</span>
+        <span class="hq-chart-pill">All time</span>
+      </div>
+      {% with tot=pending_review_count|add:under_review_count|add:approved_count|add:rejected_count|add:completed_contracts_count %}
+      <div class="hq-pipeline">
+        {% if tot %}
+          <div class="hq-pipe-item">
+            <span class="hq-pipe-label">Pending</span>
+            <div class="hq-pipe-track"><div class="hq-pipe-fill" style="background:#d97706;width:{% widthratio pending_review_count tot 100 %}%"></div></div>
+            <span class="hq-pipe-num">{{ pending_review_count }}</span>
+          </div>
+          <div class="hq-pipe-item">
+            <span class="hq-pipe-label">Under Review</span>
+            <div class="hq-pipe-track"><div class="hq-pipe-fill" style="background:#2563eb;width:{% widthratio under_review_count tot 100 %}%"></div></div>
+            <span class="hq-pipe-num">{{ under_review_count }}</span>
+          </div>
+          <div class="hq-pipe-item">
+            <span class="hq-pipe-label">Approved</span>
+            <div class="hq-pipe-track"><div class="hq-pipe-fill" style="background:#16a34a;width:{% widthratio approved_count tot 100 %}%"></div></div>
+            <span class="hq-pipe-num">{{ approved_count }}</span>
+          </div>
+          <div class="hq-pipe-item">
+            <span class="hq-pipe-label">Rejected</span>
+            <div class="hq-pipe-track"><div class="hq-pipe-fill" style="background:#dc2626;width:{% widthratio rejected_count tot 100 %}%"></div></div>
+            <span class="hq-pipe-num">{{ rejected_count }}</span>
+          </div>
+          <div class="hq-pipe-item">
+            <span class="hq-pipe-label">Completed</span>
+            <div class="hq-pipe-track"><div class="hq-pipe-fill" style="background:#7c3aed;width:{% widthratio completed_contracts_count tot 100 %}%"></div></div>
+            <span class="hq-pipe-num">{{ completed_contracts_count }}</span>
+          </div>
+        {% else %}
+          <p style="font-size:12px;color:#94a3b8;text-align:center;padding:24px 0;margin:0;">No applications yet</p>
+        {% endif %}
+      </div>
+      {% endwith %}
+    </div>
+
+
+    <div class="hq-chart-card">
+      <div class="hq-chart-hdr">
+        <span class="hq-chart-title" data-testid="daily-payments-chart">Contract Health</span>
+        <span class="hq-chart-pill">Portfolio</span>
+      </div>
+      <div class="hq-donut-wrap">
+        <canvas id="contractHealthChart" style="max-height:120px;"></canvas>
+        <div class="hq-donut-center">
+          <div class="hq-donut-center__val">{{ active_contracts_count }}</div>
+          <div class="hq-donut-center__lbl">Active</div>
+        </div>
+      </div>
+      <div class="hq-legend">
+        <div class="hq-legend-row">
+          <div class="hq-legend-dot" style="background:#16a34a;"></div>
+          Active
+          <span class="hq-legend-val">{{ active_contracts_count }}</span>
+        </div>
+        <div class="hq-legend-row">
+          <div class="hq-legend-dot" style="background:#dc2626;"></div>
+          Overdue
+          <span class="hq-legend-val">{{ overdue_contracts_count }}</span>
+        </div>
+        <div class="hq-legend-row">
+          <div class="hq-legend-dot" style="background:#7c3aed;"></div>
+          Completed
+          <span class="hq-legend-val">{{ completed_contracts_count }}</span>
+        </div>
+      </div>
+    </div>
+
+
+    <div class="hq-chart-card">
+      <div class="hq-chart-hdr">
+        <span class="hq-chart-title">Operations Queue</span>
+        <span class="hq-chart-pill">Live</span>
+      </div>
+      <canvas id="queueChart" style="max-height:165px;"></canvas>
+    </div>
+
+  </div>
+
+  <p class="hq-sl">Operations</p>
+  <div class="hq-nav-grid" data-testid="hq-nav-grid">
+
+
+    <div class="hq-nav-card">
+      <div class="hq-nav-card-hdr">
+        <div class="hq-nav-card-icon" style="background:rgba(255,107,26,0.12);color:#ff6b1a;">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+        </div>
+        <span class="hq-nav-card-title">Operations</span>
+      </div>
+
+      <a href="{% url 'hq_applications' %}" class="hq-nav-item">
+        <div class="hq-nav-item__icon ni-orange">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        </div>
+        <div class="hq-nav-item__body">
+          <span class="hq-nav-item__title">All Applications</span>
+          <span class="hq-nav-item__desc">Review &amp; manage financing</span>
+        </div>
+        {% if waiting_count %}<span class="hq-nav-badge hq-nav-badge--orange">{{ waiting_count }} new</span>{% endif %}
+        <div class="hq-nav-arrow"><svg viewBox="0 0 24 24"><polyline points="9,18 15,12 9,6"/></svg></div>
+      </a>
+
+      <a href="{% url 'hq_underwriter_queue' %}" class="hq-nav-item">
+        <div class="hq-nav-item__icon ni-blue">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        </div>
+        <div class="hq-nav-item__body">
+          <span class="hq-nav-item__title">Underwriter Queue</span>
+          <span class="hq-nav-item__desc">Assign &amp; track workload</span>
+        </div>
+        <div class="hq-nav-arrow"><svg viewBox="0 0 24 24"><polyline points="9,18 15,12 9,6"/></svg></div>
+      </a>
+
+      <a href="{% url 'hq_users' %}" class="hq-nav-item">
+        <div class="hq-nav-item__icon ni-slate">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        </div>
+        <div class="hq-nav-item__body">
+          <span class="hq-nav-item__title">Users &amp; Roles</span>
+          <span class="hq-nav-item__desc">Access &amp; permissions</span>
+        </div>
+        <div class="hq-nav-arrow"><svg viewBox="0 0 24 24"><polyline points="9,18 15,12 9,6"/></svg></div>
+      </a>
+
+      <a href="{% url 'hq_deals' %}" class="hq-nav-item">
+        <div class="hq-nav-item__icon ni-amber">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>
+        </div>
+        <div class="hq-nav-item__body">
+          <span class="hq-nav-item__title">Deals Catalog</span>
+          <span class="hq-nav-item__desc">Browse &amp; configure devices</span>
+        </div>
+        <div class="hq-nav-arrow"><svg viewBox="0 0 24 24"><polyline points="9,18 15,12 9,6"/></svg></div>
+      </a>
+
+    </div>
+
+
+    <div class="hq-nav-card">
+      <div class="hq-nav-card-hdr">
+        <div class="hq-nav-card-icon" style="background:rgba(22,163,74,0.12);color:#16a34a;">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+        </div>
+        <span class="hq-nav-card-title">Finance</span>
+      </div>
+
+      <a href="{% url 'hq_commissions' %}" class="hq-nav-item">
+        <div class="hq-nav-item__icon ni-green">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+        </div>
+        <div class="hq-nav-item__body">
+          <span class="hq-nav-item__title">Commission Ledger</span>
+          <span class="hq-nav-item__desc">All underwriter commissions</span>
+        </div>
+        <div class="hq-nav-arrow"><svg viewBox="0 0 24 24"><polyline points="9,18 15,12 9,6"/></svg></div>
+      </a>
+
+      <a href="{% url 'hq_merchant_payouts' %}" class="hq-nav-item">
+        <div class="hq-nav-item__icon ni-orange">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg>
+        </div>
+        <div class="hq-nav-item__body">
+          <span class="hq-nav-item__title">Merchant Payouts</span>
+          <span class="hq-nav-item__desc">Pending: MWK {{ merchant_payout_pending|floatformat:0 }}</span>
+        </div>
+        {% if merchant_payout_pending %}<span class="hq-nav-badge hq-nav-badge--red">Pending</span>{% endif %}
+        <div class="hq-nav-arrow"><svg viewBox="0 0 24 24"><polyline points="9,18 15,12 9,6"/></svg></div>
+      </a>
+
+      <a href="{% url 'hq_payment_collections' %}" class="hq-nav-item">
+        <div class="hq-nav-item__icon ni-blue">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="23,6 13.5,15.5 8.5,10.5 1,18"/><polyline points="17,6 23,6 23,12"/></svg>
+        </div>
+        <div class="hq-nav-item__body">
+          <span class="hq-nav-item__title">Payment Collections</span>
+          <span class="hq-nav-item__desc">Today: MWK {{ collections_today|floatformat:0 }}</span>
+        </div>
+        <div class="hq-nav-arrow"><svg viewBox="0 0 24 24"><polyline points="9,18 15,12 9,6"/></svg></div>
+      </a>
+
+      <a href="{% url 'hq_reconciliation' %}" class="hq-nav-item">
+        <div class="hq-nav-item__icon ni-slate">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+        </div>
+        <div class="hq-nav-item__body">
+          <span class="hq-nav-item__title">Reconciliation</span>
+          <span class="hq-nav-item__desc">Match payments to contracts</span>
+        </div>
+        <div class="hq-nav-arrow"><svg viewBox="0 0 24 24"><polyline points="9,18 15,12 9,6"/></svg></div>
+      </a>
+
+    </div>
+
+
+    <div class="hq-nav-card">
+      <div class="hq-nav-card-hdr">
+        <div class="hq-nav-card-icon" style="background:rgba(37,99,235,0.12);color:#2563eb;">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        </div>
+        <span class="hq-nav-card-title">Analytics</span>
+      </div>
+
+      <a href="{% url 'hq_reports' %}" class="hq-nav-item">
+        <div class="hq-nav-item__icon ni-blue">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        </div>
+        <div class="hq-nav-item__body">
+          <span class="hq-nav-item__title">Reports &amp; Exports</span>
+          <span class="hq-nav-item__desc">Download operational reports</span>
+        </div>
+        <div class="hq-nav-arrow"><svg viewBox="0 0 24 24"><polyline points="9,18 15,12 9,6"/></svg></div>
+      </a>
+
+      <a href="{% url 'hq_simulations' %}" class="hq-nav-item">
+        <div class="hq-nav-item__icon ni-purple">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/></svg>
+        </div>
+        <div class="hq-nav-item__body">
+          <span class="hq-nav-item__title">Financing Simulations</span>
+          <span class="hq-nav-item__desc">Model repayment scenarios</span>
+        </div>
+        <div class="hq-nav-arrow"><svg viewBox="0 0 24 24"><polyline points="9,18 15,12 9,6"/></svg></div>
+      </a>
+
+      <a href="{% url 'hq_sales_analytics' %}" class="hq-nav-item">
+        <div class="hq-nav-item__icon ni-orange">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        </div>
+        <div class="hq-nav-item__body">
+          <span class="hq-nav-item__title">Sales Analytics</span>
+          <span class="hq-nav-item__desc">Trends, performance, growth</span>
+        </div>
+        <div class="hq-nav-arrow"><svg viewBox="0 0 24 24"><polyline points="9,18 15,12 9,6"/></svg></div>
+      </a>
+
+      <a href="{% url 'hq_underwriter_performance' %}" class="hq-nav-item">
+        <div class="hq-nav-item__icon ni-green">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/></svg>
+        </div>
+        <div class="hq-nav-item__body">
+          <span class="hq-nav-item__title">Underwriter Performance</span>
+          <span class="hq-nav-item__desc">Individual metrics &amp; rankings</span>
+        </div>
+        <div class="hq-nav-arrow"><svg viewBox="0 0 24 24"><polyline points="9,18 15,12 9,6"/></svg></div>
+      </a>
+
+    </div>
+
+
+    <div class="hq-nav-card">
+      <div class="hq-nav-card-hdr">
+        <div class="hq-nav-card-icon" style="background:rgba(220,38,38,0.10);color:#dc2626;">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        </div>
+        <span class="hq-nav-card-title">Risk &amp; Control</span>
+      </div>
+
+      <a href="{% url 'hq_operations' %}" class="hq-nav-item">
+        <div class="hq-nav-item__icon ni-red">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        </div>
+        <div class="hq-nav-item__body">
+          <span class="hq-nav-item__title">Safe Operations</span>
+          <span class="hq-nav-item__desc">Device locks &amp; risk controls</span>
+        </div>
+        <div class="hq-nav-arrow"><svg viewBox="0 0 24 24"><polyline points="9,18 15,12 9,6"/></svg></div>
+      </a>
+
+      <a href="{% url 'hq_fraud_checks' %}" class="hq-nav-item">
+        <div class="hq-nav-item__icon ni-amber">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        </div>
+        <div class="hq-nav-item__body">
+          <span class="hq-nav-item__title">Fraud Checks</span>
+          <span class="hq-nav-item__desc">Suspicious activity flags</span>
+        </div>
+        <div class="hq-nav-arrow"><svg viewBox="0 0 24 24"><polyline points="9,18 15,12 9,6"/></svg></div>
+      </a>
+
+      <a href="{% url 'hq_audit_trail' %}" class="hq-nav-item">
+        <div class="hq-nav-item__icon ni-slate">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="9,11 12,14 22,4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+        </div>
+        <div class="hq-nav-item__body">
+          <span class="hq-nav-item__title">Audit Trail</span>
+          <span class="hq-nav-item__desc">System action log</span>
+        </div>
+        <div class="hq-nav-arrow"><svg viewBox="0 0 24 24"><polyline points="9,18 15,12 9,6"/></svg></div>
+      </a>
+
+      {% if request.user.is_staff or request.user.is_superuser %}
+        <a href="{% url 'admin:index' %}" class="hq-nav-item">
+          <div class="hq-nav-item__icon ni-slate">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06A1.65 1.65 0 0 0 15 19.4a1.65 1.65 0 0 0-1 .6 1.65 1.65 0 0 0-.38 1.07V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-.6-1 1.65 1.65 0 0 0-1.07-.38H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-.6A1.65 1.65 0 0 0 10.4 3V3a2 2 0 0 1 4 0v.09A1.65 1.65 0 0 0 15 4.6a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.14.36.36.7.6 1c.24.3.63.43 1.07.43H21a2 2 0 0 1 0 4h-.09A1.65 1.65 0 0 0 19.4 15Z"/></svg>
+          </div>
+          <div class="hq-nav-item__body">
+            <span class="hq-nav-item__title">Django Admin</span>
+            <span class="hq-nav-item__desc">Full backend access</span>
+          </div>
+          <div class="hq-nav-arrow"><svg viewBox="0 0 24 24"><polyline points="9,18 15,12 9,6"/></svg></div>
         </a>
-    {% endif %}
-    <a href="{% url 'hq_users' %}" class="menu-row">
-        <span class="left">
-            <span class="menu-icon icon-tools">U</span>
-            <span class="menu-row-copy">
-                <span>Users</span>
-                <small>Create users and assign platform roles.</small>
-            </span>
-        </span>
-        <span class="arrow" aria-hidden="true">></span>
-    </a>
-    <a href="{% url 'hq_applications' %}" class="menu-row">
-        <span class="left">
-            <span class="menu-icon icon-active">A</span>
-            <span class="menu-row-copy">
-                <span>Applications</span>
-                <small>Review applications across merchants and statuses.</small>
-            </span>
-        </span>
-        <span class="arrow" aria-hidden="true">></span>
-    </a>
-    <a href="{% url 'hq_reports' %}" class="menu-row">
-        <span class="left">
-            <span class="menu-icon icon-tools">R</span>
-            <span class="menu-row-copy">
-                <span>Reports / Analytics</span>
-                <small>View platform reporting and performance insights.</small>
-            </span>
-        </span>
-        <span class="arrow" aria-hidden="true">></span>
-    </a>
-</section>
+      {% endif %}
 
-{% endblock %}
+      {% if show_developer_preview %}
+        <a href="{% url 'hq_merchant_preview' %}" class="hq-nav-item">
+          <div class="hq-nav-item__icon ni-slate">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          </div>
+          <div class="hq-nav-item__body">
+            <span class="hq-nav-item__title">Merchant Preview</span>
+            <span class="hq-nav-item__desc">Preview merchant view</span>
+          </div>
+          <div class="hq-nav-arrow"><svg viewBox="0 0 24 24"><polyline points="9,18 15,12 9,6"/></svg></div>
+        </a>
+        <a href="{% url 'hq_underwriter_preview' %}" class="hq-nav-item">
+          <div class="hq-nav-item__icon ni-slate">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          </div>
+          <div class="hq-nav-item__body">
+            <span class="hq-nav-item__title">Underwriter Preview</span>
+            <span class="hq-nav-item__desc">Preview underwriter view</span>
+          </div>
+          <div class="hq-nav-arrow"><svg viewBox="0 0 24 24"><polyline points="9,18 15,12 9,6"/></svg></div>
+        </a>
+      {% endif %}
+
+    </div>
+
+  </div>
+
+
+  <div class="hq-footer">
+    <span class="hq-footer-brand">TengaSale</span>
+    <span>v1.0.0 &middot; HQ Dashboard &middot; Malawi</span>
+  </div>
+
+</div>
+{% endblock content %}
+
+{% block page_footer %}{% endblock page_footer %}
+
+{% block extra_scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  /* ── Widen app-shell for desktop ── */
+  var shell = document.querySelector('.app-shell');
+  if (shell) {
+    shell.style.maxWidth = '100%';
+    shell.style.boxShadow = 'none';
+  }
+  var mainContent = document.querySelector('main.content');
+  if (mainContent) {
+    mainContent.style.background = '#f8fafc';
+    mainContent.style.padding = '0';
+  }
+
+  /* ── Live clock ── */
+  var clockEl = document.getElementById('hq-clock');
+  var days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  function updateClock() {
+    if (!clockEl) return;
+    var d = new Date();
+    clockEl.textContent = days[d.getDay()] + ', ' + d.getDate() + ' ' + months[d.getMonth()] + ' \u00B7 ' +
+      String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+  }
+  updateClock();
+  setInterval(updateClock, 30000);
+
+  /* ── Contract health donut ── */
+  var chEl = document.getElementById('contractHealthChart');
+  if (chEl) {
+    var cActive    = {{ active_contracts_count }};
+    var cOverdue   = {{ overdue_contracts_count }};
+    var cCompleted = {{ completed_contracts_count }};
+    var cTotal     = cActive + cOverdue + cCompleted;
+    new Chart(chEl, {
+      type: 'doughnut',
+      data: {
+        labels: ['Active', 'Overdue', 'Completed'],
+        datasets: [{
+          data: cTotal > 0 ? [cActive, cOverdue, cCompleted] : [1, 0, 0],
+          backgroundColor: ['#16a34a', '#dc2626', '#7c3aed'],
+          borderWidth: 0,
+          hoverOffset: 4,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        cutout: '72%',
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: function (ctx) { return ' ' + ctx.label + ': ' + ctx.raw; }
+            }
+          }
+        }
+      }
+    });
+  }
+
+  /* ── Applications queue bar chart ── */
+  var qEl = document.getElementById('queueChart');
+  if (qEl) {
+    new Chart(qEl, {
+      type: 'bar',
+      data: {
+        labels: ['Pending', 'Under Review', 'Approved', 'Rejected'],
+        datasets: [{
+          label: 'Applications',
+          data: [
+            {{ pending_review_count }},
+            {{ under_review_count }},
+            {{ approved_count }},
+            {{ rejected_count }}
+          ],
+          backgroundColor: ['#fbbf24', '#60a5fa', '#4ade80', '#f87171'],
+          borderRadius: 6,
+          borderSkipped: false,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: function (ctx) { return ' ' + ctx.raw + ' applications'; }
+            }
+          }
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            ticks: { stepSize: 1, font: { size: 10 }, color: '#94a3b8' },
+            grid: { color: '#f1f5f9' },
+            border: { display: false }
+          },
+          x: {
+            ticks: { font: { size: 10 }, color: '#64748b' },
+            grid: { display: false },
+            border: { display: false }
+          }
+        }
+      }
+    });
+  }
+
+})();
+</script>
+{% endblock extra_scripts %}

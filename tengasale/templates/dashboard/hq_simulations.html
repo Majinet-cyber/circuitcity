@@ -1,0 +1,394 @@
+{% extends "base/base.html" %}
+{% load static %}
+
+{% block page_title %}Growth Simulator — TengaSale HQ{% endblock %}
+
+{% block extra_head %}
+<style>
+.sim-wrap { max-width:1280px; margin:0 auto; padding:24px 16px; overflow-x:hidden; box-sizing:border-box; }
+.sim-header { display:flex; align-items:flex-start; gap:12px; margin-bottom:24px; flex-wrap:wrap; }
+.sim-back { color:var(--primary); text-decoration:none; font-size:0.85rem; font-weight:600; white-space:nowrap; }
+.sim-title { font-size:1.4rem; font-weight:900; margin:0; letter-spacing:-0.02em; }
+.sim-sub { font-size:0.78rem; color:var(--muted); margin:2px 0 0 0; }
+.sim-layout { display:grid; grid-template-columns:minmax(300px,380px) minmax(0,1fr); gap:20px; align-items:start; min-width:0; }
+@media(max-width:960px){ .sim-layout{ grid-template-columns:1fr; } }
+
+.sim-panel {
+  background:#fff;
+  border:1.5px solid #e2e8f0;
+  border-radius:16px;
+  box-shadow:0 1px 4px rgba(15,23,42,.06);
+  overflow:hidden;
+  position:sticky;
+  top:16px;
+  min-width:0;
+  box-sizing:border-box;
+}
+.sim-panel-hdr {
+  background:linear-gradient(135deg,#fff8f0 0%,#fff 100%);
+  padding:14px 18px 12px;
+  border-bottom:1.5px solid #e2e8f0;
+  font-size:0.8rem;
+  font-weight:800;
+  text-transform:uppercase;
+  letter-spacing:.06em;
+  color:#ff6b1a;
+}
+.sim-panel-body { padding:18px; }
+.sim-group { margin-bottom:14px; }
+.sim-group:last-child { margin-bottom:0; }
+.sim-label { font-size:0.72rem; font-weight:700; color:#64748b; display:block; margin-bottom:4px; }
+.sim-input,.sim-select {
+  width:100%; padding:8px 10px; border:1.5px solid #e2e8f0; border-radius:8px;
+  font-size:0.85rem; font-weight:600; color:#0f172a; background:#fff;
+  transition:border-color .15s;
+}
+.sim-input:focus,.sim-select:focus { outline:none; border-color:#ff6b1a; box-shadow:0 0 0 3px rgba(255,107,26,.12); }
+.sim-divider { height:1px; background:#f1f5f9; margin:14px 0; }
+.sim-section-label { font-size:0.7rem; font-weight:800; color:#ff6b1a; text-transform:uppercase; letter-spacing:.08em; margin-bottom:10px; }
+.sim-btn {
+  width:100%; padding:11px; background:linear-gradient(135deg,#ff6b1a,#e85c0a);
+  color:#fff; border:none; border-radius:10px; font-size:0.9rem; font-weight:800;
+  cursor:pointer; letter-spacing:0.01em;
+  box-shadow:0 3px 12px rgba(255,107,26,.35);
+  transition:transform .12s,box-shadow .12s;
+}
+.sim-btn:hover { transform:translateY(-1px); box-shadow:0 5px 16px rgba(255,107,26,.45); }
+.sim-btn:active { transform:translateY(0); }
+
+.sim-results { display:flex; flex-direction:column; gap:18px; min-width:0; overflow:hidden; }
+
+.sim-rec-badge {
+  display:inline-flex; align-items:center; gap:10px;
+  padding:14px 20px; border-radius:14px; font-weight:800;
+}
+.sim-rec-badge span { font-size:1rem; }
+.sim-rec-label { font-size:0.75rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em; opacity:.7; }
+
+.sim-card {
+  background:#fff; border:1.5px solid #e2e8f0; border-radius:14px;
+  box-shadow:0 1px 4px rgba(15,23,42,.06); overflow:hidden;
+  min-width:0; word-break:break-word;
+}
+.sim-card-hdr {
+  padding:11px 16px; border-bottom:1.5px solid #f1f5f9;
+  font-size:0.75rem; font-weight:800; text-transform:uppercase;
+  letter-spacing:.06em; display:flex; align-items:center; gap:8px;
+}
+.sim-card-body { padding:4px 0; }
+.sim-row {
+  display:flex; justify-content:space-between; align-items:center;
+  padding:9px 14px; border-bottom:1px solid #f8fafc; font-size:0.82rem;
+  gap:8px; min-width:0;
+}
+.sim-row:last-child { border-bottom:none; }
+.sim-row-label { color:#475569; font-weight:500; flex:1; min-width:0; }
+.sim-row-val { font-weight:700; color:#0f172a; text-align:right; white-space:nowrap; }
+.sim-row-val--green { color:#16a34a; }
+.sim-row-val--red   { color:#dc2626; }
+.sim-row-val--muted { color:#64748b; }
+.sim-row-val--hero  { font-size:1rem; font-weight:900; }
+
+.sim-scenarios { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; }
+@media(max-width:1100px){ .sim-scenarios{ grid-template-columns:repeat(2,minmax(0,1fr)); } }
+@media(max-width:540px){ .sim-scenarios{ grid-template-columns:1fr; } }
+
+.sim-sc-card {
+  background:#fff; border:2px solid #e2e8f0; border-radius:14px;
+  padding:14px 10px; text-align:center;
+  box-shadow:0 1px 4px rgba(15,23,42,.06);
+  transition:transform .12s;
+  min-width:0; overflow:hidden; word-break:break-word;
+}
+.sim-sc-card:hover { transform:translateY(-2px); }
+.sim-sc-card--profitable { border-color:#16a34a; }
+.sim-sc-card--loss { border-color:#dc2626; }
+.sim-sc-label { font-size:0.65rem; font-weight:800; text-transform:uppercase; letter-spacing:.08em; margin-bottom:8px; color:#64748b; }
+.sim-sc-rate { font-size:1.5rem; font-weight:900; line-height:1; margin-bottom:4px; letter-spacing:-0.02em; }
+.sim-sc-profit { font-size:0.78rem; font-weight:700; margin-top:6px; }
+.sim-sc-badge { font-size:0.62rem; font-weight:800; padding:3px 10px; border-radius:99px; text-transform:uppercase; display:inline-block; margin-top:6px; }
+
+.sim-narrative {
+  background:linear-gradient(135deg,#fff8f0 0%,#fff 100%);
+  border:2px solid rgba(255,107,26,.20); border-radius:14px; padding:20px;
+}
+.sim-narrative-label { font-size:0.72rem; font-weight:800; text-transform:uppercase; letter-spacing:.08em; color:#ff6b1a; margin-bottom:8px; }
+.sim-narrative-text { font-size:0.88rem; color:#334155; line-height:1.65; margin:0; font-weight:500; }
+
+.sim-empty {
+  background:#fff; border:2px dashed #e2e8f0; border-radius:16px;
+  padding:60px 32px; text-align:center; color:#94a3b8;
+}
+.sim-empty-icon { font-size:2.5rem; margin-bottom:12px; }
+.sim-empty-title { font-size:1.1rem; font-weight:800; color:#334155; margin-bottom:6px; }
+.sim-empty-sub { font-size:0.85rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="sim-wrap">
+
+  <div class="sim-header">
+    <a href="{% url 'hq_dashboard' %}" class="sim-back">← HQ</a>
+    <div>
+      <h1 class="sim-title">TengaSale Growth Simulator</h1>
+      <p class="sim-sub">Model portfolio projections, commissions, risk exposure, and investor scenarios. Estimates only — not financial advice.</p>
+    </div>
+  </div>
+
+  <div class="sim-layout">
+
+    <!-- ── Input Panel ──────────────────────────────────────────── -->
+    <div class="sim-panel">
+      <div class="sim-panel-hdr">Simulation Inputs</div>
+      <div class="sim-panel-body">
+        <form method="post">
+          {% csrf_token %}
+
+          <p class="sim-section-label">Portfolio Scale</p>
+
+          <div class="sim-group">
+            <label class="sim-label">Number of Devices</label>
+            <input type="number" name="num_devices" class="sim-input" value="{{ form_data.num_devices|default:'100' }}" min="1" required>
+          </div>
+          <div class="sim-group">
+            <label class="sim-label">Average Cash Price (MWK)</label>
+            <input type="number" name="cash_price" class="sim-input" value="{{ form_data.cash_price|default:'400000' }}" min="0" step="1000" required>
+          </div>
+          <div class="sim-group">
+            <label class="sim-label">Average Contract Value (MWK)</label>
+            <input type="number" name="contract_value" class="sim-input" value="{{ form_data.contract_value|default:'1000000' }}" min="0" step="1000" required>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+            <div class="sim-group">
+              <label class="sim-label">Deposit %</label>
+              <select name="deposit_pct" class="sim-select">
+                {% for opt in deposit_options %}
+                <option value="{{ opt }}" {% if form_data.deposit_pct == opt or not form_data and opt == '20' %}selected{% endif %}>{{ opt }}%</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="sim-group">
+              <label class="sim-label">Term (months)</label>
+              <select name="term_months" class="sim-select">
+                {% for t in term_options %}
+                <option value="{{ t }}" {% if form_data.term_months == t|stringformat:'s' or not form_data and t == 12 %}selected{% endif %}>{{ t }}mo</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+
+          <div class="sim-divider"></div>
+          <p class="sim-section-label">Performance Assumptions</p>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+            <div class="sim-group">
+              <label class="sim-label">Collection Rate %</label>
+              <input type="number" name="collection_rate" class="sim-input" value="{{ form_data.collection_rate|default:'90' }}" min="0" max="100" step="1">
+            </div>
+            <div class="sim-group">
+              <label class="sim-label">Default Rate %</label>
+              <input type="number" name="default_rate" class="sim-input" value="{{ form_data.default_rate|default:'5' }}" min="0" max="100" step="0.5">
+            </div>
+          </div>
+          <div class="sim-group">
+            <label class="sim-label">Lock Recovery Rate %</label>
+            <input type="number" name="lock_recovery_rate" class="sim-input" value="{{ form_data.lock_recovery_rate|default:'60' }}" min="0" max="100" step="5">
+          </div>
+
+          <div class="sim-divider"></div>
+          <p class="sim-section-label">Commission &amp; WHT Rates</p>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+            <div class="sim-group">
+              <label class="sim-label">Merchant Commission %</label>
+              <input type="number" name="merchant_commission_rate" class="sim-input" value="{{ form_data.merchant_commission_rate|default:'1' }}" min="0" max="20" step="0.5">
+            </div>
+            <div class="sim-group">
+              <label class="sim-label">UW Commission %</label>
+              <input type="number" name="uw_commission_rate" class="sim-input" value="{{ form_data.uw_commission_rate|default:'7' }}" min="0" max="30" step="0.5">
+            </div>
+            <div class="sim-group">
+              <label class="sim-label">Arrears Penalty %</label>
+              <input type="number" name="arrears_penalty_rate" class="sim-input" value="{{ form_data.arrears_penalty_rate|default:'14' }}" min="0" max="50" step="1">
+            </div>
+            <div class="sim-group">
+              <label class="sim-label">WHT Rate %</label>
+              <input type="number" name="wht_rate" class="sim-input" value="{{ form_data.wht_rate|default:'20' }}" min="0" max="40" step="1">
+            </div>
+          </div>
+
+          <div class="sim-divider"></div>
+          <p class="sim-section-label">Operating Costs (Optional)</p>
+
+          <div class="sim-group">
+            <label class="sim-label">Monthly Tech / Platform Cost (MWK)</label>
+            <input type="number" name="monthly_tech_cost" class="sim-input" value="{{ form_data.monthly_tech_cost|default:'0' }}" min="0" step="1000">
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+            <div class="sim-group">
+              <label class="sim-label">Device Lock Cost/month</label>
+              <input type="number" name="lock_cost_per_device" class="sim-input" value="{{ form_data.lock_cost_per_device|default:'0' }}" min="0" step="100">
+            </div>
+            <div class="sim-group">
+              <label class="sim-label">SMS Cost / customer/month</label>
+              <input type="number" name="sms_cost_per_customer" class="sim-input" value="{{ form_data.sms_cost_per_customer|default:'0' }}" min="0" step="100">
+            </div>
+          </div>
+
+          <div class="sim-divider"></div>
+
+          <button type="submit" class="sim-btn">Run Simulation</button>
+
+        </form>
+      </div>
+    </div>
+
+    <!-- ── Results ──────────────────────────────────────────────── -->
+    <div class="sim-results">
+
+      {% if result %}
+
+      <!-- Recommendation -->
+      <div class="sim-rec-badge" style="background:{{ result.rec_bg }};color:{{ result.rec_color }};">
+        <div style="width:40px;height:40px;background:{{ result.rec_color }};border-radius:10px;display:grid;place-items:center;flex-shrink:0;">
+          {% if result.recommendation == 'Safe' %}
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22,4 12,14.01 9,11.01"/></svg>
+          {% elif result.recommendation == 'Watch' %}
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          {% else %}
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          {% endif %}
+        </div>
+        <div>
+          <div class="sim-rec-label">Risk Assessment</div>
+          <div style="font-size:1.2rem;font-weight:900;">{{ result.recommendation }}</div>
+        </div>
+        <div style="margin-left:auto;text-align:right;">
+          <div class="sim-rec-label">Portfolio Size</div>
+          <div style="font-size:1.2rem;font-weight:900;">{{ result.num_devices }} devices</div>
+        </div>
+      </div>
+
+      <!-- Narrative insight -->
+      <div class="sim-narrative">
+        <div class="sim-narrative-label">Insight Summary</div>
+        <p class="sim-narrative-text">{{ result.narrative }}</p>
+      </div>
+
+      <!-- Cards row -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+
+        <!-- Customer Impact -->
+        <div class="sim-card">
+          <div class="sim-card-hdr" style="background:rgba(37,99,235,0.06);color:#2563eb;">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/></svg>
+            Customer Impact
+          </div>
+          <div class="sim-card-body">
+            <div class="sim-row"><span class="sim-row-label">People Connected</span><span class="sim-row-val sim-row-val--hero sim-row-val--green">{{ result.people_connected }}</span></div>
+            <div class="sim-row"><span class="sim-row-label">Deposit per Device</span><span class="sim-row-val">MWK {{ result.deposit_per|floatformat:0 }}</span></div>
+            <div class="sim-row"><span class="sim-row-label">Financed per Device</span><span class="sim-row-val">MWK {{ result.financed_per|floatformat:0 }}</span></div>
+            <div class="sim-row"><span class="sim-row-label">Monthly Repayment</span><span class="sim-row-val">MWK {{ result.monthly_repayment|floatformat:0 }}</span></div>
+            <div class="sim-row"><span class="sim-row-label">Daily Repayment</span><span class="sim-row-val sim-row-val--muted">MWK {{ result.daily_repayment|floatformat:0 }}</span></div>
+            <div class="sim-row"><span class="sim-row-label">Total Deposits Collected</span><span class="sim-row-val sim-row-val--green">MWK {{ result.total_deposits|floatformat:0 }}</span></div>
+            <div class="sim-row"><span class="sim-row-label">Total Financed Portfolio</span><span class="sim-row-val">MWK {{ result.total_financed|floatformat:0 }}</span></div>
+          </div>
+        </div>
+
+        <!-- Company Economics -->
+        <div class="sim-card">
+          <div class="sim-card-hdr" style="background:rgba(22,163,74,0.06);color:#16a34a;">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+            Company Economics
+          </div>
+          <div class="sim-card-body">
+            <div class="sim-row"><span class="sim-row-label">Gross Sales Value</span><span class="sim-row-val">MWK {{ result.gross_sales_value|floatformat:0 }}</span></div>
+            <div class="sim-row"><span class="sim-row-label">Expected Monthly Collections</span><span class="sim-row-val">MWK {{ result.expected_monthly_collections|floatformat:0 }}</span></div>
+            <div class="sim-row"><span class="sim-row-label">Expected Total Collections</span><span class="sim-row-val sim-row-val--green">MWK {{ result.expected_total_collections|floatformat:0 }}</span></div>
+            <div class="sim-row"><span class="sim-row-label">Total Merchant Payouts</span><span class="sim-row-val sim-row-val--red">− MWK {{ result.total_merchant_payouts|floatformat:0 }}</span></div>
+            <div class="sim-row"><span class="sim-row-label">UW Gross Commission</span><span class="sim-row-val sim-row-val--red">− MWK {{ result.total_uw_gross|floatformat:0 }}</span></div>
+            <div class="sim-row"><span class="sim-row-label">WHT Withheld</span><span class="sim-row-val sim-row-val--muted">MWK {{ result.total_uw_wht|floatformat:0 }}</span></div>
+            <div class="sim-row"><span class="sim-row-label">UW Net Payout</span><span class="sim-row-val">MWK {{ result.total_uw_net|floatformat:0 }}</span></div>
+            <div class="sim-row"><span class="sim-row-label">Arrears Deductions</span><span class="sim-row-val sim-row-val--red">MWK {{ result.total_arrears_ded|floatformat:0 }}</span></div>
+            <div class="sim-row"><span class="sim-row-label">Expected Cash Flow</span><span class="sim-row-val {% if result.expected_cash_flow >= 0 %}sim-row-val--green{% else %}sim-row-val--red{% endif %}">MWK {{ result.expected_cash_flow|floatformat:0 }}</span></div>
+            <div class="sim-row" style="background:#f8fafc;"><span class="sim-row-label" style="font-weight:800;">Estimated Profit</span><span class="sim-row-val sim-row-val--hero {% if result.estimated_profit >= 0 %}sim-row-val--green{% else %}sim-row-val--red{% endif %}">MWK {{ result.estimated_profit|floatformat:0 }}</span></div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Risk card -->
+      <div class="sim-card">
+        <div class="sim-card-hdr" style="background:rgba(220,38,38,0.06);color:#dc2626;">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          Risk Analysis
+        </div>
+        <div class="sim-card-body" style="display:grid;grid-template-columns:repeat(5,1fr);">
+          <div class="sim-row" style="flex-direction:column;align-items:center;text-align:center;gap:4px;border-right:1px solid #f1f5f9;">
+            <span class="sim-row-val sim-row-val--red" style="font-size:1.1rem;">MWK {{ result.default_exposure|floatformat:0 }}</span>
+            <span class="sim-row-label" style="font-size:0.7rem;">Default Exposure</span>
+          </div>
+          <div class="sim-row" style="flex-direction:column;align-items:center;text-align:center;gap:4px;border-right:1px solid #f1f5f9;">
+            <span class="sim-row-val sim-row-val--green" style="font-size:1.1rem;">MWK {{ result.lock_recovery|floatformat:0 }}</span>
+            <span class="sim-row-label" style="font-size:0.7rem;">Lock Recovery</span>
+          </div>
+          <div class="sim-row" style="flex-direction:column;align-items:center;text-align:center;gap:4px;border-right:1px solid #f1f5f9;">
+            <span class="sim-row-val sim-row-val--red" style="font-size:1.1rem;">MWK {{ result.unrecovered_exposure|floatformat:0 }}</span>
+            <span class="sim-row-label" style="font-size:0.7rem;">Unrecovered</span>
+          </div>
+          <div class="sim-row" style="flex-direction:column;align-items:center;text-align:center;gap:4px;border-right:1px solid #f1f5f9;">
+            <span class="sim-row-val" style="font-size:1.1rem;color:#d97706;">{{ result.portfolio_at_risk }}%</span>
+            <span class="sim-row-label" style="font-size:0.7rem;">Portfolio-at-Risk</span>
+          </div>
+          <div class="sim-row" style="flex-direction:column;align-items:center;text-align:center;gap:4px;">
+            <span class="sim-row-val" style="font-size:1.1rem;color:#7c3aed;">{{ result.break_even_col_rate }}%</span>
+            <span class="sim-row-label" style="font-size:0.7rem;">Break-even Col. Rate</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Scenario comparison -->
+      <div>
+        <p style="font-size:0.75rem;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px;">Scenario Comparison</p>
+        <div class="sim-scenarios">
+          {% for sc in result.scenarios %}
+          <div class="sim-sc-card {% if sc.profitable %}sim-sc-card--profitable{% else %}sim-sc-card--loss{% endif %}">
+            <div class="sim-sc-label">{{ sc.label }}</div>
+            <div class="sim-sc-rate" style="color:{% if sc.profitable %}#16a34a{% else %}#dc2626{% endif %};">
+              {{ sc.col_rate }}%
+            </div>
+            <div style="font-size:0.7rem;color:#94a3b8;">collection · {{ sc.def_rate }}% default</div>
+            <div class="sim-sc-profit" style="color:{% if sc.profitable %}#16a34a{% else %}#dc2626{% endif %};">
+              MWK {{ sc.estimated_profit|floatformat:0 }}
+            </div>
+            <span class="sim-sc-badge" style="background:{% if sc.profitable %}rgba(22,163,74,.12);color:#16a34a;{% else %}rgba(220,38,38,.12);color:#dc2626;{% endif %}">
+              {% if sc.profitable %}Profitable{% else %}Loss{% endif %}
+            </span>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div style="font-size:0.75rem;color:#94a3b8;text-align:center;padding-top:4px;">
+        Estimates for planning purposes only. Deposit is excluded from underwriter commission.
+        WHT applies to underwriter/staff payouts only, not merchant payouts.
+      </div>
+
+      {% else %}
+
+      <div class="sim-empty">
+        <div class="sim-empty-icon">
+          <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="#cbd5e1" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/></svg>
+        </div>
+        <div class="sim-empty-title">Configure and run a simulation</div>
+        <div class="sim-empty-sub">Enter your portfolio assumptions and click Run Simulation to see investor-grade projections.</div>
+      </div>
+
+      {% endif %}
+
+    </div>
+  </div>
+
+</div>
+{% endblock %}

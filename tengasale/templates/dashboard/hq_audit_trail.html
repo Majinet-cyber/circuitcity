@@ -1,0 +1,97 @@
+{% extends "base/base.html" %}
+{% load static %}
+
+{% block page_title %}Audit Trail — TengaSale HQ{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width:1100px;margin:0 auto;padding:24px 16px;">
+
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px;">
+    <a href="{% url 'hq_dashboard' %}" style="color:var(--primary);text-decoration:none;font-size:0.85rem;font-weight:600;">← HQ</a>
+    <div>
+      <h1 style="font-size:1.4rem;font-weight:800;margin:0;">Audit Trail</h1>
+      <p style="font-size:0.8rem;color:var(--muted);margin:2px 0 0 0;">Complete log of all system actions, approvals, and HQ operations.</p>
+    </div>
+    <a href="?export=csv" class="btn btn-sm btn-outline-secondary" style="margin-left:auto;">Export CSV</a>
+  </div>
+
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin:20px 0;">
+    <div class="glass-card" style="padding:16px;text-align:center;">
+      <div style="font-size:0.72rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.06em;">Actions Today</div>
+      <div style="font-size:1.5rem;font-weight:800;color:var(--primary);margin-top:4px;">{{ total_today }}</div>
+    </div>
+    <div class="glass-card" style="padding:16px;text-align:center;">
+      <div style="font-size:0.72rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.06em;">Total Log Entries</div>
+      <div style="font-size:1.5rem;font-weight:800;margin-top:4px;">{{ total_all }}</div>
+    </div>
+  </div>
+
+  <div class="glass-card" style="padding:16px;margin-bottom:20px;">
+    <form method="get" style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;">
+      <div>
+        <label style="font-size:0.75rem;font-weight:700;color:var(--muted);">Action</label>
+        <input type="text" name="action" class="form-control form-control-sm" value="{{ action_filter }}" placeholder="e.g. approve" style="min-width:140px;">
+      </div>
+      <div>
+        <label style="font-size:0.75rem;font-weight:700;color:var(--muted);">User</label>
+        <input type="text" name="user" class="form-control form-control-sm" value="{{ user_filter }}" placeholder="username" style="min-width:120px;">
+      </div>
+      <div>
+        <label style="font-size:0.75rem;font-weight:700;color:var(--muted);">Object Type</label>
+        <select name="object_type" class="form-select form-select-sm" style="min-width:160px;">
+          <option value="">All</option>
+          {% for ot in object_types %}<option value="{{ ot }}" {% if object_type_filter == ot %}selected{% endif %}>{{ ot }}</option>{% endfor %}
+        </select>
+      </div>
+      <div>
+        <label style="font-size:0.75rem;font-weight:700;color:var(--muted);">From</label>
+        <input type="date" name="date_from" class="form-control form-control-sm" value="{{ date_from }}">
+      </div>
+      <div>
+        <label style="font-size:0.75rem;font-weight:700;color:var(--muted);">To</label>
+        <input type="date" name="date_to" class="form-control form-control-sm" value="{{ date_to }}">
+      </div>
+      <button type="submit" class="btn btn-warning btn-sm fw-bold">Filter</button>
+      <a href="?" class="btn btn-outline-secondary btn-sm">Clear</a>
+    </form>
+  </div>
+
+  <div class="glass-card" style="padding:0;overflow:hidden;">
+    <div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
+      <h2 style="font-size:0.9rem;font-weight:800;margin:0;">Log Entries</h2>
+      <span style="font-size:0.75rem;color:var(--muted);">Showing latest 200</span>
+    </div>
+    <div style="overflow-x:auto;">
+      <table style="width:100%;border-collapse:collapse;font-size:0.8rem;">
+        <thead>
+          <tr style="background:#f8fafc;">
+            <th style="padding:9px 12px;text-align:left;font-weight:700;font-size:0.7rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);">Timestamp</th>
+            <th style="padding:9px 12px;text-align:left;font-weight:700;font-size:0.7rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);">User</th>
+            <th style="padding:9px 12px;text-align:left;font-weight:700;font-size:0.7rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);">Action</th>
+            <th style="padding:9px 12px;text-align:left;font-weight:700;font-size:0.7rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);">Object Type</th>
+            <th style="padding:9px 12px;text-align:left;font-weight:700;font-size:0.7rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);">Object ID</th>
+            <th style="padding:9px 12px;text-align:left;font-weight:700;font-size:0.7rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);">IP</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for entry in entries %}
+          <tr style="border-top:1px solid var(--border);">
+            <td style="padding:9px 12px;white-space:nowrap;color:var(--muted);">{{ entry.timestamp|date:"d M Y H:i" }}</td>
+            <td style="padding:9px 12px;font-weight:600;">{% if entry.user %}{{ entry.user.username }}{% else %}—{% endif %}</td>
+            <td style="padding:9px 12px;">
+              <span style="background:#f1f5f9;padding:2px 8px;border-radius:4px;font-size:0.72rem;font-weight:700;font-family:monospace;">{{ entry.action }}</span>
+            </td>
+            <td style="padding:9px 12px;">{{ entry.object_type }}</td>
+            <td style="padding:9px 12px;color:var(--muted);font-family:monospace;font-size:0.72rem;">{{ entry.object_id }}</td>
+            <td style="padding:9px 12px;color:var(--muted);font-size:0.72rem;">{{ entry.ip_address|default:"—" }}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="6" style="padding:32px;text-align:center;color:var(--muted);">No audit log entries found.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

@@ -1,0 +1,177 @@
+{% extends "base/base.html" %}
+{% load static %}
+
+{% block page_title %}Sales Analytics — TengaSale HQ{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width:1100px;margin:0 auto;padding:24px 16px;">
+
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px;">
+    <a href="{% url 'hq_dashboard' %}" style="color:var(--primary);text-decoration:none;font-size:0.85rem;font-weight:600;">← HQ</a>
+    <div>
+      <h1 style="font-size:1.4rem;font-weight:800;margin:0;">Sales Analytics</h1>
+      <p style="font-size:0.8rem;color:var(--muted);margin:2px 0 0 0;">Sales trends, conversion funnel, and demographic breakdown.</p>
+    </div>
+    <a href="?export=csv" class="btn btn-sm btn-outline-secondary" style="margin-left:auto;">Export CSV</a>
+  </div>
+
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin:20px 0;">
+    <div class="glass-card" style="padding:16px;text-align:center;">
+      <div style="font-size:0.72rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.06em;">Total Applications</div>
+      <div style="font-size:1.5rem;font-weight:800;color:var(--primary);margin-top:4px;">{{ total_apps }}</div>
+    </div>
+    <div class="glass-card" style="padding:16px;text-align:center;">
+      <div style="font-size:0.72rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.06em;">Submitted</div>
+      <div style="font-size:1.5rem;font-weight:800;color:#2563eb;margin-top:4px;">{{ submitted }}</div>
+    </div>
+    <div class="glass-card" style="padding:16px;text-align:center;">
+      <div style="font-size:0.72rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.06em;">Approved</div>
+      <div style="font-size:1.5rem;font-weight:800;color:#16a34a;margin-top:4px;">{{ approved }}</div>
+    </div>
+    <div class="glass-card" style="padding:16px;text-align:center;">
+      <div style="font-size:0.72rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.06em;">Completed</div>
+      <div style="font-size:1.5rem;font-weight:800;color:#7c3aed;margin-top:4px;">{{ completed }}</div>
+    </div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">
+
+    <div class="glass-card" style="padding:16px;">
+      <h2 style="font-size:0.88rem;font-weight:800;margin-bottom:14px;">Applications — Last 14 Days</h2>
+      <canvas id="dailySalesChart" style="max-height:180px;"></canvas>
+    </div>
+
+    <div class="glass-card" style="padding:16px;">
+      <h2 style="font-size:0.88rem;font-weight:800;margin-bottom:14px;">Deposit Band Split</h2>
+      <div style="display:flex;flex-direction:column;gap:10px;margin-top:8px;">
+        {% with total_dep=dep_15|add:dep_20|add:dep_30 %}
+        <div>
+          <div style="display:flex;justify-content:space-between;font-size:0.8rem;margin-bottom:3px;">
+            <span style="font-weight:600;">15% Deposit</span>
+            <span style="font-weight:700;">{{ dep_15 }}</span>
+          </div>
+          <div style="background:#f1f5f9;border-radius:4px;height:8px;overflow:hidden;">
+            {% if total_dep %}<div style="background:#ff6b1a;height:100%;width:{% widthratio dep_15 total_dep 100 %}%;border-radius:4px;"></div>{% endif %}
+          </div>
+        </div>
+        <div>
+          <div style="display:flex;justify-content:space-between;font-size:0.8rem;margin-bottom:3px;">
+            <span style="font-weight:600;">20% Deposit</span>
+            <span style="font-weight:700;">{{ dep_20 }}</span>
+          </div>
+          <div style="background:#f1f5f9;border-radius:4px;height:8px;overflow:hidden;">
+            {% if total_dep %}<div style="background:#2563eb;height:100%;width:{% widthratio dep_20 total_dep 100 %}%;border-radius:4px;"></div>{% endif %}
+          </div>
+        </div>
+        <div>
+          <div style="display:flex;justify-content:space-between;font-size:0.8rem;margin-bottom:3px;">
+            <span style="font-weight:600;">30%+ Deposit</span>
+            <span style="font-weight:700;">{{ dep_30 }}</span>
+          </div>
+          <div style="background:#f1f5f9;border-radius:4px;height:8px;overflow:hidden;">
+            {% if total_dep %}<div style="background:#16a34a;height:100%;width:{% widthratio dep_30 total_dep 100 %}%;border-radius:4px;"></div>{% endif %}
+          </div>
+        </div>
+        {% endwith %}
+      </div>
+    </div>
+
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:20px;">
+
+    <div class="glass-card" style="padding:16px;">
+      <h2 style="font-size:0.88rem;font-weight:800;margin-bottom:12px;">Gender Breakdown</h2>
+      {% for label, cnt in gender_counts.items %}
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);font-size:0.82rem;">
+        <span>{{ label }}</span>
+        <span style="font-weight:700;">{{ cnt }}</span>
+      </div>
+      {% empty %}
+      <p style="color:var(--muted);font-size:0.8rem;">No data yet.</p>
+      {% endfor %}
+    </div>
+
+    <div class="glass-card" style="padding:16px;">
+      <h2 style="font-size:0.88rem;font-weight:800;margin-bottom:12px;">Marital Status</h2>
+      {% for label, cnt in marital_counts.items %}
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);font-size:0.82rem;">
+        <span>{{ label }}</span>
+        <span style="font-weight:700;">{{ cnt }}</span>
+      </div>
+      {% empty %}
+      <p style="color:var(--muted);font-size:0.8rem;">No data yet.</p>
+      {% endfor %}
+    </div>
+
+    <div class="glass-card" style="padding:16px;">
+      <h2 style="font-size:0.88rem;font-weight:800;margin-bottom:12px;">By Device Brand</h2>
+      {% for b in brand_counts %}
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);font-size:0.82rem;">
+        <span>{{ b.brand }}</span>
+        <span style="font-weight:700;">{{ b.count }}</span>
+      </div>
+      {% empty %}
+      <p style="color:var(--muted);font-size:0.8rem;">No data yet.</p>
+      {% endfor %}
+    </div>
+
+  </div>
+
+  <div class="glass-card" style="padding:16px;">
+    <h2 style="font-size:0.88rem;font-weight:800;margin-bottom:12px;">Top Merchants by Applications</h2>
+    <table style="width:100%;border-collapse:collapse;font-size:0.82rem;">
+      <thead>
+        <tr style="border-bottom:2px solid var(--border);">
+          <th style="text-align:left;padding:8px;">Merchant</th>
+          <th style="text-align:right;padding:8px;">Applications</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for m in by_merchant %}
+        <tr style="border-bottom:1px solid var(--border);">
+          <td style="padding:8px;">{{ m.created_by__username }}</td>
+          <td style="padding:8px;text-align:right;font-weight:700;">{{ m.cnt }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="2" style="padding:20px;text-align:center;color:var(--muted);">No data yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+(function(){
+  var ctx = document.getElementById('dailySalesChart');
+  if (!ctx) return;
+  var labels = [{% for d in last_14 %}"{{ d.date|slice:'5:' }}"{% if not forloop.last %},{% endif %}{% endfor %}];
+  var data   = [{% for d in last_14 %}{{ d.count }}{% if not forloop.last %},{% endif %}{% endfor %}];
+  new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: 'Applications',
+        data: data,
+        backgroundColor: '#ff6b1a',
+        borderRadius: 5,
+        borderSkipped: false,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { beginAtZero: true, ticks: { stepSize: 1, font: { size: 10 }, color: '#94a3b8' }, grid: { color: '#f1f5f9' }, border: { display: false } },
+        x: { ticks: { font: { size: 9 }, color: '#64748b', maxRotation: 45 }, grid: { display: false }, border: { display: false } }
+      }
+    }
+  });
+})();
+</script>
+{% endblock %}

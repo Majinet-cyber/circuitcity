@@ -72,6 +72,15 @@ class PaymentContract(models.Model):
         related_name="payment_contract",
     )
 
+    # Link to the source financing application (TengaSale underwriter flow)
+    source_application = models.OneToOneField(
+        "applications.FinancingApplication",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="payment_contract",
+    )
+
     # Customer info (denormalised for portal access without auth)
     customer_name = models.CharField(max_length=180)
     customer_phone = models.CharField(max_length=30)
@@ -225,6 +234,12 @@ class PaymentTransaction(models.Model):
     )
     provider = models.CharField(max_length=20, choices=PROVIDER_CHOICES, default=PROVIDER_MOCK)
     amount = models.DecimalField(max_digits=12, decimal_places=2)
+    commissionable_amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=0,
+        help_text="Amount eligible for underwriter commission (excludes deposit)",
+    )
     currency = models.CharField(max_length=5, default="MWK")
     phone = models.CharField(max_length=30)
     internal_reference = models.CharField(max_length=30, unique=True, blank=True)

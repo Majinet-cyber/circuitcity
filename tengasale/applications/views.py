@@ -11,7 +11,7 @@ from deals.models import DeviceDeal
 from geography.models import Region
 
 from .forms import CustomerDetailsForm, KYCForm, LocationNextOfKinForm, SignatureForm, WorkProofForm
-from .models import FinancingApplication
+from .models import ApplicationCorrectionToken, ApplicationFieldReview, FinancingApplication
 
 
 ACTIVE_STATUSES = [
@@ -80,6 +80,9 @@ def edit_customer_details(request, app_id):
             app.monthly_income = app.exact_monthly_income
             app.income_source = app.occupation
             app.status = "customer_details"
+            # Auto-flag third-party phone user for risk review
+            phone_user = form.cleaned_data.get("phone_user", "")
+            app.third_party_phone_user_risk_flagged = bool(phone_user and phone_user != "customer_self")
             app.save()
             messages.success(request, "Customer details saved.")
             return redirect("choose_device", app_id=app.id)
@@ -433,3 +436,107 @@ def rejected_applications(request):
         "Applications that were rejected or archived.",
         ["rejected"],
     )
+
+
+# ---------------------------------------------------------------------------
+# Secure customer correction portal (Part B)
+# ---------------------------------------------------------------------------
+
+EDITABLE_FIELD_MAP = {
+    "full_name": ("customer_name", "Customer Full Name"),
+    "national_id": ("national_id", "National ID"),
+    "primary_phone": ("customer_phone", "Primary Phone"),
+    "occupation": ("occupation", "Occupation"),
+    "income_band": ("income_band", "Income Band"),
+    "income_source": ("income_source", "Income Source"),
+    "region": ("region", "Region"),
+    "district": ("district", "District"),
+    "traditional_authority": ("traditional_authority", "Traditional Authority"),
+    "gps_location": ("gps_coordinates", "GPS Location"),
+    "guarantor_name": ("next_of_kin_1_name", "Guarantor / NOK Name"),
+    "guarantor_phone": ("next_of_kin_1_phone", "Guarantor / NOK Phone"),
+    "neighbour_name": ("next_of_kin_2_name", "Neighbour / NOK Name"),
+    "neighbour_phone": ("next_of_kin_2_phone", "Neighbour / NOK Phone"),
+    "company_contact_name": ("proof_contact_name", "Company Contact Name"),
+    "company_contact_phone": ("proof_contact_phone", "Company Contact Phone"),
+    "income_source_description": ("work_description", "Income Description"),
+}
+
+
+def customer_field_correction(request, token):
+    """
+    Secure customer self-correction portal.
+    Token must be non-expired. Only marked fields are shown/editable.
+    No internal data (scoring, audit logs, commissions) is exposed.
+    """
+    from django.utils import timezone
+    from core.models import AuditLog
+
+    try:
+        token_obj = ApplicationCorrectionToken.objects.select_related("application").get(token=token)
+    except ApplicationCorrectionToken.DoesNotExist:
+        return render(request, "applications/correction_invalid.html", {"reason": "invalid"}, status=404)
+
+    if not token_obj.is_valid:
+        return render(request, "applications/correction_invalid.html", {"reason": "expired"}, status=410)
+
+    app = token_obj.application
+
+    marked_reviews = ApplicationFieldReview.objects.filter(
+        application=app,
+        status=ApplicationFieldReview.STATUS_MARKED,
+    ).order_by("section", "field_key")
+
+    if not marked_reviews.exists():
+        return render(request, "applications/correction_invalid.html", {"reason": "no_fields"})
+
+    # Build list of editable fields (from marked reviews only, filtered to known safe field map)
+    editable = []
+    for review in marked_reviews:
+        field_info = EDITABLE_FIELD_MAP.get(review.field_key)
+        if field_info:
+            model_field, label = field_info
+            editable.append({
+                "review": review,
+                "field_key": review.field_key,
+                "model_field": model_field,
+                "label": label,
+                "reason": review.get_reason_display(),
+                "comment": review.comment,
+                "current_value": getattr(app, model_field, "") or "",
+            })
+
+    if request.method == "POST":
+        updated_fields = []
+        for item in editable:
+            new_val = request.POST.get(item["field_key"], "").strip()
+            if new_val and new_val != str(item["current_value"]):
+                setattr(app, item["model_field"], new_val)
+                updated_fields.append(item["field_key"])
+                item["review"].status = ApplicationFieldReview.STATUS_CUSTOMER_UPDATED
+                item["review"].save(update_fields=["status", "updated_at"])
+
+        if updated_fields:
+            app.save(update_fields=[EDITABLE_FIELD_MAP[f][0] for f in updated_fields])
+            token_obj.mark_used()
+
+            AuditLog.objects.create(
+                user=None,
+                action=AuditLog.ACTION_KYC_CHANGE,
+                object_type="FinancingApplication",
+                object_id=str(app.id),
+                detail={"fields_updated": updated_fields, "token": token[:8] + "..."},
+            )
+
+        return render(request, "applications/correction_success.html", {
+            "app_number": app.application_number,
+            "updated_count": len(updated_fields),
+        })
+
+    # Safe context — never expose scoring, commissions, internal notes
+    return render(request, "applications/correction_form.html", {
+        "app_number": app.application_number,
+        "editable_fields": editable,
+        "token": token,
+        "expires_at": token_obj.expires_at,
+    })

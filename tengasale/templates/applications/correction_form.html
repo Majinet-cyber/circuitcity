@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Update Your Application — TengaSale</title>
+  {% load static %}
+  <link rel="stylesheet" href="{% static 'css/tengasale.css' %}">
+  <style>
+    body { background: #f5f6fa; min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 20px 16px; }
+    .correction-card { background: #fff; border-radius: 16px; padding: 24px; max-width: 480px; width: 100%; box-shadow: 0 2px 16px rgba(0,0,0,0.08); }
+    .correction-header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+    .correction-header__logo { width: 40px; height: 40px; object-fit: contain; }
+    .correction-header__title { font-size: 1.1rem; font-weight: 700; color: #111; }
+    .correction-intro { font-size: 0.9rem; color: #555; margin-bottom: 20px; padding: 12px; background: #fff9f0; border-radius: 8px; border-left: 3px solid #e67e22; }
+    .field-block { margin-bottom: 18px; }
+    .field-block__label { font-weight: 600; font-size: 0.88rem; color: #333; margin-bottom: 4px; }
+    .field-block__reason { font-size: 0.78rem; color: #888; margin-bottom: 6px; }
+    .field-block__comment { font-size: 0.8rem; color: #e67e22; margin-bottom: 6px; }
+    .field-block input { width: 100%; padding: 10px 12px; border: 1.5px solid #ddd; border-radius: 8px; font-size: 0.9rem; box-sizing: border-box; }
+    .field-block input:focus { outline: none; border-color: #e67e22; }
+    .submit-btn { width: 100%; padding: 14px; background: #e67e22; color: #fff; border: none; border-radius: 10px; font-size: 1rem; font-weight: 700; cursor: pointer; margin-top: 20px; }
+    .submit-btn:hover { background: #d35400; }
+    .footer-note { font-size: 0.75rem; color: #aaa; margin-top: 16px; text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="correction-card">
+    <div class="correction-header">
+      <img src="{% if tengasale_app_icon_url %}{{ tengasale_app_icon_url }}{% else %}{% static 'images/brand/tengasale-logo-icon.png' %}{% endif %}" alt="TS" class="correction-header__logo sales-header-logo">
+      <div class="correction-header__title">Update Your Application</div>
+    </div>
+
+    <div class="correction-intro">
+      <strong>Application {{ app_number }}</strong><br>
+      The following fields need to be updated. Please fill in the correct information below.
+    </div>
+
+    <form method="post">
+      {% csrf_token %}
+      {% for item in editable_fields %}
+        <div class="field-block">
+          <div class="field-block__label">{{ item.label }}</div>
+          <div class="field-block__reason">Reason: {{ item.reason }}</div>
+          {% if item.comment %}
+            <div class="field-block__comment">Note: {{ item.comment }}</div>
+          {% endif %}
+          <input
+            type="text"
+            name="{{ item.field_key }}"
+            value="{{ item.current_value }}"
+            placeholder="Enter correct {{ item.label|lower }}"
+            autocomplete="off"
+          >
+        </div>
+      {% endfor %}
+
+      <button type="submit" class="submit-btn" data-testid="submit-correction">
+        Submit Updates
+      </button>
+    </form>
+
+    <div class="footer-note">
+      This link expires {{ expires_at|date:"d M Y" }}.
+      &copy; TengaSale
+    </div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,80 @@
+{% extends "base/base.html" %}
+{% load static %}
+
+{% block page_title %}Underwriter Performance — TengaSale HQ{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width:1100px;margin:0 auto;padding:24px 16px;">
+
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
+    <a href="{% url 'hq_dashboard' %}" style="color:var(--primary);text-decoration:none;font-size:0.85rem;font-weight:600;">← HQ</a>
+    <div>
+      <h1 style="font-size:1.4rem;font-weight:800;margin:0;">Underwriter Performance</h1>
+      <p style="font-size:0.8rem;color:var(--muted);margin:2px 0 0 0;">Review metrics, approval rates, commissions, and review times per underwriter.</p>
+    </div>
+  </div>
+
+  {% if not stats %}
+  <div class="glass-card" style="padding:32px;text-align:center;color:var(--muted);">
+    No underwriters registered yet.
+  </div>
+  {% else %}
+
+  {% for s in stats %}
+  <div class="glass-card" style="padding:18px;margin-bottom:14px;">
+    <div style="display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap;">
+      <div style="min-width:140px;">
+        <div style="font-size:1rem;font-weight:800;color:var(--ink);">{{ s.user.get_full_name|default:s.user.username }}</div>
+        <div style="font-size:0.72rem;color:var(--muted);">@{{ s.user.username }}</div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px;flex:1;min-width:0;">
+        <div style="text-align:center;">
+          <div style="font-size:1.3rem;font-weight:800;color:#2563eb;">{{ s.reviewed }}</div>
+          <div style="font-size:0.7rem;color:var(--muted);font-weight:600;text-transform:uppercase;">Reviewed</div>
+        </div>
+        <div style="text-align:center;">
+          <div style="font-size:1.3rem;font-weight:800;color:#16a34a;">{{ s.approval_rate }}%</div>
+          <div style="font-size:0.7rem;color:var(--muted);font-weight:600;text-transform:uppercase;">Approval Rate</div>
+        </div>
+        <div style="text-align:center;">
+          <div style="font-size:1.3rem;font-weight:800;color:#dc2626;">{{ s.rejection_rate }}%</div>
+          <div style="font-size:0.7rem;color:var(--muted);font-weight:600;text-transform:uppercase;">Rejection Rate</div>
+        </div>
+        <div style="text-align:center;">
+          <div style="font-size:1.1rem;font-weight:800;color:#16a34a;">{{ s.gross_commission|floatformat:0 }}</div>
+          <div style="font-size:0.7rem;color:var(--muted);font-weight:600;text-transform:uppercase;">Gross Commission</div>
+        </div>
+        <div style="text-align:center;">
+          <div style="font-size:1.1rem;font-weight:800;color:#dc2626;">{{ s.deductions|floatformat:0 }}</div>
+          <div style="font-size:0.7rem;color:var(--muted);font-weight:600;text-transform:uppercase;">Deductions</div>
+        </div>
+        <div style="text-align:center;">
+          <div style="font-size:1.1rem;font-weight:800;">{{ s.net_commission|floatformat:0 }}</div>
+          <div style="font-size:0.7rem;color:var(--muted);font-weight:600;text-transform:uppercase;">Net Commission</div>
+        </div>
+        <div style="text-align:center;">
+          {% if s.avg_review_hours %}
+          <div style="font-size:1.1rem;font-weight:800;color:#7c3aed;">{{ s.avg_review_hours }}h</div>
+          {% else %}
+          <div style="font-size:1.1rem;font-weight:800;color:var(--muted);">—</div>
+          {% endif %}
+          <div style="font-size:0.7rem;color:var(--muted);font-weight:600;text-transform:uppercase;">Avg Review Time</div>
+        </div>
+      </div>
+    </div>
+    {% if s.reviewed %}
+    <div style="margin-top:12px;">
+      <div style="font-size:0.72rem;color:var(--muted);margin-bottom:4px;">Review Distribution</div>
+      <div style="background:#f1f5f9;border-radius:6px;height:6px;overflow:hidden;display:flex;">
+        <div style="background:#16a34a;width:{{ s.approval_rate }}%;transition:width 0.3s;"></div>
+        <div style="background:#dc2626;width:{{ s.rejection_rate }}%;transition:width 0.3s;"></div>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+  {% endfor %}
+
+  {% endif %}
+
+</div>
+{% endblock %}

@@ -1,0 +1,122 @@
+{% extends "base/base.html" %}
+
+{% block page_title %}Underwriter Queue — TengaSale HQ{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width:1050px;margin:0 auto;padding:20px 16px;">
+
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;">
+    <a href="{% url 'hq_dashboard' %}" style="color:var(--primary);text-decoration:none;font-size:0.9rem;">← HQ</a>
+    <div>
+      <h1 style="font-size:1.4rem;font-weight:800;margin:0;">Underwriter Queue</h1>
+      <p style="font-size:0.8rem;color:var(--muted);margin:2px 0 0 0;">Monitor claimed and pending applications in the review queue.</p>
+    </div>
+  </div>
+
+  {# ── Underwriter Performance ── #}
+  {% if uw_stats %}
+  <div class="glass-card" style="padding:16px;margin-bottom:20px;">
+    <h2 style="font-size:0.95rem;font-weight:700;margin-bottom:12px;">Underwriter Activity Today</h2>
+    <div style="overflow-x:auto;">
+      <table style="width:100%;border-collapse:collapse;font-size:0.83rem;">
+        <thead>
+          <tr style="border-bottom:2px solid var(--border);">
+            <th style="padding:8px;text-align:left;">Underwriter</th>
+            <th style="padding:8px;text-align:center;">Active Reviews</th>
+            <th style="padding:8px;text-align:center;">Approved Today</th>
+            <th style="padding:8px;text-align:center;">Rejected Today</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for uw in uw_stats %}
+            <tr style="border-bottom:1px solid var(--border);">
+              <td style="padding:8px;font-weight:600;">{{ uw.user.get_full_name|default:uw.user.username }}</td>
+              <td style="padding:8px;text-align:center;">
+                <span style="background:{% if uw.active > 0 %}#fef3c7{% else %}#f3f4f6{% endif %};padding:2px 8px;border-radius:4px;">
+                  {{ uw.active }}
+                </span>
+              </td>
+              <td style="padding:8px;text-align:center;color:var(--success);">{{ uw.approved_today }}</td>
+              <td style="padding:8px;text-align:center;color:var(--danger);">{{ uw.rejected_today }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
+  {# ── Application Queue ── #}
+  <form method="get" style="display:flex;gap:10px;margin-bottom:16px;align-items:center;flex-wrap:wrap;">
+    <input type="text" name="search" placeholder="App number / customer name…" value="{{ search|default:'' }}"
+           style="padding:8px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:0.85rem;min-width:220px;">
+    <button type="submit" style="background:var(--primary);color:#fff;border:none;padding:8px 16px;border-radius:8px;font-weight:600;cursor:pointer;font-size:0.85rem;">Search</button>
+    <a href="{% url 'hq_underwriter_queue' %}" style="color:var(--muted);font-size:0.85rem;text-decoration:none;">Reset</a>
+  </form>
+
+  <div class="glass-card" style="padding:0;overflow:hidden;">
+    <div style="overflow-x:auto;">
+      <table style="width:100%;border-collapse:collapse;font-size:0.83rem;">
+        <thead>
+          <tr style="background:#fafafa;border-bottom:2px solid var(--border);">
+            <th style="padding:10px 8px;text-align:left;">App #</th>
+            <th style="padding:10px 8px;text-align:left;">Customer</th>
+            <th style="padding:10px 8px;text-align:left;">Merchant</th>
+            <th style="padding:10px 8px;text-align:left;">Underwriter</th>
+            <th style="padding:10px 8px;text-align:left;">Status</th>
+            <th style="padding:10px 8px;text-align:left;">Submitted</th>
+            <th style="padding:10px 8px;text-align:left;">Reviewed At</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for app in apps %}
+            <tr style="border-bottom:1px solid var(--border);" data-testid="app-row">
+              <td style="padding:8px;">
+                <span style="font-weight:600;color:var(--primary);">{{ app.application_number|default:app.id }}</span>
+              </td>
+              <td style="padding:8px;">{{ app.customer_name|default:"Unknown" }}</td>
+              <td style="padding:8px;">
+                {% if app.created_by %}{{ app.created_by.get_full_name|default:app.created_by.username }}{% else %}<span style="color:var(--muted);">Unknown merchant</span>{% endif %}
+              </td>
+              <td style="padding:8px;">
+                {% if app.claimed_by %}
+                  {{ app.claimed_by.get_full_name|default:app.claimed_by.username }}
+                {% else %}
+                  <span style="color:var(--muted);">Unassigned</span>
+                {% endif %}
+              </td>
+              <td style="padding:8px;">
+                <span class="status-badge
+                  {% if app.status == 'approved' %}status-badge--approved
+                  {% elif app.status == 'rejected' %}status-badge--rejected
+                  {% elif app.status == 'under_review' %}status-badge--review
+                  {% else %}status-badge--pending{% endif %}">
+                  {{ app.get_status_display }}
+                </span>
+              </td>
+              <td style="padding:8px;color:var(--muted);font-size:0.78rem;">
+                {% if app.submitted_at %}{{ app.submitted_at|date:"d M Y H:i" }}{% else %}—{% endif %}
+              </td>
+              <td style="padding:8px;color:var(--muted);font-size:0.78rem;">
+                {% if app.reviewed_at %}{{ app.reviewed_at|date:"d M Y H:i" }}{% else %}—{% endif %}
+              </td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="7" style="text-align:center;padding:28px;color:var(--muted);">No applications in queue.</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  {% if apps %}
+    <p style="font-size:0.75rem;color:var(--muted);margin-top:8px;">
+      Showing {{ apps|length }} application{{ apps|length|pluralize }}.
+      Use <a href="{% url 'hq_safe_operations' %}" style="color:var(--primary);">Safe Operations</a> to reassign or release claims.
+    </p>
+  {% endif %}
+
+</div>
+{% endblock %}

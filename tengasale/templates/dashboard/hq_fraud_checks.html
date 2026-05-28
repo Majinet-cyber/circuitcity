@@ -1,0 +1,187 @@
+{% extends "base/base.html" %}
+{% load static %}
+
+{% block page_title %}Fraud Checks — TengaSale HQ{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width:1100px;margin:0 auto;padding:24px 16px;">
+
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
+    <a href="{% url 'hq_dashboard' %}" style="color:var(--primary);text-decoration:none;font-size:0.85rem;font-weight:600;">← HQ</a>
+    <div>
+      <h1 style="font-size:1.4rem;font-weight:800;margin:0;">Fraud Checks</h1>
+      <p style="font-size:0.8rem;color:var(--muted);margin:2px 0 0 0;">Duplicate detection, risk flags, and fraud investigation tools.</p>
+    </div>
+  </div>
+
+  {% if msg %}
+  <div class="alert alert-{% if msg_type == 'success' %}success{% elif msg_type == 'error' %}danger{% elif msg_type == 'warning' %}warning{% else %}info{% endif %} mb-3" role="alert">
+    {{ msg }}
+  </div>
+  {% endif %}
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">
+
+    <div class="glass-card" style="padding:16px;">
+      <h2 style="font-size:0.88rem;font-weight:800;margin-bottom:12px;color:#dc2626;">Duplicate National IDs</h2>
+      {% if dup_ids %}
+      <table style="width:100%;border-collapse:collapse;font-size:0.82rem;">
+        <thead><tr style="border-bottom:2px solid var(--border);">
+          <th style="text-align:left;padding:6px;">National ID</th>
+          <th style="text-align:right;padding:6px;">Count</th>
+        </tr></thead>
+        <tbody>
+          {% for item in dup_ids %}
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:6px;font-weight:700;font-family:monospace;">{{ item.national_id }}</td>
+            <td style="padding:6px;text-align:right;">
+              <span style="background:#fef2f2;color:#dc2626;padding:2px 8px;border-radius:99px;font-size:0.72rem;font-weight:700;">{{ item.cnt }} apps</span>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p style="color:var(--muted);font-size:0.82rem;text-align:center;padding:16px 0;">No duplicate national IDs found.</p>
+      {% endif %}
+    </div>
+
+    <div class="glass-card" style="padding:16px;">
+      <h2 style="font-size:0.88rem;font-weight:800;margin-bottom:12px;color:#d97706;">Duplicate Phone Numbers</h2>
+      {% if dup_phones %}
+      <table style="width:100%;border-collapse:collapse;font-size:0.82rem;">
+        <thead><tr style="border-bottom:2px solid var(--border);">
+          <th style="text-align:left;padding:6px;">Phone</th>
+          <th style="text-align:right;padding:6px;">Count</th>
+        </tr></thead>
+        <tbody>
+          {% for item in dup_phones %}
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:6px;font-weight:700;font-family:monospace;">{{ item.customer_phone }}</td>
+            <td style="padding:6px;text-align:right;">
+              <span style="background:#fffbeb;color:#d97706;padding:2px 8px;border-radius:99px;font-size:0.72rem;font-weight:700;">{{ item.cnt }} apps</span>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p style="color:var(--muted);font-size:0.82rem;text-align:center;padding:16px 0;">No duplicate phones found.</p>
+      {% endif %}
+    </div>
+
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">
+
+    <div class="glass-card" style="padding:16px;">
+      <h2 style="font-size:0.88rem;font-weight:800;margin-bottom:12px;color:#2563eb;">Repeated Guarantor Phones</h2>
+      {% if dup_guarantors %}
+      <table style="width:100%;border-collapse:collapse;font-size:0.82rem;">
+        <thead><tr style="border-bottom:2px solid var(--border);">
+          <th style="text-align:left;padding:6px;">Guarantor Phone</th>
+          <th style="text-align:right;padding:6px;">Used</th>
+        </tr></thead>
+        <tbody>
+          {% for item in dup_guarantors %}
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:6px;font-family:monospace;">{{ item.next_of_kin_1_phone }}</td>
+            <td style="padding:6px;text-align:right;font-weight:700;">{{ item.cnt }}x</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p style="color:var(--muted);font-size:0.82rem;text-align:center;padding:16px 0;">No repeated guarantors found.</p>
+      {% endif %}
+    </div>
+
+    <div class="glass-card" style="padding:16px;">
+      <h2 style="font-size:0.88rem;font-weight:800;margin-bottom:12px;color:#7c3aed;">Duplicate IMEI Numbers</h2>
+      {% if dup_imei %}
+      <table style="width:100%;border-collapse:collapse;font-size:0.82rem;">
+        <thead><tr style="border-bottom:2px solid var(--border);">
+          <th style="text-align:left;padding:6px;">IMEI</th>
+          <th style="text-align:right;padding:6px;">Count</th>
+        </tr></thead>
+        <tbody>
+          {% for item in dup_imei %}
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:6px;font-family:monospace;font-size:0.78rem;">{{ item.imei_number }}</td>
+            <td style="padding:6px;text-align:right;font-weight:700;">{{ item.cnt }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p style="color:var(--muted);font-size:0.82rem;text-align:center;padding:16px 0;">No duplicate IMEIs found.</p>
+      {% endif %}
+    </div>
+
+  </div>
+
+  {% if third_party_flags %}
+  <div class="glass-card" style="padding:16px;margin-bottom:20px;">
+    <h2 style="font-size:0.88rem;font-weight:800;margin-bottom:12px;color:#d97706;">Third-Party Phone User Risk Flags</h2>
+    <table style="width:100%;border-collapse:collapse;font-size:0.82rem;">
+      <thead><tr style="border-bottom:2px solid var(--border);">
+        <th style="text-align:left;padding:6px;">Application</th>
+        <th style="text-align:left;padding:6px;">Customer</th>
+        <th style="text-align:left;padding:6px;">Merchant</th>
+        <th style="text-align:center;padding:6px;">Status</th>
+        <th style="text-align:center;padding:6px;">Action</th>
+      </tr></thead>
+      <tbody>
+        {% for app in third_party_flags %}
+        <tr style="border-bottom:1px solid var(--border);">
+          <td style="padding:6px;font-weight:600;">{{ app.application_number }}</td>
+          <td style="padding:6px;">{{ app.customer_name }}</td>
+          <td style="padding:6px;">{% if app.created_by %}{{ app.created_by.get_full_name|default:app.created_by.username }}{% else %}—{% endif %}</td>
+          <td style="padding:6px;text-align:center;">
+            <span class="status-badge status-badge--pending">{{ app.status }}</span>
+          </td>
+          <td style="padding:6px;text-align:center;">
+            <form method="post" style="display:inline-flex;gap:4px;">
+              {% csrf_token %}
+              <input type="hidden" name="app_id" value="{{ app.pk }}">
+              <button name="action" value="mark_cleared" class="btn btn-xs btn-outline-success" style="font-size:0.72rem;padding:2px 8px;">Clear</button>
+              <button name="action" value="mark_blocked" class="btn btn-xs btn-outline-danger" style="font-size:0.72rem;padding:2px 8px;">Block</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
+  {% if fraud_marked %}
+  <div class="glass-card" style="padding:16px;">
+    <h2 style="font-size:0.88rem;font-weight:800;margin-bottom:12px;">Fraud-Marked Applications</h2>
+    <table style="width:100%;border-collapse:collapse;font-size:0.82rem;">
+      <thead><tr style="border-bottom:2px solid var(--border);">
+        <th style="text-align:left;padding:6px;">Application</th>
+        <th style="text-align:left;padding:6px;">Customer</th>
+        <th style="text-align:left;padding:6px;">Note</th>
+        <th style="text-align:center;padding:6px;">Status</th>
+      </tr></thead>
+      <tbody>
+        {% for app in fraud_marked %}
+        <tr style="border-bottom:1px solid var(--border);">
+          <td style="padding:6px;font-weight:600;">{{ app.application_number }}</td>
+          <td style="padding:6px;">{{ app.customer_name }}</td>
+          <td style="padding:6px;font-size:0.75rem;color:var(--muted);">{{ app.manager_comment|truncatechars:60 }}</td>
+          <td style="padding:6px;text-align:center;">
+            <span class="status-badge {% if 'BLOCKED' in app.manager_comment %}status-badge--rejected{% else %}status-badge--approved{% endif %}">
+              {% if 'BLOCKED' in app.manager_comment %}Blocked{% else %}Cleared{% endif %}
+            </span>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}

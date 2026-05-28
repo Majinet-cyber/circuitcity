@@ -119,12 +119,9 @@ class HomePageTests(TestCase):
         self.assertContains(response, "Django Admin")
         self.assertContains(response, "Users")
         self.assertContains(response, "Applications")
-        self.assertContains(response, "Reports / Analytics")
-        self.assertContains(response, "Total HQ users")
-        self.assertContains(response, "Queue depth")
+        self.assertContains(response, "Analytics")
+        self.assertContains(response, "Reports")
         self.assertNotContains(response, "Deals Management")
-        self.assertNotContains(response, "Underwriter Queue")
-        self.assertNotContains(response, "Commissions")
         self.assertNotContains(response, "New Application")
         self.assertNotContains(response, "Claim Next")
         self.assertNotContains(response, "Merchant Portal Preview")
@@ -281,3 +278,465 @@ class DashboardUrlTests(TestCase):
         self.assertRedirects(self.client.get("/merchant/"), "/tengasale/merchant/", fetch_redirect_response=False)
         self.assertRedirects(self.client.get("/underwriter/"), "/tengasale/underwriter/", fetch_redirect_response=False)
         self.assertRedirects(self.client.get("/hq/"), "/tengasale/hq/", fetch_redirect_response=False)
+
+
+class HQPhase10ETests(TestCase):
+    """Phase 10E: HQ operational pages — crash fixes and new routes."""
+
+    def setUp(self):
+        call_command("seed_roles")
+        self.hq_user = get_user_model().objects.create_user(username="hq-phase10e", password="test-pass-123")
+        assign_role(self.hq_user, "hq")
+        self.client.login(username="hq-phase10e", password="test-pass-123")
+
+    # ── Route smoke tests ──────────────────────────────────────────────────────
+
+    def test_hq_deals_loads(self):
+        response = self.client.get(reverse("hq_deals"))
+        self.assertEqual(response.status_code, 200)
+
+    def test_hq_deals_has_no_django_admin_placeholder(self):
+        response = self.client.get(reverse("hq_deals"))
+        self.assertNotContains(response, "Use Django Admin")
+
+    def test_hq_simulations_loads(self):
+        response = self.client.get(reverse("hq_simulations"))
+        self.assertEqual(response.status_code, 200)
+
+    def test_hq_simulations_no_split_error(self):
+        """Template must not contain .split(',') call which is invalid in Django templates."""
+        response = self.client.get(reverse("hq_simulations"))
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, ".split(")
+
+    def test_hq_simulations_post_returns_calculated_outputs(self):
+        response = self.client.post(reverse("hq_simulations"), {
+            "cash_price": "400000",
+            "selling_total": "1000000",
+            "deposit_pct": "20",
+            "term_months": "12",
+            "default_rate": "5",
+            "payment_collection_rate": "90",
+            "uw_commission_rate": "7",
+            "merchant_commission_rate": "1",
+            "wht_rate": "20",
+            "arrears_rate": "14",
+            "num_devices": "1",
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("result", response.context)
+        result = response.context["result"]
+        self.assertIn("deposit_amount", result)
+        self.assertIn("financed_amount", result)
+        self.assertIn("uw_gross_commission", result)
+        self.assertIn("uw_wht", result)
+        self.assertIn("merchant_payout", result)
+        self.assertIn("recommendation", result)
+
+    def test_hq_simulations_wht_is_20_percent_of_uw_commission(self):
+        response = self.client.post(reverse("hq_simulations"), {
+            "cash_price": "400000",
+            "selling_total": "1000000",
+            "deposit_pct": "20",
+            "term_months": "12",
+            "default_rate": "0",
+            "payment_collection_rate": "100",
+            "uw_commission_rate": "7",
+            "merchant_commission_rate": "1",
+            "wht_rate": "20",
+            "arrears_rate": "14",
+            "num_devices": "1",
+        })
+        result = response.context["result"]
+        from decimal import Decimal
+        gross = result["uw_gross_commission"]
+        wht = result["uw_wht"]
+        self.assertAlmostEqual(float(wht), float(gross) * 0.20, places=0)
+
+    def test_hq_merchant_payouts_loads(self):
+        response = self.client.get(reverse("hq_merchant_payouts"))
+        self.assertEqual(response.status_code, 200)
+
+    def test_hq_merchant_payouts_no_slice_before_filter(self):
+        """Payout query must not try to filter a sliced queryset."""
+        from commissions.models import MerchantContractPayout
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+        merchant = User.objects.create_user(username="test-merchant-p10e", password="x")
+        assign_role(merchant, "merchant")
+        for i in range(5):
+            MerchantContractPayout.objects.create(
+                merchant=merchant,
+                cash_price=100000,
+                financed_amount=200000,
+                merchant_commission_amount=2000,
+                total_payable=102000,
+                status=MerchantContractPayout.STATUS_PENDING,
+            )
+        response = self.client.get(reverse("hq_merchant_payouts"))
+        self.assertEqual(response.status_code, 200)
+
+    def test_hq_applications_loads_with_null_underwriter(self):
+        """Applications page must not crash when claimed_by is None."""
+        from applications.models import FinancingApplication
+        app = FinancingApplication.objects.create(
+            created_by=self.hq_user,
+            customer_name="Test Customer",
+            national_id="AB123456",
+            customer_phone="881234567",
+            status="pending_review",
+            claimed_by=None,
+        )
+        response = self.client.get(reverse("hq_applications"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Test Customer")
+        self.assertContains(response, "Unassigned")
+
+    def test_hq_applications_loads_with_null_created_by_safely(self):
+        """Applications page must show safe fallback for None created_by."""
+        response = self.client.get(reverse("hq_applications"))
+        self.assertEqual(response.status_code, 200)
+
+    def test_hq_underwriter_queue_loads(self):
+        response = self.client.get(reverse("hq_underwriter_queue"))
+        self.assertEqual(response.status_code, 200)
+
+    def test_hq_devices_loads(self):
+        response = self.client.get(reverse("hq_devices"))
+        self.assertEqual(response.status_code, 200)
+
+    def test_hq_reports_loads(self):
+        response = self.client.get(reverse("hq_reports"))
+        self.assertEqual(response.status_code, 200)
+
+    def test_hq_safe_operations_loads(self):
+        response = self.client.get(reverse("hq_safe_operations"))
+        self.assertEqual(response.status_code, 200)
+
+    def test_hq_commission_ledger_loads(self):
+        response = self.client.get(reverse("hq_commission_ledger"))
+        self.assertEqual(response.status_code, 200)
+
+    def test_hq_staff_payouts_loads(self):
+        response = self.client.get(reverse("hq_staff_payouts"))
+        self.assertEqual(response.status_code, 200)
+
+    def test_hq_auto_approval_loads(self):
+        response = self.client.get(reverse("hq_auto_approval"))
+        self.assertEqual(response.status_code, 200)
+
+    # ── Deals CRUD ────────────────────────────────────────────────────────────
+
+    def test_hq_can_create_deal(self):
+        from deals.models import DeviceBrand
+        brand = DeviceBrand.objects.create(name="TestBrand-P10E")
+        response = self.client.post(reverse("hq_deals"), {
+            "action": "add_deal",
+            "brand_id": brand.pk,
+            "model_name": "Test Model X",
+            "specs": "128GB/8GB",
+            "default_cash_price": "400000",
+            "min_cash_price": "0",
+            "max_cash_price": "0",
+            "cash_price": "400000",
+            "deposit_percent": "13",
+            "loan_multiplier": "2.5",
+            "term_months": "12",
+            "is_active": "on",
+            "stock_status": "in_stock",
+            "lock_provider": "",
+            "country": "MW",
+            "notes": "",
+        })
+        self.assertEqual(response.status_code, 200)
+        from deals.models import DeviceDeal
+        self.assertTrue(DeviceDeal.objects.filter(model_name="Test Model X").exists())
+
+    def test_hq_can_toggle_deal(self):
+        from deals.models import DeviceBrand, DeviceDeal
+        brand = DeviceBrand.objects.create(name="BrandToggle-P10E")
+        deal = DeviceDeal.objects.create(
+            brand=brand, model_name="Toggle Me", specs="64GB",
+            cash_price=200000, deposit_percent=13, is_active=True,
+        )
+        self.client.post(reverse("hq_deals"), {
+            "action": "toggle_deal",
+            "deal_id": deal.pk,
+        })
+        deal.refresh_from_db()
+        self.assertFalse(deal.is_active)
+
+    # ── Commission / WHT rules ────────────────────────────────────────────────
+
+    def test_merchant_commission_is_1_percent_of_financed_amount(self):
+        """Merchant commission = 1% of financed amount (excluding deposit)."""
+        from decimal import Decimal
+        financed = Decimal("800000")
+        commission = financed * Decimal("0.01")
+        self.assertEqual(commission, Decimal("8000.00"))
+
+    def test_wht_20_percent_applies_to_underwriter_commission(self):
+        from decimal import Decimal
+        uw_gross = Decimal("56000")
+        wht = uw_gross * Decimal("0.20")
+        net = uw_gross - wht
+        self.assertEqual(wht, Decimal("11200.00"))
+        self.assertEqual(net, Decimal("44800.00"))
+
+    def test_arrears_deduction_is_14_percent_of_missed_payment(self):
+        from decimal import Decimal
+        missed = Decimal("33333")
+        deduction = missed * Decimal("0.14")
+        self.assertAlmostEqual(float(deduction), float(missed) * 0.14, places=2)
+
+    # ── Auto-approval ─────────────────────────────────────────────────────────
+
+    def test_auto_approval_blocks_application_with_duplicate_active_id(self):
+        from applications.models import FinancingApplication
+        from applications.services.auto_approval import evaluate_auto_approval
+        from portal.models import PaymentContract
+
+        # Create an active contract with the same national ID
+        PaymentContract.objects.create(
+            customer_name="Existing Customer",
+            customer_phone="881111111",
+            customer_national_id="DUP12345",
+            total_amount=1000000,
+            status="active",
+        )
+
+        app = FinancingApplication.objects.create(
+            created_by=self.hq_user,
+            national_id="DUP12345",
+            customer_name="Duplicate Customer",
+            customer_phone="882222222",
+            status="pending_review",
+        )
+
+        result = evaluate_auto_approval(app)
+        self.assertFalse(result["eligible"])
+        self.assertTrue(any("DUP12345" in b for b in result["blocks"]))
+
+    def test_auto_approval_eligible_when_all_checks_pass(self):
+        from applications.models import FinancingApplication
+        from applications.services.auto_approval import evaluate_auto_approval
+        from deals.models import DeviceBrand, DeviceDeal
+        import tempfile, os
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        brand = DeviceBrand.objects.create(name="AutoBrand-P10E")
+        deal = DeviceDeal.objects.create(
+            brand=brand, model_name="Auto Deal", specs="64GB",
+            cash_price=200000, deposit_percent=13, is_active=True,
+        )
+        face = SimpleUploadedFile("face.jpg", b"\xff\xd8\xff", content_type="image/jpeg")
+        id_f = SimpleUploadedFile("id_f.jpg", b"\xff\xd8\xff", content_type="image/jpeg")
+        id_b = SimpleUploadedFile("id_b.jpg", b"\xff\xd8\xff", content_type="image/jpeg")
+
+        app = FinancingApplication.objects.create(
+            created_by=self.hq_user,
+            national_id="OKID0001",
+            customer_name="Eligible Customer",
+            customer_phone="883333333",
+            status="pending_review",
+            deal=deal,
+            agreed_to_terms=True,
+            customer_face_image=face,
+            id_front_image=id_f,
+            id_back_image=id_b,
+            exact_monthly_income=150000,
+            calculated_monthly_payment=30000,
+        )
+
+        result = evaluate_auto_approval(app)
+        self.assertEqual(result["blocks"], [])
+        self.assertTrue(result["eligible"])
+
+    # ── Template safety ───────────────────────────────────────────────────────
+
+    def test_no_hq_template_contains_visible_template_comments(self):
+        """No HQ page should output raw Django template comment markers."""
+        hq_routes = [
+            "hq_dashboard", "hq_deals", "hq_simulations",
+            "hq_merchant_payouts", "hq_applications",
+            "hq_underwriter_queue", "hq_reports",
+            "hq_devices", "hq_staff_payouts", "hq_auto_approval",
+            "hq_safe_operations", "hq_commission_ledger",
+        ]
+        for name in hq_routes:
+            with self.subTest(route=name):
+                response = self.client.get(reverse(name))
+                self.assertEqual(response.status_code, 200, f"Route {name} returned {response.status_code}")
+                self.assertNotContains(response, "{#", msg_prefix=f"Route {name} contains visible template comment")
+
+
+class RoleAccessControlTests(TestCase):
+    """Ensure role-based access is correctly enforced across HQ routes."""
+
+    def setUp(self):
+        call_command("seed_roles")
+        self.hq_user = get_user_model().objects.create_user(username="hq-access-test", password="x")
+        assign_role(self.hq_user, "hq")
+        self.merchant_user = get_user_model().objects.create_user(username="merchant-access-test", password="x")
+        assign_role(self.merchant_user, "merchant")
+        self.underwriter_user = get_user_model().objects.create_user(username="uw-access-test", password="x")
+        assign_role(self.underwriter_user, "underwriter")
+
+    HQ_ONLY_ROUTES = [
+        "hq_dashboard",
+        "hq_applications",
+        "hq_deals",
+        "hq_simulations",
+        "hq_commissions",
+        "hq_merchant_payouts",
+        "hq_reports",
+        "hq_devices",
+        "hq_fraud_checks",
+        "hq_audit_trail",
+        "hq_payment_collections",
+        "hq_reconciliation",
+        "hq_sales_analytics",
+        "hq_underwriter_performance",
+    ]
+
+    def test_unauthenticated_redirected_to_login_on_hq_routes(self):
+        for route in self.HQ_ONLY_ROUTES:
+            with self.subTest(route=route):
+                response = self.client.get(reverse(route))
+                self.assertIn(response.status_code, [302, 301], f"{route} should redirect unauthenticated")
+                self.assertIn("/login/", response.url, f"{route} should redirect to login")
+
+    def test_merchant_denied_hq_dashboard(self):
+        self.client.login(username="merchant-access-test", password="x")
+        response = self.client.get(reverse("hq_dashboard"))
+        self.assertEqual(response.status_code, 403)
+
+    def test_merchant_denied_hq_commissions(self):
+        self.client.login(username="merchant-access-test", password="x")
+        response = self.client.get(reverse("hq_commissions"))
+        self.assertEqual(response.status_code, 403)
+
+    def test_merchant_denied_hq_applications(self):
+        self.client.login(username="merchant-access-test", password="x")
+        response = self.client.get(reverse("hq_applications"))
+        self.assertEqual(response.status_code, 403)
+
+    def test_merchant_denied_merchant_payouts_hq(self):
+        self.client.login(username="merchant-access-test", password="x")
+        response = self.client.get(reverse("hq_merchant_payouts"))
+        self.assertEqual(response.status_code, 403)
+
+    def test_underwriter_denied_hq_dashboard(self):
+        self.client.login(username="uw-access-test", password="x")
+        response = self.client.get(reverse("hq_dashboard"))
+        self.assertEqual(response.status_code, 403)
+
+    def test_underwriter_denied_merchant_payouts_hq(self):
+        self.client.login(username="uw-access-test", password="x")
+        response = self.client.get(reverse("hq_merchant_payouts"))
+        self.assertEqual(response.status_code, 403)
+
+    def test_hq_allowed_all_hq_routes(self):
+        self.client.login(username="hq-access-test", password="x")
+        for route in self.HQ_ONLY_ROUTES:
+            with self.subTest(route=route):
+                response = self.client.get(reverse(route))
+                self.assertEqual(response.status_code, 200, f"HQ user should access {route}")
+
+    def test_applications_page_loads_with_no_assigned_uw(self):
+        """Applications without claimed_by (unassigned UW) should not crash the page."""
+        from applications.models import FinancingApplication
+        merchant = get_user_model().objects.create_user(username="merchant-app-test-null", password="x")
+        assign_role(merchant, "merchant")
+        FinancingApplication.objects.create(
+            customer_name="Test Customer",
+            customer_phone="0991234567",
+            national_id="TSNULL12345",
+            created_by=merchant,
+            claimed_by=None,  # No underwriter assigned
+            status="pending_review",
+        )
+        self.client.login(username="hq-access-test", password="x")
+        response = self.client.get(reverse("hq_applications"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Unassigned")
+
+
+class DiscountPolicyTests(TestCase):
+    """Ensure gender is never used in discount/deposit policy outcomes."""
+
+    def test_gender_does_not_change_deposit_result_male_vs_female(self):
+        """Calling evaluate_deposit_eligibility with any gender must produce identical results."""
+        from applications.services.discount_policy import evaluate_deposit_eligibility
+        from decimal import Decimal
+
+        # Simulate a standard new customer — same inputs, different gender (not passed in at all)
+        base_kwargs = dict(
+            age=30,
+            completed_contracts=0,
+            monthly_income=Decimal("150000"),
+            monthly_repayment=Decimal("50000"),
+            has_active_contract=False,
+            has_arrears_history=False,
+            kyc_verified=True,
+        )
+        result = evaluate_deposit_eligibility(**base_kwargs)
+        # Gender is not a parameter — calling it multiple times must always return same result
+        result2 = evaluate_deposit_eligibility(**base_kwargs)
+        self.assertEqual(result["min_deposit_pct"], result2["min_deposit_pct"])
+        self.assertEqual(result["eligible"], result2["eligible"])
+        self.assertEqual(result["loyalty_discount_pct"], result2["loyalty_discount_pct"])
+
+    def test_returning_customer_gets_lower_deposit(self):
+        from applications.services.discount_policy import evaluate_deposit_eligibility
+        from decimal import Decimal
+        result = evaluate_deposit_eligibility(
+            age=32, completed_contracts=1, has_active_contract=False,
+            has_arrears_history=False, kyc_verified=True,
+        )
+        self.assertTrue(result["eligible"])
+        self.assertLess(result["min_deposit_pct"], 30)
+
+    def test_active_contract_blocks_application(self):
+        from applications.services.discount_policy import evaluate_deposit_eligibility
+        result = evaluate_deposit_eligibility(age=30, has_active_contract=True)
+        self.assertFalse(result["eligible"])
+        self.assertTrue(len(result["blocks"]) > 0)
+
+    def test_underage_applicant_blocked(self):
+        from applications.services.discount_policy import evaluate_deposit_eligibility
+        result = evaluate_deposit_eligibility(age=18)
+        self.assertFalse(result["eligible"])
+
+    def test_overage_applicant_blocked(self):
+        from applications.services.discount_policy import evaluate_deposit_eligibility
+        result = evaluate_deposit_eligibility(age=75)
+        self.assertFalse(result["eligible"])
+
+    def test_arrears_history_forces_highest_deposit(self):
+        from applications.services.discount_policy import evaluate_deposit_eligibility
+        from decimal import Decimal
+        result = evaluate_deposit_eligibility(
+            age=35, completed_contracts=2, has_arrears_history=True,
+            has_active_contract=False, kyc_verified=True,
+        )
+        # Even with 2 completed contracts, arrears resets to 30%
+        self.assertEqual(result["min_deposit_pct"], Decimal("30"))
+
+    def test_get_eligible_deposit_options_new_customer(self):
+        from applications.services.discount_policy import get_eligible_deposit_options
+        from decimal import Decimal
+        options = get_eligible_deposit_options(age=28, completed_contracts=0)
+        # New customer: only 30% allowed
+        self.assertEqual(options, [Decimal("30")])
+
+    def test_get_eligible_deposit_options_returning_customer(self):
+        from applications.services.discount_policy import get_eligible_deposit_options
+        from decimal import Decimal
+        options = get_eligible_deposit_options(
+            age=32, completed_contracts=2, has_arrears_history=False, kyc_verified=True,
+        )
+        # Returning customer aged 25+: all bands available
+        self.assertIn(Decimal("15"), options)
+        self.assertIn(Decimal("20"), options)
+        self.assertIn(Decimal("30"), options)

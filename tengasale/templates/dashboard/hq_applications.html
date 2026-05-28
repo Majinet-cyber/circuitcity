@@ -1,40 +1,196 @@
 {% extends "base/base.html" %}
+{% load static %}
 
-{% block page_title %}{{ title|default:"Applications" }}{% endblock %}
+{% block page_title %}Applications — TengaSale HQ{% endblock %}
+
+{% block extra_head %}
+<style>
+.app-wrap { max-width:1200px; margin:0 auto; padding:24px 16px; overflow-x:hidden; box-sizing:border-box; }
+.app-hdr { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:20px; }
+.app-title { font-size:1.35rem; font-weight:900; margin:0; letter-spacing:-0.01em; }
+.app-sub { font-size:0.78rem; color:#64748b; margin:2px 0 0; }
+
+.app-kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:10px; margin-bottom:20px; }
+.app-kpi { background:#fff; border:1.5px solid #e2e8f0; border-radius:12px; padding:12px 14px; }
+.app-kpi-val { font-size:1.4rem; font-weight:800; line-height:1; }
+.app-kpi-lbl { font-size:0.7rem; color:#64748b; font-weight:600; text-transform:uppercase; letter-spacing:.06em; margin-top:4px; }
+
+.app-filter { background:#fff; border:1.5px solid #e2e8f0; border-radius:12px; padding:14px 16px; margin-bottom:16px; display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; }
+.app-filter input, .app-filter select {
+  padding:7px 10px; border:1.5px solid #e2e8f0; border-radius:8px; font-size:0.82rem; color:#0f172a;
+  min-width:120px; background:#fff;
+}
+.app-filter input:focus, .app-filter select:focus { outline:none; border-color:#ff6b1a; }
+.app-filter-btn { background:#ff6b1a; color:#fff; border:none; padding:8px 16px; border-radius:8px; font-weight:700; cursor:pointer; font-size:0.82rem; }
+.app-filter-reset { color:#64748b; font-size:0.82rem; text-decoration:none; align-self:center; }
+
+.app-table-wrap { background:#fff; border:1.5px solid #e2e8f0; border-radius:14px; overflow:hidden; }
+.app-table-scroll { overflow-x:auto; }
+table.app-table { width:100%; border-collapse:collapse; font-size:0.82rem; }
+.app-table thead tr { background:#fafafa; border-bottom:2px solid #e2e8f0; }
+.app-table th { padding:10px 10px; text-align:left; font-size:0.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:#64748b; white-space:nowrap; }
+.app-table tbody tr { border-bottom:1px solid #f1f5f9; transition:background .12s; }
+.app-table tbody tr:hover { background:#fffbf8; }
+.app-table td { padding:9px 10px; vertical-align:middle; }
+
+.s-badge { display:inline-block; padding:2px 8px; border-radius:99px; font-size:0.68rem; font-weight:700; letter-spacing:.04em; }
+.s-approved { background:#dcfce7; color:#15803d; }
+.s-rejected { background:#fee2e2; color:#b91c1c; }
+.s-review   { background:#fef3c7; color:#92400e; }
+.s-pending  { background:#f1f5f9; color:#475569; }
+.s-contract { background:#ede9fe; color:#6d28d9; }
+
+.app-count { font-size:0.75rem; color:#64748b; margin-top:8px; }
+</style>
+{% endblock %}
 
 {% block content %}
+<div class="app-wrap">
 
-<a href="{% url 'hq_dashboard' %}" class="soft-back">
-    <span class="soft-back-icon">&larr;</span>
-    <span>BACK</span>
-</a>
+  <div class="app-hdr">
+    <div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;">
+        <a href="{% url 'hq_dashboard' %}" style="color:#ff6b1a;text-decoration:none;font-size:0.82rem;font-weight:600;">← HQ</a>
+      </div>
+      <h1 class="app-title">Applications</h1>
+      <p class="app-sub">All financing applications across the platform.</p>
+    </div>
+    <a href="{% url 'hq_audit_trail' %}" style="font-size:0.78rem;color:#64748b;text-decoration:none;padding:8px 14px;border:1.5px solid #e2e8f0;border-radius:8px;">Audit Trail</a>
+  </div>
 
-<h1 class="greeting">{{ title|default:"Applications" }}</h1>
+  {% if msg %}
+  <div style="padding:10px 14px;border-radius:8px;margin-bottom:14px;font-size:0.85rem;font-weight:600;
+    background:{% if msg_type == 'success' %}#dcfce7{% elif msg_type == 'error' %}#fee2e2{% else %}#fef3c7{% endif %};
+    color:{% if msg_type == 'success' %}#15803d{% elif msg_type == 'error' %}#b91c1c{% else %}#92400e{% endif %};">
+    {{ msg }}
+  </div>
+  {% endif %}
 
-{% if subtitle %}
-    <section class="card instruction-card">
-        <p>{{ subtitle }}</p>
-    </section>
-{% endif %}
+  {# ── Filters ── #}
+  <form method="get" class="app-filter">
+    <div>
+      <label style="font-size:0.7rem;font-weight:700;color:#64748b;display:block;margin-bottom:3px;">Search</label>
+      <input type="text" name="search" placeholder="Name / ID / Phone / Ref" value="{{ search|default:'' }}" style="min-width:180px;">
+    </div>
+    <div>
+      <label style="font-size:0.7rem;font-weight:700;color:#64748b;display:block;margin-bottom:3px;">Status</label>
+      <select name="status">
+        <option value="">All Statuses</option>
+        <option value="pending_review" {% if status_filter == 'pending_review' %}selected{% endif %}>Pending Review</option>
+        <option value="under_review" {% if status_filter == 'under_review' %}selected{% endif %}>Under Review</option>
+        <option value="approved" {% if status_filter == 'approved' %}selected{% endif %}>Approved</option>
+        <option value="rejected" {% if status_filter == 'rejected' %}selected{% endif %}>Rejected</option>
+        <option value="contract_complete" {% if status_filter == 'contract_complete' %}selected{% endif %}>Contract Complete</option>
+        <option value="submitted" {% if status_filter == 'submitted' %}selected{% endif %}>Submitted</option>
+        <option value="resubmitted" {% if status_filter == 'resubmitted' %}selected{% endif %}>Resubmitted</option>
+      </select>
+    </div>
+    <div>
+      <label style="font-size:0.7rem;font-weight:700;color:#64748b;display:block;margin-bottom:3px;">Merchant</label>
+      <input type="text" name="merchant" placeholder="Merchant name / username" value="{{ merchant_filter|default:'' }}" style="min-width:160px;">
+    </div>
+    <div>
+      <label style="font-size:0.7rem;font-weight:700;color:#64748b;display:block;margin-bottom:3px;">Risk</label>
+      <select name="dup_risk">
+        <option value="">All</option>
+        <option value="1" {% if dup_filter == '1' %}selected{% endif %}>Third-party risk flagged</option>
+      </select>
+    </div>
+    <button type="submit" class="app-filter-btn">Filter</button>
+    <a href="{% url 'hq_applications' %}" class="app-filter-reset">Reset</a>
+  </form>
 
-<div class="application-list">
-    {% for app in apps %}
-        <div class="application-card">
-            <div class="application-card-main">
-                <div class="application-card-header">
-                    <h3>{{ app.customer_name|default:"Unnamed Customer" }}</h3>
-                    <span class="status-pill status-{{ app.merchant_status_key }}">{{ app.merchant_status_label }}</span>
-                </div>
-                <div class="application-meta">
-                    <span>App: {{ app.application_number|default:app.id }}</span>
-                    <span>Merchant: {{ app.created_by.get_full_name|default:app.created_by.username }}</span>
-                    <span>Underwriter: {{ app.claimed_by.get_full_name|default:app.claimed_by.username|default:"Unassigned" }}</span>
-                </div>
-            </div>
-        </div>
-    {% empty %}
-        <div class="card">No applications found.</div>
-    {% endfor %}
+  <div class="app-table-wrap">
+    <div class="app-table-scroll">
+      <table class="app-table">
+        <thead>
+          <tr>
+            <th>App #</th>
+            <th>Customer</th>
+            <th>Phone</th>
+            <th>Merchant</th>
+            <th>Underwriter</th>
+            <th>Deal</th>
+            <th>Deposit</th>
+            <th>Status</th>
+            <th>Submitted</th>
+            {% if show_actions %}<th style="text-align:center;">Actions</th>{% endif %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for app in apps %}
+          <tr data-testid="app-row">
+            <td>
+              <span style="font-weight:700;font-size:0.78rem;color:#ff6b1a;">{{ app.application_number|default:app.id }}</span>
+            </td>
+            <td>
+              <div style="font-weight:600;">{{ app.customer_name|default:"Unknown" }}</div>
+              {% if app.national_id %}
+              <div style="font-size:0.72rem;color:#94a3b8;">ID: {{ app.national_id|slice:":4" }}••••••</div>
+              {% endif %}
+            </td>
+            <td style="color:#64748b;">
+              {% if app.customer_phone %}
+                {{ app.customer_phone|slice:":4" }}•••{{ app.customer_phone|slice:"-3:" }}
+              {% else %}—{% endif %}
+            </td>
+            <td>
+              {% if app.created_by %}
+                <div>{{ app.created_by.get_full_name|default:app.created_by.username }}</div>
+              {% else %}
+                <span style="color:#94a3b8;">No merchant</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if app.claimed_by %}
+                <div>{{ app.claimed_by.get_full_name|default:app.claimed_by.username }}</div>
+              {% else %}
+                <span style="color:#94a3b8;">Unassigned</span>
+              {% endif %}
+            </td>
+            <td style="font-size:0.78rem;">
+              {% if app.deal %}
+                {% if app.deal.brand %}{{ app.deal.brand.name }}{% endif %} {{ app.deal.model_name }}
+              {% else %}—{% endif %}
+            </td>
+            <td style="font-size:0.78rem;font-weight:700;">
+              {% if app.selected_deposit_percent %}{{ app.selected_deposit_percent|floatformat:0 }}%{% else %}—{% endif %}
+            </td>
+            <td>
+              <span class="s-badge
+                {% if app.status == 'approved' or app.status == 'contract_complete' or app.status == 'completed' %}s-approved
+                {% elif app.status == 'rejected' %}s-rejected
+                {% elif app.status == 'under_review' %}s-review
+                {% elif app.status == 'contract_complete' %}s-contract
+                {% else %}s-pending{% endif %}">
+                {{ app.get_status_display }}
+              </span>
+            </td>
+            <td style="color:#64748b;font-size:0.75rem;white-space:nowrap;">
+              {% if app.submitted_at %}{{ app.submitted_at|date:"d M Y" }}{% else %}—{% endif %}
+            </td>
+            {% if show_actions %}
+            <td style="text-align:center;white-space:nowrap;">
+              <a href="{% url 'hq_audit_trail' %}?object_id={{ app.pk }}"
+                 style="font-size:0.72rem;padding:3px 8px;background:#f8fafc;color:#475569;border:1px solid #e2e8f0;border-radius:4px;text-decoration:none;">
+                Audit
+              </a>
+            </td>
+            {% endif %}
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="10" style="text-align:center;padding:36px;color:#94a3b8;">No applications match your filter.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  {% if total_count %}
+  <p class="app-count">Showing {{ apps|length }} of {{ total_count }} application{{ total_count|pluralize }}.</p>
+  {% endif %}
+
 </div>
-
 {% endblock %}

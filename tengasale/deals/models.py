@@ -1,5 +1,6 @@
 from decimal import Decimal
 
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
@@ -15,9 +16,40 @@ class DeviceBrand(models.Model):
 
 
 class DeviceDeal(models.Model):
+    STOCK_IN = "in_stock"
+    STOCK_LIMITED = "limited"
+    STOCK_OUT = "out_of_stock"
+    STOCK_CHOICES = [
+        (STOCK_IN, "In Stock"),
+        (STOCK_LIMITED, "Limited Stock"),
+        (STOCK_OUT, "Out of Stock"),
+    ]
+
+    LOCK_NONE = ""
+    LOCK_KNOX = "knox"
+    LOCK_NUOVO = "nuovo"
+    LOCK_UPYA = "upya"
+    LOCK_PREDIKT = "predikt"
+    LOCK_PARETIX = "paretix"
+    LOCK_TRANSUNION = "transunion"
+    LOCK_MOCK = "mock"
+    LOCK_OTHER = "other"
+    LOCK_CHOICES = [
+        ("", "None / Not Configured"),
+        ("mock", "Mock / Sandbox"),
+        ("knox", "Knox (Samsung)"),
+        ("nuovo", "NuovoPay"),
+        ("upya", "Upya"),
+        ("predikt", "Predikt"),
+        ("paretix", "Paretix"),
+        ("transunion", "TransUnion"),
+        ("other", "Other"),
+    ]
+
     brand = models.ForeignKey(DeviceBrand, on_delete=models.CASCADE, related_name="deals")
     model_name = models.CharField(max_length=120)
     specs = models.CharField(max_length=80)
+    country = models.CharField(max_length=10, default="MW")
 
     cash_price = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     min_cash_price = models.DecimalField(max_digits=12, decimal_places=2, default=0)
@@ -35,6 +67,38 @@ class DeviceDeal(models.Model):
 
     total_12_month_price = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     is_active = models.BooleanField(default=True)
+    is_featured = models.BooleanField(default=False)
+
+    # Commission rates
+    merchant_commission_rate = models.DecimalField(
+        max_digits=6, decimal_places=4, default=Decimal("0.0100"),
+        help_text="Merchant commission rate (e.g. 0.01 = 1%)",
+    )
+    underwriter_commission_rate = models.DecimalField(
+        max_digits=6, decimal_places=4, default=Decimal("0.0700"),
+        help_text="Underwriter commission rate (e.g. 0.07 = 7%)",
+    )
+    arrears_penalty_rate = models.DecimalField(
+        max_digits=6, decimal_places=4, default=Decimal("0.1400"),
+        help_text="Arrears/penalty deduction rate (e.g. 0.14 = 14%)",
+    )
+
+    # Operations
+    stock_status = models.CharField(max_length=20, choices=STOCK_CHOICES, default=STOCK_IN)
+    lock_provider = models.CharField(max_length=20, blank=True, default="")
+    notes = models.TextField(blank=True)
+
+    # Audit
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name="deals_created",
+    )
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name="deals_updated",
+    )
+    created_at = models.DateTimeField(auto_now_add=True, null=True)
+    updated_at = models.DateTimeField(auto_now=True, null=True)
 
     def calculated_total_loan(self, cash_price=None):
         selected_price = Decimal(cash_price) if cash_price is not None else self.default_cash_price
@@ -104,6 +168,8 @@ class DeviceDeal(models.Model):
             self.min_cash_price is not None
             and self.default_cash_price is not None
             and self.max_cash_price is not None
+            and self.min_cash_price > 0
+            and self.max_cash_price > 0
             and not self.min_cash_price <= self.default_cash_price <= self.max_cash_price
         ):
             errors["default_cash_price"] = "Default cash price must be between min and max cash price."

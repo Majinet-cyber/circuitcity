@@ -388,13 +388,14 @@ class BrandingTests(TestCase):
         response = self.client.get("/sales/", follow=True)
         self.assertEqual(response.status_code, 200)
         content = response.content.decode()
-        # Sales pages use the compact icon in the mobile header; either icon or full logo is acceptable
+        # Accept SVG or any PNG logo variant — SVG is preferred for clean rendering
         has_logo = (
-            "tengasale-logo-full.png" in content
+            "tengasale-logo-full.svg" in content
+            or "tengasale-logo-full.png" in content
             or "tengasale-logo-icon.png" in content
+            or "tengasale-logo-mark.png" in content
         )
         self.assertTrue(has_logo, "Header must contain a TengaSale logo image")
-        self.assertNotIn('<span class="ts-logo">T</span>', content)
 
     def test_footer_says_tengasale_not_yellow(self):
         self.client.login(username="mgr_brand", password="test123")
@@ -445,13 +446,13 @@ class SeedCommandTests(TestCase):
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Phase 7 UI Correction — KulaSell-style mobile UI tests
+# Phase 10: TengaSale mobile UI tests
 # ──────────────────────────────────────────────────────────────────────────────
 
 
 class SalesMobileUITests(TestCase):
     """
-    Verify that /sales/ renders with the new KulaSell-style mobile layout.
+    Verify that /sales/ renders with the TengaSale mobile layout.
     Tests assert presence of key UI elements and absence of old branding.
     """
 
@@ -600,3 +601,282 @@ class SalesMobileUITests(TestCase):
             self.assertNotIn("from Yellow", content)
             self.assertNotIn("© Yellow Africa", content)
             self.assertIn("TengaSale", content)
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Phase 10: Commission Ledger — repayment commission, arrears, merchant payout
+# ──────────────────────────────────────────────────────────────────────────────
+
+from portal.models import PaymentContract, PaymentTransaction
+from commissions.models import CommissionLedger, MerchantContractPayout, UnderwriterMonthlyPayout
+from commissions.services import (
+    calculate_underwriter_payment_commission,
+    create_commission_for_payment,
+    calculate_arrears_deduction,
+    create_daily_arrears_deduction,
+    calculate_merchant_commission,
+    create_merchant_payout_for_contract,
+    generate_underwriter_monthly_payout,
+)
+
+
+class Phase10CommissionLedgerTests(TestCase):
+    """Test 7% repayment commission and 14% arrears deduction logic."""
+
+    def setUp(self):
+        self.underwriter = User.objects.create_user(username="uw_ph10", password="pass")
+        assign_role(self.underwriter, "underwriter")
+        self.contract = PaymentContract.objects.create(
+            customer_name="Grace Phiri",
+            customer_phone="0991111111",
+            total_amount=Decimal("500000"),
+            daily_price=Decimal("3000"),
+            status=PaymentContract.STATUS_ACTIVE,
+        )
+
+    def _make_paid_txn(self, commissionable_amount):
+        return PaymentTransaction.objects.create(
+            payment_contract=self.contract,
+            amount=commissionable_amount + Decimal("50000"),
+            commissionable_amount=commissionable_amount,
+            status=PaymentTransaction.STATUS_PAID,
+            provider=PaymentTransaction.PROVIDER_MOCK,
+            phone="0991111111",
+        )
+
+    def test_calculate_7_percent_commission(self):
+        txn = self._make_paid_txn(Decimal("100000"))
+        result = calculate_underwriter_payment_commission(txn)
+        self.assertEqual(result, Decimal("7000"))
+
+    def test_zero_commissionable_amount_yields_zero(self):
+        txn = self._make_paid_txn(Decimal("0"))
+        result = calculate_underwriter_payment_commission(txn)
+        self.assertEqual(result, Decimal("0"))
+
+    def test_deposit_only_payment_creates_no_commission_entry(self):
+        txn = self._make_paid_txn(Decimal("0"))
+        entry = create_commission_for_payment(txn, underwriter=self.underwriter)
+        self.assertIsNone(entry)
+        self.assertEqual(
+            CommissionLedger.objects.filter(source_payment=txn).count(), 0
+        )
+
+    def test_repayment_creates_positive_commission_entry(self):
+        txn = self._make_paid_txn(Decimal("100000"))
+        entry = create_commission_for_payment(txn, underwriter=self.underwriter)
+        self.assertIsNotNone(entry)
+        self.assertEqual(entry.entry_type, CommissionLedger.ENTRY_REPAYMENT)
+        self.assertEqual(entry.amount, Decimal("7000"))
+        self.assertGreater(entry.amount, Decimal("0"))
+
+    def test_commission_creation_is_idempotent(self):
+        txn = self._make_paid_txn(Decimal("100000"))
+        entry1 = create_commission_for_payment(txn, underwriter=self.underwriter)
+        entry2 = create_commission_for_payment(txn, underwriter=self.underwriter)
+        self.assertIsNotNone(entry1)
+        self.assertIsNone(entry2)
+        count = CommissionLedger.objects.filter(
+            source_payment=txn, user=self.underwriter, entry_type=CommissionLedger.ENTRY_REPAYMENT
+        ).count()
+        self.assertEqual(count, 1)
+
+    def test_arrears_deduction_14_percent_of_daily_price(self):
+        deduction = calculate_arrears_deduction(self.contract, missed_days=1)
+        # daily_price=3000 * 0.14 = 420
+        self.assertEqual(deduction, Decimal("420"))
+
+    def test_arrears_deduction_multiple_days(self):
+        deduction = calculate_arrears_deduction(self.contract, missed_days=5)
+        # 3000 * 0.14 * 5 = 2100
+        self.assertEqual(deduction, Decimal("2100"))
+
+    def test_create_arrears_deduction_entry_is_negative(self):
+        missed = date(2026, 5, 1)
+        entry = create_daily_arrears_deduction(self.contract, missed, underwriter=self.underwriter)
+        self.assertIsNotNone(entry)
+        self.assertLess(entry.amount, Decimal("0"))
+        self.assertEqual(entry.entry_type, CommissionLedger.ENTRY_ARREARS)
+        self.assertEqual(entry.amount, Decimal("-420"))
+
+    def test_arrears_deduction_is_idempotent(self):
+        missed = date(2026, 5, 2)
+        entry1 = create_daily_arrears_deduction(self.contract, missed, underwriter=self.underwriter)
+        entry2 = create_daily_arrears_deduction(self.contract, missed, underwriter=self.underwriter)
+        self.assertIsNotNone(entry1)
+        self.assertIsNone(entry2)
+        count = CommissionLedger.objects.filter(
+            contract=self.contract,
+            user=self.underwriter,
+            missed_date=missed,
+            entry_type=CommissionLedger.ENTRY_ARREARS,
+        ).count()
+        self.assertEqual(count, 1)
+
+    def test_completed_contract_skips_arrears_deduction(self):
+        self.contract.status = PaymentContract.STATUS_COMPLETED
+        self.contract.save()
+        missed = date(2026, 5, 3)
+        entry = create_daily_arrears_deduction(self.contract, missed, underwriter=self.underwriter)
+        self.assertIsNone(entry)
+
+    def test_cancelled_contract_skips_arrears_deduction(self):
+        self.contract.status = PaymentContract.STATUS_CANCELLED
+        self.contract.save()
+        missed = date(2026, 5, 4)
+        entry = create_daily_arrears_deduction(self.contract, missed, underwriter=self.underwriter)
+        self.assertIsNone(entry)
+
+    def test_non_paid_transaction_creates_no_commission(self):
+        txn = PaymentTransaction.objects.create(
+            payment_contract=self.contract,
+            amount=Decimal("50000"),
+            commissionable_amount=Decimal("50000"),
+            status=PaymentTransaction.STATUS_PENDING,
+            provider=PaymentTransaction.PROVIDER_MOCK,
+            phone="0991111111",
+        )
+        entry = create_commission_for_payment(txn, underwriter=self.underwriter)
+        self.assertIsNone(entry)
+
+
+class Phase10MerchantPayoutTests(TestCase):
+    """Test merchant payout: cash_price + 1% financed_amount, no WHT."""
+
+    def setUp(self):
+        self.merchant_user = User.objects.create_user(username="merch_ph10", password="pass")
+        assign_role(self.merchant_user, "merchant")
+        self.contract = PaymentContract.objects.create(
+            customer_name="Ali Kamwendo",
+            customer_phone="0882222222",
+            total_amount=Decimal("600000"),
+            deposit_paid=Decimal("120000"),
+            daily_price=Decimal("2000"),
+            status=PaymentContract.STATUS_ACTIVE,
+        )
+
+    def test_calculate_merchant_commission_1_percent_of_financed(self):
+        # financed = total - deposit = 600000 - 120000 = 480000
+        # 1% = 4800
+        commission = calculate_merchant_commission(self.contract)
+        self.assertEqual(commission, Decimal("4800"))
+
+    def test_create_merchant_payout_has_pending_status(self):
+        payout = create_merchant_payout_for_contract(
+            self.contract,
+            merchant_user=self.merchant_user,
+            created_by=self.merchant_user,
+        )
+        self.assertIsNotNone(payout)
+        self.assertEqual(payout.status, MerchantContractPayout.STATUS_PENDING)
+
+    def test_merchant_payout_wht_amount_is_zero(self):
+        payout = create_merchant_payout_for_contract(
+            self.contract,
+            merchant_user=self.merchant_user,
+            created_by=self.merchant_user,
+        )
+        self.assertIsNotNone(payout)
+        self.assertEqual(payout.wht_amount, Decimal("0"))
+
+    def test_merchant_payout_total_payable_includes_commission(self):
+        payout = create_merchant_payout_for_contract(
+            self.contract,
+            merchant_user=self.merchant_user,
+            created_by=self.merchant_user,
+        )
+        self.assertIsNotNone(payout)
+        # cash_price = total_amount = 600000
+        # financed = 480000, merchant_commission = 4800
+        # total_payable = 600000 + 4800 = 604800
+        self.assertEqual(payout.total_payable, Decimal("604800.00"))
+
+    def test_create_merchant_payout_is_idempotent(self):
+        payout1 = create_merchant_payout_for_contract(
+            self.contract,
+            merchant_user=self.merchant_user,
+            created_by=self.merchant_user,
+        )
+        payout2 = create_merchant_payout_for_contract(
+            self.contract,
+            merchant_user=self.merchant_user,
+            created_by=self.merchant_user,
+        )
+        self.assertEqual(payout1.pk, payout2.pk)
+        self.assertEqual(MerchantContractPayout.objects.filter(contract=self.contract).count(), 1)
+
+
+class Phase10UnderwriterMonthlyPayoutTests(TestCase):
+    """Test 20% WHT on positive gross, 0% on negative gross."""
+
+    def setUp(self):
+        self.underwriter = User.objects.create_user(username="uw_monthly_ph10", password="pass")
+        assign_role(self.underwriter, "underwriter")
+
+    def test_monthly_payout_wht_20_percent_on_positive_gross(self):
+        payout = UnderwriterMonthlyPayout.objects.create(
+            user=self.underwriter,
+            period_start=date(2026, 5, 1),
+            period_end=date(2026, 5, 31),
+            gross_commission=Decimal("100000"),
+        )
+        self.assertEqual(payout.wht_amount, Decimal("20000.00"))
+        self.assertEqual(payout.net_amount, Decimal("80000.00"))
+
+    def test_monthly_payout_no_wht_on_negative_gross(self):
+        payout = UnderwriterMonthlyPayout.objects.create(
+            user=self.underwriter,
+            period_start=date(2026, 4, 1),
+            period_end=date(2026, 4, 30),
+            gross_commission=Decimal("-5000"),
+        )
+        self.assertEqual(payout.wht_amount, Decimal("0.00"))
+        self.assertEqual(payout.net_amount, Decimal("-5000.00"))
+
+    def test_generate_monthly_payout_from_ledger(self):
+        """generate_underwriter_monthly_payout sums ledger entries and applies WHT."""
+        period_start = date(2026, 5, 1)
+        period_end = date(2026, 5, 31)
+        contract = PaymentContract.objects.create(
+            customer_name="Payout Test Customer",
+            customer_phone="0993333333",
+            total_amount=Decimal("300000"),
+            daily_price=Decimal("1000"),
+            status=PaymentContract.STATUS_ACTIVE,
+        )
+        CommissionLedger.objects.create(
+            user=self.underwriter,
+            contract=contract,
+            entry_type=CommissionLedger.ENTRY_REPAYMENT,
+            amount=Decimal("50000"),
+            base_amount=Decimal("714286"),
+            rate=Decimal("0.07"),
+            period_start=period_start,
+            period_end=period_end,
+        )
+        CommissionLedger.objects.create(
+            user=self.underwriter,
+            contract=contract,
+            entry_type=CommissionLedger.ENTRY_ARREARS,
+            amount=Decimal("-1400"),
+            base_amount=Decimal("1000"),
+            rate=Decimal("0.14"),
+            missed_date=date(2026, 5, 15),
+            period_start=period_start,
+            period_end=period_end,
+        )
+        payout = generate_underwriter_monthly_payout(self.underwriter, period_start, period_end)
+        self.assertIsNotNone(payout)
+        # gross = 50000 + (-1400) = 48600
+        self.assertEqual(payout.gross_commission, Decimal("48600.00"))
+        # WHT = 48600 * 0.20 = 9720
+        self.assertEqual(payout.wht_amount, Decimal("9720.00"))
+        # net = 48600 - 9720 = 38880
+        self.assertEqual(payout.net_amount, Decimal("38880.00"))
+
+    def test_generate_monthly_payout_idempotent(self):
+        period_start = date(2026, 3, 1)
+        period_end = date(2026, 3, 31)
+        payout1 = generate_underwriter_monthly_payout(self.underwriter, period_start, period_end)
+        payout2 = generate_underwriter_monthly_payout(self.underwriter, period_start, period_end)
+        self.assertEqual(payout1.pk, payout2.pk)

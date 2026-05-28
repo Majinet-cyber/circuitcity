@@ -1021,3 +1021,236 @@ class ApplicationAdminImportTests(TestCase):
 
     def test_financing_application_is_registered_in_admin(self):
         self.assertIn(FinancingApplication, admin.site._registry)
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Phase 10: Field Marking and Customer Correction Flow
+# ──────────────────────────────────────────────────────────────────────────────
+
+from applications.models import ApplicationCorrectionToken, ApplicationFieldReview
+
+
+class Phase10FieldMarkingTests(TestCase):
+    """Test field marking by underwriters and secure customer correction flow."""
+
+    def setUp(self):
+        self.merchant = get_user_model().objects.create_user(
+            username="merch_fm10", password="pass123"
+        )
+        assign_role(self.merchant, "merchant")
+        self.underwriter = get_user_model().objects.create_user(
+            username="uw_fm10", password="pass123"
+        )
+        assign_role(self.underwriter, "underwriter")
+        self.app = FinancingApplication.objects.create(
+            created_by=self.merchant,
+            status="under_review",
+            claimed_by=self.underwriter,
+            customer_name="Janet Banda",
+            national_id="ABCD1234",
+            customer_phone="099123456",
+        )
+
+    # ── Model-level tests ──
+
+    def test_create_field_review_model(self):
+        review = ApplicationFieldReview.objects.create(
+            application=self.app,
+            field_key="customer_name",
+            field_label="Customer Name",
+            section=ApplicationFieldReview.SECTION_CUSTOMER,
+            reason=ApplicationFieldReview.REASON_INCORRECT,
+            marked_by=self.underwriter,
+            status=ApplicationFieldReview.STATUS_MARKED,
+        )
+        self.assertEqual(review.status, ApplicationFieldReview.STATUS_MARKED)
+        self.assertEqual(review.application, self.app)
+
+    def test_dismiss_field_review_changes_status(self):
+        review = ApplicationFieldReview.objects.create(
+            application=self.app,
+            field_key="national_id",
+            field_label="National ID",
+            section=ApplicationFieldReview.SECTION_CUSTOMER,
+            reason=ApplicationFieldReview.REASON_UNCLEAR_DOC,
+            marked_by=self.underwriter,
+            status=ApplicationFieldReview.STATUS_MARKED,
+        )
+        review.status = ApplicationFieldReview.STATUS_DISMISSED
+        review.save()
+        review.refresh_from_db()
+        self.assertEqual(review.status, ApplicationFieldReview.STATUS_DISMISSED)
+
+    # ── Mark field via view ──
+
+    def test_underwriter_can_mark_field_via_post(self):
+        self.client.login(username="uw_fm10", password="pass123")
+        response = self.client.post(
+            reverse("sales_mark_field", args=[self.app.id]),
+            {
+                "field_key": "full_name",
+                "field_label": "Customer Full Name",
+                "reason": ApplicationFieldReview.REASON_INCORRECT,
+                "section": ApplicationFieldReview.SECTION_CUSTOMER,
+                "current_value": "Janet Banda",
+            },
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(
+            ApplicationFieldReview.objects.filter(
+                application=self.app, field_key="full_name"
+            ).exists()
+        )
+
+    # ── Customer correction page ──
+
+    def test_correction_page_returns_404_on_invalid_token(self):
+        response = self.client.get(
+            reverse("customer_field_correction", args=["totally-invalid-token"])
+        )
+        self.assertEqual(response.status_code, 404)
+
+    def test_correction_page_returns_410_on_expired_token(self):
+        from datetime import timedelta
+        from django.utils import timezone
+
+        ApplicationFieldReview.objects.create(
+            application=self.app,
+            field_key="customer_name",
+            field_label="Customer Name",
+            section=ApplicationFieldReview.SECTION_CUSTOMER,
+            reason=ApplicationFieldReview.REASON_INCORRECT,
+            marked_by=self.underwriter,
+            status=ApplicationFieldReview.STATUS_MARKED,
+        )
+        token_obj = ApplicationCorrectionToken.create_or_refresh(self.app)
+        token_obj.expires_at = timezone.now() - timedelta(hours=1)
+        token_obj.save()
+
+        response = self.client.get(
+            reverse("customer_field_correction", args=[token_obj.token])
+        )
+        self.assertEqual(response.status_code, 410)
+
+    def test_correction_page_shows_only_marked_fields(self):
+        ApplicationFieldReview.objects.create(
+            application=self.app,
+            field_key="full_name",          # matches EDITABLE_FIELD_MAP key
+            field_label="Customer Full Name",
+            section=ApplicationFieldReview.SECTION_CUSTOMER,
+            reason=ApplicationFieldReview.REASON_INCORRECT,
+            marked_by=self.underwriter,
+            status=ApplicationFieldReview.STATUS_MARKED,
+        )
+        # Dismissed review — should NOT appear on the correction page
+        ApplicationFieldReview.objects.create(
+            application=self.app,
+            field_key="national_id",
+            field_label="National ID",
+            section=ApplicationFieldReview.SECTION_CUSTOMER,
+            reason=ApplicationFieldReview.REASON_UNCLEAR_DOC,
+            marked_by=self.underwriter,
+            status=ApplicationFieldReview.STATUS_DISMISSED,
+        )
+        token_obj = ApplicationCorrectionToken.create_or_refresh(self.app)
+        response = self.client.get(
+            reverse("customer_field_correction", args=[token_obj.token])
+        )
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        self.assertIn("Customer Full Name", content)
+        self.assertNotIn("National ID", content)
+
+    def test_correction_page_no_internal_data_leakage(self):
+        ApplicationFieldReview.objects.create(
+            application=self.app,
+            field_key="full_name",
+            field_label="Customer Full Name",
+            section=ApplicationFieldReview.SECTION_CUSTOMER,
+            reason=ApplicationFieldReview.REASON_INCORRECT,
+            marked_by=self.underwriter,
+            status=ApplicationFieldReview.STATUS_MARKED,
+        )
+        token_obj = ApplicationCorrectionToken.create_or_refresh(self.app)
+        response = self.client.get(
+            reverse("customer_field_correction", args=[token_obj.token])
+        )
+        content = response.content.decode().lower()
+        self.assertNotIn("commission", content)
+        self.assertNotIn("audit", content)
+        self.assertNotIn("claimed_by", content)
+        self.assertNotIn("kulasell", content)
+        self.assertNotIn("yellow africa", content)
+
+    def test_customer_can_correct_marked_field(self):
+        ApplicationFieldReview.objects.create(
+            application=self.app,
+            field_key="full_name",          # matches EDITABLE_FIELD_MAP key
+            field_label="Customer Full Name",
+            section=ApplicationFieldReview.SECTION_CUSTOMER,
+            reason=ApplicationFieldReview.REASON_INCORRECT,
+            marked_by=self.underwriter,
+            status=ApplicationFieldReview.STATUS_MARKED,
+        )
+        token_obj = ApplicationCorrectionToken.create_or_refresh(self.app)
+        response = self.client.post(
+            reverse("customer_field_correction", args=[token_obj.token]),
+            {"full_name": "Janet Moyo"},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.app.refresh_from_db()
+        self.assertEqual(self.app.customer_name, "Janet Moyo")
+
+    def test_correction_changes_status_to_customer_updated(self):
+        review = ApplicationFieldReview.objects.create(
+            application=self.app,
+            field_key="full_name",
+            field_label="Customer Full Name",
+            section=ApplicationFieldReview.SECTION_CUSTOMER,
+            reason=ApplicationFieldReview.REASON_INCORRECT,
+            marked_by=self.underwriter,
+            status=ApplicationFieldReview.STATUS_MARKED,
+        )
+        token_obj = ApplicationCorrectionToken.create_or_refresh(self.app)
+        self.client.post(
+            reverse("customer_field_correction", args=[token_obj.token]),
+            {"full_name": "Janet Phiri"},
+        )
+        review.refresh_from_db()
+        self.assertEqual(review.status, ApplicationFieldReview.STATUS_CUSTOMER_UPDATED)
+
+    def test_unmarked_field_not_editable_via_correction_page(self):
+        ApplicationFieldReview.objects.create(
+            application=self.app,
+            field_key="full_name",
+            field_label="Customer Full Name",
+            section=ApplicationFieldReview.SECTION_CUSTOMER,
+            reason=ApplicationFieldReview.REASON_INCORRECT,
+            marked_by=self.underwriter,
+            status=ApplicationFieldReview.STATUS_MARKED,
+        )
+        token_obj = ApplicationCorrectionToken.create_or_refresh(self.app)
+        original_national_id = self.app.national_id
+
+        # Submit national_id but it is not marked — must not be accepted
+        self.client.post(
+            reverse("customer_field_correction", args=[token_obj.token]),
+            {"full_name": "Janet Chirwa", "national_id": "HACKED01"},
+        )
+        self.app.refresh_from_db()
+        self.assertEqual(self.app.national_id, original_national_id)
+
+    # ── Token behaviour ──
+
+    def test_correction_token_is_generated_securely(self):
+        token_obj = ApplicationCorrectionToken.create_or_refresh(self.app)
+        self.assertGreater(len(token_obj.token), 20)
+        self.assertTrue(token_obj.is_valid)
+
+    def test_create_or_refresh_replaces_existing_token(self):
+        token1 = ApplicationCorrectionToken.create_or_refresh(self.app)
+        old_token_value = token1.token
+        token2 = ApplicationCorrectionToken.create_or_refresh(self.app)
+        self.assertEqual(token1.pk, token2.pk)
+        self.assertNotEqual(token2.token, old_token_value)

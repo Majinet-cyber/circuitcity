@@ -138,3 +138,32 @@ def send_payout_notification(to: str, agent_name: str, net_amount: str, period: 
         f"Check your TengaSale wallet for details."
     )
     return send_sms(to, body)
+
+
+def send_overdue_notification(to: str, customer_name: str, contract_number: str, overdue_days: int) -> Dict[str, Any]:
+    """Notify customer their contract is overdue and device may be locked."""
+    body = (
+        f"Hi {customer_name}, your TengaSale contract {contract_number} is {overdue_days} day(s) overdue. "
+        f"Please make a payment now to restore full device access. "
+        f"Pay via Airtel Money or TNM Mpamba or call +265883596135."
+    )
+    return send_sms(to, body)
+
+
+def send_payment_receipt_sms(to: str, customer_name: str, amount: str, contract_number: str, reference: str = "") -> Dict[str, Any]:
+    """Send a brief payment receipt confirmation via SMS."""
+    ref_part = f" Ref: {reference}." if reference else ""
+    body = (
+        f"TengaSale: Payment of MWK {amount} received for contract {contract_number}.{ref_part} "
+        f"Thank you, {customer_name}. Keep paying on time."
+    )
+    return send_sms(to, body)
+
+
+def send_customer_edit_link(to: str, customer_name: str, edit_url: str, expires_hours: int = 72) -> Dict[str, Any]:
+    """Send a secure field-correction link to the customer."""
+    body = (
+        f"Hi {customer_name}, TengaSale needs you to update some details on your application. "
+        f"Click this secure link (expires in {expires_hours} hours): {edit_url}"
+    )
+    return send_sms(to, body)

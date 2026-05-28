@@ -92,6 +92,35 @@ def local_phone_widget(placeholder="990870616"):
     )
 
 
+GENDER_CHOICES = [
+    ("", "Select gender"),
+    ("male", "Male"),
+    ("female", "Female"),
+    ("other", "Prefer not to say"),
+]
+
+MARITAL_CHOICES = [
+    ("", "Select marital status"),
+    ("single", "Single"),
+    ("married", "Married"),
+    ("divorced", "Divorced"),
+    ("widowed", "Widowed"),
+    ("separated", "Separated"),
+]
+
+PHONE_USER_CHOICES = [
+    ("", "Who will mainly use this phone?"),
+    ("customer_self", "The customer themselves"),
+    ("spouse", "Spouse"),
+    ("child", "Child"),
+    ("parent", "Parent"),
+    ("family_member", "Other family member"),
+    ("friend", "Friend"),
+    ("business_employee", "Business employee"),
+    ("other", "Other"),
+]
+
+
 class CustomerDetailsForm(forms.ModelForm):
     customer_name = forms.CharField(required=True, min_length=2, strip=True)
     national_id = forms.CharField(
@@ -125,6 +154,24 @@ class CustomerDetailsForm(forms.ModelForm):
             }
         ),
     )
+    date_of_birth = forms.DateField(
+        required=False,
+        widget=forms.DateInput(attrs={"type": "date", "inputmode": "numeric"}),
+        label="Date of birth",
+    )
+    gender = forms.ChoiceField(choices=GENDER_CHOICES, required=False, label="Gender")
+    marital_status = forms.ChoiceField(choices=MARITAL_CHOICES, required=False, label="Marital status")
+    num_dependents = forms.IntegerField(
+        required=False, min_value=0, max_value=20,
+        label="Number of dependents",
+        widget=forms.NumberInput(attrs={"inputmode": "numeric", "placeholder": "0"}),
+    )
+    phone_user = forms.ChoiceField(choices=PHONE_USER_CHOICES, required=False, label="Who will use the phone?")
+    phone_user_other = forms.CharField(
+        required=False, max_length=100,
+        label="Specify who",
+        widget=forms.TextInput(attrs={"placeholder": "Specify who will use it"}),
+    )
     occupation = forms.ChoiceField(choices=OCCUPATION_CHOICES, required=True)
     occupation_other = forms.CharField(
         required=False,
@@ -142,6 +189,12 @@ class CustomerDetailsForm(forms.ModelForm):
             "customer_name",
             "national_id",
             "customer_phone",
+            "date_of_birth",
+            "gender",
+            "marital_status",
+            "num_dependents",
+            "phone_user",
+            "phone_user_other",
             "occupation",
             "income_band",
             "exact_monthly_income",
@@ -175,6 +228,10 @@ class CustomerDetailsForm(forms.ModelForm):
                 self.add_error("occupation_other", "Specify the occupation when Other is selected.")
             else:
                 cleaned_data["occupation"] = occupation_other
+
+        phone_user = cleaned_data.get("phone_user", "")
+        if phone_user and phone_user != "customer_self":
+            cleaned_data["third_party_phone_user_risk_flagged"] = True
         return cleaned_data
 
 

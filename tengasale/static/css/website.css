@@ -464,18 +464,19 @@ a { color: inherit; text-decoration: none; }
 
 /* ── Hero ────────────────────────────────────────────────────── */
 .hero {
-  padding: 88px 24px 80px;
+  padding: 56px 24px 64px;
   background: transparent;
   border-bottom: 1px solid var(--w-border);
+  overflow-x: hidden;
 }
 
 .hero__inner {
   max-width: var(--w-max);
   margin: 0 auto;
   display: grid;
-  grid-template-columns: 1fr 460px;
-  gap: 64px;
-  align-items: center;
+  grid-template-columns: 1fr 440px;
+  gap: 56px;
+  align-items: flex-start;
 }
 
 .hero__eyebrow {
@@ -1397,4 +1398,1050 @@ a { color: inherit; text-decoration: none; }
 @media (max-width: 380px) {
   .hero__headline { font-size: 27px; }
   .payments-grid { grid-template-columns: 1fr; }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   PHASE 10D ADDITIONS
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── Country pill in site nav ─────────────────────────────────── */
+.site-country-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  background: #f1f5f9;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 99px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #334155;
+  white-space: nowrap;
+  cursor: default;
+}
+
+/* ── Bottom CTA section ───────────────────────────────────────── */
+.site-cta-section {
+  background: linear-gradient(135deg, #ff6b1a 0%, #e8530a 100%);
+  padding: 72px 24px;
+}
+
+.btn-primary--white {
+  background: #ffffff;
+  color: #ff6b1a;
+}
+
+.btn-primary--white:hover {
+  background: #f1f5f9;
+  color: #e8530a;
+}
+
+.btn-secondary--white {
+  border-color: rgba(255,255,255,0.50);
+  color: #ffffff;
+  background: transparent;
+}
+
+.btn-secondary--white:hover {
+  border-color: #ffffff;
+  background: rgba(255,255,255,0.10);
+  color: #ffffff;
+}
+
+/* ── Animations ───────────────────────────────────────────────── */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.96); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+.hero__copy { animation: fadeUp 0.55s ease both; }
+.hero__visual { animation: scaleIn 0.6s 0.2s ease both; }
+
+.step { animation: fadeUp 0.4s ease both; }
+.step:nth-child(1) { animation-delay: 0.05s; }
+.step:nth-child(2) { animation-delay: 0.10s; }
+.step:nth-child(3) { animation-delay: 0.15s; }
+.step:nth-child(4) { animation-delay: 0.20s; }
+.step:nth-child(5) { animation-delay: 0.25s; }
+.step:nth-child(6) { animation-delay: 0.30s; }
+
+.hcard { transition: transform 0.18s ease, box-shadow 0.18s ease; }
+.hcard:hover { transform: translateY(-3px); box-shadow: 0 12px 32px rgba(15,23,42,0.14); }
+
+.feature-item { transition: transform 0.14s ease; }
+.feature-item:hover { transform: translateX(4px); }
+
+/* ── Lead form ────────────────────────────────────────────────── */
+.lead-form-section {
+  min-height: calc(100vh - 72px);
+  background: #f8fafc;
+  padding: 48px 20px 80px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+}
+
+.lead-form-shell {
+  width: 100%;
+  max-width: 680px;
+}
+
+.lead-form-shell--centered {
+  margin: 0 auto;
+}
+
+.lead-back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #64748b;
+  text-decoration: none;
+  margin-bottom: 28px;
+  transition: color 0.13s;
+}
+
+.lead-back-link svg {
+  width: 16px; height: 16px;
+  fill: none; stroke: currentColor; stroke-width: 2.5;
+}
+
+.lead-back-link:hover { color: #ff6b1a; }
+
+.lead-form-hdr { margin-bottom: 28px; }
+
+.lead-form-badge {
+  display: inline-block;
+  background: rgba(255,107,26,0.12);
+  color: #ff6b1a;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  padding: 3px 10px;
+  border-radius: 99px;
+  margin-bottom: 14px;
+}
+
+.lead-form-title {
+  font-size: 28px;
+  font-weight: 900;
+  color: #0f172a;
+  margin: 0 0 10px;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+}
+
+.lead-form-sub {
+  font-size: 15px;
+  color: #64748b;
+  margin: 0;
+  line-height: 1.6;
+}
+
+.lead-errors {
+  background: #fef2f2;
+  border: 1.5px solid #fca5a5;
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin-bottom: 20px;
+  color: #991b1b;
+  font-size: 14px;
+}
+
+.lead-errors ul { margin: 6px 0 0 16px; padding: 0; }
+.lead-errors li { margin-bottom: 4px; }
+
+.lead-form {
+  background: #ffffff;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 28px 28px 24px;
+  box-shadow: 0 2px 12px rgba(15,23,42,0.05);
+}
+
+.lead-fieldset {
+  border: none;
+  padding: 0;
+  margin: 0 0 24px;
+}
+
+.lead-legend {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #64748b;
+  margin-bottom: 16px;
+  display: block;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #f1f5f9;
+  width: 100%;
+}
+
+.lead-field {
+  margin-bottom: 14px;
+}
+
+.lead-field--required .lead-label::after {
+  content: " *";
+  color: #dc2626;
+}
+
+.lead-field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.lead-label {
+  display: block;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #334155;
+  margin-bottom: 6px;
+}
+
+.lead-optional {
+  font-weight: 500;
+  color: #94a3b8;
+}
+
+.lead-input,
+.lead-select,
+.lead-textarea {
+  width: 100%;
+  padding: 10px 13px;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 9px;
+  font-size: 14px;
+  background: #f8fafc;
+  color: #0f172a;
+  font-family: inherit;
+  transition: border-color 0.13s, box-shadow 0.13s;
+  box-sizing: border-box;
+}
+
+.lead-input:focus,
+.lead-select:focus,
+.lead-textarea:focus {
+  outline: none;
+  border-color: #ff6b1a;
+  box-shadow: 0 0 0 3px rgba(255,107,26,0.10);
+  background: #ffffff;
+}
+
+.lead-textarea { resize: vertical; min-height: 80px; }
+
+.lead-radio-row {
+  display: flex;
+  gap: 20px;
+  margin-top: 2px;
+  flex-wrap: wrap;
+}
+
+.lead-radio {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #334155;
+  cursor: pointer;
+}
+
+.lead-radio input[type="radio"] { accent-color: #ff6b1a; }
+
+.lead-file-input {
+  width: 100%;
+  font-size: 13px;
+  color: #64748b;
+  padding: 8px 0;
+}
+
+.lead-form-footer {
+  border-top: 1px solid #f1f5f9;
+  padding-top: 18px;
+  margin-top: 4px;
+}
+
+.lead-consent {
+  font-size: 12px;
+  color: #94a3b8;
+  margin: 0 0 16px;
+  line-height: 1.5;
+}
+
+.lead-consent a { color: #64748b; text-decoration: underline; }
+.lead-consent a:hover { color: #ff6b1a; }
+
+.lead-submit {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 13px 24px;
+  background: #ff6b1a;
+  color: #ffffff;
+  font-size: 15px;
+  font-weight: 800;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.13s, transform 0.12s;
+}
+
+.lead-submit svg {
+  width: 16px; height: 16px;
+  fill: none; stroke: currentColor; stroke-width: 2.5;
+  stroke-linecap: round; stroke-linejoin: round;
+}
+
+.lead-submit:hover { background: #e8530a; transform: translateY(-1px); }
+.lead-submit:active { transform: translateY(0); }
+
+/* ── Lead success ─────────────────────────────────────────────── */
+.lead-success-shell {
+  width: 100%;
+  max-width: 520px;
+  margin: 0 auto;
+  text-align: center;
+  padding-top: 20px;
+}
+
+.lead-success-icon {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: #dcfce7;
+  display: grid;
+  place-items: center;
+  margin: 0 auto 24px;
+}
+
+.lead-success-icon svg {
+  width: 34px; height: 34px;
+  fill: none; stroke: #16a34a; stroke-width: 2.5;
+  stroke-linecap: round; stroke-linejoin: round;
+}
+
+.lead-success-title {
+  font-size: 26px;
+  font-weight: 900;
+  color: #0f172a;
+  margin: 0 0 14px;
+  letter-spacing: -0.03em;
+}
+
+.lead-success-body {
+  font-size: 15px;
+  color: #64748b;
+  line-height: 1.6;
+  margin: 0 0 8px;
+}
+
+.lead-success-body a { color: #ff6b1a; }
+
+/* ── Careers hero — LIGHT MODE ────────────────────────────────── */
+.careers-hero {
+  background:
+    radial-gradient(ellipse at 70% 50%, rgba(255,107,26,0.07) 0%, transparent 55%),
+    linear-gradient(180deg, #fffaf7 0%, #f8fafc 100%);
+  padding: 80px 24px 72px;
+  border-bottom: 1px solid var(--w-border);
+}
+
+.careers-hero__inner {
+  max-width: var(--w-max);
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: 60px;
+  align-items: center;
+}
+
+.careers-hero__copy { }
+
+.careers-hero__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: var(--w-orange);
+  background: var(--w-orange-tint);
+  border: 1px solid rgba(255,106,0,0.18);
+  padding: 5px 13px;
+  border-radius: 999px;
+  margin-bottom: 22px;
+}
+
+.careers-hero__title {
+  font-size: clamp(28px, 3.8vw, 46px);
+  font-weight: 900;
+  color: var(--w-black);
+  margin: 0 0 18px;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+}
+
+.careers-hero__sub {
+  font-size: 17px;
+  color: var(--w-muted);
+  max-width: 520px;
+  margin: 0 0 32px;
+  line-height: 1.65;
+}
+
+/* The visual card column in careers hero */
+.careers-hero__visual {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.careers-hero-card {
+  background: rgba(255,255,255,0.90);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255,255,255,0.78);
+  border-radius: var(--w-radius-lg);
+  padding: 28px 24px;
+  box-shadow: var(--w-shadow-lg);
+}
+
+.careers-hero-card__eyebrow {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: var(--w-orange);
+  margin-bottom: 14px;
+}
+
+.careers-hero-card__roles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-bottom: 18px;
+}
+
+.careers-role-pill {
+  display: inline-block;
+  padding: 5px 11px;
+  background: var(--w-bg-alt);
+  border: 1.5px solid var(--w-border-dk);
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--w-ink);
+}
+
+.careers-hero-card__tagline {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--w-muted);
+  line-height: 1.55;
+  padding-top: 14px;
+  border-top: 1px solid var(--w-border);
+}
+
+/* ── Careers why grid ─────────────────────────────────────────── */
+.careers-why-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 16px;
+  margin-top: 36px;
+}
+
+.careers-why-card {
+  background: #ffffff;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 20px 18px;
+  box-shadow: 0 2px 8px rgba(15,23,42,0.05);
+  transition: transform 0.14s, box-shadow 0.14s;
+}
+
+.careers-why-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 24px rgba(15,23,42,0.10);
+}
+
+.careers-why-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: rgba(255,107,26,0.10);
+  display: grid;
+  place-items: center;
+  margin-bottom: 12px;
+  color: #ff6b1a;
+}
+
+.careers-why-icon svg {
+  width: 18px; height: 18px;
+  fill: none; stroke: currentColor; stroke-width: 2;
+  stroke-linecap: round; stroke-linejoin: round;
+}
+
+.careers-why-title {
+  font-size: 14px;
+  font-weight: 800;
+  color: #0f172a;
+  margin-bottom: 6px;
+}
+
+.careers-why-body {
+  font-size: 13px;
+  color: #64748b;
+  margin: 0;
+  line-height: 1.55;
+}
+
+/* ── Careers roles grid ───────────────────────────────────────── */
+.careers-roles-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 12px;
+  margin-top: 32px;
+}
+
+.careers-role-card {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  background: #ffffff;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 18px 16px;
+  box-shadow: 0 1px 4px rgba(15,23,42,0.05);
+  transition: transform 0.14s, box-shadow 0.14s;
+}
+
+.careers-role-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(15,23,42,0.09);
+}
+
+.careers-role-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 9px;
+  background: rgba(255,107,26,0.10);
+  display: grid;
+  place-items: center;
+  color: #ff6b1a;
+  flex-shrink: 0;
+}
+
+.careers-role-icon svg {
+  width: 17px; height: 17px;
+  fill: none; stroke: currentColor; stroke-width: 2;
+  stroke-linecap: round; stroke-linejoin: round;
+}
+
+.careers-role-title {
+  font-size: 14px;
+  font-weight: 800;
+  color: #0f172a;
+  margin-bottom: 4px;
+}
+
+.careers-role-body {
+  font-size: 13px;
+  color: #64748b;
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* ── Values grid ──────────────────────────────────────────────── */
+.careers-values-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 14px;
+  margin-top: 32px;
+}
+
+.careers-value {
+  background: #f8fafc;
+  border: 1.5px solid #e2e8f0;
+  border-top: 3px solid #ff6b1a;
+  border-radius: 12px;
+  padding: 16px 14px;
+}
+
+.careers-value__label {
+  font-size: 13px;
+  font-weight: 800;
+  color: #0f172a;
+  margin-bottom: 6px;
+  text-transform: capitalize;
+}
+
+.careers-value__body {
+  font-size: 12.5px;
+  color: #64748b;
+  margin: 0;
+  line-height: 1.55;
+}
+
+/* ── Responsive ───────────────────────────────────────────────── */
+@media (max-width: 720px) {
+  .lead-form-field-row,
+  .lead-field-row { grid-template-columns: 1fr; }
+  .lead-form { padding: 20px 16px 18px; }
+  .careers-hero__title { font-size: 32px; }
+  .lead-form-title { font-size: 22px; }
+}
+
+@media (max-width: 860px) {
+  .site-country-pill { display: none; }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   PHASE 10F — Branding, Logo, Careers, Merchant Signup fixes
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── Force light mode on all public site pages ────────────────── */
+.site-body {
+  color-scheme: light;
+}
+
+/* ── Image safety — prevent images overflowing their containers ── */
+.site-body img,
+.site-section img,
+.careers-hero img,
+.merchant-hero img,
+.hero img,
+.lead-form-section img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+/* ── Logo compact — used in navbar ───────────────────────────── */
+.logo-compact {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+}
+
+.logo-compact-img {
+  height: 44px;
+  width: auto;
+  max-width: 200px;
+  object-fit: contain;
+  display: block;
+  flex: 0 0 auto;
+}
+
+.logo-wordmark {
+  font-weight: 900;
+  font-size: 19px;
+  letter-spacing: -0.04em;
+  color: var(--w-black);
+}
+
+.logo-wordmark .highlight {
+  color: var(--ts-orange, #ff5a00);
+}
+
+.logo-tagline {
+  font-size: 0.72rem;
+  color: #64748b;
+  font-weight: 700;
+}
+
+/* ── Logo full showcase — constrained brand image ─────────────── */
+.logo-full-showcase {
+  width: min(560px, 92vw);
+  margin-inline: auto;
+}
+
+.logo-full-showcase__img,
+.logo-full-showcase img {
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+  display: block;
+  max-width: 100%;
+}
+
+/* ── Hero brand image — in the hero visual column ─────────────── */
+.hero-brand-card {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(255,255,255,0.90);
+  min-height: 80px;
+}
+
+.hero-brand-img {
+  width: 100%;
+  max-width: 240px;
+  height: auto;
+  object-fit: contain;
+  display: block;
+  margin: 0 auto;
+}
+
+/* ── Brand showcase section ───────────────────────────────────── */
+.site-section--brand-showcase {
+  background:
+    radial-gradient(ellipse at 30% 60%, rgba(255,106,0,0.06) 0%, transparent 50%),
+    rgba(248,250,252,0.80);
+}
+
+.brand-showcase-layout {
+  display: grid;
+  grid-template-columns: 1fr 480px;
+  gap: 64px;
+  align-items: center;
+}
+
+.brand-showcase-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 20px;
+}
+
+.brand-pill {
+  display: inline-block;
+  padding: 5px 13px;
+  background: rgba(255,106,0,0.08);
+  border: 1px solid rgba(255,106,0,0.18);
+  color: var(--w-orange);
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.brand-showcase-frame {
+  padding: 28px;
+  border-radius: var(--w-radius-xl);
+  text-align: center;
+}
+
+.brand-showcase-caption {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--w-subtle);
+  margin-top: 16px;
+  margin-bottom: 0;
+}
+
+/* ── Platform stats grid (replaces duplicate brand showcase visual) ─ */
+.platform-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+
+.platform-stat-card {
+  background: rgba(255, 255, 255, 0.90);
+  border: 1px solid var(--w-border);
+  border-radius: var(--w-radius-lg);
+  padding: 22px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-shadow: var(--w-shadow);
+}
+
+.platform-stat-icon {
+  width: 38px;
+  height: 38px;
+  background: rgba(255, 106, 0, 0.10);
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.platform-stat-icon svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: var(--w-orange);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.platform-stat-val {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--w-black);
+  letter-spacing: -0.01em;
+}
+
+.platform-stat-label {
+  font-size: 12px;
+  color: var(--w-muted);
+  line-height: 1.5;
+}
+
+@media (max-width: 900px) {
+  .platform-stats-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 500px) {
+  .platform-stats-grid { grid-template-columns: 1fr; }
+}
+
+/* ── Merchant hero ─────────────────────────────────────────────── */
+.merchant-hero {
+  background:
+    radial-gradient(ellipse at 80% 40%, rgba(255,107,26,0.08) 0%, transparent 55%),
+    linear-gradient(180deg, #fffaf7 0%, #f8fafc 100%);
+  padding: 72px 24px 64px;
+  border-bottom: 1px solid var(--w-border);
+}
+
+.merchant-hero__inner {
+  max-width: var(--w-max);
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: 56px;
+  align-items: center;
+}
+
+.merchant-hero__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: var(--w-orange);
+  background: var(--w-orange-tint);
+  border: 1px solid rgba(255,106,0,0.18);
+  padding: 5px 13px;
+  border-radius: 999px;
+  margin-bottom: 22px;
+}
+
+.merchant-hero__title {
+  font-size: clamp(26px, 3.5vw, 42px);
+  font-weight: 900;
+  color: var(--w-black);
+  margin: 0 0 18px;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+}
+
+.merchant-hero__sub {
+  font-size: 17px;
+  color: var(--w-muted);
+  max-width: 500px;
+  margin: 0 0 28px;
+  line-height: 1.65;
+}
+
+.merchant-hero-trust {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.merchant-trust-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--w-muted);
+}
+
+.merchant-trust-item svg {
+  width: 16px;
+  height: 16px;
+  stroke: var(--w-green);
+  fill: none;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  flex-shrink: 0;
+}
+
+.merchant-hero__visual {
+  display: flex;
+  flex-direction: column;
+}
+
+.merchant-hero-card {
+  padding: 24px;
+}
+
+.merchant-hero-card__label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: var(--w-muted);
+  margin-bottom: 6px;
+}
+
+.merchant-hero-card__title {
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--w-black);
+  margin-bottom: 12px;
+}
+
+.merchant-hero-card__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.merchant-hero-card__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.merchant-hero-card__badge--green {
+  background: var(--w-green-tint);
+  color: var(--w-green);
+}
+
+.merchant-hero-card__meta {
+  font-size: 12px;
+  color: var(--w-muted);
+  font-weight: 600;
+}
+
+.merchant-hero-card__divider {
+  height: 1px;
+  background: var(--w-border);
+  margin: 12px 0;
+}
+
+.merchant-hero-card__stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.merchant-hero-card__stat-val {
+  font-size: 20px;
+  font-weight: 900;
+  color: var(--w-black);
+  letter-spacing: -0.02em;
+  margin-bottom: 2px;
+}
+
+.merchant-hero-card__stat-label {
+  font-size: 11px;
+  color: var(--w-muted);
+  font-weight: 600;
+}
+
+/* Merchant form section — remove top padding since hero provides it */
+.merchant-form-section {
+  padding-top: 56px;
+}
+
+/* ── Portal /pay/ compact topbar ──────────────────────────────── */
+.portal-pay-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 24px;
+}
+
+.portal-compact-logo {
+  height: 44px;
+  width: auto;
+  max-width: 200px;
+  object-fit: contain;
+  display: block;
+}
+
+.portal-pay-topbar__right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.portal-country-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  background: #f1f5f9;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 99px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #334155;
+  white-space: nowrap;
+}
+
+/* ── Careers hero responsive ──────────────────────────────────── */
+@media (max-width: 860px) {
+  .careers-hero__inner {
+    grid-template-columns: 1fr;
+  }
+  .careers-hero__visual {
+    display: none;
+  }
+  .merchant-hero__inner {
+    grid-template-columns: 1fr;
+  }
+  .merchant-hero__visual {
+    display: none;
+  }
+  .brand-showcase-layout {
+    grid-template-columns: 1fr;
+    gap: 36px;
+  }
+}
+
+@media (max-width: 600px) {
+  .careers-hero {
+    padding: 56px 20px 52px;
+  }
+  .merchant-hero {
+    padding: 52px 20px 48px;
+  }
+  .logo-full-showcase {
+    width: min(92vw, 360px);
+  }
+  .hero-brand-img {
+    max-width: 180px;
+  }
+}
+
+@media (max-width: 414px) {
+  .logo-compact-img {
+    height: 36px;
+    max-width: 160px;
+  }
+  .portal-compact-logo {
+    height: 36px;
+  }
 }

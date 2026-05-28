@@ -9,10 +9,14 @@ MWK rounding note:
   nearest 1 MWK (use the mwk_round() helper for display/payment suggestions).
 """
 
+import logging
 from decimal import ROUND_HALF_UP, Decimal
 from datetime import timedelta
 
+from django.db import transaction
 from django.utils import timezone
+
+logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -265,4 +269,64 @@ def search_payment_contract(query: str):
         contract = PaymentContract.objects.filter(
             customer_phone__endswith=last9
         ).first()
+    return contract
+
+
+# ---------------------------------------------------------------------------
+# Contract creation from approved FinancingApplication
+# ---------------------------------------------------------------------------
+
+@transaction.atomic
+def create_contract_from_application(application, approved_by=None) -> "PaymentContract":
+    """
+    Idempotently create a PaymentContract from an approved FinancingApplication.
+    Also creates a MerchantContractPayout.
+    Returns the (possibly existing) PaymentContract.
+    """
+    from portal.models import PaymentContract
+
+    # Idempotent: return existing contract if already created
+    try:
+        return application.payment_contract
+    except PaymentContract.DoesNotExist:
+        pass
+
+    total_amount = Decimal(application.calculated_total_loan or 0)
+    deposit = Decimal(application.deposit_amount or 0)
+    term = application.term_months or 12
+    daily = calculate_daily_price(total_amount, term)
+    monthly = calculate_thirty_day_price(total_amount, term)
+
+    contract = PaymentContract.objects.create(
+        source_application=application,
+        customer_name=application.customer_name or "",
+        customer_phone=application.customer_phone or "",
+        customer_national_id=application.national_id or "",
+        device_model=str(application.deal) if application.deal else "",
+        total_amount=total_amount,
+        deposit_paid=deposit,
+        daily_price=daily,
+        thirty_day_price=monthly,
+        term_months=term,
+        status=PaymentContract.STATUS_ACTIVE,
+    )
+    logger.info(
+        "Created PaymentContract %s (PayG: %s) from application %s",
+        contract.contract_number,
+        contract.payg_number,
+        application.application_number,
+    )
+
+    # Create merchant payout (idempotent)
+    try:
+        from commissions.services import create_merchant_payout_for_contract
+        merchant_user = application.created_by
+        create_merchant_payout_for_contract(
+            contract,
+            merchant_user=merchant_user,
+            created_by=approved_by,
+        )
+    except Exception as exc:
+        logger.warning("Could not create MerchantContractPayout for contract %s: %s", contract.pk, exc)
+
     return contract

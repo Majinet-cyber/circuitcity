@@ -27,11 +27,19 @@
         <div class="brand-left">
             <a href="{% url 'home' %}" class="brand-lockup" aria-label="TengaSale home">
                 <img
-                    src="{% if tengasale_logo_full_url %}{{ tengasale_logo_full_url }}{% else %}{% static 'images/brand/tengasale-logo-full.png' %}{% endif %}"
+                    src="{% static 'images/brand/tengasale-logo-full.svg' %}"
                     alt="TengaSale"
                     class="ts-logo-img"
-                    style="max-height:38px;max-width:140px;object-fit:contain;"
+                    style="max-height:38px;max-width:160px;object-fit:contain;display:block;"
+                    onerror="this.style.display='none';this.nextElementSibling.style.display='flex';"
                 >
+                <span class="brand-lockup-fallback" style="display:none;">
+                    <span class="ts-logo">T</span>
+                    <span class="brand-copy">
+                        <span class="brand-title">TengaSale</span>
+                        <span class="brand-tagline">Endless Possibilities</span>
+                    </span>
+                </span>
             </a>
         </div>
 

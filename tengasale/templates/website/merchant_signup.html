@@ -1,0 +1,245 @@
+{% extends "website/site_base.html" %}
+{% load static %}
+
+{% block site_title %}Become a Merchant — TengaSale{% endblock %}
+{% block site_description %}Join TengaSale as a merchant. Submit your business details and our onboarding team will contact you.{% endblock %}
+
+{% block site_content %}
+
+<!-- Merchant Signup Hero -->
+<section class="merchant-hero">
+  <div class="site-section__inner merchant-hero__inner">
+    <div class="merchant-hero__copy">
+      <span class="merchant-hero__badge">Become a TengaSale Merchant</span>
+      <h1 class="merchant-hero__title">Offer phones on instalments without losing control.</h1>
+      <p class="merchant-hero__sub">
+        Submit your shop details. A TengaSale merchant administrator will review your
+        application and contact you to discuss onboarding and next steps.
+      </p>
+      <div class="merchant-hero-trust">
+        <div class="merchant-trust-item">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+          Structured repayment tracking
+        </div>
+        <div class="merchant-trust-item">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+          Customer KYC and contract records
+        </div>
+        <div class="merchant-trust-item">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+          Mobile money payment visibility
+        </div>
+        <div class="merchant-trust-item">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+          Dedicated merchant administrator support
+        </div>
+      </div>
+    </div>
+    <div class="merchant-hero__visual" aria-hidden="true">
+      <div class="merchant-hero-card glass-card">
+        <div class="merchant-hero-card__label">Merchant Portal</div>
+        <div class="merchant-hero-card__title">City Phones Lilongwe</div>
+        <div class="merchant-hero-card__row">
+          <span class="merchant-hero-card__badge merchant-hero-card__badge--green">Active</span>
+          <span class="merchant-hero-card__meta">24 active contracts</span>
+        </div>
+        <div class="merchant-hero-card__divider"></div>
+        <div class="merchant-hero-card__label">This Month</div>
+        <div class="merchant-hero-card__stats">
+          <div>
+            <div class="merchant-hero-card__stat-val">MWK 1.2M</div>
+            <div class="merchant-hero-card__stat-label">Repayments received</div>
+          </div>
+          <div>
+            <div class="merchant-hero-card__stat-val">8</div>
+            <div class="merchant-hero-card__stat-label">New applications</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Merchant Signup Form Section -->
+<section class="lead-form-section merchant-form-section">
+  <div class="lead-form-shell">
+
+    <!-- Back link -->
+    <a href="{% url 'website_landing' %}" class="lead-back-link">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="15,18 9,12 15,6"/></svg>
+      Back to TengaSale
+    </a>
+
+    <!-- Header -->
+    <div class="lead-form-hdr">
+      <div class="lead-form-badge">Merchant Application</div>
+      <h2 class="lead-form-title">Submit your merchant details</h2>
+      <p class="lead-form-sub">
+        Our merchant onboarding team will review your application
+        and contact you within 2 business days to discuss next steps.
+      </p>
+    </div>
+
+    <!-- Error display -->
+    {% if errors %}
+    <div class="lead-errors" role="alert">
+      <strong>Please correct the following:</strong>
+      <ul>
+        {% for err in errors %}
+          <li>{{ err }}</li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+
+    <!-- Form -->
+    <form method="post" class="lead-form" novalidate>
+      {% csrf_token %}
+
+      <fieldset class="lead-fieldset">
+        <legend class="lead-legend">Business Information</legend>
+
+        <div class="lead-field lead-field--required">
+          <label for="business_name" class="lead-label">Business / Shop Name</label>
+          <input type="text" id="business_name" name="business_name"
+                 class="lead-input" placeholder="e.g. City Phones Lilongwe"
+                 value="{{ post.business_name|default:'' }}" required>
+        </div>
+
+        <div class="lead-field-row">
+          <div class="lead-field lead-field--required">
+            <label for="business_type" class="lead-label">Business Type</label>
+            <select id="business_type" name="business_type" class="lead-select" required>
+              <option value="">Select type…</option>
+              <option value="phone_shop" {% if post.business_type == 'phone_shop' %}selected{% endif %}>Phone Shop</option>
+              <option value="electronics_shop" {% if post.business_type == 'electronics_shop' %}selected{% endif %}>Electronics Shop</option>
+              <option value="mixed_retail" {% if post.business_type == 'mixed_retail' %}selected{% endif %}>Mixed Retail</option>
+              <option value="agent" {% if post.business_type == 'agent' %}selected{% endif %}>Agent</option>
+              <option value="other" {% if post.business_type == 'other' %}selected{% endif %}>Other</option>
+            </select>
+          </div>
+
+          <div class="lead-field">
+            <label for="estimated_monthly_phone_sales" class="lead-label">Est. phones sold per month</label>
+            <input type="number" id="estimated_monthly_phone_sales" name="estimated_monthly_phone_sales"
+                   class="lead-input" placeholder="e.g. 20" min="0"
+                   value="{{ post.estimated_monthly_phone_sales|default:'' }}">
+          </div>
+        </div>
+
+        <div class="lead-field-row">
+          <div class="lead-field lead-field--required">
+            <label for="district" class="lead-label">District</label>
+            <select id="district" name="district" class="lead-select" required>
+              <option value="">Select district…</option>
+              {% for d in districts %}
+                <option value="{{ d }}" {% if post.district == d %}selected{% endif %}>{{ d }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="lead-field">
+            <label for="area" class="lead-label">Area / Town</label>
+            <input type="text" id="area" name="area"
+                   class="lead-input" placeholder="e.g. Area 25"
+                   value="{{ post.area|default:'' }}">
+          </div>
+        </div>
+
+        <div class="lead-field">
+          <label class="lead-label">Do you have business registration?</label>
+          <div class="lead-radio-row">
+            <label class="lead-radio">
+              <input type="radio" name="has_business_registration" value="yes"
+                     {% if post.has_business_registration == 'yes' %}checked{% endif %}>
+              Yes
+            </label>
+            <label class="lead-radio">
+              <input type="radio" name="has_business_registration" value="no"
+                     {% if post.has_business_registration == 'no' %}checked{% endif %}>
+              No
+            </label>
+            <label class="lead-radio">
+              <input type="radio" name="has_business_registration" value=""
+                     {% if not post.has_business_registration %}checked{% endif %}>
+              Not sure
+            </label>
+          </div>
+        </div>
+
+      </fieldset>
+
+      <fieldset class="lead-fieldset">
+        <legend class="lead-legend">Contact Details</legend>
+
+        <div class="lead-field lead-field--required">
+          <label for="owner_full_name" class="lead-label">Owner Full Name</label>
+          <input type="text" id="owner_full_name" name="owner_full_name"
+                 class="lead-input" placeholder="Your full name"
+                 value="{{ post.owner_full_name|default:'' }}" required>
+        </div>
+
+        <div class="lead-field-row">
+          <div class="lead-field lead-field--required">
+            <label for="phone" class="lead-label">Phone Number</label>
+            <input type="tel" id="phone" name="phone"
+                   class="lead-input" placeholder="+265 990 000 000"
+                   value="{{ post.phone|default:'' }}" required>
+          </div>
+
+          <div class="lead-field">
+            <label for="whatsapp_phone" class="lead-label">WhatsApp Number <span class="lead-optional">(optional)</span></label>
+            <input type="tel" id="whatsapp_phone" name="whatsapp_phone"
+                   class="lead-input" placeholder="+265 990 000 000"
+                   value="{{ post.whatsapp_phone|default:'' }}">
+          </div>
+        </div>
+
+        <div class="lead-field">
+          <label for="email" class="lead-label">Email Address <span class="lead-optional">(optional)</span></label>
+          <input type="email" id="email" name="email"
+                 class="lead-input" placeholder="your@email.com"
+                 value="{{ post.email|default:'' }}">
+        </div>
+
+      </fieldset>
+
+      <fieldset class="lead-fieldset">
+        <legend class="lead-legend">Payment Preferences</legend>
+
+        <div class="lead-field">
+          <label for="preferred_payout_method" class="lead-label">Preferred payout method</label>
+          <select id="preferred_payout_method" name="preferred_payout_method" class="lead-select">
+            <option value="">Select…</option>
+            <option value="bank" {% if post.preferred_payout_method == 'bank' %}selected{% endif %}>Bank Transfer</option>
+            <option value="airtel_money" {% if post.preferred_payout_method == 'airtel_money' %}selected{% endif %}>Airtel Money</option>
+            <option value="tnm_mpamba" {% if post.preferred_payout_method == 'tnm_mpamba' %}selected{% endif %}>TNM Mpamba</option>
+            <option value="not_sure" {% if post.preferred_payout_method == 'not_sure' %}selected{% endif %}>Not sure yet</option>
+          </select>
+        </div>
+
+        <div class="lead-field">
+          <label for="message" class="lead-label">Additional notes <span class="lead-optional">(optional)</span></label>
+          <textarea id="message" name="message" class="lead-textarea" rows="3"
+                    placeholder="Anything you'd like us to know before we contact you…">{{ post.message|default:'' }}</textarea>
+        </div>
+
+      </fieldset>
+
+      <div class="lead-form-footer">
+        <p class="lead-consent">
+          By submitting this form you consent to TengaSale contacting you about merchant onboarding.
+          See our <a href="{% url 'website_privacy' %}">Privacy Policy</a>.
+        </p>
+        <button type="submit" class="lead-submit">
+          Submit Application
+          <svg viewBox="0 0 24 24" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12,5 19,12 12,19"/></svg>
+        </button>
+      </div>
+
+    </form>
+
+  </div>
+</section><!-- end .merchant-form-section -->
+
+{% endblock %}

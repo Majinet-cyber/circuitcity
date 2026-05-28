@@ -1,3 +1,5 @@
+import secrets
+from datetime import timedelta
 from decimal import Decimal
 
 from django.conf import settings
@@ -101,6 +103,12 @@ class FinancingApplication(models.Model):
         "proof_income_file": "Proof income file",
         "customer_signature": "Customer signature",
         "agreed_to_terms": "Agreed to terms",
+        "gender": "Gender",
+        "marital_status": "Marital status",
+        "num_dependents": "Number of dependents",
+        "date_of_birth": "Date of birth",
+        "phone_user": "Who will use the phone",
+        "device_purpose": "Device purpose",
     }
 
     CORRECTION_FIELD_ORDER = list(CORRECTION_FIELD_LABELS.keys())
@@ -114,6 +122,76 @@ class FinancingApplication(models.Model):
     occupation = models.CharField(max_length=150, blank=True)
     income_band = models.CharField(max_length=40, blank=True)
     exact_monthly_income = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+
+    # ── Demographic enrichment ────────────────────────────────────────────────
+    GENDER_MALE = "male"
+    GENDER_FEMALE = "female"
+    GENDER_OTHER = "other"
+    GENDER_CHOICES = [
+        ("", "Select gender"),
+        (GENDER_MALE, "Male"),
+        (GENDER_FEMALE, "Female"),
+        (GENDER_OTHER, "Prefer not to say"),
+    ]
+
+    MARITAL_SINGLE = "single"
+    MARITAL_MARRIED = "married"
+    MARITAL_DIVORCED = "divorced"
+    MARITAL_WIDOWED = "widowed"
+    MARITAL_SEPARATED = "separated"
+    MARITAL_CHOICES = [
+        ("", "Select marital status"),
+        (MARITAL_SINGLE, "Single"),
+        (MARITAL_MARRIED, "Married"),
+        (MARITAL_DIVORCED, "Divorced"),
+        (MARITAL_WIDOWED, "Widowed"),
+        (MARITAL_SEPARATED, "Separated"),
+    ]
+
+    PHONE_USER_SELF = "customer_self"
+    PHONE_USER_CHOICES = [
+        ("", "Select who will use the phone"),
+        (PHONE_USER_SELF, "The customer themselves"),
+        ("spouse", "Spouse"),
+        ("child", "Child"),
+        ("parent", "Parent"),
+        ("family_member", "Other family member"),
+        ("friend", "Friend"),
+        ("business_employee", "Business employee"),
+        ("other", "Other"),
+    ]
+
+    DEVICE_PURPOSE_CHOICES = [
+        ("", "Select purpose"),
+        ("personal", "Personal use"),
+        ("business", "Business use"),
+        ("school", "School / education"),
+        ("family_use", "Family use"),
+        ("other", "Other"),
+    ]
+
+    RENT_OWN_CHOICES = [
+        ("", "Select"),
+        ("rent", "Renting"),
+        ("own", "Owned home"),
+        ("family_home", "Family/parental home"),
+        ("employer_provided", "Employer-provided"),
+        ("other", "Other"),
+    ]
+
+    gender = models.CharField(max_length=10, choices=GENDER_CHOICES, blank=True, default="")
+    marital_status = models.CharField(max_length=15, choices=MARITAL_CHOICES, blank=True, default="")
+    num_dependents = models.PositiveSmallIntegerField(null=True, blank=True)
+    date_of_birth = models.DateField(null=True, blank=True)
+    phone_user = models.CharField(max_length=20, choices=PHONE_USER_CHOICES, blank=True, default="")
+    phone_user_other = models.CharField(max_length=100, blank=True, default="")
+    device_purpose = models.CharField(max_length=20, choices=DEVICE_PURPOSE_CHOICES, blank=True, default="")
+    household_income_contributors = models.PositiveSmallIntegerField(null=True, blank=True)
+    rent_or_own_home = models.CharField(max_length=20, choices=RENT_OWN_CHOICES, blank=True, default="")
+    third_party_phone_user_risk_flagged = models.BooleanField(
+        default=False,
+        help_text="Auto-flagged when phone will be used by someone other than the applicant",
+    )
 
     income_source = models.CharField(max_length=150, blank=True)
     monthly_income = models.DecimalField(max_digits=12, decimal_places=2, default=0)
@@ -499,3 +577,144 @@ class ApplicationCorrection(models.Model):
 
     def __str__(self):
         return f"{self.application} - {self.label}"
+
+
+class ApplicationCorrectionToken(models.Model):
+    """
+    Secure, time-limited token for customer self-correction of marked fields.
+    The token is embedded in a link sent to the customer via SMS/email.
+    """
+    application = models.OneToOneField(
+        FinancingApplication,
+        on_delete=models.CASCADE,
+        related_name="correction_token_obj",
+    )
+    token = models.CharField(max_length=64, unique=True, blank=True)
+    expires_at = models.DateTimeField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    used_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = "Application Correction Token"
+
+    def save(self, *args, **kwargs):
+        if not self.token:
+            self.token = secrets.token_urlsafe(32)
+        if not self.expires_at:
+            self.expires_at = timezone.now() + timedelta(hours=72)
+        super().save(*args, **kwargs)
+
+    @property
+    def is_valid(self) -> bool:
+        return timezone.now() < self.expires_at
+
+    def mark_used(self):
+        self.used_at = timezone.now()
+        self.save(update_fields=["used_at"])
+
+    @classmethod
+    def create_or_refresh(cls, application: FinancingApplication) -> "ApplicationCorrectionToken":
+        obj, created = cls.objects.get_or_create(application=application)
+        if not created:
+            obj.token = secrets.token_urlsafe(32)
+            obj.expires_at = timezone.now() + timedelta(hours=72)
+            obj.used_at = None
+            obj.save(update_fields=["token", "expires_at", "used_at"])
+        return obj
+
+    def __str__(self):
+        return f"CorrectionToken for {self.application_id}"
+
+
+class ApplicationFieldReview(models.Model):
+    """
+    Granular field-level marking for underwriter review.
+    Allows marking individual fields needing customer correction
+    with a status trail and reason.
+    """
+
+    SECTION_CUSTOMER = "customer"
+    SECTION_INCOME = "income"
+    SECTION_CONTACTS = "contacts"
+    SECTION_LOCATION = "location"
+    SECTION_DOCUMENTS = "documents"
+
+    SECTION_CHOICES = [
+        (SECTION_CUSTOMER, "Customer"),
+        (SECTION_INCOME, "Income"),
+        (SECTION_CONTACTS, "Contacts"),
+        (SECTION_LOCATION, "Location"),
+        (SECTION_DOCUMENTS, "Documents"),
+    ]
+
+    STATUS_MARKED = "marked"
+    STATUS_CUSTOMER_UPDATED = "customer_updated"
+    STATUS_ACCEPTED = "accepted"
+    STATUS_DISMISSED = "dismissed"
+
+    STATUS_CHOICES = [
+        (STATUS_MARKED, "Needs Review"),
+        (STATUS_CUSTOMER_UPDATED, "Customer Updated"),
+        (STATUS_ACCEPTED, "Accepted"),
+        (STATUS_DISMISSED, "Dismissed"),
+    ]
+
+    REASON_INCORRECT = "incorrect_information"
+    REASON_MISSING = "missing_information"
+    REASON_UNCLEAR_DOC = "unclear_document"
+    REASON_NEEDS_CONFIRM = "needs_customer_confirmation"
+    REASON_NEEDS_PROOF = "needs_updated_proof"
+    REASON_OTHER = "other"
+
+    REASON_CHOICES = [
+        (REASON_INCORRECT, "Incorrect information"),
+        (REASON_MISSING, "Missing information"),
+        (REASON_UNCLEAR_DOC, "Unclear document"),
+        (REASON_NEEDS_CONFIRM, "Needs customer confirmation"),
+        (REASON_NEEDS_PROOF, "Needs updated proof"),
+        (REASON_OTHER, "Other"),
+    ]
+
+    EDITABLE_FIELD_KEYS = [
+        "full_name", "dob", "gender", "national_id", "primary_phone", "secondary_phone",
+        "income_band", "income_amount", "income_frequency", "income_source", "occupation",
+        "company_name", "income_source_description", "company_contact_name", "company_contact_phone",
+        "proof_of_income",
+        "guarantor_type", "guarantor_name", "guarantor_phone", "neighbour_name", "neighbour_phone",
+        "region", "district", "area", "village", "traditional_authority", "gps_location",
+        "selfie", "id_front", "id_back", "pre_approval_signature", "contract_signature",
+    ]
+
+    application = models.ForeignKey(
+        FinancingApplication,
+        on_delete=models.CASCADE,
+        related_name="field_reviews",
+    )
+    field_key = models.CharField(max_length=80)
+    field_label = models.CharField(max_length=180)
+    section = models.CharField(max_length=30, choices=SECTION_CHOICES, blank=True)
+    current_value_snapshot = models.TextField(blank=True)
+    reason = models.CharField(max_length=40, choices=REASON_CHOICES, default=REASON_INCORRECT)
+    comment = models.TextField(blank=True)
+    marked_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="field_reviews_marked",
+    )
+    status = models.CharField(max_length=30, choices=STATUS_CHOICES, default=STATUS_MARKED)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["section", "field_key"]
+        verbose_name = "Application Field Review"
+        verbose_name_plural = "Application Field Reviews"
+        indexes = [
+            models.Index(fields=["application", "status"]),
+            models.Index(fields=["field_key"]),
+        ]
+
+    def __str__(self):
+        return f"{self.application_id} — {self.field_label} [{self.status}]"
