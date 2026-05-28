@@ -15,9 +15,12 @@ ENV/
 
 # Django
 *.sqlite3
+db.sqlite3
 tengasale/db.sqlite3
 tengasale/media/
 tengasale/.env
+staticfiles/
+tengasale/staticfiles/
 *.log
 local_settings.py
 
@@ -46,5 +49,6 @@ htmlcov/
 
 # Secrets
 .env
+.env.local
 .env.*
 !.env.example
