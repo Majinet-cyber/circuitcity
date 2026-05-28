@@ -1,5 +1,5 @@
 {% extends "base/base.html" %}
-{% load static %}
+{% load static ts_filters %}
 
 {% block page_title %}Payment History — {{ contract.contract_number }}{% endblock %}
 
@@ -15,7 +15,7 @@
 <div class="glass-card review-card mb-8">
   <div class="review-row"><span>Contract</span><strong>{{ contract.contract_number }}</strong></div>
   <div class="review-row"><span>PayG</span><strong>{{ contract.payg_number }}</strong></div>
-  <div class="review-row"><span>Total Paid</span><strong>MWK {{ contract.amount_paid|floatformat:0 }}</strong></div>
+  <div class="review-row"><span>Total Paid</span><strong>{{ contract.amount_paid|mwk }}</strong></div>
 </div>
 
 {% if transactions %}
@@ -31,7 +31,7 @@
       </div>
     </div>
     <div class="tx-row__amount {% if tx.status == 'paid' %}text-green{% else %}text-red{% endif %}">
-      {% if tx.status == 'paid' %}+{% endif %}MWK {{ tx.amount|floatformat:0 }}
+      {% if tx.status == 'paid' %}+{% endif %}{{ tx.amount|mwk }}
     </div>
   </div>
   {% endfor %}

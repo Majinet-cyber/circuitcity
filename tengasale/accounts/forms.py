@@ -1,20 +1,22 @@
 from django import forms
 from django.contrib.auth import get_user_model
 
-from .utils import assign_role, profile_role
+from .utils import assign_role, profile_role, ROLE_GROUPS
 
 
 ROLE_CHOICES = [
-    ("merchant", "Merchant"),
-    ("underwriter", "Underwriter"),
-    ("hq", "HQ"),
+    ("merchant",       "Merchant"),
+    ("merchant_admin", "Merchant Administrator"),
+    ("underwriter",    "Underwriter"),
+    ("tech_support",   "Tech Support"),
+    ("hq",             "HQ"),
 ]
 
 
 class HQUserForm(forms.ModelForm):
-    full_name = forms.CharField(max_length=150, required=False)
+    full_name = forms.CharField(max_length=150, required=False, label="Full name")
     role = forms.ChoiceField(choices=ROLE_CHOICES)
-    password = forms.CharField(widget=forms.PasswordInput, required=False)
+    password = forms.CharField(widget=forms.PasswordInput, required=False, label="Password")
 
     class Meta:
         model = get_user_model()
@@ -28,14 +30,14 @@ class HQUserForm(forms.ModelForm):
         if self.instance.pk:
             self.fields["full_name"].initial = self.instance.get_full_name()
             role = profile_role(self.instance)
-            if role in {"merchant", "underwriter", "hq"}:
+            all_roles = set(ROLE_GROUPS.keys())
+            if role in all_roles:
                 self.fields["role"].initial = role
-            elif self.instance.groups.filter(name="HQ").exists():
-                self.fields["role"].initial = "hq"
-            elif self.instance.groups.filter(name="Underwriter").exists():
-                self.fields["role"].initial = "underwriter"
-            elif self.instance.groups.filter(name="Merchant").exists():
-                self.fields["role"].initial = "merchant"
+            else:
+                for slug, group_name in ROLE_GROUPS.items():
+                    if self.instance.groups.filter(name=group_name).exists():
+                        self.fields["role"].initial = slug
+                        break
 
     def save(self, commit=True):
         user = super().save(commit=False)

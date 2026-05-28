@@ -1,5 +1,5 @@
 {% extends "base/base.html" %}
-{% load static %}
+{% load static ts_filters %}
 
 {% block page_title %}Device Finance Catalog — TengaSale HQ{% endblock %}
 
@@ -204,15 +204,15 @@
           <div class="dc-metric-label">Cash Price</div>
         </div>
         <div class="dc-metric">
-          <div class="dc-metric-val">MWK {{ deal.calculated_total_loan|floatformat:0 }}</div>
+          <div class="dc-metric-val">{{ deal.calculated_total_loan|mwk }}</div>
           <div class="dc-metric-label">Contract Value</div>
         </div>
         <div class="dc-metric">
-          <div class="dc-metric-val">MWK {{ deal.deposit_amount|floatformat:0 }}</div>
+          <div class="dc-metric-val">{{ deal.deposit_amount|mwk }}</div>
           <div class="dc-metric-label">Deposit ({{ deal.deposit_percent }}%)</div>
         </div>
         <div class="dc-metric">
-          <div class="dc-metric-val">MWK {{ deal.monthly_payment|floatformat:0 }}/mo</div>
+          <div class="dc-metric-val">{{ deal.monthly_payment|mwk }}/mo</div>
           <div class="dc-metric-label">{{ deal.term_months }}-Month Plan</div>
         </div>
       </div>

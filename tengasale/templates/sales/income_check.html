@@ -1,5 +1,5 @@
 {% extends "sales/base.html" %}
-{% load static %}
+{% load static ts_filters %}
 
 {% block page_title %}Income Check — {{ app.application_number }}{% endblock %}
 
@@ -19,15 +19,15 @@
     <div class="ts-review-card__title">Income Details</div>
     <div class="ts-review-row"><span>Occupation</span><strong>{{ app.occupation|default:"—" }}</strong></div>
     <div class="ts-review-row"><span>Income Band</span><strong>{{ app.income_band|default:"—" }}</strong></div>
-    <div class="ts-review-row"><span>Monthly Income</span><strong>MWK {{ monthly_income|floatformat:0 }}</strong></div>
-    <div class="ts-review-row"><span>Monthly Repayment</span><strong>MWK {{ monthly_payment|floatformat:0 }}</strong></div>
+    <div class="ts-review-row"><span>Monthly Income</span><strong>{{ monthly_income|mwk }}</strong></div>
+    <div class="ts-review-row"><span>Monthly Repayment</span><strong>{{ monthly_payment|mwk }}</strong></div>
     <div class="ts-review-row">
       <span>Income Multiple</span>
       <strong class="{% if income_multiple >= 10 %}text-green{% elif income_multiple >= 5 %}text-orange{% else %}text-red{% endif %}">
         {{ income_multiple }}x
       </strong>
     </div>
-    <div class="ts-review-row"><span>Recommended Min Income</span><strong>MWK {{ recommended_income|floatformat:0 }}</strong></div>
+    <div class="ts-review-row"><span>Recommended Min Income</span><strong>{{ recommended_income|mwk }}</strong></div>
   </div>
 
   <form method="post">

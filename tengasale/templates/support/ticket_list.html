@@ -1,0 +1,76 @@
+{% extends "base/base.html" %}
+
+{% block page_title %}Support Tickets{% endblock %}
+
+{% block topbar %}{% include "support/_topbar.html" %}{% endblock %}
+
+{% block content %}
+<div class="hq-page-wrap">
+
+  <div class="hq-page-hdr">
+    <div>
+      <a href="{% url 'support_dashboard' %}" class="hq-back-link">← Dashboard</a>
+      <h1 class="hq-page-title">Support Tickets</h1>
+    </div>
+    <a href="{% url 'ticket_create' %}" class="hq-action-btn">+ New Ticket</a>
+  </div>
+
+  <!-- Filters -->
+  <form method="get" class="hq-filter-row" style="margin-bottom:20px">
+    <select name="status" class="hq-select hq-select--sm">
+      <option value="">All Statuses</option>
+      {% for val, label in status_choices %}<option value="{{ val }}" {% if status_f == val %}selected{% endif %}>{{ label }}</option>{% endfor %}
+    </select>
+    <select name="category" class="hq-select hq-select--sm">
+      <option value="">All Categories</option>
+      {% for val, label in category_choices %}<option value="{{ val }}" {% if category_f == val %}selected{% endif %}>{{ label }}</option>{% endfor %}
+    </select>
+    <select name="priority" class="hq-select hq-select--sm">
+      <option value="">All Priorities</option>
+      {% for val, label in priority_choices %}<option value="{{ val }}" {% if priority_f == val %}selected{% endif %}>{{ label }}</option>{% endfor %}
+    </select>
+    <button type="submit" class="hq-btn hq-btn--primary hq-btn--sm">Filter</button>
+    <a href="{% url 'ticket_list' %}" class="hq-btn hq-btn--ghost hq-btn--sm">Clear</a>
+  </form>
+
+  <div class="hq-table-wrap">
+    <table class="hq-table">
+      <thead>
+        <tr>
+          <th>#</th><th>Title</th><th>Category</th><th>Priority</th><th>Status</th>
+          {% if can_manage %}<th>Created by</th><th>Assigned</th>{% endif %}
+          <th>Created</th><th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for ticket in tickets %}
+        <tr>
+          <td class="hq-td-muted">{{ ticket.ticket_number }}</td>
+          <td><strong>{{ ticket.title|truncatechars:55 }}</strong></td>
+          <td>{{ ticket.get_category_display }}</td>
+          <td>
+            <span class="hq-badge {% if ticket.priority == 'critical' %}hq-badge--red{% elif ticket.priority == 'high' %}hq-badge--orange{% elif ticket.priority == 'medium' %}hq-badge--yellow{% else %}hq-badge--gray{% endif %}">
+              {{ ticket.get_priority_display }}
+            </span>
+          </td>
+          <td>
+            <span class="hq-badge {% if ticket.status == 'open' %}hq-badge--orange{% elif ticket.status == 'resolved' or ticket.status == 'closed' %}hq-badge--green{% else %}hq-badge--gray{% endif %}">
+              {{ ticket.get_status_display }}
+            </span>
+          </td>
+          {% if can_manage %}
+          <td class="hq-td-muted">{{ ticket.created_by.username|default:"—" }}</td>
+          <td class="hq-td-muted">{{ ticket.assigned_to.username|default:"—" }}</td>
+          {% endif %}
+          <td class="hq-td-muted">{{ ticket.created_at|date:"d M Y" }}</td>
+          <td><a href="{% url 'ticket_detail' ticket.id %}" class="hq-table-link">View →</a></td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="9" class="hq-td-empty">No tickets found.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+</div>
+{% endblock %}

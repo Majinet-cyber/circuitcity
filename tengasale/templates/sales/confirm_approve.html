@@ -1,5 +1,5 @@
 {% extends "sales/base.html" %}
-{% load static %}
+{% load static ts_filters %}
 
 {% block page_title %}Confirm Approve — {{ app.application_number }}{% endblock %}
 
@@ -25,7 +25,7 @@
       <div class="ts-review-row"><span>Customer</span><strong>{{ app.customer_name }}</strong></div>
       {% if app.deal %}
         <div class="ts-review-row"><span>Device</span><strong>{{ app.deal }}</strong></div>
-        <div class="ts-review-row"><span>Total Contract</span><strong>MWK {{ app.calculated_total_loan|floatformat:0 }}</strong></div>
+        <div class="ts-review-row"><span>Total Contract</span><strong>{{ app.calculated_total_loan|mwk }}</strong></div>
       {% endif %}
     </div>
 

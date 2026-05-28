@@ -6,7 +6,16 @@ class Command(BaseCommand):
     help = "Create TengaSale role groups."
 
     def handle(self, *args, **options):
-        for group_name in ["Merchant", "Underwriter", "HQ"]:
+        groups = [
+            "Merchant",
+            "Merchant Administrator",
+            "Underwriter",
+            "Tech Support",
+            "HQ",
+        ]
+        for group_name in groups:
             Group.objects.get_or_create(name=group_name)
 
-        self.stdout.write(self.style.SUCCESS("Seeded TengaSale roles: Merchant, Underwriter, HQ."))
+        self.stdout.write(self.style.SUCCESS(
+            "Seeded TengaSale roles: Merchant, Merchant Administrator, Underwriter, Tech Support, HQ."
+        ))

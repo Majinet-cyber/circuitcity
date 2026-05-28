@@ -1,4 +1,5 @@
 {% extends "base/base.html" %}
+{% load ts_filters %}
 
 {% block page_title %}Contract Terms{% endblock %}
 
@@ -14,13 +15,13 @@
 <div class="card detail-card">
     <div class="detail-row"><span>Customer</span><strong>{{ application.customer_name }}</strong></div>
     <div class="detail-row"><span>Device/deal</span><strong>{{ contract.deal_name|default:"Not selected" }}</strong></div>
-    <div class="detail-row"><span>Cash price</span><strong>MWK {{ contract.cash_price|floatformat:0 }}</strong></div>
-    <div class="detail-row"><span>Total loan</span><strong>MWK {{ contract.total_loan|floatformat:0 }}</strong></div>
-    <div class="detail-row"><span>Deposit</span><strong>MWK {{ contract.deposit_amount|floatformat:0 }}</strong></div>
-    <div class="detail-row"><span>Monthly payment</span><strong>MWK {{ contract.monthly_payment|floatformat:0 }}</strong></div>
-    <div class="detail-row"><span>Daily payment</span><strong>MWK {{ contract.daily_payment|floatformat:0 }}</strong></div>
-    <div class="detail-row"><span>3 month early option</span><strong>MWK {{ application.calculated_3_month_total|floatformat:0 }}</strong></div>
-    <div class="detail-row"><span>6 month early option</span><strong>MWK {{ application.calculated_6_month_total|floatformat:0 }}</strong></div>
+    <div class="detail-row"><span>Cash price</span><strong>{{ contract.cash_price|mwk }}</strong></div>
+    <div class="detail-row"><span>Total loan</span><strong>{{ contract.total_loan|mwk }}</strong></div>
+    <div class="detail-row"><span>Deposit</span><strong>{{ contract.deposit_amount|mwk }}</strong></div>
+    <div class="detail-row"><span>Monthly payment</span><strong>{{ contract.monthly_payment|mwk }}</strong></div>
+    <div class="detail-row"><span>Daily payment</span><strong>{{ contract.daily_payment|mwk }}</strong></div>
+    <div class="detail-row"><span>3 month early option</span><strong>{{ application.calculated_3_month_total|mwk }}</strong></div>
+    <div class="detail-row"><span>6 month early option</span><strong>{{ application.calculated_6_month_total|mwk }}</strong></div>
 </div>
 
 <form method="post" class="card" id="terms-form">

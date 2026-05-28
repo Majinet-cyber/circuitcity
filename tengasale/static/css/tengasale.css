@@ -153,6 +153,25 @@
   margin: 0;
 }
 
+.ts-report-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  background: rgba(255,107,26,0.10);
+  color: #ff6a00;
+  border: 1.5px solid rgba(255,107,26,0.25);
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.ts-report-btn:hover {
+  background: rgba(255,107,26,0.18);
+}
+
 .ts-country-pill {
   display: inline-flex;
   align-items: center;

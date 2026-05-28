@@ -1,4 +1,5 @@
 {% extends "base/base.html" %}
+{% load ts_filters %}
 
 {% block content %}
 
@@ -7,7 +8,7 @@
 
 <section class="stat-card">
     <span>{{ payment.customer.full_name }}</span>
-    <strong>MWK {{ payment.amount|floatformat:0 }}</strong>
+    <strong>{{ payment.amount|mwk }}</strong>
     <p>{{ payment.get_payment_method_display }} | {{ payment.transaction_reference|default:"No reference" }}</p>
 </section>
 

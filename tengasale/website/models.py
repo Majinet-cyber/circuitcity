@@ -5,16 +5,28 @@ from django.db import models
 class MerchantLead(models.Model):
     STATUS_NEW = "new"
     STATUS_CONTACTED = "contacted"
+    STATUS_KYC_PENDING = "kyc_pending"
+    STATUS_DOCUMENTS_PENDING = "documents_pending"
+    STATUS_SITE_VISIT = "site_visit_needed"
+    STATUS_AWAITING_HQ = "awaiting_hq"
     STATUS_QUALIFIED = "qualified"
+    STATUS_APPROVED = "approved"
     STATUS_CONVERTED = "converted"
     STATUS_REJECTED = "rejected"
+    STATUS_SUSPENDED = "suspended"
 
     STATUS_CHOICES = [
-        (STATUS_NEW, "New"),
-        (STATUS_CONTACTED, "Contacted"),
-        (STATUS_QUALIFIED, "Qualified"),
-        (STATUS_CONVERTED, "Converted"),
-        (STATUS_REJECTED, "Rejected"),
+        (STATUS_NEW,               "New Lead"),
+        (STATUS_CONTACTED,         "Contacted"),
+        (STATUS_KYC_PENDING,       "KYC Pending"),
+        (STATUS_DOCUMENTS_PENDING, "Documents Pending"),
+        (STATUS_SITE_VISIT,        "Site Visit Needed"),
+        (STATUS_AWAITING_HQ,       "Awaiting HQ Approval"),
+        (STATUS_QUALIFIED,         "Qualified"),
+        (STATUS_APPROVED,          "Approved"),
+        (STATUS_CONVERTED,         "Converted"),
+        (STATUS_REJECTED,          "Rejected"),
+        (STATUS_SUSPENDED,         "Suspended"),
     ]
 
     BUSINESS_TYPE_CHOICES = [

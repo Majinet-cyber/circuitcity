@@ -1,0 +1,135 @@
+{% extends "base/base.html" %}
+{% load ts_filters %}
+
+{% block page_title %}Tech Support{% endblock %}
+
+{% block topbar %}{% include "support/_topbar.html" %}{% endblock %}
+
+{% block content %}
+<div class="hq-page-wrap">
+
+  <div class="hq-page-hdr">
+    <div>
+      <h1 class="hq-page-title">Tech Support</h1>
+      <p class="hq-page-sub">Tickets, bug events, and system health.</p>
+    </div>
+    <a href="{% url 'ticket_create' %}" class="hq-action-btn">
+      + New Ticket
+    </a>
+  </div>
+
+  <!-- KPI row -->
+  <div class="hq-kpi-row">
+    <div class="hq-kpi-card">
+      <div class="hq-kpi-val" style="color:#ff6a00">{{ open_tickets }}</div>
+      <div class="hq-kpi-lbl">Open Tickets</div>
+    </div>
+    <div class="hq-kpi-card">
+      <div class="hq-kpi-val" style="color:#dc2626">{{ critical_tickets }}</div>
+      <div class="hq-kpi-lbl">Critical Tickets</div>
+    </div>
+    <div class="hq-kpi-card">
+      <div class="hq-kpi-val" style="color:#2563eb">{{ my_tickets }}</div>
+      <div class="hq-kpi-lbl">Assigned to Me</div>
+    </div>
+    <div class="hq-kpi-card">
+      <div class="hq-kpi-val" style="color:#dc2626">{{ critical_bugs }}</div>
+      <div class="hq-kpi-lbl">Critical Bugs</div>
+    </div>
+    <div class="hq-kpi-card">
+      <div class="hq-kpi-val" style="color:#d97706">{{ new_bugs }}</div>
+      <div class="hq-kpi-lbl">New Bug Events</div>
+    </div>
+  </div>
+
+  <!-- Quick links -->
+  <div class="hq-quick-row" style="margin-bottom:24px">
+    <a href="{% url 'ticket_list' %}" class="hq-quick-card">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="2"/></svg>
+      All Tickets
+    </a>
+    <a href="{% url 'bug_monitor' %}" class="hq-quick-card">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      Bug Monitor
+    </a>
+    <a href="{% url 'ticket_create' %}" class="hq-quick-card">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      New Ticket
+    </a>
+  </div>
+
+  <!-- Recent tickets -->
+  <div class="hq-section" style="margin-bottom:28px">
+    <div class="hq-section-hdr">
+      <h2 class="hq-section-title">Recent Tickets</h2>
+      <a href="{% url 'ticket_list' %}" class="hq-section-link">View all →</a>
+    </div>
+    <div class="hq-table-wrap">
+      <table class="hq-table">
+        <thead>
+          <tr><th>#</th><th>Title</th><th>Category</th><th>Priority</th><th>Status</th><th>Created by</th><th>Assigned</th><th>Created</th><th></th></tr>
+        </thead>
+        <tbody>
+          {% for ticket in recent_tickets %}
+          <tr>
+            <td class="hq-td-muted">{{ ticket.ticket_number }}</td>
+            <td><strong>{{ ticket.title|truncatechars:50 }}</strong></td>
+            <td>{{ ticket.get_category_display }}</td>
+            <td>
+              <span class="hq-badge {% if ticket.priority == 'critical' %}hq-badge--red{% elif ticket.priority == 'high' %}hq-badge--orange{% elif ticket.priority == 'medium' %}hq-badge--yellow{% else %}hq-badge--gray{% endif %}">
+                {{ ticket.get_priority_display }}
+              </span>
+            </td>
+            <td>
+              <span class="hq-badge {% if ticket.status == 'open' %}hq-badge--orange{% elif ticket.status == 'resolved' or ticket.status == 'closed' %}hq-badge--green{% else %}hq-badge--gray{% endif %}">
+                {{ ticket.get_status_display }}
+              </span>
+            </td>
+            <td class="hq-td-muted">{{ ticket.created_by.username|default:"—" }}</td>
+            <td class="hq-td-muted">{{ ticket.assigned_to.username|default:"—" }}</td>
+            <td class="hq-td-muted">{{ ticket.created_at|date:"d M" }}</td>
+            <td><a href="{% url 'ticket_detail' ticket.id %}" class="hq-table-link">View →</a></td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="9" class="hq-td-empty">No tickets yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Recent bugs -->
+  <div class="hq-section">
+    <div class="hq-section-hdr">
+      <h2 class="hq-section-title">Recent Bug Events</h2>
+      <a href="{% url 'bug_monitor' %}" class="hq-section-link">View all →</a>
+    </div>
+    <div class="hq-table-wrap">
+      <table class="hq-table">
+        <thead>
+          <tr><th>Source</th><th>Severity</th><th>Message</th><th>Count</th><th>Last seen</th><th></th></tr>
+        </thead>
+        <tbody>
+          {% for bug in recent_bugs %}
+          <tr>
+            <td>{{ bug.get_source_display }}</td>
+            <td>
+              <span class="hq-badge {% if bug.severity == 'critical' %}hq-badge--red{% elif bug.severity == 'high' %}hq-badge--orange{% elif bug.severity == 'medium' %}hq-badge--yellow{% else %}hq-badge--gray{% endif %}">
+                {{ bug.get_severity_display }}
+              </span>
+            </td>
+            <td>{{ bug.message|truncatechars:60 }}</td>
+            <td class="hq-td-muted">{{ bug.occurrence_count }}</td>
+            <td class="hq-td-muted">{{ bug.last_seen_at|date:"d M H:i" }}</td>
+            <td><a href="{% url 'bug_detail' bug.id %}" class="hq-table-link">View →</a></td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="6" class="hq-td-empty">No bug events.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

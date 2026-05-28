@@ -1,4 +1,5 @@
 {% extends "base/base.html" %}
+{% load ts_filters %}
 
 {% block content %}
 
@@ -7,7 +8,7 @@
 <section class="stat-card earnings-home-card">
     <span>TengaSale</span>
     <h2>You are now earning more with TengaSale.</h2>
-    <strong class="amount-positive">Earnings MWK {{ earnings_total|floatformat:2 }}</strong>
+    <strong class="amount-positive">Earnings {{ earnings_total|mwk }}</strong>
     <a href="{% url 'earnings_home' %}" class="btn">VIEW ALL EARNINGS</a>
 </section>
 
@@ -32,7 +33,13 @@
         <p>You are outside TengaSale business hours, application reviews and support may be delayed.</p>
     {% endif %}
     <p class="text-muted">{{ business_hours_label }}<br>Current CAT time: {{ business_hours_now|date:"D H:i" }}</p>
-    <a href="{{ tengasale_whatsapp_link }}" class="btn btn-blue">WhatsApp +265883596135</a>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <a href="{{ tengasale_whatsapp_link }}" class="btn btn-blue">WhatsApp +265883596135</a>
+        <a href="{% url 'ticket_create' %}" class="btn" style="background:rgba(255,107,26,0.12);color:#ff6a00;border:1.5px solid rgba(255,107,26,0.3)">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" style="margin-right:5px;vertical-align:-2px" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            Report Issue
+        </a>
+    </div>
 </section>
 
 <a href="{% url 'new_application' %}" class="new-application-button">
@@ -52,7 +59,7 @@
         </div>
         <div>
             <span>Pending value</span>
-            <strong class="amount-positive">MWK {{ merchant_payout_summary.pending_total|floatformat:0 }}</strong>
+            <strong class="amount-positive">{{ merchant_payout_summary.pending_total|mwk }}</strong>
         </div>
         <div>
             <span>Paid settlements</span>
@@ -60,7 +67,7 @@
         </div>
         <div>
             <span>Paid total</span>
-            <strong class="amount-positive">MWK {{ merchant_payout_summary.paid_total|floatformat:0 }}</strong>
+            <strong class="amount-positive">{{ merchant_payout_summary.paid_total|mwk }}</strong>
         </div>
     </div>
     {% if merchant_payout_summary.recent %}
@@ -69,11 +76,11 @@
     <article class="transaction-row">
         <div>
             <strong>{{ p.contract.contract_number|default:"—" }}</strong>
-            <p class="text-muted">Cash Price: MWK {{ p.cash_price|floatformat:0 }} + 1% Commission: MWK {{ p.merchant_commission_amount|floatformat:0 }}</p>
+            <p class="text-muted">Cash Price: {{ p.cash_price|mwk }} + 1% Commission: {{ p.merchant_commission_amount|mwk }}</p>
             <p class="text-muted">Method: {{ p.get_payout_method_display }} · {{ p.created_at|date:"d M Y" }}</p>
         </div>
         <div class="transaction-side">
-            <span class="amount-positive">MWK {{ p.total_payable|floatformat:0 }}</span>
+            <span class="amount-positive">{{ p.total_payable|mwk }}</span>
             <span class="status-pill status-{{ p.status }}">{{ p.get_status_display }}</span>
         </div>
     </article>
@@ -114,7 +121,7 @@
         </div>
         <div>
             <span>Expected monthly collections</span>
-            <strong>MWK {{ device_financing_stats.expected_monthly_collections|floatformat:0 }}</strong>
+            <strong>{{ device_financing_stats.expected_monthly_collections|mwk }}</strong>
         </div>
         <div>
             <span>Default risk count</span>
@@ -131,7 +138,7 @@
                 <strong>{{ contract.customer.full_name }}</strong>
                 <small>{{ contract.device.brand }} {{ contract.device.model }} | {{ contract.get_status_display }}</small>
             </div>
-            <span>MWK {{ contract.monthly_payment_amount|floatformat:0 }}</span>
+            <span>{{ contract.monthly_payment_amount|mwk }}</span>
         </div>
     {% empty %}
         <p class="text-muted">No financed devices yet.</p>
@@ -146,7 +153,7 @@
                 <strong>{{ payment.customer.full_name }}</strong>
                 <small>{{ payment.contract.device.masked_imei }} | {{ payment.get_payment_method_display }}</small>
             </div>
-            <span>MWK {{ payment.amount|floatformat:0 }}</span>
+            <span>{{ payment.amount|mwk }}</span>
         </a>
     {% empty %}
         <p class="text-muted">No pending payment proofs.</p>

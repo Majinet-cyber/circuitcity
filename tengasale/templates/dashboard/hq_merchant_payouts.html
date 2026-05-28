@@ -1,5 +1,5 @@
 {% extends "base/base.html" %}
-{% load static %}
+{% load static ts_filters %}
 
 {% block page_title %}Merchant Payouts — TengaSale HQ{% endblock %}
 
@@ -20,19 +20,19 @@
   <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:24px;">
     <div class="glass-card" style="padding:16px;text-align:center;">
       <div style="font-size:0.75rem;color:var(--muted);">Pending Settlement</div>
-      <div style="font-size:1.4rem;font-weight:700;color:var(--warning);">MWK {{ pending_total|floatformat:0 }}</div>
+      <div style="font-size:1.4rem;font-weight:700;color:var(--warning);">{{ pending_total|mwk }}</div>
     </div>
     <div class="glass-card" style="padding:16px;text-align:center;">
       <div style="font-size:0.75rem;color:var(--muted);">Processing</div>
-      <div style="font-size:1.4rem;font-weight:700;color:#1d4ed8;">MWK {{ processing_total|floatformat:0 }}</div>
+      <div style="font-size:1.4rem;font-weight:700;color:#1d4ed8;">{{ processing_total|mwk }}</div>
     </div>
     <div class="glass-card" style="padding:16px;text-align:center;">
       <div style="font-size:0.75rem;color:var(--muted);">Paid Settlement</div>
-      <div style="font-size:1.4rem;font-weight:700;color:var(--success);">MWK {{ paid_total|floatformat:0 }}</div>
+      <div style="font-size:1.4rem;font-weight:700;color:var(--success);">{{ paid_total|mwk }}</div>
     </div>
     <div class="glass-card" style="padding:16px;text-align:center;">
       <div style="font-size:0.75rem;color:var(--muted);">Total Commission</div>
-      <div style="font-size:1.4rem;font-weight:700;color:var(--primary);">MWK {{ commission_total|floatformat:0 }}</div>
+      <div style="font-size:1.4rem;font-weight:700;color:var(--primary);">{{ commission_total|mwk }}</div>
     </div>
   </div>
 
@@ -76,9 +76,9 @@
               <td style="padding:8px;color:var(--primary);">
                 {% if p.contract %}{{ p.contract.contract_number }}{% else %}—{% endif %}
               </td>
-              <td style="padding:8px;text-align:right;">MWK {{ p.cash_price|floatformat:0 }}</td>
-              <td style="padding:8px;text-align:right;color:var(--primary);">MWK {{ p.merchant_commission_amount|floatformat:0 }}</td>
-              <td style="padding:8px;text-align:right;font-weight:700;">MWK {{ p.total_payable|floatformat:0 }}</td>
+              <td style="padding:8px;text-align:right;">{{ p.cash_price|mwk }}</td>
+              <td style="padding:8px;text-align:right;color:var(--primary);">{{ p.merchant_commission_amount|mwk }}</td>
+              <td style="padding:8px;text-align:right;font-weight:700;">{{ p.total_payable|mwk }}</td>
               <td style="padding:8px;text-align:center;">
                 <span style="font-size:0.75rem;background:#f3f4f6;padding:2px 6px;border-radius:4px;">
                   {{ p.get_payout_method_display }}

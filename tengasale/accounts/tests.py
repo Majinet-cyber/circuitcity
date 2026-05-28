@@ -395,7 +395,7 @@ class SeedTengaSaleUsersCommandTests(TestCase):
         }
         for username, (role, is_staff, is_superuser) in expected_users.items():
             user = get_user_model().objects.get(username=username)
-            self.assertTrue(user.check_password("Testpass123!"))
+            self.assertTrue(user.check_password("demo12345"))
             self.assertTrue(user.is_active)
             self.assertEqual(user.profile.role, role)
             self.assertEqual(user.is_staff, is_staff)
@@ -407,7 +407,7 @@ class SeedRolesCommandTests(TestCase):
         call_command("seed_roles")
         call_command("seed_roles")
 
-        for group_name in ["Merchant", "Underwriter", "HQ"]:
+        for group_name in ["Merchant", "Merchant Administrator", "Underwriter", "Tech Support", "HQ"]:
             self.assertTrue(Group.objects.filter(name=group_name).exists())
 
     def test_seed_tengasale_roles_creates_profiles_and_defaults_staff_to_hq(self):

@@ -835,3 +835,282 @@ class DiscountPolicyTests(TestCase):
         self.assertIn(Decimal("15"), options)
         self.assertIn(Decimal("20"), options)
         self.assertIn(Decimal("30"), options)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Phase-6 Tests: New roles, Merchant Admin portal, Support & Bug Monitor
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class NewRolesTests(TestCase):
+    """Test role assignment and redirect logic for the two new roles."""
+
+    def setUp(self):
+        call_command("seed_roles")
+        User = get_user_model()
+        self.ma_user = User.objects.create_user(username="ma_test", password="pass")
+        self.ts_user = User.objects.create_user(username="ts_test", password="pass")
+        assign_role(self.ma_user, "merchant_admin")
+        assign_role(self.ts_user, "tech_support")
+
+    def test_merchant_admin_role_assigned(self):
+        from accounts.utils import is_merchant_admin, primary_role
+        self.assertTrue(is_merchant_admin(self.ma_user))
+        self.assertEqual(primary_role(self.ma_user), "merchant_admin")
+
+    def test_tech_support_role_assigned(self):
+        from accounts.utils import is_tech_support, primary_role
+        self.assertTrue(is_tech_support(self.ts_user))
+        self.assertEqual(primary_role(self.ts_user), "tech_support")
+
+    def test_merchant_admin_redirect_url(self):
+        from accounts.utils import role_redirect_url
+        from django.urls import reverse
+        self.assertEqual(role_redirect_url(self.ma_user), reverse("ma_dashboard"))
+
+    def test_tech_support_redirect_url(self):
+        from accounts.utils import role_redirect_url
+        from django.urls import reverse
+        self.assertEqual(role_redirect_url(self.ts_user), reverse("support_dashboard"))
+
+    def test_root_redirects_merchant_admin(self):
+        self.client.login(username="ma_test", password="pass")
+        response = self.client.get("/")
+        self.assertRedirects(response, reverse("ma_dashboard"), fetch_redirect_response=False)
+
+    def test_root_redirects_tech_support(self):
+        self.client.login(username="ts_test", password="pass")
+        response = self.client.get("/")
+        self.assertRedirects(response, reverse("support_dashboard"), fetch_redirect_response=False)
+
+
+class AccessControlMatrixTests(TestCase):
+    """Verify role-based access rules across key portal URLs."""
+
+    def setUp(self):
+        call_command("seed_roles")
+        User = get_user_model()
+        self.merchant = User.objects.create_user(username="ac_merchant", password="pass")
+        self.underwriter = User.objects.create_user(username="ac_uw", password="pass")
+        self.hq = User.objects.create_user(username="ac_hq", password="pass")
+        self.ma = User.objects.create_user(username="ac_ma", password="pass")
+        self.ts = User.objects.create_user(username="ac_ts", password="pass")
+        assign_role(self.merchant, "merchant")
+        assign_role(self.underwriter, "underwriter")
+        assign_role(self.hq, "hq")
+        assign_role(self.ma, "merchant_admin")
+        assign_role(self.ts, "tech_support")
+
+    def _login(self, user):
+        self.client.login(username=user.username, password="pass")
+
+    def test_merchant_cannot_access_hq_dashboard(self):
+        self._login(self.merchant)
+        response = self.client.get(reverse("hq_dashboard"))
+        self.assertEqual(response.status_code, 403)
+
+    def test_merchant_admin_can_access_ma_dashboard(self):
+        self._login(self.ma)
+        response = self.client.get(reverse("ma_dashboard"))
+        self.assertEqual(response.status_code, 200)
+
+    def test_tech_support_can_access_support_dashboard(self):
+        self._login(self.ts)
+        response = self.client.get(reverse("support_dashboard"))
+        self.assertEqual(response.status_code, 200)
+
+    def test_hq_can_access_ma_dashboard(self):
+        self._login(self.hq)
+        response = self.client.get(reverse("ma_dashboard"))
+        self.assertEqual(response.status_code, 200)
+
+    def test_hq_can_access_support_dashboard(self):
+        self._login(self.hq)
+        response = self.client.get(reverse("support_dashboard"))
+        self.assertEqual(response.status_code, 200)
+
+    def test_merchant_cannot_access_ma_dashboard(self):
+        self._login(self.merchant)
+        response = self.client.get(reverse("ma_dashboard"))
+        self.assertEqual(response.status_code, 403)
+
+    def test_underwriter_cannot_access_support_dashboard(self):
+        self._login(self.underwriter)
+        response = self.client.get(reverse("support_dashboard"))
+        self.assertEqual(response.status_code, 403)
+
+    def test_any_authenticated_user_can_create_ticket(self):
+        self._login(self.merchant)
+        response = self.client.get(reverse("ticket_create"))
+        self.assertEqual(response.status_code, 200)
+
+    def test_unauthenticated_ticket_create_redirects_to_login(self):
+        response = self.client.get(reverse("ticket_create"))
+        self.assertIn(response.status_code, [301, 302])
+
+
+class SupportTicketTests(TestCase):
+    """Test ticket creation and comment flow."""
+
+    def setUp(self):
+        call_command("seed_roles")
+        User = get_user_model()
+        self.user = User.objects.create_user(username="tkt_user", password="pass")
+        self.ts_user = User.objects.create_user(username="tkt_ts", password="pass")
+        assign_role(self.user, "merchant")
+        assign_role(self.ts_user, "tech_support")
+
+    def test_authenticated_user_can_submit_ticket(self):
+        self.client.login(username="tkt_user", password="pass")
+        response = self.client.post(reverse("ticket_create"), {
+            "title": "Test ticket",
+            "description": "Something went wrong",
+            "category": "other",
+            "priority": "medium",
+        }, follow=True)
+        self.assertEqual(response.status_code, 200)
+        from support.models import SupportTicket
+        self.assertEqual(SupportTicket.objects.count(), 1)
+        ticket = SupportTicket.objects.first()
+        self.assertEqual(ticket.title, "Test ticket")
+        self.assertEqual(ticket.created_by, self.user)
+
+    def test_ticket_detail_accessible_by_creator(self):
+        from support.models import SupportTicket
+        self.client.login(username="tkt_user", password="pass")
+        ticket = SupportTicket.objects.create(
+            title="My ticket",
+            description="Help",
+            created_by=self.user,
+        )
+        response = self.client.get(reverse("ticket_detail", kwargs={"ticket_id": ticket.pk}))
+        self.assertEqual(response.status_code, 200)
+
+    def test_ticket_not_visible_to_other_merchant(self):
+        from support.models import SupportTicket
+        User = get_user_model()
+        other = User.objects.create_user(username="other_merchant", password="pass")
+        assign_role(other, "merchant")
+        ticket = SupportTicket.objects.create(
+            title="Private ticket",
+            description="Mine",
+            created_by=self.user,
+        )
+        self.client.login(username="other_merchant", password="pass")
+        response = self.client.get(reverse("ticket_detail", kwargs={"ticket_id": ticket.pk}))
+        self.assertRedirects(response, reverse("ticket_list"), fetch_redirect_response=False)
+
+    def test_tech_support_can_see_all_tickets(self):
+        from support.models import SupportTicket
+        SupportTicket.objects.create(title="T1", description="D1", created_by=self.user)
+        self.client.login(username="tkt_ts", password="pass")
+        response = self.client.get(reverse("ticket_list"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "T1")
+
+
+class BugSanitizationTests(TestCase):
+    """Test sanitize_error_metadata utility."""
+
+    def test_password_is_redacted(self):
+        from support.utils import sanitize_error_metadata
+        data = {"password": "secret123", "amount": 100}
+        result = sanitize_error_metadata(data)
+        self.assertEqual(result["password"], "[REDACTED]")
+        self.assertEqual(result["amount"], 100)
+
+    def test_nested_token_is_redacted(self):
+        from support.utils import sanitize_error_metadata
+        data = {"payload": {"access_token": "abc", "user_id": 42}}
+        result = sanitize_error_metadata(data)
+        self.assertEqual(result["payload"]["access_token"], "[REDACTED]")
+        self.assertEqual(result["payload"]["user_id"], 42)
+
+    def test_api_key_in_list_redacted(self):
+        from support.utils import sanitize_error_metadata
+        data = {"headers": [{"api_key": "xxx"}, {"x-request-id": "123"}]}
+        result = sanitize_error_metadata(data)
+        self.assertEqual(result["headers"][0]["api_key"], "[REDACTED]")
+        self.assertEqual(result["headers"][1]["x-request-id"], "123")
+
+    def test_safe_data_passes_through(self):
+        from support.utils import sanitize_error_metadata
+        data = {"user": "alice", "action": "login", "count": 3}
+        result = sanitize_error_metadata(data)
+        self.assertEqual(result, data)
+
+    def test_bug_event_record_sanitizes_metadata(self):
+        from support.models import BugEvent
+        BugEvent.record(
+            source=BugEvent.SRC_PAYMENT,
+            message="Payment failed",
+            metadata={"api_key": "secret", "amount": 5000},
+        )
+        bug = BugEvent.objects.first()
+        self.assertEqual(bug.metadata["api_key"], "[REDACTED]")
+        self.assertEqual(bug.metadata["amount"], 5000)
+
+
+class MerchantAdminLeadFlowTests(TestCase):
+    """Test Merchant Admin lead management."""
+
+    def setUp(self):
+        call_command("seed_roles")
+        User = get_user_model()
+        self.ma_user = User.objects.create_user(username="ma_flow", password="pass")
+        assign_role(self.ma_user, "merchant_admin")
+        from website.models import MerchantLead
+        self.lead = MerchantLead.objects.create(
+            business_name="Test Shop",
+            owner_full_name="Alice Banda",
+            phone="+265881234567",
+            district="Lilongwe",
+            business_type="phone_shop",
+        )
+
+    def test_ma_can_view_leads_list(self):
+        self.client.login(username="ma_flow", password="pass")
+        response = self.client.get(reverse("ma_leads"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Test Shop")
+
+    def test_ma_can_view_lead_detail(self):
+        self.client.login(username="ma_flow", password="pass")
+        response = self.client.get(reverse("ma_lead_detail", kwargs={"lead_id": self.lead.pk}))
+        self.assertEqual(response.status_code, 200)
+
+    def test_ma_can_update_lead_status(self):
+        self.client.login(username="ma_flow", password="pass")
+        self.client.post(
+            reverse("ma_lead_status", kwargs={"lead_id": self.lead.pk}),
+            {"status": "kyc_pending"},
+        )
+        self.lead.refresh_from_db()
+        self.assertEqual(self.lead.status, "kyc_pending")
+
+    def test_merchant_cannot_access_ma_leads(self):
+        User = get_user_model()
+        m = User.objects.create_user(username="plain_merchant", password="pass")
+        assign_role(m, "merchant")
+        self.client.login(username="plain_merchant", password="pass")
+        response = self.client.get(reverse("ma_leads"))
+        self.assertEqual(response.status_code, 403)
+
+    @override_settings(REQUIRE_HQ_MERCHANT_APPROVAL=False)
+    def test_recommend_approve_directly_activates_when_no_hq_required(self):
+        self.client.login(username="ma_flow", password="pass")
+        self.client.post(
+            reverse("ma_recommend", kwargs={"lead_id": self.lead.pk}),
+            {"action": "approve"},
+        )
+        self.lead.refresh_from_db()
+        self.assertEqual(self.lead.status, "approved")
+
+    @override_settings(REQUIRE_HQ_MERCHANT_APPROVAL=True)
+    def test_recommend_approve_sets_awaiting_hq_when_required(self):
+        self.client.login(username="ma_flow", password="pass")
+        self.client.post(
+            reverse("ma_recommend", kwargs={"lead_id": self.lead.pk}),
+            {"action": "approve"},
+        )
+        self.lead.refresh_from_db()
+        self.assertEqual(self.lead.status, "awaiting_hq")

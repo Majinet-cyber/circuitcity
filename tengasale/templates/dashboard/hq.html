@@ -753,6 +753,10 @@
 
     {% if request.user.is_authenticated %}
 
+      <a href="{% url 'ticket_create' %}" class="hq-icon-btn" title="Report Issue" aria-label="Report Issue">
+        <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      </a>
+
       <button class="hq-icon-btn" type="button" aria-label="Notifications" title="Notifications">
         <div class="hq-notif-pip"></div>
         <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -975,6 +979,72 @@
         <div class="hq-pulse-label">UW Payout Liability</div>
       </div>
     </div>
+
+  </div>
+
+  <!-- ── Operations section ── -->
+  <p class="hq-sl">Operations</p>
+  <div class="hq-pulse-grid">
+
+    <a href="{% url 'ma_leads' %}" class="hq-pulse-card" style="text-decoration:none">
+      <div class="hq-pulse-icon" style="background:rgba(255,107,26,0.10);color:#ff6a00;">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      </div>
+      <div class="hq-pulse-body">
+        <div class="hq-pulse-val">{{ new_leads_count }}</div>
+        <div class="hq-pulse-label">New Merchant Leads</div>
+      </div>
+    </a>
+
+    <a href="{% url 'ma_leads' %}?status=awaiting_hq" class="hq-pulse-card" style="text-decoration:none">
+      <div class="hq-pulse-icon" style="background:rgba(217,119,6,0.10);color:#d97706;">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/></svg>
+      </div>
+      <div class="hq-pulse-body">
+        <div class="hq-pulse-val">{{ awaiting_hq_count }}</div>
+        <div class="hq-pulse-label">Awaiting HQ Approval</div>
+      </div>
+    </a>
+
+    <a href="{% url 'ticket_list' %}" class="hq-pulse-card" style="text-decoration:none">
+      <div class="hq-pulse-icon" style="background:rgba(37,99,235,0.10);color:#2563eb;">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="2"/></svg>
+      </div>
+      <div class="hq-pulse-body">
+        <div class="hq-pulse-val">{{ open_tickets_count }}</div>
+        <div class="hq-pulse-label">Open Support Tickets</div>
+      </div>
+    </a>
+
+    <a href="{% url 'bug_monitor' %}" class="hq-pulse-card" style="text-decoration:none">
+      <div class="hq-pulse-icon" style="background:rgba(220,38,38,0.10);color:#dc2626;">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      </div>
+      <div class="hq-pulse-body">
+        <div class="hq-pulse-val">{{ critical_bugs_count }}</div>
+        <div class="hq-pulse-label">Critical Bug Events</div>
+      </div>
+    </a>
+
+    <a href="{% url 'ma_dashboard' %}" class="hq-pulse-card" style="text-decoration:none">
+      <div class="hq-pulse-icon" style="background:rgba(37,99,235,0.10);color:#2563eb;">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      </div>
+      <div class="hq-pulse-body">
+        <div class="hq-pulse-val">{{ total_merchant_admins }}</div>
+        <div class="hq-pulse-label">Merchant Admins</div>
+      </div>
+    </a>
+
+    <a href="{% url 'support_dashboard' %}" class="hq-pulse-card" style="text-decoration:none">
+      <div class="hq-pulse-icon" style="background:rgba(67,56,202,0.10);color:#4338ca;">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+      </div>
+      <div class="hq-pulse-body">
+        <div class="hq-pulse-val">{{ total_tech_support }}</div>
+        <div class="hq-pulse-label">Tech Support Staff</div>
+      </div>
+    </a>
 
   </div>
 

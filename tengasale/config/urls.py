@@ -25,6 +25,12 @@ urlpatterns = [
     path("", include("financing.urls")),
     path("api/tengasale/", include("financing.api_urls")),
 
+    # Merchant Administrator portal
+    path("tengasale/merchant-admin/", include("merchant_admin.urls")),
+
+    # Tech Support portal
+    path("tengasale/support/", include("support.urls")),
+
     # Public website (after all app routes so /admin/, /sales/, /pay/ etc. take priority)
     path("site/", include("website.urls")),
 

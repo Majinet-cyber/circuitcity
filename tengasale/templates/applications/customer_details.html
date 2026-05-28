@@ -12,6 +12,19 @@
 <h1 class="greeting">Customer Details</h1>
 <p class="text-muted small mb-3" style="margin-top:-8px;">Step 1 of 8 — Identity &amp; Demographics</p>
 
+{% if not is_business_hours %}
+<div style="background:#fff8ed;border:1.5px solid #f59e0b;border-radius:12px;padding:14px 16px;margin-bottom:18px;display:flex;gap:12px;align-items:flex-start;">
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:1px;" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+  <div>
+    <div style="font-size:0.85rem;font-weight:800;color:#92400e;margin-bottom:3px;">Outside business hours</div>
+    <div style="font-size:0.80rem;color:#78350f;line-height:1.5;">
+      We are currently outside business hours ({{ business_hours_label }}).
+      Your application can still be submitted, but approval may take longer unless a team member is available.
+    </div>
+  </div>
+</div>
+{% endif %}
+
 <form method="post" class="card">
     {% csrf_token %}
     {{ form.non_field_errors }}
@@ -41,6 +54,7 @@
     <div class="form-group{% if 'date_of_birth' in app.correction_fields %} has-correction{% endif %}">
         <label for="{{ form.date_of_birth.id_for_label }}">Date of birth</label>
         {{ form.date_of_birth }}
+        <p class="field-help">Applicant must be aged 20–69 years.</p>
         {% for error in form.date_of_birth.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
     </div>
 

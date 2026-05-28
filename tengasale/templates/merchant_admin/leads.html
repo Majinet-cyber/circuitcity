@@ -1,0 +1,64 @@
+{% extends "base/base.html" %}
+{% load ts_filters %}
+
+{% block page_title %}Merchant Leads{% endblock %}
+
+{% block topbar %}{% include "merchant_admin/_topbar.html" %}{% endblock %}
+
+{% block content %}
+<div class="hq-page-wrap">
+
+  <div class="hq-page-hdr">
+    <div>
+      <a href="{% url 'ma_dashboard' %}" class="hq-back-link">← Dashboard</a>
+      <h1 class="hq-page-title">Merchant Leads</h1>
+    </div>
+  </div>
+
+  <!-- Status filter tabs -->
+  <div class="hq-tab-row">
+    <a href="{% url 'ma_leads' %}" class="hq-tab {% if not status_filter %}hq-tab--active{% endif %}">All</a>
+    {% for val, label in status_choices %}
+    <a href="?status={{ val }}" class="hq-tab {% if status_filter == val %}hq-tab--active{% endif %}">{{ label }}</a>
+    {% endfor %}
+  </div>
+
+  <div class="hq-table-wrap">
+    <table class="hq-table">
+      <thead>
+        <tr>
+          <th>#</th><th>Business</th><th>Owner</th><th>Phone</th><th>District</th><th>Type</th><th>Status</th><th>Assigned</th><th>Created</th><th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for lead in leads %}
+        <tr>
+          <td class="hq-td-muted">{{ lead.id }}</td>
+          <td><strong>{{ lead.business_name }}</strong></td>
+          <td>{{ lead.owner_full_name }}</td>
+          <td>{{ lead.phone }}</td>
+          <td>{{ lead.district }}</td>
+          <td>{{ lead.get_business_type_display }}</td>
+          <td>
+            <span class="hq-badge
+              {% if lead.status == 'new' %}hq-badge--orange
+              {% elif lead.status == 'approved' %}hq-badge--green
+              {% elif lead.status == 'rejected' %}hq-badge--red
+              {% elif lead.status == 'awaiting_hq' %}hq-badge--yellow
+              {% else %}hq-badge--gray{% endif %}">
+              {{ lead.get_status_display }}
+            </span>
+          </td>
+          <td class="hq-td-muted">{{ lead.assigned_to.username|default:"—" }}</td>
+          <td class="hq-td-muted">{{ lead.created_at|date:"d M Y" }}</td>
+          <td><a href="{% url 'ma_lead_detail' lead.id %}" class="hq-table-link">Open →</a></td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="10" class="hq-td-empty">No leads found{% if status_filter %} with status "{{ status_filter }}"{% endif %}.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+</div>
+{% endblock %}

@@ -3,7 +3,16 @@ from functools import wraps
 from django.contrib.auth.views import redirect_to_login
 from django.shortcuts import render
 
-from .utils import is_hq, is_merchant, is_underwriter, role_redirect_url
+from .utils import (
+    is_hq,
+    is_merchant,
+    is_merchant_admin,
+    is_tech_support,
+    is_underwriter,
+    is_hq_or_merchant_admin,
+    is_hq_or_tech_support,
+    role_redirect_url,
+)
 
 
 def role_required(test_func, sensitive=False):
@@ -38,4 +47,14 @@ def underwriter_required(view_func=None, *, sensitive=False):
 
 def hq_required(view_func=None, *, sensitive=False):
     decorator = role_required(is_hq, sensitive=sensitive)
+    return decorator(view_func) if view_func else decorator
+
+
+def merchant_admin_required(view_func=None, *, sensitive=False):
+    decorator = role_required(is_hq_or_merchant_admin, sensitive=sensitive)
+    return decorator(view_func) if view_func else decorator
+
+
+def tech_support_required(view_func=None, *, sensitive=False):
+    decorator = role_required(is_hq_or_tech_support, sensitive=sensitive)
     return decorator(view_func) if view_func else decorator

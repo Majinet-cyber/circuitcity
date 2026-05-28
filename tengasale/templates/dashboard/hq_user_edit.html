@@ -1,25 +1,66 @@
 {% extends "base/base.html" %}
 
-{% block page_title %}Edit User{% endblock %}
+{% block page_title %}Edit {{ user_obj.username }}{% endblock %}
 
 {% block content %}
+<div class="hq-page-wrap" style="max-width:700px">
 
-<a href="{% url 'hq_users' %}" class="soft-back">
-    <span class="soft-back-icon">&larr;</span>
-    <span>BACK</span>
-</a>
+  <div class="hq-page-hdr">
+    <div>
+      <a href="{% url 'hq_users' %}" class="hq-back-link">← Users</a>
+      <h1 class="hq-page-title">Edit {{ user_obj.username }}</h1>
+    </div>
+  </div>
 
-<h1 class="greeting">Edit {{ user_obj.username }}</h1>
-
-<form method="post" class="card">
-    {% csrf_token %}
-    {{ form.non_field_errors }}
-    {% for field in form %}
-        <label for="{{ field.id_for_label }}">{{ field.label }}</label>
-        {{ field }}
-        {{ field.errors }}
+  {% if messages %}
+  <div style="margin-bottom:16px">
+    {% for msg in messages %}
+    <div class="hq-msg hq-msg--{{ msg.tags }}">{{ msg }}</div>
     {% endfor %}
-    <button type="submit" class="btn green-button">SAVE USER</button>
-</form>
+  </div>
+  {% endif %}
 
+  <div class="hq-card">
+    <form method="post">
+      {% csrf_token %}
+      {{ form.non_field_errors }}
+      <div class="hq-form-row">
+        <div class="hq-form-field">
+          <label class="hq-form-label">{{ form.username.label }}</label>
+          {{ form.username }}{{ form.username.errors }}
+        </div>
+        <div class="hq-form-field">
+          <label class="hq-form-label">{{ form.full_name.label }}</label>
+          {{ form.full_name }}{{ form.full_name.errors }}
+        </div>
+      </div>
+      <div class="hq-form-row">
+        <div class="hq-form-field">
+          <label class="hq-form-label">{{ form.email.label }}</label>
+          {{ form.email }}{{ form.email.errors }}
+        </div>
+        <div class="hq-form-field">
+          <label class="hq-form-label">{{ form.password.label }} <span class="hq-optional">(leave blank to keep current)</span></label>
+          {{ form.password }}{{ form.password.errors }}
+        </div>
+      </div>
+      <div class="hq-form-row">
+        <div class="hq-form-field">
+          <label class="hq-form-label">{{ form.role.label }}</label>
+          {{ form.role }}{{ form.role.errors }}
+        </div>
+        <div class="hq-form-field" style="align-self:flex-end;padding-bottom:4px">
+          <label class="hq-checkbox-row">
+            {{ form.is_active }} <span>Active account</span>
+          </label>
+        </div>
+      </div>
+      <div class="hq-form-actions">
+        <button type="submit" class="hq-btn hq-btn--primary">Save Changes</button>
+        <a href="{% url 'hq_users' %}" class="hq-btn hq-btn--ghost">Cancel</a>
+      </div>
+    </form>
+  </div>
+
+</div>
 {% endblock %}

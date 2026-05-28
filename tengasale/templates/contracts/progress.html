@@ -1,4 +1,5 @@
 {% extends "base/base.html" %}
+{% load ts_filters %}
 
 {% block page_title %}Contract Progress{% endblock %}
 
@@ -36,7 +37,7 @@
     {% elif not contract.phone_locked %}
         <button class="btn primary-button" name="action" value="locked">Mark phone locked</button>
     {% elif not contract.deposit_paid %}
-        <p>Deposit due: <strong>MWK {{ contract.deposit_amount|floatformat:0 }}</strong></p>
+        <p>Deposit due: <strong>{{ contract.deposit_amount|mwk }}</strong></p>
         <button class="btn primary-button" name="action" value="deposit">Mark deposit paid</button>
     {% else %}
         <a href="{% url 'contract_complete' contract.id %}" class="btn primary-button">Contract complete</a>

@@ -1,4 +1,5 @@
 {% extends "base/base.html" %}
+{% load ts_filters %}
 
 {% block page_title %}Earnings{% endblock %}
 
@@ -14,9 +15,9 @@
 <section class="stat-card wallet-balance-card">
     <span>Wallet balance</span>
     {% if wallet.balance < 0 %}
-        <strong class="amount-negative">MWK {{ wallet.balance|floatformat:2 }}</strong>
+        <strong class="amount-negative">{{ wallet.balance|mwk }}</strong>
     {% else %}
-        <strong class="amount-positive">MWK {{ wallet.balance|floatformat:2 }}</strong>
+        <strong class="amount-positive">{{ wallet.balance|mwk }}</strong>
     {% endif %}
     <p>You are now earning more with TengaSale.</p>
 </section>
@@ -37,13 +38,13 @@
                     <p class="text-muted">Status: {{ row.status|default:"Pending" }}</p>
                 </div>
                 <div class="transaction-side">
-                    <span class="amount-negative">MWK {{ row.amount|floatformat:2 }}</span>
+                    <span class="amount-negative">{{ row.amount|mwk }}</span>
                 </div>
             </article>
             <div class="payout-breakdown">
-                <div class="detail-row"><span>Gross</span><strong>MWK {{ row.amount|floatformat:2 }}</strong></div>
+                <div class="detail-row"><span>Gross</span><strong>{{ row.amount|mwk }}</strong></div>
                 <div class="detail-row"><span>Withholding tax</span><strong>MWK 0.00</strong></div>
-                <div class="detail-row"><span>Net</span><strong>MWK {{ row.amount|floatformat:2 }}</strong></div>
+                <div class="detail-row"><span>Net</span><strong>{{ row.amount|mwk }}</strong></div>
                 <span class="status-pill status-pending_review">Pending</span>
             </div>
         {% empty %}
@@ -61,15 +62,15 @@
         <div class="metric-grid">
             <div>
                 <span>Total earned</span>
-                <strong class="amount-positive">MWK {{ total_commission_earned|floatformat:2 }}</strong>
+                <strong class="amount-positive">{{ total_commission_earned|mwk }}</strong>
             </div>
             <div>
                 <span>Pending commissions</span>
-                <strong>MWK {{ pending_commission_total|floatformat:2 }}</strong>
+                <strong>{{ pending_commission_total|mwk }}</strong>
             </div>
             <div>
                 <span>Paid commissions</span>
-                <strong class="amount-positive">MWK {{ paid_commission_total|floatformat:2 }}</strong>
+                <strong class="amount-positive">{{ paid_commission_total|mwk }}</strong>
             </div>
             <div>
                 <span>Available spins</span>
@@ -101,9 +102,9 @@
                 </div>
                 <div class="transaction-side">
                     {% if row.amount < 0 %}
-                        <span class="amount-negative">MWK {{ row.amount|floatformat:2 }}</span>
+                        <span class="amount-negative">{{ row.amount|mwk }}</span>
                     {% else %}
-                        <span class="amount-positive">MWK {{ row.amount|floatformat:2 }}</span>
+                        <span class="amount-positive">{{ row.amount|mwk }}</span>
                     {% endif %}
                 </div>
             </article>

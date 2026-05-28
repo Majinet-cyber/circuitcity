@@ -1,5 +1,5 @@
 {% extends "base/base.html" %}
-{% load static %}
+{% load static ts_filters %}
 
 {% block page_title %}Staff Payouts — TengaSale HQ{% endblock %}
 
@@ -30,11 +30,11 @@
   <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:24px;">
     <div class="glass-card" style="padding:14px;text-align:center;">
       <div style="font-size:0.72rem;color:var(--muted);">Pending Net Payable</div>
-      <div style="font-size:1.4rem;font-weight:700;color:var(--warning);">MWK {{ total_pending_net|floatformat:0 }}</div>
+      <div style="font-size:1.4rem;font-weight:700;color:var(--warning);">{{ total_pending_net|mwk }}</div>
     </div>
     <div class="glass-card" style="padding:14px;text-align:center;">
       <div style="font-size:0.72rem;color:var(--muted);">WHT Withheld (Paid Batches)</div>
-      <div style="font-size:1.4rem;font-weight:700;color:var(--danger);">MWK {{ total_wht_withheld|floatformat:0 }}</div>
+      <div style="font-size:1.4rem;font-weight:700;color:var(--danger);">{{ total_wht_withheld|mwk }}</div>
     </div>
   </div>
 
@@ -63,10 +63,10 @@
               <td style="padding:8px;color:var(--muted);">
                 {{ payout.period_start|date:"d M Y" }} – {{ payout.period_end|date:"d M Y" }}
               </td>
-              <td style="padding:8px;text-align:right;">MWK {{ payout.gross_commission|floatformat:2 }}</td>
-              <td style="padding:8px;text-align:right;color:var(--danger);">MWK {{ payout.wht_amount|floatformat:2 }}</td>
+              <td style="padding:8px;text-align:right;">{{ payout.gross_commission|mwk }}</td>
+              <td style="padding:8px;text-align:right;color:var(--danger);">{{ payout.wht_amount|mwk }}</td>
               <td style="padding:8px;text-align:right;font-weight:700;color:var(--success);">
-                MWK {{ payout.net_amount|floatformat:2 }}
+                {{ payout.net_amount|mwk }}
               </td>
               <td style="padding:8px;text-align:center;">
                 <span style="font-size:0.75rem;padding:2px 8px;border-radius:4px;font-weight:600;

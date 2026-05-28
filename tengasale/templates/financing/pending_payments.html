@@ -1,4 +1,5 @@
 {% extends "base/base.html" %}
+{% load ts_filters %}
 
 {% block content %}
 
@@ -12,7 +13,7 @@
                 <strong>{{ payment.customer.full_name }}</strong>
                 <small>{{ payment.contract.device.brand }} {{ payment.contract.device.model }} | {{ payment.created_at|date:"M d, H:i" }}</small>
             </div>
-            <span>MWK {{ payment.amount|floatformat:0 }}</span>
+            <span>{{ payment.amount|mwk }}</span>
         </a>
     {% empty %}
         <p class="text-muted">There are no pending payment proofs.</p>

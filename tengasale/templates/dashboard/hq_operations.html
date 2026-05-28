@@ -1,5 +1,5 @@
 {% extends "base/base.html" %}
-{% load static %}
+{% load static ts_filters %}
 
 {% block page_title %}Safe Operations — TengaSale HQ{% endblock %}
 
@@ -109,7 +109,7 @@
                   {% for txn in pending_transactions %}
                     <tr>
                       <td class="small">{{ txn.internal_reference|truncatechars:12 }}</td>
-                      <td class="small">MWK {{ txn.amount|floatformat:0 }}</td>
+                      <td class="small">{{ txn.amount|mwk }}</td>
                       <td class="small">{{ txn.status }}</td>
                       <td>
                         <form method="post" style="display:inline;">

@@ -1,0 +1,302 @@
+{% extends "base/base.html" %}
+{% load ts_filters %}
+
+{% block page_title %}Lead: {{ lead.business_name }}{% endblock %}
+
+{% block topbar %}{% include "merchant_admin/_topbar.html" %}{% endblock %}
+
+{% block content %}
+<div class="hq-page-wrap">
+
+  <div class="hq-page-hdr">
+    <div>
+      <a href="{% url 'ma_leads' %}" class="hq-back-link">← Leads</a>
+      <h1 class="hq-page-title">{{ lead.business_name }}</h1>
+      <p class="hq-page-sub">{{ lead.owner_full_name }} · {{ lead.district }}
+        <span class="hq-badge
+          {% if lead.status == 'new' %}hq-badge--orange
+          {% elif lead.status == 'approved' %}hq-badge--green
+          {% elif lead.status == 'rejected' %}hq-badge--red
+          {% elif lead.status == 'awaiting_hq' %}hq-badge--yellow
+          {% else %}hq-badge--gray{% endif %}" style="margin-left:10px">
+          {{ lead.get_status_display }}
+        </span>
+      </p>
+    </div>
+  </div>
+
+  <!-- Lead summary -->
+  <div class="hq-card" style="margin-bottom:20px">
+    <div class="hq-card-hdr"><h3>Lead Details</h3></div>
+    <div class="hq-detail-grid">
+      <div><span class="hq-detail-lbl">Phone</span><span class="hq-detail-val">{{ lead.phone }}</span></div>
+      <div><span class="hq-detail-lbl">WhatsApp</span><span class="hq-detail-val">{{ lead.whatsapp_phone|default:"—" }}</span></div>
+      <div><span class="hq-detail-lbl">Email</span><span class="hq-detail-val">{{ lead.email|default:"—" }}</span></div>
+      <div><span class="hq-detail-lbl">Business Type</span><span class="hq-detail-val">{{ lead.get_business_type_display }}</span></div>
+      <div><span class="hq-detail-lbl">District</span><span class="hq-detail-val">{{ lead.district }}</span></div>
+      <div><span class="hq-detail-lbl">Area</span><span class="hq-detail-val">{{ lead.area|default:"—" }}</span></div>
+      <div><span class="hq-detail-lbl">Est. Monthly Sales</span><span class="hq-detail-val">{{ lead.estimated_monthly_phone_sales }} devices</span></div>
+      <div><span class="hq-detail-lbl">Business Registration</span><span class="hq-detail-val">{{ lead.has_business_registration|yesno:"Yes,No,Unknown" }}</span></div>
+      <div><span class="hq-detail-lbl">Payout Preference</span><span class="hq-detail-val">{{ lead.get_preferred_payout_method_display|default:"—" }}</span></div>
+      <div><span class="hq-detail-lbl">Source</span><span class="hq-detail-val">{{ lead.source }}</span></div>
+      <div><span class="hq-detail-lbl">Created</span><span class="hq-detail-val">{{ lead.created_at|date:"d M Y H:i" }}</span></div>
+      <div><span class="hq-detail-lbl">Assigned</span><span class="hq-detail-val">{{ lead.assigned_to.username|default:"Unassigned" }}</span></div>
+    </div>
+    {% if lead.message %}
+    <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--hq-border)">
+      <span class="hq-detail-lbl">Notes from lead form:</span>
+      <p style="margin-top:6px;color:var(--hq-muted);font-size:13px">{{ lead.message }}</p>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Status change + assign -->
+  <div class="hq-card" style="margin-bottom:20px">
+    <div class="hq-card-hdr"><h3>Update Status</h3></div>
+    <form method="post" action="{% url 'ma_lead_status' lead.id %}">
+      {% csrf_token %}
+      <div class="hq-form-row">
+        <div class="hq-form-field">
+          <label class="hq-form-label">Status</label>
+          <select name="status" class="hq-select">
+            {% for val, label in status_choices %}
+            <option value="{{ val }}" {% if lead.status == val %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="hq-form-field">
+          <label class="hq-form-label">Assign to</label>
+          <select name="assigned_to" class="hq-select">
+            <option value="">— Unassigned —</option>
+            {% for user in all_staff %}
+            <option value="{{ user.id }}" {% if lead.assigned_to_id == user.id %}selected{% endif %}>{{ user.username }} ({{ user.profile.role }})</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="hq-form-field hq-form-field--action">
+          <button type="submit" class="hq-btn hq-btn--primary">Update</button>
+        </div>
+      </div>
+    </form>
+  </div>
+
+  <!-- KYC Form -->
+  <div class="hq-card" style="margin-bottom:20px">
+    <div class="hq-card-hdr"><h3>KYC Details</h3></div>
+    <form method="post" action="{% url 'ma_lead_kyc' lead.id %}" enctype="multipart/form-data">
+      {% csrf_token %}
+      <div class="hq-form-section-label">Identity</div>
+      <div class="hq-form-row">
+        <div class="hq-form-field">
+          <label class="hq-form-label">National ID Number</label>
+          <input type="text" name="national_id_number" class="hq-input" value="{{ kyc.national_id_number }}">
+        </div>
+        <div class="hq-form-field">
+          <label class="hq-form-label">Business Registration Number</label>
+          <input type="text" name="business_reg_number" class="hq-input" value="{{ kyc.business_reg_number }}">
+        </div>
+      </div>
+
+      <div class="hq-form-section-label">Location</div>
+      <div class="hq-form-row">
+        <div class="hq-form-field">
+          <label class="hq-form-label">Region</label>
+          <input type="text" name="region" class="hq-input" value="{{ kyc.region }}">
+        </div>
+        <div class="hq-form-field">
+          <label class="hq-form-label">Trading Area</label>
+          <input type="text" name="trading_area" class="hq-input" value="{{ kyc.trading_area }}">
+        </div>
+      </div>
+      <div class="hq-form-field">
+        <label class="hq-form-label">Physical Address</label>
+        <textarea name="physical_address" class="hq-textarea" rows="2">{{ kyc.physical_address }}</textarea>
+      </div>
+      <div class="hq-form-row">
+        <div class="hq-form-field">
+          <label class="hq-form-label">GPS Latitude</label>
+          <input type="text" name="gps_latitude" class="hq-input" value="{{ kyc.gps_latitude|default:'' }}">
+        </div>
+        <div class="hq-form-field">
+          <label class="hq-form-label">GPS Longitude</label>
+          <input type="text" name="gps_longitude" class="hq-input" value="{{ kyc.gps_longitude|default:'' }}">
+        </div>
+      </div>
+
+      <div class="hq-form-section-label">Banking / Payout</div>
+      <div class="hq-form-row">
+        <div class="hq-form-field">
+          <label class="hq-form-label">Bank Name</label>
+          <input type="text" name="bank_name" class="hq-input" value="{{ kyc.bank_name }}">
+        </div>
+        <div class="hq-form-field">
+          <label class="hq-form-label">Account Name</label>
+          <input type="text" name="bank_account_name" class="hq-input" value="{{ kyc.bank_account_name }}">
+        </div>
+        <div class="hq-form-field">
+          <label class="hq-form-label">Account Number</label>
+          <input type="text" name="bank_account_number" class="hq-input" value="{{ kyc.bank_account_number }}">
+        </div>
+      </div>
+      <div class="hq-form-row">
+        <div class="hq-form-field">
+          <label class="hq-form-label">Airtel Money Number</label>
+          <input type="text" name="airtel_money_number" class="hq-input" value="{{ kyc.airtel_money_number }}">
+        </div>
+        <div class="hq-form-field">
+          <label class="hq-form-label">TNM Mpamba Number</label>
+          <input type="text" name="tnm_mpamba_number" class="hq-input" value="{{ kyc.tnm_mpamba_number }}">
+        </div>
+      </div>
+
+      <div class="hq-form-section-label">Documents</div>
+      <div class="hq-form-row">
+        <div class="hq-form-field">
+          <label class="hq-form-label">Business Certificate {% if kyc.business_certificate %}<a href="{{ kyc.business_certificate.url }}" target="_blank" class="hq-file-link">[view]</a>{% endif %}</label>
+          <input type="file" name="business_certificate" class="hq-file-input">
+        </div>
+        <div class="hq-form-field">
+          <label class="hq-form-label">Tax Certificate {% if kyc.tax_certificate %}<a href="{{ kyc.tax_certificate.url }}" target="_blank" class="hq-file-link">[view]</a>{% endif %}</label>
+          <input type="file" name="tax_certificate" class="hq-file-input">
+        </div>
+      </div>
+      <div class="hq-form-row">
+        <div class="hq-form-field">
+          <label class="hq-form-label">Shop Photo 1 {% if kyc.shop_photo_1 %}<a href="{{ kyc.shop_photo_1.url }}" target="_blank" class="hq-file-link">[view]</a>{% endif %}</label>
+          <input type="file" name="shop_photo_1" class="hq-file-input" accept="image/*">
+        </div>
+        <div class="hq-form-field">
+          <label class="hq-form-label">Shop Photo 2 {% if kyc.shop_photo_2 %}<a href="{{ kyc.shop_photo_2.url }}" target="_blank" class="hq-file-link">[view]</a>{% endif %}</label>
+          <input type="file" name="shop_photo_2" class="hq-file-input" accept="image/*">
+        </div>
+      </div>
+
+      <div class="hq-form-field">
+        <label class="hq-form-label">Internal Notes</label>
+        <textarea name="notes" class="hq-textarea" rows="3">{{ kyc.notes }}</textarea>
+      </div>
+
+      <div class="hq-form-actions">
+        <button type="submit" class="hq-btn hq-btn--primary">Save KYC</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Verification Checklist -->
+  <div class="hq-card" style="margin-bottom:20px">
+    <div class="hq-card-hdr"><h3>Verification Checklist <span class="hq-kpi-sub">{{ checklist.checks_passed }} checks</span></h3></div>
+    <form method="post" action="{% url 'ma_checklist' lead.id %}">
+      {% csrf_token %}
+
+      <div class="hq-checklist-row">
+        <span class="hq-checklist-label">Did you speak to the owner?</span>
+        <div class="hq-checklist-btns">
+          <label class="hq-radio-btn {% if checklist.spoke_to_owner == True %}hq-radio-btn--yes{% endif %}"><input type="radio" name="spoke_to_owner" value="yes" {% if checklist.spoke_to_owner == True %}checked{% endif %}> Yes</label>
+          <label class="hq-radio-btn {% if checklist.spoke_to_owner == False %}hq-radio-btn--no{% endif %}"><input type="radio" name="spoke_to_owner" value="no" {% if checklist.spoke_to_owner == False %}checked{% endif %}> No</label>
+          <label class="hq-radio-btn {% if checklist.spoke_to_owner is None %}hq-radio-btn--na{% endif %}"><input type="radio" name="spoke_to_owner" value="" {% if checklist.spoke_to_owner is None %}checked{% endif %}> —</label>
+        </div>
+      </div>
+      <div class="hq-checklist-row">
+        <span class="hq-checklist-label">Is the shop physically traceable?</span>
+        <div class="hq-checklist-btns">
+          <label class="hq-radio-btn {% if checklist.shop_physically_traceable == True %}hq-radio-btn--yes{% endif %}"><input type="radio" name="shop_physically_traceable" value="yes" {% if checklist.shop_physically_traceable == True %}checked{% endif %}> Yes</label>
+          <label class="hq-radio-btn {% if checklist.shop_physically_traceable == False %}hq-radio-btn--no{% endif %}"><input type="radio" name="shop_physically_traceable" value="no" {% if checklist.shop_physically_traceable == False %}checked{% endif %}> No</label>
+          <label class="hq-radio-btn {% if checklist.shop_physically_traceable is None %}hq-radio-btn--na{% endif %}"><input type="radio" name="shop_physically_traceable" value="" {% if checklist.shop_physically_traceable is None %}checked{% endif %}> —</label>
+        </div>
+      </div>
+      <div class="hq-checklist-row">
+        <span class="hq-checklist-label">Were documents verified?</span>
+        <div class="hq-checklist-btns">
+          <label class="hq-radio-btn {% if checklist.documents_verified == True %}hq-radio-btn--yes{% endif %}"><input type="radio" name="documents_verified" value="yes" {% if checklist.documents_verified == True %}checked{% endif %}> Yes</label>
+          <label class="hq-radio-btn {% if checklist.documents_verified == False %}hq-radio-btn--no{% endif %}"><input type="radio" name="documents_verified" value="no" {% if checklist.documents_verified == False %}checked{% endif %}> No</label>
+          <label class="hq-radio-btn {% if checklist.documents_verified is None %}hq-radio-btn--na{% endif %}"><input type="radio" name="documents_verified" value="" {% if checklist.documents_verified is None %}checked{% endif %}> —</label>
+        </div>
+      </div>
+      <div class="hq-checklist-row">
+        <span class="hq-checklist-label">Does bank/mobile money name match owner/shop?</span>
+        <div class="hq-checklist-btns">
+          <label class="hq-radio-btn {% if checklist.bank_name_matches == True %}hq-radio-btn--yes{% endif %}"><input type="radio" name="bank_name_matches" value="yes" {% if checklist.bank_name_matches == True %}checked{% endif %}> Yes</label>
+          <label class="hq-radio-btn {% if checklist.bank_name_matches == False %}hq-radio-btn--no{% endif %}"><input type="radio" name="bank_name_matches" value="no" {% if checklist.bank_name_matches == False %}checked{% endif %}> No</label>
+          <label class="hq-radio-btn {% if checklist.bank_name_matches is None %}hq-radio-btn--na{% endif %}"><input type="radio" name="bank_name_matches" value="" {% if checklist.bank_name_matches is None %}checked{% endif %}> —</label>
+        </div>
+      </div>
+      <div class="hq-checklist-row">
+        <span class="hq-checklist-label">Does merchant understand TengaSale settlement rules?</span>
+        <div class="hq-checklist-btns">
+          <label class="hq-radio-btn {% if checklist.understands_settlement == True %}hq-radio-btn--yes{% endif %}"><input type="radio" name="understands_settlement" value="yes" {% if checklist.understands_settlement == True %}checked{% endif %}> Yes</label>
+          <label class="hq-radio-btn {% if checklist.understands_settlement == False %}hq-radio-btn--no{% endif %}"><input type="radio" name="understands_settlement" value="no" {% if checklist.understands_settlement == False %}checked{% endif %}> No</label>
+          <label class="hq-radio-btn {% if checklist.understands_settlement is None %}hq-radio-btn--na{% endif %}"><input type="radio" name="understands_settlement" value="" {% if checklist.understands_settlement is None %}checked{% endif %}> —</label>
+        </div>
+      </div>
+      <div class="hq-checklist-row">
+        <span class="hq-checklist-label">Does merchant understand no WHT applies to payouts?</span>
+        <div class="hq-checklist-btns">
+          <label class="hq-radio-btn {% if checklist.understands_no_wht == True %}hq-radio-btn--yes{% endif %}"><input type="radio" name="understands_no_wht" value="yes" {% if checklist.understands_no_wht == True %}checked{% endif %}> Yes</label>
+          <label class="hq-radio-btn {% if checklist.understands_no_wht == False %}hq-radio-btn--no{% endif %}"><input type="radio" name="understands_no_wht" value="no" {% if checklist.understands_no_wht == False %}checked{% endif %}> No</label>
+          <label class="hq-radio-btn {% if checklist.understands_no_wht is None %}hq-radio-btn--na{% endif %}"><input type="radio" name="understands_no_wht" value="" {% if checklist.understands_no_wht is None %}checked{% endif %}> —</label>
+        </div>
+      </div>
+      <div class="hq-checklist-row">
+        <span class="hq-checklist-label">Does merchant understand fraud consequences?</span>
+        <div class="hq-checklist-btns">
+          <label class="hq-radio-btn {% if checklist.understands_fraud_consequences == True %}hq-radio-btn--yes{% endif %}"><input type="radio" name="understands_fraud_consequences" value="yes" {% if checklist.understands_fraud_consequences == True %}checked{% endif %}> Yes</label>
+          <label class="hq-radio-btn {% if checklist.understands_fraud_consequences == False %}hq-radio-btn--no{% endif %}"><input type="radio" name="understands_fraud_consequences" value="no" {% if checklist.understands_fraud_consequences == False %}checked{% endif %}> No</label>
+          <label class="hq-radio-btn {% if checklist.understands_fraud_consequences is None %}hq-radio-btn--na{% endif %}"><input type="radio" name="understands_fraud_consequences" value="" {% if checklist.understands_fraud_consequences is None %}checked{% endif %}> —</label>
+        </div>
+      </div>
+      <div class="hq-checklist-row">
+        <span class="hq-checklist-label">Is merchant approved for pilot?</span>
+        <div class="hq-checklist-btns">
+          <label class="hq-radio-btn {% if checklist.approved_for_pilot == True %}hq-radio-btn--yes{% endif %}"><input type="radio" name="approved_for_pilot" value="yes" {% if checklist.approved_for_pilot == True %}checked{% endif %}> Yes</label>
+          <label class="hq-radio-btn {% if checklist.approved_for_pilot == False %}hq-radio-btn--no{% endif %}"><input type="radio" name="approved_for_pilot" value="no" {% if checklist.approved_for_pilot == False %}checked{% endif %}> No</label>
+          <label class="hq-radio-btn {% if checklist.approved_for_pilot is None %}hq-radio-btn--na{% endif %}"><input type="radio" name="approved_for_pilot" value="" {% if checklist.approved_for_pilot is None %}checked{% endif %}> —</label>
+        </div>
+      </div>
+
+      <div class="hq-checklist-row" style="align-items:flex-start;flex-direction:column;gap:6px">
+        <label class="hq-form-label">Site visit completed?</label>
+        <div class="hq-checklist-btns">
+          <label class="hq-radio-btn {% if checklist.site_visit_completed %}hq-radio-btn--yes{% endif %}"><input type="radio" name="site_visit_completed" value="yes" {% if checklist.site_visit_completed %}checked{% endif %}> Yes</label>
+          <label class="hq-radio-btn {% if not checklist.site_visit_completed %}hq-radio-btn--no{% endif %}"><input type="radio" name="site_visit_completed" value="no" {% if not checklist.site_visit_completed %}checked{% endif %}> No</label>
+        </div>
+        <input type="date" name="site_visit_date" class="hq-input" value="{{ checklist.site_visit_date|date:'Y-m-d'|default:'' }}" style="max-width:200px;margin-top:4px">
+      </div>
+
+      <div class="hq-form-field" style="margin-top:14px">
+        <label class="hq-form-label">Checklist Notes</label>
+        <textarea name="notes" class="hq-textarea" rows="3">{{ checklist.notes }}</textarea>
+      </div>
+      <div class="hq-form-actions">
+        <button type="submit" class="hq-btn hq-btn--primary">Save Checklist</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Recommendation actions -->
+  <div class="hq-card" style="margin-bottom:40px">
+    <div class="hq-card-hdr"><h3>Recommendation</h3></div>
+    <p style="color:var(--hq-muted);font-size:13px;margin-bottom:16px">
+      Current recommendation: <strong>{{ checklist.get_recommendation_display }}</strong>
+      {% if require_hq %} &nbsp;·&nbsp; HQ final approval required{% endif %}
+    </p>
+    <div style="display:flex;gap:12px;flex-wrap:wrap">
+      <form method="post" action="{% url 'ma_recommend' lead.id %}">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="approve">
+        <button type="submit" class="hq-btn hq-btn--green">Recommend Approval</button>
+      </form>
+      <form method="post" action="{% url 'ma_recommend' lead.id %}">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="reject">
+        <button type="submit" class="hq-btn hq-btn--red">Recommend Rejection</button>
+      </form>
+      <form method="post" action="{% url 'ma_recommend' lead.id %}">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="escalate">
+        <button type="submit" class="hq-btn hq-btn--yellow">Escalate to HQ</button>
+      </form>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

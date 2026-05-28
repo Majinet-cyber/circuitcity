@@ -1,4 +1,5 @@
 {% extends "base/base.html" %}
+{% load ts_filters %}
 
 {% block page_title %}Application Detail{% endblock %}
 
@@ -73,7 +74,7 @@
     </div>
     <div class="detail-row">
         <span>Exact monthly income</span>
-        <strong>MWK {{ app.exact_monthly_income|floatformat:0 }}</strong>
+        <strong>{{ app.exact_monthly_income|mwk }}</strong>
     </div>
     <div class="detail-row">
         <span>Deal selected</span>
@@ -81,23 +82,23 @@
     </div>
     <div class="detail-row">
         <span>Selected cash price</span>
-        <strong>MWK {{ app.selected_cash_price|floatformat:0 }}</strong>
+        <strong>{{ app.selected_cash_price|mwk }}</strong>
     </div>
     <div class="detail-row">
         <span>Total loan</span>
-        <strong>MWK {{ app.calculated_total_loan|floatformat:0 }}</strong>
+        <strong>{{ app.calculated_total_loan|mwk }}</strong>
     </div>
     <div class="detail-row">
         <span>Deposit</span>
-        <strong>MWK {{ app.calculated_deposit_amount|floatformat:0 }}</strong>
+        <strong>{{ app.calculated_deposit_amount|mwk }}</strong>
     </div>
     <div class="detail-row">
         <span>Monthly payment</span>
-        <strong>MWK {{ app.calculated_monthly_payment|floatformat:0 }}</strong>
+        <strong>{{ app.calculated_monthly_payment|mwk }}</strong>
     </div>
     <div class="detail-row">
         <span>Daily payment</span>
-        <strong>MWK {{ app.calculated_daily_payment|floatformat:0 }}</strong>
+        <strong>{{ app.calculated_daily_payment|mwk }}</strong>
     </div>
     <div class="detail-row">
         <span>Work/service description</span>

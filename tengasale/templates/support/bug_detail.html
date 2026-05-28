@@ -1,0 +1,98 @@
+{% extends "base/base.html" %}
+
+{% block page_title %}Bug #{{ bug.id }}{% endblock %}
+
+{% block topbar %}{% include "support/_topbar.html" %}{% endblock %}
+
+{% block content %}
+<div class="hq-page-wrap">
+
+  <div class="hq-page-hdr">
+    <div>
+      <a href="{% url 'bug_monitor' %}" class="hq-back-link">← Bug Monitor</a>
+      <h1 class="hq-page-title">Bug #{{ bug.id }}</h1>
+      <p class="hq-page-sub">
+        <span class="hq-badge {% if bug.severity == 'critical' %}hq-badge--red{% elif bug.severity == 'high' %}hq-badge--orange{% elif bug.severity == 'medium' %}hq-badge--yellow{% else %}hq-badge--gray{% endif %}">{{ bug.get_severity_display }}</span>
+        <span class="hq-badge {% if bug.status == 'new' %}hq-badge--orange{% elif bug.status == 'fixed' %}hq-badge--green{% elif bug.status == 'escalated' %}hq-badge--red{% else %}hq-badge--gray{% endif %}" style="margin-left:6px">{{ bug.get_status_display }}</span>
+      </p>
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      {% if bug.status != 'fixed' and bug.status != 'ignored' %}
+      <!-- Convert to ticket -->
+      <form method="post" action="{% url 'bug_to_ticket' bug.id %}">
+        {% csrf_token %}
+        <button type="submit" class="hq-btn hq-btn--ghost">Convert to Ticket</button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="hq-two-col">
+    <div class="hq-two-col-main">
+      <!-- Message -->
+      <div class="hq-card" style="margin-bottom:20px">
+        <div class="hq-card-hdr"><h3>Error Message</h3></div>
+        <pre class="hq-code-block">{{ bug.message }}</pre>
+      </div>
+
+      {% if bug.traceback_safe_summary %}
+      <div class="hq-card" style="margin-bottom:20px">
+        <div class="hq-card-hdr"><h3>Safe Traceback Summary</h3></div>
+        <pre class="hq-code-block">{{ bug.traceback_safe_summary }}</pre>
+      </div>
+      {% endif %}
+
+      {% if bug.metadata %}
+      <div class="hq-card" style="margin-bottom:20px">
+        <div class="hq-card-hdr"><h3>Metadata (sanitized)</h3></div>
+        <pre class="hq-code-block">{{ bug.metadata }}</pre>
+      </div>
+      {% endif %}
+    </div>
+
+    <div class="hq-two-col-side">
+      <!-- Info -->
+      <div class="hq-card" style="margin-bottom:16px">
+        <div class="hq-card-hdr"><h3>Event Info</h3></div>
+        <div class="hq-detail-stack">
+          <div><span class="hq-detail-lbl">Source</span><span class="hq-detail-val">{{ bug.get_source_display }}</span></div>
+          <div><span class="hq-detail-lbl">Severity</span><span class="hq-detail-val">{{ bug.get_severity_display }}</span></div>
+          <div><span class="hq-detail-lbl">Status</span><span class="hq-detail-val">{{ bug.get_status_display }}</span></div>
+          <div><span class="hq-detail-lbl">Occurrences</span><span class="hq-detail-val">{{ bug.occurrence_count }}</span></div>
+          <div><span class="hq-detail-lbl">First Seen</span><span class="hq-detail-val">{{ bug.first_seen_at|date:"d M Y H:i" }}</span></div>
+          <div><span class="hq-detail-lbl">Last Seen</span><span class="hq-detail-val">{{ bug.last_seen_at|date:"d M Y H:i" }}</span></div>
+          {% if bug.related_user %}<div><span class="hq-detail-lbl">User</span><span class="hq-detail-val">{{ bug.related_user.username }}</span></div>{% endif %}
+          {% if bug.related_contract %}<div><span class="hq-detail-lbl">Contract</span><span class="hq-detail-val">{{ bug.related_contract }}</span></div>{% endif %}
+          {% if bug.related_payment %}<div><span class="hq-detail-lbl">Payment</span><span class="hq-detail-val">{{ bug.related_payment }}</span></div>{% endif %}
+          {% if bug.related_device %}<div><span class="hq-detail-lbl">Device</span><span class="hq-detail-val">{{ bug.related_device }}</span></div>{% endif %}
+        </div>
+      </div>
+
+      {% if bug.status != 'fixed' and bug.status != 'ignored' %}
+      <!-- Resolve -->
+      <div class="hq-card" style="margin-bottom:16px">
+        <div class="hq-card-hdr"><h3>Mark Fixed</h3></div>
+        <form method="post" action="{% url 'bug_resolve' bug.id %}">
+          {% csrf_token %}
+          <textarea name="resolution_note" class="hq-textarea" rows="3" placeholder="What was the fix? (required)"></textarea>
+          <button type="submit" class="hq-btn hq-btn--green" style="margin-top:8px;width:100%">Mark as Fixed</button>
+        </form>
+      </div>
+      {% endif %}
+
+      {% if bug.resolved_by %}
+      <div class="hq-card" style="margin-bottom:16px">
+        <div class="hq-card-hdr"><h3>Resolution</h3></div>
+        <div class="hq-detail-stack">
+          <div><span class="hq-detail-lbl">Fixed by</span><span class="hq-detail-val">{{ bug.resolved_by.username }}</span></div>
+          <div><span class="hq-detail-lbl">Fixed at</span><span class="hq-detail-val">{{ bug.resolved_at|date:"d M Y H:i" }}</span></div>
+        </div>
+        <p style="font-size:13px;color:var(--hq-muted);margin-top:10px;white-space:pre-wrap">{{ bug.resolution_note }}</p>
+      </div>
+      {% endif %}
+
+    </div>
+  </div>
+
+</div>
+{% endblock %}

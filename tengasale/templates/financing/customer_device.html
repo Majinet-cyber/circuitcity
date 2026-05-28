@@ -1,4 +1,5 @@
 {% extends "base/base.html" %}
+{% load ts_filters %}
 
 {% block content %}
 
@@ -13,7 +14,7 @@
     <div class="detail-list">
         <span>Lock Date</span><strong>{{ contract.lock_date|date:"M d, Y"|default:"Not scheduled" }}</strong>
         <span>Due Date</span><strong>{{ contract.next_due_date|date:"M d, Y" }}</strong>
-        <span>Amount Due</span><strong>MWK {{ contract.amount_due|floatformat:0 }}</strong>
+        <span>Amount Due</span><strong>{{ contract.amount_due|mwk }}</strong>
         <span>Payment Status</span><strong>{{ next_schedule.get_status_display|default:"No balance" }}</strong>
     </div>
 </section>

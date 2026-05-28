@@ -51,7 +51,7 @@ class EarningsPageTests(TestCase):
         response = self.client.get(reverse("earnings_home"))
 
         self.assertContains(response, "Pending commissions")
-        self.assertContains(response, "MWK 10000.00")
+        self.assertContains(response, "MWK 10,000")
         self.assertContains(response, "Available spins")
         self.assertContains(response, "SPIN & WIN")
         self.assertContains(response, f'href="{settings.TENGASALE_WHATSAPP_LINK}"')
@@ -184,7 +184,7 @@ class PaymentsPageTests(TestCase):
         response = self.client.get(reverse("payments_home"))
 
         self.assertContains(response, self.contract.contract_number)
-        self.assertContains(response, "MWK 10000.00")
+        self.assertContains(response, "MWK 10,000")
         self.assertContains(response, "VIEW CONTRACT")
 
     def test_payments_page_only_shows_current_users_data(self):

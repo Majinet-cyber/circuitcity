@@ -3,43 +3,131 @@
 {% block page_title %}HQ Users{% endblock %}
 
 {% block content %}
+<div class="hq-page-wrap">
 
-<a href="{% url 'hq_dashboard' %}" class="soft-back">
-    <span class="soft-back-icon">&larr;</span>
-    <span>BACK</span>
-</a>
+  <div class="hq-page-hdr">
+    <div>
+      <a href="{% url 'hq_dashboard' %}" class="hq-back-link">← Dashboard</a>
+      <h1 class="hq-page-title">Users</h1>
+      <p class="hq-page-sub">Create and manage TengaSale platform users and roles.</p>
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <a href="{% url 'ma_dashboard' %}" class="hq-quick-card hq-quick-card--sm">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        Merchant Admin Portal
+      </a>
+      <a href="{% url 'support_dashboard' %}" class="hq-quick-card hq-quick-card--sm">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        Tech Support Portal
+      </a>
+    </div>
+  </div>
 
-<h1 class="greeting">Users</h1>
-
-<form method="post" class="card">
-    {% csrf_token %}
-    <h2>Add user</h2>
-    {{ form.non_field_errors }}
-    {% for field in form %}
-        <label for="{{ field.id_for_label }}">{{ field.label }}</label>
-        {{ field }}
-        {{ field.errors }}
+  {% if messages %}
+  <div style="margin-bottom:16px">
+    {% for msg in messages %}
+    <div class="hq-msg hq-msg--{{ msg.tags }}">{{ msg }}</div>
     {% endfor %}
-    <button type="submit" class="btn green-button">CREATE USER</button>
-</form>
+  </div>
+  {% endif %}
 
-<section class="menu-list">
-    <h2>Existing Users</h2>
-    {% for row in rows %}
-        <a href="{% url 'hq_user_edit' row.user.id %}" class="menu-row hq-user-row">
-            <span class="left">
-                <span class="menu-icon icon-tools">{{ row.role|first|upper }}</span>
-                <span>
-                    <strong>{{ row.user.username }}</strong>
-                    <small>{{ row.user.email|default:"No email" }} · {{ row.user.get_full_name|default:"No full name" }}</small>
-                    <small>{{ row.role|title }} · {% if row.user.is_active %}Active{% else %}Inactive{% endif %} · Joined {{ row.user.date_joined|date:"Y/m/d" }}</small>
-                </span>
-            </span>
-            <span class="arrow" aria-hidden="true">></span>
-        </a>
-    {% empty %}
-        <div class="card">No users found.</div>
-    {% endfor %}
-</section>
+  <!-- Create user form -->
+  <div class="hq-card" style="margin-bottom:28px">
+    <div class="hq-card-hdr"><h3>Add New User</h3></div>
+    <form method="post">
+      {% csrf_token %}
+      {{ form.non_field_errors }}
+      <div class="hq-form-row">
+        <div class="hq-form-field">
+          <label class="hq-form-label">{{ form.username.label }}</label>
+          {{ form.username }}{{ form.username.errors }}
+        </div>
+        <div class="hq-form-field">
+          <label class="hq-form-label">{{ form.full_name.label }}</label>
+          {{ form.full_name }}{{ form.full_name.errors }}
+        </div>
+        <div class="hq-form-field">
+          <label class="hq-form-label">{{ form.email.label }}</label>
+          {{ form.email }}{{ form.email.errors }}
+        </div>
+      </div>
+      <div class="hq-form-row">
+        <div class="hq-form-field">
+          <label class="hq-form-label">{{ form.password.label }}</label>
+          {{ form.password }}{{ form.password.errors }}
+        </div>
+        <div class="hq-form-field">
+          <label class="hq-form-label">{{ form.role.label }}</label>
+          {{ form.role }}{{ form.role.errors }}
+        </div>
+        <div class="hq-form-field" style="align-self:flex-end;padding-bottom:4px">
+          <label class="hq-checkbox-row">
+            {{ form.is_active }} <span>Active</span>
+          </label>
+        </div>
+      </div>
+      <div class="hq-form-actions">
+        <button type="submit" class="hq-btn hq-btn--primary">Create User</button>
+      </div>
+    </form>
+  </div>
 
+  <!-- User list -->
+  <div class="hq-section">
+    <div class="hq-section-hdr">
+      <h2 class="hq-section-title">All Users ({{ rows|length }})</h2>
+    </div>
+    <div class="hq-table-wrap">
+      <table class="hq-table">
+        <thead>
+          <tr><th>Username</th><th>Full Name</th><th>Email</th><th>Role</th><th>Status</th><th>Joined</th><th></th></tr>
+        </thead>
+        <tbody>
+          {% for row in rows %}
+          <tr>
+            <td><strong>{{ row.user.username }}</strong></td>
+            <td>{{ row.user.get_full_name|default:"—" }}</td>
+            <td class="hq-td-muted">{{ row.user.email|default:"—" }}</td>
+            <td>
+              <span class="hq-badge
+                {% if row.role == 'hq' %}hq-badge--black
+                {% elif row.role == 'merchant_admin' %}hq-badge--blue
+                {% elif row.role == 'tech_support' %}hq-badge--indigo
+                {% elif row.role == 'underwriter' %}hq-badge--purple
+                {% elif row.role == 'merchant' %}hq-badge--orange
+                {% else %}hq-badge--gray{% endif %}">
+                {{ row.role|title }}
+              </span>
+            </td>
+            <td>
+              {% if row.user.is_active %}
+              <span class="hq-badge hq-badge--green">Active</span>
+              {% else %}
+              <span class="hq-badge hq-badge--red">Inactive</span>
+              {% endif %}
+            </td>
+            <td class="hq-td-muted">{{ row.user.date_joined|date:"d M Y" }}</td>
+            <td><a href="{% url 'hq_user_edit' row.user.id %}" class="hq-table-link">Edit →</a></td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="7" class="hq-td-empty">No users found.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<style>
+  .hq-badge--black   { background:#1a1a1a;color:#fff; }
+  .hq-badge--blue    { background:#2563eb;color:#fff; }
+  .hq-badge--indigo  { background:#4338ca;color:#fff; }
+  .hq-badge--purple  { background:#7c3aed;color:#fff; }
+  .hq-badge--orange  { background:#ff6a00;color:#fff; }
+  .hq-badge--green   { background:#16a34a;color:#fff; }
+  .hq-badge--red     { background:#dc2626;color:#fff; }
+  .hq-badge--yellow  { background:#d97706;color:#fff; }
+  .hq-badge--gray    { background:#6b7280;color:#fff; }
+</style>
 {% endblock %}

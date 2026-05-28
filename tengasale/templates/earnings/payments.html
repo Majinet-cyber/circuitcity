@@ -1,4 +1,5 @@
 {% extends "base/base.html" %}
+{% load ts_filters %}
 
 {% block page_title %}Payments{% endblock %}
 
@@ -68,7 +69,7 @@
                     <tr>
                         <td>{{ row.date|date:"d M Y" }}</td>
                         <td><span class="status-pill">{{ row.status }}</span></td>
-                        <td>MWK {{ row.amount|floatformat:2 }}</td>
+                        <td>{{ row.amount|mwk }}</td>
                         <td>{{ row.institution }}</td>
                         <td>{{ row.account }}</td>
                         <td>
@@ -118,7 +119,7 @@
                     <tr>
                         <td>{{ row.date|date:"d M Y" }}</td>
                         <td>{% if row.contract %}{{ row.contract.contract_number }}{% else %}{{ row.application_number }}{% endif %}</td>
-                        <td>MWK {{ row.amount|floatformat:2 }}</td>
+                        <td>{{ row.amount|mwk }}</td>
                         <td><span class="status-pill">{{ row.status }}</span></td>
                         <td>
                             {% if row.contract %}

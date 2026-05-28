@@ -1,0 +1,329 @@
+"""Tech Support portal views."""
+from django.contrib import messages
+from django.contrib.auth import get_user_model
+from django.contrib.auth.decorators import login_required
+from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
+
+from accounts.decorators import tech_support_required
+from accounts.utils import is_hq, is_hq_or_tech_support, is_merchant_admin
+
+from .models import BugEvent, SupportTicket, TicketComment
+
+
+# ── helpers ──────────────────────────────────────────────────────────────────
+
+def _can_manage_ticket(user):
+    """True for HQ, Tech Support, or Merchant Admin."""
+    return is_hq(user) or is_hq_or_tech_support(user) or is_merchant_admin(user)
+
+
+def _visible_comments(ticket, user):
+    """Return comments visible to this user."""
+    qs = ticket.comments.select_related("author")
+    if not _can_manage_ticket(user):
+        qs = qs.filter(is_internal=False)
+    return qs
+
+
+# ── dashboard ────────────────────────────────────────────────────────────────
+
+@tech_support_required
+def support_dashboard(request):
+    from django.db.models import Avg, ExpressionWrapper, F, fields
+
+    open_tickets     = SupportTicket.objects.filter(status=SupportTicket.STATUS_OPEN).count()
+    critical_tickets = SupportTicket.objects.filter(
+        priority=SupportTicket.PRI_CRITICAL,
+        status__in=[SupportTicket.STATUS_OPEN, SupportTicket.STATUS_ASSIGNED, SupportTicket.STATUS_IN_PROGRESS],
+    ).count()
+    my_tickets       = SupportTicket.objects.filter(
+        assigned_to=request.user,
+        status__in=[SupportTicket.STATUS_OPEN, SupportTicket.STATUS_ASSIGNED, SupportTicket.STATUS_IN_PROGRESS],
+    ).count()
+
+    critical_bugs = BugEvent.objects.filter(severity=BugEvent.SEV_CRITICAL, status=BugEvent.STAT_NEW).count()
+    new_bugs      = BugEvent.objects.filter(status=BugEvent.STAT_NEW).count()
+
+    recent_tickets = SupportTicket.objects.select_related("created_by", "assigned_to").order_by("-created_at")[:10]
+    recent_bugs    = BugEvent.objects.filter(status=BugEvent.STAT_NEW).order_by("-last_seen_at")[:5]
+
+    ctx = {
+        "open_tickets":     open_tickets,
+        "critical_tickets": critical_tickets,
+        "my_tickets":       my_tickets,
+        "critical_bugs":    critical_bugs,
+        "new_bugs":         new_bugs,
+        "recent_tickets":   recent_tickets,
+        "recent_bugs":      recent_bugs,
+    }
+    return render(request, "support/dashboard.html", ctx)
+
+
+# ── ticket list ──────────────────────────────────────────────────────────────
+
+@login_required
+def ticket_list(request):
+    qs = SupportTicket.objects.select_related("created_by", "assigned_to").order_by("-created_at")
+
+    # Non-staff users see only their own tickets
+    if not _can_manage_ticket(request.user):
+        qs = qs.filter(created_by=request.user)
+
+    status_f   = request.GET.get("status", "")
+    category_f = request.GET.get("category", "")
+    priority_f = request.GET.get("priority", "")
+    if status_f:
+        qs = qs.filter(status=status_f)
+    if category_f:
+        qs = qs.filter(category=category_f)
+    if priority_f:
+        qs = qs.filter(priority=priority_f)
+
+    ctx = {
+        "tickets":          qs,
+        "status_choices":   SupportTicket.STATUS_CHOICES,
+        "category_choices": SupportTicket.CATEGORY_CHOICES,
+        "priority_choices": SupportTicket.PRIORITY_CHOICES,
+        "status_f":         status_f,
+        "category_f":       category_f,
+        "priority_f":       priority_f,
+        "can_manage":       _can_manage_ticket(request.user),
+    }
+    return render(request, "support/ticket_list.html", ctx)
+
+
+# ── ticket create ─────────────────────────────────────────────────────────────
+
+@login_required
+def ticket_create(request):
+    if request.method == "POST":
+        title    = request.POST.get("title", "").strip()
+        desc     = request.POST.get("description", "").strip()
+        category = request.POST.get("category", SupportTicket.CAT_OTHER)
+        priority = request.POST.get("priority", SupportTicket.PRI_MEDIUM)
+
+        if not title or not desc:
+            messages.error(request, "Title and description are required.")
+            return render(request, "support/ticket_form.html", {
+                "category_choices": SupportTicket.CATEGORY_CHOICES,
+                "priority_choices": SupportTicket.PRIORITY_CHOICES,
+                "post": request.POST,
+            })
+
+        ticket = SupportTicket.objects.create(
+            title=title,
+            description=desc,
+            category=category,
+            priority=priority,
+            created_by=request.user,
+            status=SupportTicket.STATUS_OPEN,
+            related_payment_ref=request.POST.get("related_payment_ref", "").strip(),
+            related_device_imei=request.POST.get("related_device_imei", "").strip(),
+        )
+        if "screenshot" in request.FILES:
+            ticket.screenshot = request.FILES["screenshot"]
+            ticket.save(update_fields=["screenshot"])
+
+        # Optional FK links
+        app_id = request.POST.get("related_application")
+        if app_id:
+            try:
+                from applications.models import FinancingApplication
+                ticket.related_application = FinancingApplication.objects.get(pk=app_id)
+                ticket.save(update_fields=["related_application"])
+            except Exception:
+                pass
+
+        contract_id = request.POST.get("related_contract")
+        if contract_id:
+            try:
+                from contracts.models import Contract
+                ticket.related_contract = Contract.objects.get(pk=contract_id)
+                ticket.save(update_fields=["related_contract"])
+            except Exception:
+                pass
+
+        messages.success(request, f"Ticket {ticket.ticket_number} created successfully.")
+        return redirect("ticket_detail", ticket_id=ticket.pk)
+
+    ctx = {
+        "category_choices": SupportTicket.CATEGORY_CHOICES,
+        "priority_choices": SupportTicket.PRIORITY_CHOICES,
+        "post": {},
+    }
+    return render(request, "support/ticket_form.html", ctx)
+
+
+# ── ticket detail ─────────────────────────────────────────────────────────────
+
+@login_required
+def ticket_detail(request, ticket_id):
+    ticket = get_object_or_404(SupportTicket, pk=ticket_id)
+    can_manage = _can_manage_ticket(request.user)
+
+    # Non-staff can only see their own tickets
+    if not can_manage and ticket.created_by != request.user:
+        messages.error(request, "You do not have permission to view this ticket.")
+        return redirect("ticket_list")
+
+    if request.method == "POST":
+        body = request.POST.get("body", "").strip()
+        if body:
+            is_internal = request.POST.get("is_internal") == "1" and can_manage
+            TicketComment.objects.create(
+                ticket=ticket,
+                author=request.user,
+                body=body,
+                is_internal=is_internal,
+            )
+            ticket.save(update_fields=["updated_at"])
+            messages.success(request, "Comment added.")
+        return redirect("ticket_detail", ticket_id=ticket_id)
+
+    staff_users = get_user_model().objects.filter(
+        profile__role__in=["hq", "tech_support", "merchant_admin"]
+    ).select_related("profile").order_by("username") if can_manage else []
+
+    ctx = {
+        "ticket":     ticket,
+        "comments":   _visible_comments(ticket, request.user),
+        "can_manage": can_manage,
+        "staff_users": staff_users,
+    }
+    return render(request, "support/ticket_detail.html", ctx)
+
+
+# ── ticket assign ─────────────────────────────────────────────────────────────
+
+@tech_support_required
+def ticket_assign(request, ticket_id):
+    ticket = get_object_or_404(SupportTicket, pk=ticket_id)
+    if request.method == "POST":
+        uid = request.POST.get("assigned_to")
+        if uid:
+            try:
+                ticket.assigned_to = get_user_model().objects.get(pk=uid)
+                ticket.status = SupportTicket.STATUS_ASSIGNED
+                ticket.save(update_fields=["assigned_to", "status", "updated_at"])
+                messages.success(request, f"Ticket assigned to {ticket.assigned_to.username}.")
+            except get_user_model().DoesNotExist:
+                messages.error(request, "User not found.")
+    return redirect("ticket_detail", ticket_id=ticket_id)
+
+
+# ── ticket resolve ────────────────────────────────────────────────────────────
+
+@tech_support_required
+def ticket_resolve(request, ticket_id):
+    ticket = get_object_or_404(SupportTicket, pk=ticket_id)
+    if request.method == "POST":
+        note = request.POST.get("resolution_note", "").strip()
+        if not note:
+            messages.error(request, "A resolution note is required to resolve a ticket.")
+            return redirect("ticket_detail", ticket_id=ticket_id)
+        ticket.resolution_note = note
+        ticket.status = SupportTicket.STATUS_RESOLVED
+        ticket.closed_at = timezone.now()
+        ticket.save(update_fields=["resolution_note", "status", "closed_at", "updated_at"])
+        messages.success(request, f"Ticket {ticket.ticket_number} resolved.")
+    return redirect("ticket_detail", ticket_id=ticket_id)
+
+
+# ── ticket reopen ─────────────────────────────────────────────────────────────
+
+@tech_support_required
+def ticket_reopen(request, ticket_id):
+    ticket = get_object_or_404(SupportTicket, pk=ticket_id)
+    if request.method == "POST":
+        ticket.status = SupportTicket.STATUS_OPEN
+        ticket.closed_at = None
+        ticket.save(update_fields=["status", "closed_at", "updated_at"])
+        messages.success(request, f"Ticket {ticket.ticket_number} reopened.")
+    return redirect("ticket_detail", ticket_id=ticket_id)
+
+
+# ── bug monitor ───────────────────────────────────────────────────────────────
+
+@tech_support_required
+def bug_monitor(request):
+    qs = BugEvent.objects.order_by("-last_seen_at")
+
+    severity_f = request.GET.get("severity", "")
+    source_f   = request.GET.get("source", "")
+    status_f   = request.GET.get("status", "")
+    if severity_f:
+        qs = qs.filter(severity=severity_f)
+    if source_f:
+        qs = qs.filter(source=source_f)
+    if status_f:
+        qs = qs.filter(status=status_f)
+
+    ctx = {
+        "bugs":             qs[:200],
+        "severity_choices": BugEvent.SEVERITY_CHOICES,
+        "source_choices":   BugEvent.SOURCE_CHOICES,
+        "status_choices":   BugEvent.BUG_STATUS_CHOICES,
+        "severity_f":       severity_f,
+        "source_f":         source_f,
+        "status_f":         status_f,
+        "new_count":        BugEvent.objects.filter(status=BugEvent.STAT_NEW).count(),
+        "critical_count":   BugEvent.objects.filter(severity=BugEvent.SEV_CRITICAL, status=BugEvent.STAT_NEW).count(),
+    }
+    return render(request, "support/bug_monitor.html", ctx)
+
+
+# ── bug detail ────────────────────────────────────────────────────────────────
+
+@tech_support_required
+def bug_detail(request, bug_id):
+    bug = get_object_or_404(BugEvent, pk=bug_id)
+    ctx = {"bug": bug}
+    return render(request, "support/bug_detail.html", ctx)
+
+
+# ── bug resolve ───────────────────────────────────────────────────────────────
+
+@tech_support_required
+def bug_resolve(request, bug_id):
+    bug = get_object_or_404(BugEvent, pk=bug_id)
+    if request.method == "POST":
+        note = request.POST.get("resolution_note", "").strip()
+        if not note:
+            messages.error(request, "A resolution note is required.")
+            return redirect("bug_detail", bug_id=bug_id)
+        bug.status = BugEvent.STAT_FIXED
+        bug.resolved_by = request.user
+        bug.resolved_at = timezone.now()
+        bug.resolution_note = note
+        bug.save(update_fields=["status", "resolved_by", "resolved_at", "resolution_note"])
+        messages.success(request, "Bug marked as fixed.")
+    return redirect("bug_detail", bug_id=bug_id)
+
+
+# ── bug → ticket ──────────────────────────────────────────────────────────────
+
+@tech_support_required
+def bug_to_ticket(request, bug_id):
+    bug = get_object_or_404(BugEvent, pk=bug_id)
+    if request.method == "POST":
+        ticket = SupportTicket.objects.create(
+            title=f"[Bug] {bug.message[:150]}",
+            description=(
+                f"Auto-generated from Bug #{bug.pk}.\n\n"
+                f"Source: {bug.get_source_display()}\n"
+                f"Severity: {bug.get_severity_display()}\n"
+                f"First seen: {bug.first_seen_at}\n"
+                f"Occurrences: {bug.occurrence_count}\n\n"
+                f"{bug.traceback_safe_summary}"
+            ),
+            category=SupportTicket.CAT_APP_ERROR,
+            priority=SupportTicket.PRI_HIGH if bug.severity in (BugEvent.SEV_HIGH, BugEvent.SEV_CRITICAL) else SupportTicket.PRI_MEDIUM,
+            created_by=request.user,
+            status=SupportTicket.STATUS_OPEN,
+        )
+        bug.status = BugEvent.STAT_INVESTIGATING
+        bug.save(update_fields=["status"])
+        messages.success(request, f"Ticket {ticket.ticket_number} created from bug #{bug.pk}.")
+        return redirect("ticket_detail", ticket_id=ticket.pk)
+    return redirect("bug_detail", bug_id=bug_id)

@@ -1,6 +1,7 @@
 import base64
 import binascii
 import uuid
+from datetime import date
 from decimal import Decimal
 
 from django import forms
@@ -212,6 +213,21 @@ class CustomerDetailsForm(forms.ModelForm):
         if len(value) != 8 or not value.isalnum():
             raise forms.ValidationError("National ID must be exactly 8 letters or numbers.")
         return value
+
+    def clean_date_of_birth(self):
+        dob = self.cleaned_data.get("date_of_birth")
+        if dob:
+            today = date.today()
+            age = today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
+            if age < 20:
+                raise forms.ValidationError(
+                    "Applicant must be at least 20 years old to qualify for financing."
+                )
+            if age > 69:
+                raise forms.ValidationError(
+                    "Applicant must be 69 years old or under to qualify for financing."
+                )
+        return dob
 
     def clean_customer_phone(self):
         value = (self.cleaned_data.get("customer_phone") or "").strip()

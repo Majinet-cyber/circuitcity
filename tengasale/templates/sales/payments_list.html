@@ -1,5 +1,5 @@
 {% extends "sales/base.html" %}
-{% load static %}
+{% load static ts_filters %}
 
 {% block page_title %}Payments — TengaSale{% endblock %}
 
@@ -26,7 +26,7 @@
           </div>
           <div style="text-align:right;">
             <div style="font-weight:700;font-size:15px;color:{% if tx.status == 'paid' %}#16a34a{% elif tx.status == 'failed' %}#dc2626{% else %}#f59e0b{% endif %}">
-              MWK {{ tx.amount|floatformat:0 }}
+              {{ tx.amount|mwk }}
             </div>
             <span style="font-size:11px;background:{% if tx.status == 'paid' %}#dcfce7{% elif tx.status == 'failed' %}#fee2e2{% else %}#fef3c7{% endif %};padding:2px 6px;border-radius:6px;">
               {{ tx.status|upper }}

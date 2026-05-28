@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "django.contrib.humanize",
 
     "accounts.apps.AccountsConfig",
     "merchants",
@@ -57,6 +58,8 @@ INSTALLED_APPS = [
     "sales",
     "portal",
     "website",
+    "merchant_admin.apps.MerchantAdminConfig",
+    "support.apps.SupportConfig",
 ]
 
 MIDDLEWARE = [
@@ -215,6 +218,11 @@ CORRECTION_TOKEN_EXPIRY_HOURS = int(os.environ.get("CORRECTION_TOKEN_EXPIRY_HOUR
 PAYCHANGU_CALLBACK_URL = os.environ.get("PAYCHANGU_CALLBACK_URL", "")
 
 APP_VERSION = "1.0.0"
+
+# ── Merchant Administrator settings ──────────────────────────────────────────
+# If True, Merchant Admins can only *recommend* approval; HQ must give final sign-off.
+# Set to False to allow Merchant Admins to directly approve leads without HQ review.
+REQUIRE_HQ_MERCHANT_APPROVAL = True
 
 if "test" in sys.argv:
     PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]

@@ -1,5 +1,5 @@
 {% extends "base/base.html" %}
-{% load static %}
+{% load static ts_filters %}
 
 {% block page_title %}Reports &amp; Exports — TengaSale HQ{% endblock %}
 
@@ -48,11 +48,11 @@
   {# ── KPI Cards ── #}
   <div class="rpt-kpi-grid">
     <div class="rpt-kpi" style="border-top:3px solid #ff6b1a;">
-      <div class="rpt-kpi-val" style="color:#ff6b1a;">MWK {{ total_portfolio|floatformat:0 }}</div>
+      <div class="rpt-kpi-val" style="color:#ff6b1a;">{{ total_portfolio|mwk }}</div>
       <div class="rpt-kpi-lbl">Total Portfolio</div>
     </div>
     <div class="rpt-kpi" style="border-top:3px solid #16a34a;">
-      <div class="rpt-kpi-val" style="color:#16a34a;">MWK {{ total_paid|floatformat:0 }}</div>
+      <div class="rpt-kpi-val" style="color:#16a34a;">{{ total_paid|mwk }}</div>
       <div class="rpt-kpi-lbl">Total Collected</div>
     </div>
     <div class="rpt-kpi" style="border-top:3px solid #2563eb;">
@@ -60,7 +60,7 @@
       <div class="rpt-kpi-lbl">Active Contracts</div>
     </div>
     <div class="rpt-kpi" style="border-top:3px solid #dc2626;">
-      <div class="rpt-kpi-val" style="color:#dc2626;">MWK {{ overdue_amount|floatformat:0 }}</div>
+      <div class="rpt-kpi-val" style="color:#dc2626;">{{ overdue_amount|mwk }}</div>
       <div class="rpt-kpi-lbl">Overdue Amount</div>
     </div>
   </div>

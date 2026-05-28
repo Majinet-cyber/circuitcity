@@ -72,6 +72,7 @@ def new_application(request):
 @merchant_required
 def edit_customer_details(request, app_id):
     app = merchant_application(request, app_id)
+    bh = business_hours_context()
 
     if request.method == "POST":
         form = CustomerDetailsForm(request.POST, instance=app)
@@ -83,13 +84,39 @@ def edit_customer_details(request, app_id):
             # Auto-flag third-party phone user for risk review
             phone_user = form.cleaned_data.get("phone_user", "")
             app.third_party_phone_user_risk_flagged = bool(phone_user and phone_user != "customer_self")
+
+            # Check for active contract using same National ID (duplicate prevention)
+            national_id = form.cleaned_data.get("national_id", "").strip().upper()
+            if national_id:
+                duplicate = FinancingApplication.objects.filter(
+                    national_id__iexact=national_id,
+                    status__in=ACTIVE_STATUSES,
+                ).exclude(pk=app.pk).first()
+                if duplicate:
+                    # Check if the duplicate is for the same person in a completed state
+                    form.add_error(
+                        "national_id",
+                        "This National ID already has an active financing contract or application in progress. "
+                        "A customer must complete and fully settle their current contract before applying for a new device."
+                    )
+                    return render(request, "applications/customer_details.html", {
+                        "app": app,
+                        "form": form,
+                        "has_active_contract": True,
+                        **bh,
+                    })
+
             app.save()
             messages.success(request, "Customer details saved.")
             return redirect("choose_device", app_id=app.id)
     else:
         form = CustomerDetailsForm(instance=app)
 
-    return render(request, "applications/customer_details.html", {"app": app, "form": form})
+    return render(request, "applications/customer_details.html", {
+        "app": app,
+        "form": form,
+        **bh,
+    })
 
 
 @merchant_required

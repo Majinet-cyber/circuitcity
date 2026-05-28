@@ -1,4 +1,5 @@
 {% extends "base/base.html" %}
+{% load ts_filters %}
 
 {% block content %}
 
@@ -71,7 +72,7 @@
                 <strong>{{ contract.customer.full_name }}</strong>
                 <small>{{ contract.device.brand }} {{ contract.device.model }} | {{ contract.get_status_display }}</small>
             </div>
-            <span>MWK {{ contract.monthly_payment_amount|floatformat:0 }}</span>
+            <span>{{ contract.monthly_payment_amount|mwk }}</span>
         </div>
     {% empty %}
         <p class="text-muted">No financing contracts yet.</p>
@@ -86,7 +87,7 @@
                 <strong>{{ payment.customer.full_name }}</strong>
                 <small>{{ payment.get_payment_method_display }} | {{ payment.transaction_reference|default:"No reference" }}</small>
             </div>
-            <span>MWK {{ payment.amount|floatformat:0 }}</span>
+            <span>{{ payment.amount|mwk }}</span>
         </a>
     {% empty %}
         <p class="text-muted">No pending payments.</p>

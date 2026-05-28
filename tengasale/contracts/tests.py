@@ -168,7 +168,7 @@ class ContractFlowTests(TestCase):
         self.assertContains(response, "Cash price")
         self.assertContains(response, "Merchant price / financed amount")
         self.assertContains(response, "Total loan")
-        self.assertContains(response, "MWK 875000")
+        self.assertContains(response, "875,000")
 
     def test_view_contract_link_appears_only_when_contract_exists(self):
         no_contract_app = FinancingApplication.objects.create(created_by=self.merchant, status="completed")

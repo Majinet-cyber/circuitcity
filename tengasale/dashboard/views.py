@@ -144,6 +144,8 @@ def hq_dashboard(request):
     total_merchants = User.objects.filter(profile__role="merchant").count()
     total_underwriters = User.objects.filter(profile__role="underwriter").count()
     total_hq_users = User.objects.filter(profile__role="hq").count()
+    total_merchant_admins = User.objects.filter(profile__role="merchant_admin").count()
+    total_tech_support = User.objects.filter(profile__role="tech_support").count()
     rejected_count = FinancingApplication.objects.filter(status="rejected").count()
     waiting_count = FinancingApplication.objects.filter(
         status__in=["submitted", "pending_review", "resubmitted"],
@@ -190,10 +192,31 @@ def hq_dashboard(request):
         status__in=["active", "overdue", "locked"]
     ).count()
 
+    # New role & portal KPIs
+    from website.models import MerchantLead
+    new_leads_count = MerchantLead.objects.filter(status=MerchantLead.STATUS_NEW).count()
+    awaiting_hq_count = MerchantLead.objects.filter(status="awaiting_hq").count()
+
+    try:
+        from support.models import SupportTicket, BugEvent
+        open_tickets_count = SupportTicket.objects.filter(status=SupportTicket.STATUS_OPEN).count()
+        critical_bugs_count = BugEvent.objects.filter(
+            severity=BugEvent.SEV_CRITICAL, status=BugEvent.STAT_NEW
+        ).count()
+    except Exception:
+        open_tickets_count = 0
+        critical_bugs_count = 0
+
     context = {
         "total_merchants": total_merchants,
         "total_underwriters": total_underwriters,
         "total_hq_users": total_hq_users,
+        "total_merchant_admins": total_merchant_admins,
+        "total_tech_support": total_tech_support,
+        "new_leads_count": new_leads_count,
+        "awaiting_hq_count": awaiting_hq_count,
+        "open_tickets_count": open_tickets_count,
+        "critical_bugs_count": critical_bugs_count,
         "pending_review_count": FinancingApplication.objects.filter(status="pending_review").count(),
         "under_review_count": FinancingApplication.objects.filter(status="under_review").count(),
         "approved_count": approved_count_total,
@@ -218,12 +241,24 @@ def hq_dashboard(request):
 
 @hq_required
 def hq_users(request):
+    from core.models import AuditLog
     User = get_user_model()
     if request.method == "POST":
         form = HQUserForm(request.POST, creating=True)
         if form.is_valid():
-            form.save()
-            messages.success(request, "User created successfully.")
+            new_user = form.save()
+            AuditLog.objects.create(
+                user=request.user,
+                action="hq_user_create",
+                object_type="User",
+                object_id=str(new_user.pk),
+                detail={
+                    "username": new_user.username,
+                    "role": form.cleaned_data.get("role", ""),
+                    "created_by": request.user.username,
+                },
+            )
+            messages.success(request, f"User '{new_user.username}' created successfully.")
             return redirect("hq_users")
     else:
         form = HQUserForm(creating=True)

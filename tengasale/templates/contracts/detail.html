@@ -1,4 +1,5 @@
 {% extends "base/base.html" %}
+{% load ts_filters %}
 
 {% block page_title %}Contract Detail{% endblock %}
 
@@ -18,12 +19,12 @@
     <div class="detail-row"><span>Merchant</span><strong>{{ contract.merchant.get_full_name|default:contract.merchant.username }}</strong></div>
     <div class="detail-row"><span>Device</span><strong>{{ contract.deal_name|default:"Not selected" }}</strong></div>
     <div class="detail-row"><span>IMEI</span><strong>{{ contract.imei_number|default:"Not captured" }}</strong></div>
-    <div class="detail-row"><span>Cash price</span><strong>MWK {{ contract.cash_price|floatformat:0 }}</strong></div>
-    <div class="detail-row"><span>Merchant price / financed amount</span><strong>MWK {{ contract.total_loan|floatformat:0 }}</strong></div>
-    <div class="detail-row"><span>Total loan</span><strong>MWK {{ contract.total_loan|floatformat:0 }}</strong></div>
-    <div class="detail-row"><span>Deposit</span><strong>MWK {{ contract.deposit_amount|floatformat:0 }}</strong></div>
-    <div class="detail-row"><span>Monthly payment</span><strong>MWK {{ contract.monthly_payment|floatformat:0 }}</strong></div>
-    <div class="detail-row"><span>Daily payment</span><strong>MWK {{ contract.daily_payment|floatformat:0 }}</strong></div>
+    <div class="detail-row"><span>Cash price</span><strong>{{ contract.cash_price|mwk }}</strong></div>
+    <div class="detail-row"><span>Merchant price / financed amount</span><strong>{{ contract.total_loan|mwk }}</strong></div>
+    <div class="detail-row"><span>Total loan</span><strong>{{ contract.total_loan|mwk }}</strong></div>
+    <div class="detail-row"><span>Deposit</span><strong>{{ contract.deposit_amount|mwk }}</strong></div>
+    <div class="detail-row"><span>Monthly payment</span><strong>{{ contract.monthly_payment|mwk }}</strong></div>
+    <div class="detail-row"><span>Daily payment</span><strong>{{ contract.daily_payment|mwk }}</strong></div>
     <div class="detail-row"><span>Status</span><strong>{{ contract.get_status_display }}</strong></div>
     <div class="detail-row"><span>Created</span><strong>{{ contract.created_at|date:"Y/m/d, H:i" }}</strong></div>
     <div class="detail-row"><span>Updated</span><strong>{{ contract.updated_at|date:"Y/m/d, H:i" }}</strong></div>

@@ -5,13 +5,22 @@ from .models import UserProfile
 
 
 ROLE_GROUPS = {
-    "merchant": "Merchant",
-    "underwriter": "Underwriter",
-    "hq": "HQ",
+    "merchant":       "Merchant",
+    "merchant_admin": "Merchant Administrator",
+    "underwriter":    "Underwriter",
+    "tech_support":   "Tech Support",
+    "hq":             "HQ",
 }
 
-
 VALID_PORTAL_ROLES = set(ROLE_GROUPS)
+
+ROLE_DISPLAY = {
+    "merchant":       "Merchant",
+    "merchant_admin": "Merchant Administrator",
+    "underwriter":    "Underwriter",
+    "tech_support":   "Tech Support",
+    "hq":             "HQ",
+}
 
 
 def profile_role(user):
@@ -51,7 +60,7 @@ def get_user_portal_role(user):
 
 
 def has_role_group(user, role):
-    group_name = ROLE_GROUPS[role]
+    group_name = ROLE_GROUPS.get(role, "")
     return user.groups.filter(name=group_name).exists()
 
 
@@ -67,6 +76,22 @@ def is_merchant(user):
     return get_user_portal_role(user) == "merchant"
 
 
+def is_merchant_admin(user):
+    return get_user_portal_role(user) == "merchant_admin"
+
+
+def is_tech_support(user):
+    return get_user_portal_role(user) == "tech_support"
+
+
+def is_hq_or_merchant_admin(user):
+    return get_user_portal_role(user) in ("hq", "merchant_admin")
+
+
+def is_hq_or_tech_support(user):
+    return get_user_portal_role(user) in ("hq", "tech_support")
+
+
 def primary_role(user):
     return get_user_portal_role(user)
 
@@ -79,6 +104,10 @@ def role_redirect_url(user):
         return reverse("underwriter_dashboard")
     if role == "merchant":
         return reverse("merchant_dashboard")
+    if role == "merchant_admin":
+        return reverse("ma_dashboard")
+    if role == "tech_support":
+        return reverse("support_dashboard")
     return reverse("no_role")
 
 

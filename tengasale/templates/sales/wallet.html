@@ -1,5 +1,5 @@
 {% extends "sales/base.html" %}
-{% load static %}
+{% load static ts_filters %}
 
 {% block page_title %}Wallet & Earnings — TengaSale{% endblock %}
 
@@ -22,19 +22,19 @@
   <div class="wallet-balance-card__stats">
     <div class="wallet-stat">
       <span class="wallet-stat__label">This Month (Gross)</span>
-      <span class="wallet-stat__value text-green">MWK {{ summary.current_month_gross|floatformat:0 }}</span>
+      <span class="wallet-stat__value text-green">{{ summary.current_month_gross|mwk }}</span>
     </div>
     <div class="wallet-stat">
       <span class="wallet-stat__label">WHT (20% est.)</span>
-      <span class="wallet-stat__value text-red">−MWK {{ summary.current_month_wht_estimate|floatformat:0 }}</span>
+      <span class="wallet-stat__value text-red">−{{ summary.current_month_wht_estimate|mwk }}</span>
     </div>
     <div class="wallet-stat">
       <span class="wallet-stat__label">Net Estimate</span>
-      <span class="wallet-stat__value">MWK {{ summary.current_month_net_estimate|floatformat:0 }}</span>
+      <span class="wallet-stat__value">{{ summary.current_month_net_estimate|mwk }}</span>
     </div>
     <div class="wallet-stat">
       <span class="wallet-stat__label">Arrears Deductions</span>
-      <span class="wallet-stat__value text-red">MWK {{ summary.total_arrears_deductions|floatformat:0 }}</span>
+      <span class="wallet-stat__value text-red">{{ summary.total_arrears_deductions|mwk }}</span>
     </div>
   </div>
 </div>
@@ -77,7 +77,7 @@
             {% endif %}
             <div class="tx-row__date">{{ row.created_at|date:"d M Y, H:i" }}</div>
           </div>
-          <div class="tx-row__amount text-green">+MWK {{ row.amount|floatformat:0 }}</div>
+          <div class="tx-row__amount text-green">+{{ row.amount|mwk }}</div>
         </div>
         {% endif %}
       {% endfor %}
@@ -92,7 +92,7 @@
             {% endif %}
             <div class="tx-row__date">{{ row.created_at|date:"d M Y, H:i" }}</div>
           </div>
-          <div class="tx-row__amount text-green">+MWK {{ row.amount|floatformat:0 }}</div>
+          <div class="tx-row__amount text-green">+{{ row.amount|mwk }}</div>
         </div>
         {% endif %}
       {% endfor %}
@@ -149,15 +149,15 @@
           <div class="payout-breakdown">
             <div class="payout-row">
               <span>Gross Commission</span>
-              <span class="text-green">MWK {{ payout.gross_commission|floatformat:0 }}</span>
+              <span class="text-green">{{ payout.gross_commission|mwk }}</span>
             </div>
             <div class="payout-row">
               <span>WHT (20%)</span>
-              <span class="text-red">− MWK {{ payout.wht_amount|floatformat:0 }}</span>
+              <span class="text-red">− {{ payout.wht_amount|mwk }}</span>
             </div>
             <div class="payout-row payout-row--net">
               <span><strong>Net Payable</strong></span>
-              <span><strong>MWK {{ payout.net_amount|floatformat:0 }}</strong></span>
+              <span><strong>{{ payout.net_amount|mwk }}</strong></span>
             </div>
             {% if payout.destination_phone %}
               <div class="payout-row">
@@ -186,14 +186,14 @@
           </div>
           <div class="payout-breakdown">
             <div class="payout-row">
-              <span>Gross</span><span class="text-green">MWK {{ payout.gross_amount|floatformat:0 }}</span>
+              <span>Gross</span><span class="text-green">{{ payout.gross_amount|mwk }}</span>
             </div>
             <div class="payout-row">
-              <span>WHT</span><span class="text-red">− MWK {{ payout.wht_amount|floatformat:0 }}</span>
+              <span>WHT</span><span class="text-red">− {{ payout.wht_amount|mwk }}</span>
             </div>
             <div class="payout-row payout-row--net">
               <span><strong>Net</strong></span>
-              <span><strong>MWK {{ payout.net_amount|floatformat:0 }}</strong></span>
+              <span><strong>{{ payout.net_amount|mwk }}</strong></span>
             </div>
           </div>
         </div>
@@ -214,7 +214,7 @@
       <div class="payout-breakdown mb-12">
         <div class="payout-row">
           <span>Available Balance</span>
-          <span class="text-green">MWK {{ wallet.balance|floatformat:2 }}</span>
+          <span class="text-green">{{ wallet.balance|mwk }}</span>
         </div>
         <div class="payout-row">
           <span>WHT (20%)</span>

@@ -1,5 +1,5 @@
 {% extends "base/base.html" %}
-{% load static %}
+{% load static ts_filters %}
 
 {% block page_title %}Contract {{ contract.contract_number }} | TengaSale{% endblock %}
 
@@ -18,7 +18,7 @@
   <span class="error-mark" aria-hidden="true">!</span>
   <span>
     To prevent your device from locking on {{ lock_warning.date|date:"d M Y" }},
-    pay MWK {{ lock_warning.amount|floatformat:0 }}.
+    pay {{ lock_warning.amount|mwk }}.
   </span>
 </div>
 {% endif %}
@@ -55,24 +55,24 @@
       ></div>
     </div>
     <div class="portal-progress-labels">
-      <span>MWK {{ contract.amount_paid|floatformat:0 }} paid</span>
+      <span>{{ contract.amount_paid|mwk }} paid</span>
       <span>{{ contract.progress_percent }}%</span>
-      <span>MWK {{ contract.total_amount|floatformat:0 }} total</span>
+      <span>{{ contract.total_amount|mwk }} total</span>
     </div>
   </div>
 
   <div class="portal-stats-row mt-12">
     <div class="portal-stat">
       <div class="portal-stat__label">Remaining</div>
-      <div class="portal-stat__value">MWK {{ remaining|floatformat:0 }}</div>
+      <div class="portal-stat__value">{{ remaining|mwk }}</div>
     </div>
     <div class="portal-stat">
       <div class="portal-stat__label">Daily Price</div>
-      <div class="portal-stat__value">MWK {{ contract.daily_price|floatformat:2 }}</div>
+      <div class="portal-stat__value">{{ contract.daily_price|mwk }}</div>
     </div>
     <div class="portal-stat">
       <div class="portal-stat__label">30-Day Price</div>
-      <div class="portal-stat__value">MWK {{ contract.thirty_day_price|floatformat:0 }}</div>
+      <div class="portal-stat__value">{{ contract.thirty_day_price|mwk }}</div>
     </div>
   </div>
 
@@ -108,9 +108,9 @@
     {% if opt.discount_percent > 0 %}
       <div class="early-option-card__badge">{{ opt.discount_percent }}% off</div>
     {% endif %}
-    <div class="early-option-card__total">MWK {{ opt.total_cost|floatformat:0 }}</div>
-    <div class="early-option-card__sub">Pay MWK {{ opt.remaining_to_pay|floatformat:0 }} now</div>
-    <div class="early-option-card__sub">Daily: MWK {{ opt.daily_price|floatformat:2 }}</div>
+    <div class="early-option-card__total">{{ opt.total_cost|mwk }}</div>
+    <div class="early-option-card__sub">Pay {{ opt.remaining_to_pay|mwk }} now</div>
+    <div class="early-option-card__sub">Daily: {{ opt.daily_price|mwk }}</div>
   </div>
   {% endfor %}
 </div>
@@ -209,7 +209,7 @@
     <div class="tx-row__meta">{{ tx.masked_phone }} · {{ tx.get_provider_display }}</div>
     <div class="tx-row__date">{{ tx.paid_at|date:"d M Y, H:i"|default:tx.created_at|date:"d M Y" }}</div>
   </div>
-  <div class="tx-row__amount text-green">+MWK {{ tx.amount|floatformat:0 }}</div>
+  <div class="tx-row__amount text-green">+{{ tx.amount|mwk }}</div>
 </div>
 {% endfor %}
 <div style="text-align:center;margin-top:8px;">

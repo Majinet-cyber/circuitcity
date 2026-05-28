@@ -4,12 +4,16 @@ from django.db import models
 
 class UserProfile(models.Model):
     ROLE_MERCHANT = "merchant"
+    ROLE_MERCHANT_ADMIN = "merchant_admin"
     ROLE_UNDERWRITER = "underwriter"
+    ROLE_TECH_SUPPORT = "tech_support"
     ROLE_HQ = "hq"
 
     ROLE_CHOICES = [
         (ROLE_MERCHANT, "Merchant"),
+        (ROLE_MERCHANT_ADMIN, "Merchant Administrator"),
         (ROLE_UNDERWRITER, "Underwriter"),
+        (ROLE_TECH_SUPPORT, "Tech Support"),
         (ROLE_HQ, "HQ"),
     ]
 
