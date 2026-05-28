@@ -245,7 +245,7 @@ a { color: inherit; text-decoration: none; }
 
 /* ── Section scaffold ────────────────────────────────────────── */
 .site-section {
-  padding: 88px 24px;
+  padding: 72px 24px;
 }
 
 .site-section--alt {
@@ -464,7 +464,7 @@ a { color: inherit; text-decoration: none; }
 
 /* ── Hero ────────────────────────────────────────────────────── */
 .hero {
-  padding: 56px 24px 64px;
+  padding: 48px 24px 56px;
   background: transparent;
   border-bottom: 1px solid var(--w-border);
   overflow-x: hidden;
@@ -806,7 +806,7 @@ a { color: inherit; text-decoration: none; }
 .split-layout {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 80px;
+  gap: 64px;
   align-items: start;
 }
 
@@ -1355,7 +1355,7 @@ a { color: inherit; text-decoration: none; }
 /* ── Responsive ──────────────────────────────────────────────── */
 @media (max-width: 1040px) {
   .hero__inner { grid-template-columns: 1fr 380px; gap: 40px; }
-  .split-layout { gap: 48px; }
+  .split-layout { gap: 40px; }
   .sitefooter__inner { grid-template-columns: 1fr 1fr; }
   .sitefooter__brand { grid-column: 1 / -1; }
 }
@@ -2444,4 +2444,455 @@ a { color: inherit; text-decoration: none; }
   .portal-compact-logo {
     height: 36px;
   }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   PHASE 11 — Hero Intelligence Panel, Integrations, Malawi Flag
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── Hero Platform Intelligence Panel ────────────────────────── */
+.hero-intel {
+  margin-top: 28px;
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.78);
+  border-radius: var(--w-radius-lg);
+  overflow: hidden;
+  box-shadow: var(--w-shadow);
+}
+
+.hero-intel__hdr {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 18px;
+  background: linear-gradient(135deg, rgba(255, 106, 0, 0.06) 0%, transparent 100%);
+  border-bottom: 1px solid var(--w-border);
+}
+
+.hero-intel__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #16a34a;
+  flex-shrink: 0;
+  box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.20);
+  animation: pulse-dot 2.4s ease infinite;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.20); }
+  50%       { box-shadow: 0 0 0 6px rgba(22, 163, 74, 0.08); }
+}
+
+.hero-intel__title {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--w-muted);
+  flex: 1;
+}
+
+.hero-intel__badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  background: rgba(22, 163, 74, 0.10);
+  color: #16a34a;
+  font-size: 10px;
+  font-weight: 800;
+  border-radius: 999px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.hero-intel__body {
+  padding: 14px 18px 16px;
+}
+
+.hero-intel__row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.hero-intel__metric {
+  padding: 10px 12px;
+  background: rgba(248, 250, 252, 0.80);
+  border: 1px solid var(--w-border);
+  border-radius: var(--w-radius-sm);
+}
+
+.hero-intel__val {
+  font-size: 15px;
+  font-weight: 900;
+  color: var(--w-black);
+  letter-spacing: -0.01em;
+  margin-bottom: 2px;
+}
+
+.hero-intel__lbl {
+  font-size: 11px;
+  color: var(--w-muted);
+  font-weight: 500;
+}
+
+/* Financing flow mini-steps */
+.hero-intel__flow {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  padding: 12px 0 0;
+  border-top: 1px solid var(--w-border);
+  overflow-x: auto;
+}
+
+.hero-intel__flow-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  flex: 1;
+  min-width: 0;
+}
+
+.hero-intel__flow-step span {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--w-muted);
+  text-align: center;
+  white-space: nowrap;
+}
+
+.hero-intel__flow-line {
+  flex: 1;
+  height: 2px;
+  background: var(--w-border);
+  position: relative;
+  top: -11px;
+  max-width: 40px;
+}
+
+.hero-intel__flow-dot {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.hero-intel__flow-dot--orange { background: rgba(255, 106, 0, 0.15); border: 2px solid var(--w-orange); }
+.hero-intel__flow-dot--blue   { background: rgba(37, 99, 235, 0.12); border: 2px solid #2563eb; }
+.hero-intel__flow-dot--green  { background: rgba(22, 163, 74, 0.12); border: 2px solid #16a34a; }
+.hero-intel__flow-dot--teal   { background: rgba(8, 145, 178, 0.12); border: 2px solid #0891b2; }
+
+/* ── Hero trust grid card ─────────────────────────────────────── */
+.hero-trust-card {
+  padding: 16px 20px;
+}
+
+.hero-trust-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.hero-trust-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
+  padding: 12px 8px;
+  background: rgba(248, 250, 252, 0.80);
+  border: 1px solid var(--w-border);
+  border-radius: var(--w-radius-sm);
+}
+
+.hero-trust-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
+  background: var(--w-orange-tint);
+  border: 1px solid rgba(255, 106, 0, 0.14);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.hero-trust-icon svg {
+  width: 18px;
+  height: 18px;
+  stroke: var(--w-orange);
+  fill: none;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.hero-trust-icon--green {
+  background: var(--w-green-tint);
+  border-color: rgba(22, 163, 74, 0.14);
+}
+.hero-trust-icon--green svg { stroke: #16a34a; }
+
+.hero-trust-icon--blue {
+  background: rgba(37, 99, 235, 0.08);
+  border-color: rgba(37, 99, 235, 0.14);
+}
+.hero-trust-icon--blue svg { stroke: #2563eb; }
+
+.hero-trust-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--w-black);
+}
+
+.hero-trust-sub {
+  font-size: 10px;
+  color: var(--w-muted);
+}
+
+/* ── Integrations Grid ────────────────────────────────────────── */
+.integrations-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+  margin-top: 8px;
+}
+
+.integration-card {
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1.5px solid rgba(255, 255, 255, 0.75);
+  border-radius: var(--w-radius-lg);
+  padding: 22px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  box-shadow: var(--w-shadow);
+  transition: transform 0.20s, box-shadow 0.20s;
+}
+
+.integration-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--w-shadow-lg);
+}
+
+.integration-card__top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Integration logo container */
+.integration-logo {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  overflow: hidden;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.12);
+}
+
+.integration-logo svg {
+  width: 48px;
+  height: 48px;
+}
+
+.integration-card__name {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--w-black);
+  margin-bottom: 2px;
+}
+
+.integration-card__provider {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--w-muted);
+}
+
+/* Status badges */
+.integration-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.integration-badge--live {
+  background: rgba(22, 163, 74, 0.12);
+  color: #16a34a;
+  border: 1px solid rgba(22, 163, 74, 0.25);
+}
+
+.integration-badge--ready {
+  background: rgba(37, 99, 235, 0.10);
+  color: #2563eb;
+  border: 1px solid rgba(37, 99, 235, 0.20);
+}
+
+.integration-badge--supported {
+  background: rgba(255, 106, 0, 0.08);
+  color: var(--w-orange);
+  border: 1px solid rgba(255, 106, 0, 0.20);
+}
+
+.integration-badge--configurable {
+  background: rgba(124, 58, 237, 0.09);
+  color: #7c3aed;
+  border: 1px solid rgba(124, 58, 237, 0.18);
+}
+
+.integration-card__desc {
+  font-size: 13px;
+  color: var(--w-muted);
+  line-height: 1.6;
+  margin: 0;
+  flex: 1;
+}
+
+.integration-card__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.integration-tag {
+  display: inline-flex;
+  padding: 3px 9px;
+  background: var(--w-bg-deep);
+  border: 1px solid var(--w-border);
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--w-muted);
+  white-space: nowrap;
+}
+
+/* ── Malawi flag SVG pill (replaces emoji) ───────────────────── */
+.site-country-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 11px 4px 6px;
+  background: #f1f5f9;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 99px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #334155;
+  white-space: nowrap;
+  cursor: default;
+}
+
+.site-country-flag {
+  width: 20px;
+  height: 14px;
+  border-radius: 3px;
+  overflow: hidden;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.site-country-flag__band {
+  flex: 1;
+}
+
+/* ── Responsive for new components ───────────────────────────── */
+@media (max-width: 860px) {
+  .hero-intel { display: none; }
+  .hero-trust-card { display: none; }
+  .integrations-grid { grid-template-columns: repeat(2, 1fr); }
+  .trust-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 600px) {
+  .integrations-grid { grid-template-columns: 1fr; }
+  .hero-trust-grid { grid-template-columns: repeat(3, 1fr); }
+  .integration-card { padding: 18px 16px; }
+  .trust-grid { grid-template-columns: 1fr; }
+  .trust-card { padding: 20px 18px; }
+}
+
+/* ── Built for Controlled Phone Financing — trust-grid ───────── */
+.trust-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-top: 8px;
+}
+
+.trust-card {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  padding: 24px 20px;
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1.5px solid rgba(255, 255, 255, 0.78);
+  border-radius: var(--w-radius-lg);
+  box-shadow: var(--w-shadow);
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.trust-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--w-shadow-lg);
+  border-color: rgba(255, 106, 0, 0.18);
+}
+
+.trust-card__icon {
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
+  background: var(--w-orange-tint);
+  border: 1px solid rgba(255, 106, 0, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.trust-card__icon svg {
+  width: 20px;
+  height: 20px;
+  stroke: var(--w-orange);
+}
+
+.trust-card__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.trust-card__title {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--w-black);
+  margin-bottom: 6px;
+  line-height: 1.25;
+}
+
+.trust-card__text {
+  font-size: 13.5px;
+  color: var(--w-muted);
+  line-height: 1.6;
 }

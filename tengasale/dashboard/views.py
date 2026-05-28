@@ -847,12 +847,12 @@ def hq_reports(request):
 
 @hq_required
 def hq_simulations(request):
-    """TengaSale Growth Simulator — investor-grade phone financing projections."""
+    """TengaSale Financing Simulator — investor-grade phone financing projections."""
     result = None
     form_data = {}
 
     if request.method == "POST":
-        from decimal import Decimal, InvalidOperation
+        from decimal import Decimal
 
         def _d(key, default):
             v = request.POST.get(key, str(default)) or str(default)
@@ -869,121 +869,129 @@ def hq_simulations(request):
                 return default
 
         try:
-            # ── Inputs ──────────────────────────────────────────────────────
-            num_devices         = _i("num_devices", 100)
-            cash_price          = _d("cash_price", 400000)
-            contract_value      = _d("contract_value", 1000000)
-            deposit_pct         = _d("deposit_pct", 20) / Decimal("100")
-            term_months         = _i("term_months", 12)
-            collection_rate     = _d("collection_rate", 90) / Decimal("100")
-            default_rate        = _d("default_rate", 5) / Decimal("100")
-            lock_recovery_rate  = _d("lock_recovery_rate", 60) / Decimal("100")
-            merchant_rate       = _d("merchant_commission_rate", 1) / Decimal("100")
-            uw_rate             = _d("uw_commission_rate", 7) / Decimal("100")
-            arrears_penalty     = _d("arrears_penalty_rate", 14) / Decimal("100")
-            wht_rate            = _d("wht_rate", 20) / Decimal("100")
-            monthly_tech_cost   = _d("monthly_tech_cost", 0)
-            lock_cost_per_dev   = _d("lock_cost_per_device", 0)
-            sms_cost_per_cust   = _d("sms_cost_per_customer", 0)
-            num_merchants       = _i("num_merchants", 10)
-            num_underwriters    = _i("num_underwriters", 3)
-            sales_per_merchant  = _i("avg_sales_per_merchant_per_month", 5)
-
             D = Decimal
 
+            # ── Inputs ──────────────────────────────────────────────────────
+            num_devices        = _i("num_devices", 100)
+            cash_price         = _d("cash_price", 400000)
+            contract_value     = _d("contract_value", 1000000)
+            deposit_pct        = _d("deposit_pct", 20) / D("100")
+            term_months        = _i("term_months", 12)
+            collection_rate    = _d("collection_rate", 90) / D("100")
+            default_rate       = _d("default_rate", 5) / D("100")
+            lock_recovery_rate = _d("lock_recovery_rate", 60) / D("100")
+            merchant_rate      = _d("merchant_commission_rate", 1) / D("100")
+            uw_rate            = _d("uw_commission_rate", 7) / D("100")
+            arrears_penalty    = _d("arrears_penalty_rate", 14) / D("100")
+            wht_rate           = _d("wht_rate", 20) / D("100")
+            monthly_tech_cost  = _d("monthly_tech_cost", 0)
+            lock_cost_per_dev  = _d("lock_cost_per_device", 0)
+            sms_cost_per_cust  = _d("sms_cost_per_customer", 0)
+
             # ── Customer impact ─────────────────────────────────────────────
-            people_connected    = num_devices
-            deposit_per         = contract_value * deposit_pct
-            financed_per        = contract_value - deposit_per
-            monthly_repayment   = financed_per / D(str(term_months))
-            daily_repayment     = financed_per / D(str(term_months * 30))
-            total_deposits      = deposit_per * D(str(num_devices))
-            total_financed      = financed_per * D(str(num_devices))
+            people_connected = num_devices
+            deposit_per      = contract_value * deposit_pct
+            financed_per     = contract_value - deposit_per
+            monthly_repayment = financed_per / D(str(term_months))
+            daily_repayment  = financed_per / D(str(term_months * 30))
+            total_deposits   = deposit_per * D(str(num_devices))
+            total_financed   = financed_per * D(str(num_devices))
 
-            # ── Company economics ───────────────────────────────────────────
-            gross_sales_value      = contract_value * D(str(num_devices))
-            expected_monthly_col   = monthly_repayment * collection_rate * (D("1") - default_rate) * D(str(num_devices))
-            expected_total_col     = expected_monthly_col * D(str(term_months))
-            total_inflows          = total_deposits + expected_total_col
-
+            # ── Merchant (commission applies to financed amount, not contract value) ──
             merchant_comm_per      = financed_per * merchant_rate
             merchant_payout_per    = cash_price + merchant_comm_per
             total_merchant_payouts = merchant_payout_per * D(str(num_devices))
 
-            uw_gross_per           = (financed_per * collection_rate * (D("1") - default_rate)) * uw_rate
-            uw_wht_per             = uw_gross_per * wht_rate
-            uw_net_per             = uw_gross_per - uw_wht_per
-            total_uw_gross         = uw_gross_per * D(str(num_devices))
-            total_uw_wht           = uw_wht_per * D(str(num_devices))
-            total_uw_net           = uw_net_per * D(str(num_devices))
+            # ── Expected collections (collection_rate on financed, per spec) ─
+            expected_collections_per = financed_per * collection_rate
+            expected_total_col       = expected_collections_per * D(str(num_devices))
+            expected_monthly_col     = expected_total_col / D(str(term_months))
+            total_inflows            = total_deposits + expected_total_col
+            gross_sales_value        = contract_value * D(str(num_devices))
 
-            missed_per             = financed_per * default_rate
-            arrears_deduction_per  = missed_per * arrears_penalty
-            total_arrears_ded      = arrears_deduction_per * D(str(num_devices))
+            # ── Underwriter (commission on expected collections, deposit excluded) ──
+            uw_gross_per          = expected_collections_per * uw_rate
+            default_exposure_per  = financed_per * default_rate
+            arrears_deduction_per = default_exposure_per * arrears_penalty
+            uw_after_ded_per      = max(D("0"), uw_gross_per - arrears_deduction_per)
+            uw_wht_per            = uw_after_ded_per * wht_rate
+            uw_net_per            = uw_after_ded_per - uw_wht_per
 
-            # Operating costs
+            total_uw_gross    = uw_gross_per * D(str(num_devices))
+            total_uw_wht      = uw_wht_per * D(str(num_devices))
+            total_uw_net      = uw_net_per * D(str(num_devices))
+            total_arrears_ded = arrears_deduction_per * D(str(num_devices))
+
+            # ── Operating costs ──────────────────────────────────────────────
             total_tech_cost = monthly_tech_cost * D(str(term_months))
             total_lock_cost = lock_cost_per_dev * D(str(num_devices)) * D(str(term_months))
             total_sms_cost  = sms_cost_per_cust * D(str(num_devices)) * D(str(term_months))
             total_op_costs  = total_tech_cost + total_lock_cost + total_sms_cost
 
-            total_outflows = (
-                total_merchant_payouts + total_uw_gross + total_arrears_ded + total_op_costs
+            # ── Risk ─────────────────────────────────────────────────────────
+            default_exposure     = default_exposure_per * D(str(num_devices))
+            lock_recovery        = default_exposure * lock_recovery_rate
+            unrecovered_exposure = default_exposure - lock_recovery
+            portfolio_at_risk    = round(float(default_rate) * 100, 1)
+            total_outflows       = total_merchant_payouts + total_uw_net + total_op_costs
+            break_even_col_rate  = (
+                float(total_outflows / total_financed * 100) if total_financed > 0 else 0
             )
-            expected_cash_flow  = total_inflows - total_merchant_payouts - total_uw_gross - total_op_costs
-            estimated_profit    = expected_cash_flow - total_arrears_ded
 
-            # ── Risk ────────────────────────────────────────────────────────
-            default_exposure       = financed_per * default_rate * D(str(num_devices))
-            lock_recovery          = default_exposure * lock_recovery_rate
-            unrecovered_exposure   = default_exposure - lock_recovery
-            portfolio_at_risk      = round(float(default_rate) * 100, 1)
-            total_collections_needed = total_merchant_payouts + total_op_costs
-            if total_deposits > 0 and total_inflows > 0:
-                break_even_col_rate = float(total_collections_needed / total_financed * 100) if total_financed > 0 else 0
-            else:
-                break_even_col_rate = 0
+            # ── Profit (spec formula: deposits + collections + lock_recovery − costs) ──
+            estimated_profit   = (
+                total_deposits + expected_total_col + lock_recovery
+                - total_merchant_payouts - total_uw_net - total_op_costs
+            )
+            expected_cash_flow = total_inflows - total_merchant_payouts - total_uw_net - total_op_costs
 
-            # ── Scenario comparison ─────────────────────────────────────────
-            def _scenario(col_rate, def_rate, label, badge):
-                col = D(str(col_rate)) / D("100")
-                dflt = D(str(def_rate)) / D("100")
-                exp_col = monthly_repayment * col * (D("1") - dflt) * D(str(num_devices)) * D(str(term_months))
-                uw_c = exp_col * uw_rate
-                merch_c = financed_per * merchant_rate * D(str(num_devices))
-                inflow = total_deposits + exp_col
-                outflow = total_merchant_payouts + uw_c + (financed_per * dflt * arrears_penalty * D(str(num_devices))) + total_op_costs
-                profit = inflow - outflow
+            # ── Scenario comparison ──────────────────────────────────────────
+            def _scenario(col_rate, def_rate_pct, label, badge, insight):
+                col    = D(str(col_rate)) / D("100")
+                dflt   = D(str(def_rate_pct)) / D("100")
+                exp_c  = financed_per * col * D(str(num_devices))
+                uw_g   = exp_c * uw_rate
+                def_e  = financed_per * dflt * D(str(num_devices))
+                arr_d  = def_e * arrears_penalty
+                uw_d   = max(D("0"), uw_g - arr_d)
+                uw_n   = uw_d - uw_d * wht_rate
+                lk_r   = def_e * lock_recovery_rate
+                profit = total_deposits + exp_c + lk_r - total_merchant_payouts - uw_n - total_op_costs
                 return {
                     "label": label,
                     "badge": badge,
                     "col_rate": col_rate,
-                    "def_rate": def_rate,
-                    "expected_collections": round(exp_col, 0),
+                    "def_rate": def_rate_pct,
+                    "insight": insight,
+                    "expected_collections": round(exp_c, 0),
                     "estimated_profit": round(profit, 0),
                     "profitable": profit > 0,
                 }
 
             scenarios = [
-                _scenario(75, 15, "Conservative", "warning"),
-                _scenario(90, 5,  "Base Case",    "primary"),
-                _scenario(95, 3,  "Aggressive",   "success"),
-                _scenario(60, 30, "High Default Stress", "danger"),
+                _scenario(75, 15, "Conservative", "warning",
+                          "Still viable if lock recovery remains above 60%."),
+                _scenario(90, 5, "Base Case", "primary",
+                          "Expected operating outcome for a healthy portfolio."),
+                _scenario(95, 3, "Aggressive", "success",
+                          "Exceptional performance — requires strong underwriting."),
+                _scenario(60, 30, "High Default Stress", "danger",
+                          "Loss scenario. Lock recovery critical to limit exposure."),
             ]
 
-            # ── Narrative ───────────────────────────────────────────────────
+            # ── Narrative ────────────────────────────────────────────────────
             narrative = (
                 f"If TengaSale finances {num_devices:,} devices at MWK {int(contract_value):,} "
-                f"contract value with {int(deposit_pct * 100)}% deposits, approximately {people_connected:,} "
-                f"people gain access to smartphones. The platform would collect "
-                f"MWK {int(total_deposits):,} in deposits, manage a "
+                f"contract value with {int(deposit_pct * 100)}% deposits, approximately "
+                f"{people_connected:,} people gain access to smartphones. The platform would "
+                f"collect MWK {int(total_deposits):,} in deposits, manage a "
                 f"MWK {int(total_financed):,} financed portfolio, and expect "
-                f"MWK {int(expected_monthly_col):,} monthly collections at {int(collection_rate * 100)}% "
-                f"collection rate. Estimated profit over {term_months} months is "
-                f"MWK {int(estimated_profit):,}."
+                f"MWK {int(expected_total_col):,} in customer repayments at a "
+                f"{int(collection_rate * 100)}% collection rate. Estimated profit over "
+                f"{term_months} months is MWK {int(estimated_profit):,}."
             )
 
-            # ── Recommendation ──────────────────────────────────────────────
+            # ── Recommendation ───────────────────────────────────────────────
             if estimated_profit > 0 and float(default_rate) <= 0.05:
                 recommendation = "Safe"
                 rec_color = "#16a34a"
@@ -996,6 +1004,130 @@ def hq_simulations(request):
                 recommendation = "Danger"
                 rec_color = "#dc2626"
                 rec_bg = "rgba(220,38,38,0.10)"
+
+            # ── Sensitivity analysis ─────────────────────────────────────────
+            # Helper: recalculate profit with a single parameter change
+            def _profit_at(col_r=collection_rate, def_r=default_rate,
+                           dep_p=deposit_pct, lk_r=lock_recovery_rate,
+                           m_r=merchant_rate):
+                _dep_per   = contract_value * dep_p
+                _fin_per   = contract_value - _dep_per
+                _tot_dep   = _dep_per * D(str(num_devices))
+                _tot_fin   = _fin_per * D(str(num_devices))
+                _exp_col   = _fin_per * col_r * D(str(num_devices))
+                _uw_g      = _exp_col * uw_rate
+                _def_e     = _fin_per * def_r * D(str(num_devices))
+                _arr_d     = _def_e * arrears_penalty
+                _uw_d      = max(D("0"), _uw_g - _arr_d)
+                _uw_n      = _uw_d - _uw_d * wht_rate
+                _lk_r      = _def_e * lk_r
+                _merch_pay = (cash_price + _fin_per * m_r) * D(str(num_devices))
+                return _tot_dep + _exp_col + _lk_r - _merch_pay - _uw_n - total_op_costs
+
+            _base = _profit_at()
+            _sensitivity_items = []
+
+            # +1% collection rate
+            _delta = _profit_at(col_r=collection_rate + D("0.01")) - _base
+            _sensitivity_items.append({
+                "label": "+1% Collection Rate",
+                "delta": round(_delta, 0),
+                "positive": _delta >= 0,
+                "description": "Each additional 1% in collection rate",
+            })
+            # -1% default rate
+            _delta = _profit_at(def_r=max(D("0"), default_rate - D("0.01"))) - _base
+            _sensitivity_items.append({
+                "label": "-1% Default Rate",
+                "delta": round(_delta, 0),
+                "positive": _delta >= 0,
+                "description": "Each 1% reduction in default rate",
+            })
+            # +5% deposit
+            _delta = _profit_at(dep_p=min(D("0.80"), deposit_pct + D("0.05"))) - _base
+            _sensitivity_items.append({
+                "label": "+5% Deposit",
+                "delta": round(_delta, 0),
+                "positive": _delta >= 0,
+                "description": "Each 5% increase in deposit percentage",
+            })
+            # +10% lock recovery
+            _delta = _profit_at(lk_r=min(D("1.0"), lock_recovery_rate + D("0.10"))) - _base
+            _sensitivity_items.append({
+                "label": "+10% Lock Recovery",
+                "delta": round(_delta, 0),
+                "positive": _delta >= 0,
+                "description": "Each 10% improvement in lock recovery rate",
+            })
+            # -1% merchant commission
+            _delta = _profit_at(m_r=max(D("0"), merchant_rate - D("0.01"))) - _base
+            _sensitivity_items.append({
+                "label": "-1% Merchant Commission",
+                "delta": round(_delta, 0),
+                "positive": _delta >= 0,
+                "description": "Each 1% reduction in merchant commission rate",
+            })
+
+            # Capital efficiency metrics
+            total_capital_required   = total_merchant_payouts  # capital out upfront
+            deposit_leverage         = round(float(total_deposits / total_capital_required * 100), 1) if total_capital_required > 0 else 0
+            revenue_yield            = round(float(total_inflows / total_capital_required * 100), 1) if total_capital_required > 0 else 0
+            gross_margin_pct         = round(float(estimated_profit / total_inflows * 100), 1) if total_inflows > 0 else 0
+            net_margin_pct           = round(float(estimated_profit / gross_sales_value * 100), 1) if gross_sales_value > 0 else 0
+            return_on_portfolio      = round(float(estimated_profit / total_financed * 100), 1) if total_financed > 0 else 0
+
+            # Operating cost breakdown total
+            total_op_cost_display = round(total_op_costs, 0)
+
+            # Profit/loss indicator
+            profit_positive = estimated_profit >= 0
+
+            # ── Cashflow waterfall bars ───────────────────────────────────────
+            _wf_rows = [
+                ("Deposits Collected",    round(total_deposits, 0),         "#16a34a", False),
+                ("Customer Repayments",   round(expected_total_col, 0),     "#2563eb", False),
+                ("Lock Recovery",         round(lock_recovery, 0),          "#0891b2", False),
+                ("Merchant Payouts",      round(total_merchant_payouts, 0), "#dc2626", True),
+                ("Underwriter Payout",    round(total_uw_net, 0),           "#d97706", True),
+                ("Operating Costs",       round(total_op_costs, 0),         "#7c3aed", True),
+                ("Estimated Margin",      round(abs(estimated_profit), 0),
+                 "#16a34a" if estimated_profit >= 0 else "#dc2626",
+                 estimated_profit < 0),
+            ]
+            _wf_max = max(float(v) for _, v, _, _ in _wf_rows) or 1
+            waterfall_items = [
+                {
+                    "label": lbl,
+                    "value": v,
+                    "width_pct": round(float(v) / _wf_max * 100, 1),
+                    "color": color,
+                    "is_outflow": is_out,
+                }
+                for lbl, v, color, is_out in _wf_rows
+            ]
+
+            # ── Risk exposure bars ────────────────────────────────────────────
+            _risk_max = float(default_exposure) if float(default_exposure) > 0 else 1
+            risk_items = [
+                {
+                    "label": "Default Exposure",
+                    "value": round(default_exposure, 0),
+                    "width_pct": 100.0,
+                    "color": "#dc2626",
+                },
+                {
+                    "label": "Lock Recovery",
+                    "value": round(lock_recovery, 0),
+                    "width_pct": round(float(lock_recovery) / _risk_max * 100, 1),
+                    "color": "#16a34a",
+                },
+                {
+                    "label": "Unrecovered Amount",
+                    "value": round(unrecovered_exposure, 0),
+                    "width_pct": round(float(unrecovered_exposure) / _risk_max * 100, 1),
+                    "color": "#d97706",
+                },
+            ]
 
             result = {
                 # Inputs
@@ -1035,6 +1167,9 @@ def hq_simulations(request):
                 "unrecovered_exposure": round(unrecovered_exposure, 0),
                 "portfolio_at_risk": portfolio_at_risk,
                 "break_even_col_rate": round(break_even_col_rate, 1),
+                # Charts
+                "waterfall_items": waterfall_items,
+                "risk_items": risk_items,
                 # Scenarios
                 "scenarios": scenarios,
                 # Narrative
@@ -1043,6 +1178,21 @@ def hq_simulations(request):
                 "recommendation": recommendation,
                 "rec_color": rec_color,
                 "rec_bg": rec_bg,
+                # Sensitivity analysis
+                "sensitivity_items": _sensitivity_items,
+                # Capital efficiency
+                "total_capital_required": round(total_capital_required, 0),
+                "deposit_leverage": deposit_leverage,
+                "revenue_yield": revenue_yield,
+                "gross_margin_pct": gross_margin_pct,
+                "net_margin_pct": net_margin_pct,
+                "return_on_portfolio": return_on_portfolio,
+                # Operating cost breakdown
+                "total_tech_cost": round(total_tech_cost, 0),
+                "total_lock_cost": round(total_lock_cost, 0),
+                "total_sms_cost": round(total_sms_cost, 0),
+                "total_op_cost_display": total_op_cost_display,
+                "profit_positive": profit_positive,
                 # Aliases for test compatibility
                 "deposit_amount": round(deposit_per, 0),
                 "financed_amount": round(financed_per, 0),
@@ -1051,7 +1201,7 @@ def hq_simulations(request):
                 "merchant_payout": round(total_merchant_payouts, 0),
             }
             form_data = request.POST
-        except (Exception,) as exc:
+        except Exception:
             result = None
             form_data = request.POST
 

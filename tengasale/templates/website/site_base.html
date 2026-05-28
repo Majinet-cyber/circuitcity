@@ -42,7 +42,7 @@
     <div class="sitenav__links" role="list">
       <a href="#how-it-works" class="sitenav__link" role="listitem">How It Works</a>
       <a href="#for-merchants" class="sitenav__link" role="listitem">Merchants</a>
-      <a href="#payment-channels" class="sitenav__link" role="listitem">Payments</a>
+      <a href="#trust" class="sitenav__link" role="listitem">Platform</a>
       <a href="#faq" class="sitenav__link" role="listitem">FAQ</a>
       <a href="{% url 'website_careers' %}" class="sitenav__link" role="listitem">Careers</a>
       <a href="mailto:support@tengasale.africa" class="sitenav__link" role="listitem">Contact</a>
@@ -50,7 +50,27 @@
 
     <!-- Desktop CTA buttons + country pill -->
     <div class="sitenav__actions">
-      <span class="site-country-pill" title="Operating country: Malawi">🇲🇼 Malawi</span>
+      <span class="site-country-pill" title="Operating country: Malawi">
+        <!-- Malawi flag: black, red, green horizontal stripes with rising sun -->
+        <svg class="site-country-flag" viewBox="0 0 20 14" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <rect width="20" height="14" fill="#339E35"/>
+          <rect width="20" height="9.33" fill="#CE1126"/>
+          <rect width="20" height="4.67" fill="#000000"/>
+          <!-- Rising sun -->
+          <g transform="translate(10,4.9)">
+            <circle r="2.4" fill="#000000"/>
+            <circle r="1.9" fill="#CE1126"/>
+            <!-- sun rays -->
+            <line x1="0" y1="-3.2" x2="0" y2="-4.2" stroke="#000" stroke-width="0.6" stroke-linecap="round"/>
+            <line x1="2.26" y1="-2.26" x2="2.97" y2="-2.97" stroke="#000" stroke-width="0.6" stroke-linecap="round"/>
+            <line x1="3.2" y1="0" x2="4.2" y2="0" stroke="#000" stroke-width="0.6" stroke-linecap="round"/>
+            <line x1="2.26" y1="2.26" x2="2.97" y2="2.97" stroke="#000" stroke-width="0.6" stroke-linecap="round"/>
+            <line x1="-2.26" y1="-2.26" x2="-2.97" y2="-2.97" stroke="#000" stroke-width="0.6" stroke-linecap="round"/>
+            <line x1="-3.2" y1="0" x2="-4.2" y2="0" stroke="#000" stroke-width="0.6" stroke-linecap="round"/>
+          </g>
+        </svg>
+        Malawi
+      </span>
       <a href="{% url 'portal_search' %}" class="sitenav__cta sitenav__cta--primary">Make Payment</a>
       <a href="{% url 'login' %}" class="sitenav__cta sitenav__cta--ghost">Merchant Login</a>
     </div>
@@ -69,7 +89,7 @@
   <div class="sitenav__mobile">
     <a href="#how-it-works" class="sitenav__mobile-link" onclick="this.closest('.sitenav').classList.remove('sitenav--open')">How It Works</a>
     <a href="#for-merchants" class="sitenav__mobile-link" onclick="this.closest('.sitenav').classList.remove('sitenav--open')">For Merchants</a>
-    <a href="#payment-channels" class="sitenav__mobile-link" onclick="this.closest('.sitenav').classList.remove('sitenav--open')">Payments</a>
+    <a href="#trust" class="sitenav__mobile-link" onclick="this.closest('.sitenav').classList.remove('sitenav--open')">Platform</a>
     <a href="#faq" class="sitenav__mobile-link" onclick="this.closest('.sitenav').classList.remove('sitenav--open')">FAQ</a>
     <a href="{% url 'website_careers' %}" class="sitenav__mobile-link" onclick="this.closest('.sitenav').classList.remove('sitenav--open')">Careers</a>
     <a href="{% url 'portal_search' %}" class="sitenav__mobile-link sitenav__mobile-link--cta">Make Payment</a>
@@ -104,6 +124,7 @@
       <a href="{% url 'login' %}" class="sitefooter__link">Merchant Login</a>
       <a href="#how-it-works" class="sitefooter__link">How It Works</a>
       <a href="#for-merchants" class="sitefooter__link">For Merchants</a>
+      <a href="#trust" class="sitefooter__link">Platform</a>
       <a href="#faq" class="sitefooter__link">FAQ</a>
       <a href="{% url 'website_careers' %}" class="sitefooter__link">Careers</a>
       <a href="{% url 'website_merchant_signup' %}" class="sitefooter__link">Become a Merchant</a>
@@ -128,7 +149,18 @@
 
   <div class="sitefooter__bottom">
     <span>&copy; 2026 TengaSale. All rights reserved.</span>
-    <span>Malawi</span>
+    <span style="display:inline-flex;align-items:center;gap:6px;">
+      <svg viewBox="0 0 20 14" width="20" height="14" xmlns="http://www.w3.org/2000/svg" style="border-radius:3px;overflow:hidden;" aria-hidden="true">
+        <rect width="20" height="14" fill="#339E35"/>
+        <rect width="20" height="9.33" fill="#CE1126"/>
+        <rect width="20" height="4.67" fill="#000000"/>
+        <g transform="translate(10,4.9)">
+          <circle r="2.4" fill="#000000"/>
+          <circle r="1.9" fill="#CE1126"/>
+        </g>
+      </svg>
+      Malawi
+    </span>
   </div>
 </footer>
 

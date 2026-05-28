@@ -1,5 +1,5 @@
 {% extends "sales/base.html" %}
-{% load static %}
+{% load static ts_filters %}
 
 {% block page_title %}Home — TengaSale{% endblock %}
 
@@ -22,7 +22,24 @@
       <p class="ts-greeting">Hi, {{ request.user.first_name|default:request.user.username }}</p>
       <p class="ts-greeting-sub">Welcome back</p>
     </div>
-    <span class="ts-country-pill">🇲🇼 Malawi</span>
+    <span class="ts-country-pill" title="Operating country: Malawi">
+      <svg viewBox="0 0 20 14" width="18" height="13" xmlns="http://www.w3.org/2000/svg" style="border-radius:2px;flex-shrink:0;" aria-hidden="true">
+        <rect width="20" height="14" fill="#339E35"/>
+        <rect width="20" height="9.33" fill="#CE1126"/>
+        <rect width="20" height="4.67" fill="#000000"/>
+        <g transform="translate(10,4.9)">
+          <circle r="2.4" fill="#000000"/>
+          <circle r="1.9" fill="#CE1126"/>
+          <line x1="0" y1="-3.2" x2="0" y2="-4.2" stroke="#000" stroke-width="0.6" stroke-linecap="round"/>
+          <line x1="2.26" y1="-2.26" x2="2.97" y2="-2.97" stroke="#000" stroke-width="0.6" stroke-linecap="round"/>
+          <line x1="3.2" y1="0" x2="4.2" y2="0" stroke="#000" stroke-width="0.6" stroke-linecap="round"/>
+          <line x1="2.26" y1="2.26" x2="2.97" y2="2.97" stroke="#000" stroke-width="0.6" stroke-linecap="round"/>
+          <line x1="-2.26" y1="-2.26" x2="-2.97" y2="-2.97" stroke="#000" stroke-width="0.6" stroke-linecap="round"/>
+          <line x1="-3.2" y1="0" x2="-4.2" y2="0" stroke="#000" stroke-width="0.6" stroke-linecap="round"/>
+        </g>
+      </svg>
+      Malawi
+    </span>
   </div>
 
   {# ── Toast ── #}
@@ -144,7 +161,7 @@
       </div>
       <span class="ts-menu-row__label">Earnings & Wallet</span>
       {% if wallet.balance %}
-        <span class="ts-menu-row__sub">MWK {{ wallet.balance|floatformat:0 }}</span>
+        <span class="ts-menu-row__sub">{{ wallet.balance|mwk }}</span>
       {% endif %}
       <svg class="ts-row-arrow" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
     </a>

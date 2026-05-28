@@ -336,22 +336,117 @@ class HQPhase10ETests(TestCase):
     def test_hq_simulations_wht_is_20_percent_of_uw_commission(self):
         response = self.client.post(reverse("hq_simulations"), {
             "cash_price": "400000",
-            "selling_total": "1000000",
+            "contract_value": "1000000",
             "deposit_pct": "20",
             "term_months": "12",
             "default_rate": "0",
-            "payment_collection_rate": "100",
+            "collection_rate": "100",
             "uw_commission_rate": "7",
             "merchant_commission_rate": "1",
             "wht_rate": "20",
-            "arrears_rate": "14",
+            "arrears_penalty_rate": "14",
             "num_devices": "1",
         })
         result = response.context["result"]
-        from decimal import Decimal
         gross = result["uw_gross_commission"]
         wht = result["uw_wht"]
         self.assertAlmostEqual(float(wht), float(gross) * 0.20, places=0)
+
+    def test_hq_simulations_scenario_list_renders(self):
+        """Simulation result must include 4 scenario objects with required fields."""
+        response = self.client.post(reverse("hq_simulations"), {
+            "cash_price": "400000",
+            "contract_value": "1000000",
+            "deposit_pct": "20",
+            "term_months": "12",
+            "default_rate": "5",
+            "collection_rate": "90",
+            "uw_commission_rate": "7",
+            "merchant_commission_rate": "1",
+            "wht_rate": "20",
+            "arrears_penalty_rate": "14",
+            "num_devices": "50",
+        })
+        self.assertEqual(response.status_code, 200)
+        result = response.context["result"]
+        self.assertIn("scenarios", result)
+        scenarios = result["scenarios"]
+        self.assertEqual(len(scenarios), 4)
+        for sc in scenarios:
+            self.assertIn("label", sc)
+            self.assertIn("estimated_profit", sc)
+            self.assertIn("profitable", sc)
+            self.assertIn("insight", sc)
+
+    def test_hq_simulations_merchant_commission_excludes_deposit(self):
+        """Merchant commission must be calculated on financed amount, not contract value."""
+        response = self.client.post(reverse("hq_simulations"), {
+            "cash_price": "400000",
+            "contract_value": "1000000",
+            "deposit_pct": "20",
+            "term_months": "12",
+            "default_rate": "0",
+            "collection_rate": "90",
+            "uw_commission_rate": "0",
+            "merchant_commission_rate": "1",
+            "wht_rate": "0",
+            "arrears_penalty_rate": "0",
+            "num_devices": "1",
+        })
+        result = response.context["result"]
+        # financed_per = 1000000 - (1000000 * 0.20) = 800000
+        # merchant_comm_per = 800000 * 0.01 = 8000 (NOT 1000000 * 0.01 = 10000)
+        self.assertAlmostEqual(float(result["merchant_comm_per"]), 8000.0, places=0)
+        # merchant_payout = cash_price + merchant_comm = 400000 + 8000 = 408000
+        self.assertAlmostEqual(float(result["merchant_payout_per"]), 408000.0, places=0)
+
+    def test_hq_simulations_uw_commission_excludes_deposit(self):
+        """Underwriter commission must be on expected_collections from financed amount, not contract value."""
+        response = self.client.post(reverse("hq_simulations"), {
+            "cash_price": "400000",
+            "contract_value": "1000000",
+            "deposit_pct": "20",
+            "term_months": "12",
+            "default_rate": "0",
+            "collection_rate": "100",
+            "uw_commission_rate": "7",
+            "merchant_commission_rate": "0",
+            "wht_rate": "0",
+            "arrears_penalty_rate": "0",
+            "num_devices": "1",
+        })
+        result = response.context["result"]
+        # financed_per = 800000; expected_collections = 800000 * 1.0 = 800000
+        # uw_gross = 800000 * 0.07 = 56000 (NOT 1000000 * 0.07 = 70000)
+        self.assertAlmostEqual(float(result["uw_gross_commission"]), 56000.0, places=0)
+
+    def test_hq_simulations_gender_field_has_no_effect(self):
+        """Posting a gender field must not affect the simulation result."""
+        base_post = {
+            "cash_price": "400000",
+            "contract_value": "1000000",
+            "deposit_pct": "20",
+            "term_months": "12",
+            "default_rate": "5",
+            "collection_rate": "90",
+            "uw_commission_rate": "7",
+            "merchant_commission_rate": "1",
+            "wht_rate": "20",
+            "arrears_penalty_rate": "14",
+            "num_devices": "10",
+        }
+        r1 = self.client.post(reverse("hq_simulations"), base_post)
+        post_with_gender = dict(base_post, gender="Male")
+        r2 = self.client.post(reverse("hq_simulations"), post_with_gender)
+        p1 = r1.context["result"]["estimated_profit"]
+        p2 = r2.context["result"]["estimated_profit"]
+        self.assertEqual(p1, p2)
+
+    def test_hq_simulations_no_template_syntax_error(self):
+        """Template must render without errors and return HTTP 200."""
+        response = self.client.get(reverse("hq_simulations"))
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "dashboard/hq_simulations.html")
 
     def test_hq_merchant_payouts_loads(self):
         response = self.client.get(reverse("hq_merchant_payouts"))
